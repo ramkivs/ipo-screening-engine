@@ -85,6 +85,45 @@ The golden fixture is the worked example:
 python3 -m json.tool fixtures/vishal_nirmiti/input.json | head -60
 ```
 
+### 3.2.1 Automated RHP Extraction & Pre-Score Enrichment (`extract --enrich`)
+
+To automatically extract statutory facts directly from an RHP/DRHP PDF and enrich
+them with a Price Band Notice:
+
+```bash
+python3 engine/tools/ipo_screen.py extract filings/prospectus.pdf \
+    --enrich \
+    --notice notices/price_band.txt \
+    --output build/canonical.json \
+    --mode final
+```
+
+To run evaluation immediately on the resulting document, pass `--run`:
+
+```bash
+python3 engine/tools/ipo_screen.py extract filings/prospectus.pdf \
+    --enrich \
+    --notice notices/price_band.txt \
+    --run \
+    --mode final \
+    --at 2026-10-05T12:00:00Z \
+    --store build/evaluations
+```
+
+### 3.2.2 Deterministic Canonical Assembly (`assemble`)
+
+To assemble a canonical input JSON from an unpriced or preliminary input along
+with external market, peer, and analyst snapshots:
+
+```bash
+python3 engine/tools/ipo_screen.py assemble raw_rhp.json \
+    --notice notices/price_band.txt \
+    --market market_snapshot.json \
+    --peers peer_snapshot.json \
+    --output build/assembled_canonical.json \
+    --mode final
+```
+
 ### 3.3 Run an evaluation
 
 **Pin the evaluation instant with `--at` whenever the result will be compared,

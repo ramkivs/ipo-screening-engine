@@ -128,6 +128,9 @@ def load_json_or_file(arg: str | None) -> Optional[dict]:
     p = Path(arg)
     if p.exists() and p.is_file():
         return json.loads(p.read_text(encoding="utf-8"))
+    stripped = arg.strip()
+    if not (stripped.startswith("{") or stripped.startswith("[")):
+        raise FileNotFoundError(f"file not found: {arg}")
     return json.loads(arg)
 
 

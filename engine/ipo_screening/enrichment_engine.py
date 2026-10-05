@@ -437,6 +437,32 @@ class EnrichmentEngine:
                 )
                 raise EnrichmentValidationError(err_msg)
 
+            if issue.get("lot_size") is None:
+                err_msg = "Final evaluation mode requires verified lot_size"
+                findings.append(
+                    Finding(
+                        code="MISSING_LOT_SIZE",
+                        message=err_msg,
+                        severity=SEVERITY_ERROR,
+                        scope="enrichment",
+                        location="issue.lot_size",
+                    )
+                )
+                raise EnrichmentValidationError(err_msg)
+
+            if not issue.get("open_date") or not issue.get("close_date"):
+                err_msg = "Final evaluation mode requires verified issue dates (open_date and close_date)"
+                findings.append(
+                    Finding(
+                        code="MISSING_ISSUE_DATES",
+                        message=err_msg,
+                        severity=SEVERITY_ERROR,
+                        scope="enrichment",
+                        location="issue.open_date",
+                    )
+                )
+                raise EnrichmentValidationError(err_msg)
+
     @classmethod
     def _resolve_pricing_field(
         cls,
@@ -580,14 +606,12 @@ class EnrichmentEngine:
             source_ref = analyst_data.get("_source_ref") or {
                 "source_id": "SRC-ANALYST-ASSESSMENT",
                 "source_type": SourceType.STRUCTURED_INPUT.value,
-                "note": "ANALYST_ASSESSMENT",
             }
         elif supplemental and "analyst_assessment" in supplemental:
             analyst_data = supplemental["analyst_assessment"]
             source_ref = {
                 "source_id": "SRC-ANALYST-ASSESSMENT",
                 "source_type": SourceType.STRUCTURED_INPUT.value,
-                "note": "ANALYST_ASSESSMENT",
             }
 
         business = canonical.setdefault("business", {})
@@ -669,7 +693,6 @@ class EnrichmentEngine:
             src_ref = m_dict.get("_source_ref") or {
                 "source_id": "SRC-MARKET-SNAPSHOT",
                 "source_type": SourceType.MARKET_DATA.value,
-                "note": "MARKET_DEMAND_SNAPSHOT",
             }
             if src_ref.get("source_id") not in existing_source_ids:
                 canonical["_sources"].append(src_ref)
@@ -725,7 +748,6 @@ class EnrichmentEngine:
             src_ref = p_dict.get("_source_ref") or {
                 "source_id": "SRC-PEER-SNAPSHOT",
                 "source_type": SourceType.PEER_DATA.value,
-                "note": "PEER_VALUATION_SNAPSHOT",
             }
             if src_ref.get("source_id") not in existing_source_ids:
                 canonical["_sources"].append(src_ref)
