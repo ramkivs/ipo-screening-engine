@@ -31,6 +31,7 @@ two projections of the same store produce byte-identical output.
 from __future__ import annotations
 
 import io
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -566,6 +567,41 @@ def _rows_peer_snapshots(
     return headers, rows
 
 
+def _extract_post_listing(record: Mapping[str, Any]) -> Mapping[str, Any]:
+    snapshot = (record.get("input_snapshot") or {}).get("input", {}) or {}
+    post = snapshot.get("post_listing")
+    if post:
+        return post
+    post_direct = record.get("post_listing")
+    if post_direct:
+        return post_direct
+    obs_map = record.get("observations")
+    if obs_map and isinstance(obs_map, dict):
+        obs_1w = obs_map.get("1W") or {}
+        obs_1m = obs_map.get("1M") or {}
+        obs_6m = obs_map.get("6M") or {}
+        listing_date = obs_1w.get("listing_date") or obs_1m.get("listing_date") or obs_6m.get("listing_date")
+        listing_gain = (obs_1w.get("returns") or {}).get("listing_gain_pct") or \
+                       (obs_1m.get("returns") or {}).get("listing_gain_pct") or \
+                       (obs_6m.get("returns") or {}).get("listing_gain_pct")
+        r_1w = (obs_1w.get("returns") or {}).get("absolute_return_pct")
+        r_1m = (obs_1m.get("returns") or {}).get("absolute_return_pct")
+        r_6m = (obs_6m.get("returns") or {}).get("absolute_return_pct")
+        n_1m = (obs_1m.get("benchmark") or {}).get("return_pct")
+        n_6m = (obs_6m.get("benchmark") or {}).get("return_pct")
+        if listing_date or listing_gain is not None or r_1w is not None or r_1m is not None or r_6m is not None:
+            return {
+                "listing_date": listing_date,
+                "listing_gain_pct": listing_gain,
+                "return_1w_pct": r_1w,
+                "return_1m_pct": r_1m,
+                "return_6m_pct": r_6m,
+                "nifty_return_1m_pct": n_1m,
+                "nifty_return_6m_pct": n_6m,
+            }
+    return {}
+
+
 def _rows_post_listing(
     records: Sequence[Mapping[str, Any]]
 ) -> Tuple[List[str], List[List[Any]]]:
@@ -584,8 +620,7 @@ def _rows_post_listing(
     ]
     rows: List[List[Any]] = []
     for record in _sort_records(records):
-        snapshot = (record.get("input_snapshot") or {}).get("input", {}) or {}
-        post = snapshot.get("post_listing") or {}
+        post = _extract_post_listing(record)
         if not post:
             continue
         rows.append(
@@ -624,8 +659,7 @@ def _rows_backtest(records: Sequence[Mapping[str, Any]]) -> Tuple[List[str], Lis
     ]
     rows: List[List[Any]] = []
     for record in _sort_records(records):
-        snapshot = (record.get("input_snapshot") or {}).get("input", {}) or {}
-        post = snapshot.get("post_listing") or {}
+        post = _extract_post_listing(record)
         if not post:
             continue
         six_month = post.get("return_6m_pct")
@@ -819,6 +853,27 @@ def project(
 ) -> ProjectionResult:
     """Regenerate the workbook from every record in the store."""
     records = store.read_all()
+    for record in records:
+        eid = record.get("evaluation_id")
+        if eid and hasattr(store, "path_for"):
+            try:
+                obs_dir = Path(store.path_for(eid)) / "observations"
+                if obs_dir.is_dir():
+                    obs_dict: Dict[str, Any] = {}
+                    for f in sorted(obs_dir.glob("observation_*.json")):
+                        try:
+                            with f.open("r", encoding="utf-8") as handle:
+                                odata = json.load(handle)
+                                h = str(odata.get("horizon", "")).upper()
+                                if h:
+                                    obs_dict[h] = odata
+                        except Exception:
+                            pass
+                    if obs_dict:
+                        record["observations"] = obs_dict
+            except Exception:
+                pass
+
     workbook = build_workbook(records)
     target = Path(output_path)
     target.parent.mkdir(parents=True, exist_ok=True)

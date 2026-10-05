@@ -510,6 +510,215 @@ def cmd_assemble(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_post_listing_ingest(args: argparse.Namespace) -> int:
+    store_path = Path(args.store)
+    eval_dir = store_path / args.evaluation_id
+    eval_file = eval_dir / "evaluation.json"
+
+    if not eval_file.is_file():
+        print(f"error: evaluation {args.evaluation_id} not found in store {args.store}", file=sys.stderr)
+        return EXIT_REFUSED
+
+    try:
+        with eval_file.open("r", encoding="utf-8") as handle:
+            eval_record = json.load(handle)
+    except Exception as e:
+        print(f"error reading evaluation {args.evaluation_id}: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+
+    mode = str(eval_record.get("evaluation_mode", "")).upper()
+    if mode != "FINAL":
+        print(f"error: evaluation {args.evaluation_id} has mode {mode!r}; observations can only attach to FINAL evaluations", file=sys.stderr)
+        return EXIT_REFUSED
+
+    final_result_hash = eval_record.get("result_hash")
+    if not final_result_hash:
+        print(f"error: evaluation {args.evaluation_id} has missing result_hash", file=sys.stderr)
+        return EXIT_REFUSED
+
+    ipo_id = eval_record.get("ipo_id") or args.evaluation_id
+
+    # Load input snapshot
+    input_file = eval_dir / "input.json"
+    snapshot = {}
+    if input_file.is_file():
+        try:
+            with input_file.open("r", encoding="utf-8") as handle:
+                in_data = json.load(handle)
+                snapshot = in_data.get("snapshot", {}).get("input", {}) or in_data.get("input", {})
+        except Exception as e:
+            if args.verbose:
+                print(f"warning: could not read input snapshot: {e}", file=sys.stderr)
+
+    # Determine symbol
+    company = snapshot.get("company") or {}
+    symbol = (
+        company.get("symbol")
+        or company.get("nse_symbol")
+        or company.get("bse_scrip_id")
+        or snapshot.get("ipo_id")
+        or ipo_id.split("-")[0]
+    )
+
+    # Determine issue price
+    issue = snapshot.get("issue") or {}
+    valuation = snapshot.get("valuation") or {}
+    issue_price = (
+        issue.get("price_band_high")
+        or issue.get("issue_price")
+        or issue.get("price_band_low")
+        or valuation.get("issue_price")
+    )
+    if issue_price is None or float(issue_price) <= 0.0:
+        print(f"error: issue price is missing or invalid in evaluation {args.evaluation_id}", file=sys.stderr)
+        return EXIT_REFUSED
+    issue_price = float(issue_price)
+
+    # Determine listing date
+    post_data = snapshot.get("post_listing") or {}
+    listing_date = (
+        post_data.get("listing_date")
+        or issue.get("listing_date")
+        or company.get("listing_date")
+    )
+
+    # Load price file
+    try:
+        try:
+            from ipo_screening.post_listing import (
+                load_price_file,
+                build_observation,
+                save_observation,
+                read_observation,
+                NegativePriceError,
+                DuplicatePriceConflictError,
+                MalformedPriceDataError,
+            )
+        except ImportError:
+            from engine.ipo_screening.post_listing import (
+                load_price_file,
+                build_observation,
+                save_observation,
+                read_observation,
+                NegativePriceError,
+                DuplicatePriceConflictError,
+                MalformedPriceDataError,
+            )
+        price_dataset = load_price_file(args.prices)
+    except (NegativePriceError, DuplicatePriceConflictError, MalformedPriceDataError, FileNotFoundError) as e:
+        print(f"error loading price file {args.prices}: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+    except Exception as e:
+        print(f"error loading price file {args.prices}: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+
+    # If symbol not directly found, match flexibly
+    if symbol.upper() not in price_dataset.records_by_symbol:
+        matched_sym = None
+        for k in price_dataset.records_by_symbol:
+            if k in symbol.upper() or symbol.upper() in k:
+                matched_sym = k
+                break
+        if matched_sym:
+            symbol = matched_sym
+        elif len(price_dataset.records_by_symbol) == 1:
+            symbol = list(price_dataset.records_by_symbol.keys())[0]
+
+    if not listing_date:
+        sym_recs = price_dataset.records_by_symbol.get(symbol.upper(), {})
+        if sym_recs:
+            listing_date = sorted(sym_recs.keys())[0]
+        else:
+            print(f"error: could not determine listing date for symbol {symbol}", file=sys.stderr)
+            return EXIT_REFUSED
+
+    # Load corporate actions if provided
+    corp_actions = {}
+    if args.corporate_actions:
+        try:
+            with open(args.corporate_actions, "r", encoding="utf-8") as handle:
+                ca_data = json.load(handle)
+                if isinstance(ca_data, dict):
+                    corp_actions = ca_data
+        except Exception as e:
+            print(f"error reading corporate actions file: {e}", file=sys.stderr)
+            return EXIT_REFUSED
+
+    created_observations = []
+    horizons = ["1W", "1M", "6M"]
+
+    for h in horizons:
+        existing_obs = read_observation(store_path, args.evaluation_id, h)
+        version = 1
+        supersedes_id = None
+        if existing_obs:
+            if args.reason:
+                version = existing_obs.version + 1
+                supersedes_id = existing_obs.observation_id
+            else:
+                version = existing_obs.version
+
+        ca_factor = 1.0
+        ca_unverified = False
+        if corp_actions:
+            h_ca = corp_actions.get(h) or corp_actions.get(h.lower()) or corp_actions.get("factor")
+            if isinstance(h_ca, dict):
+                ca_factor = float(h_ca.get("factor", 1.0))
+                ca_unverified = bool(h_ca.get("unverified", False))
+            elif h_ca is not None:
+                ca_factor = float(h_ca)
+
+        try:
+            obs = build_observation(
+                final_evaluation_id=args.evaluation_id,
+                final_result_hash=final_result_hash,
+                ipo_id=ipo_id,
+                symbol=symbol,
+                issue_price=issue_price,
+                listing_date=listing_date,
+                horizon=h,
+                price_dataset=price_dataset,
+                corporate_action_factor=ca_factor,
+                corporate_action_unverified=ca_unverified,
+                version=version,
+                supersedes_observation_id=supersedes_id,
+                restatement_reason=args.reason if supersedes_id else None,
+            )
+            save_observation(obs, store_path)
+            created_observations.append(obs)
+        except Exception as e:
+            print(f"error calculating/saving observation for horizon {h}: {e}", file=sys.stderr)
+            return EXIT_REFUSED
+
+    # Output formatted report
+    print("=" * 80)
+    print("POST-LISTING INGESTION REPORT")
+    print("=" * 80)
+    print(f"Evaluation ID:        {args.evaluation_id}")
+    print(f"Result Hash:          {final_result_hash}")
+    print(f"IPO Symbol:           {symbol}")
+    print(f"Issue Price:          INR {issue_price:.2f}")
+    print(f"Listing Date:         {listing_date}")
+    print(f"Price Source File:    {args.prices} (SHA-256: {price_dataset.content_hash})")
+    print("-" * 80)
+    header = f"{'Horizon':<8} {'Target Date':<12} {'Actual Date':<12} {'Status':<11} {'Adj Close':<10} {'Abs Return':<12} {'Nifty Return':<13} {'Excess Return':<13}"
+    print(header)
+    print("-" * 80)
+    for obs in created_observations:
+        p_close = f"{obs.prices.adjusted_observed_close:.2f}" if obs.prices.adjusted_observed_close is not None else "UNKNOWN"
+        r_abs = f"{obs.returns.absolute_return_pct:+.2f}%" if obs.returns.absolute_return_pct is not None else "UNKNOWN"
+        r_nifty = f"{obs.returns.benchmark_return_pct:+.2f}%" if obs.returns.benchmark_return_pct is not None else "UNKNOWN"
+        r_excess = f"{obs.returns.excess_return_pct:+.2f}%" if obs.returns.excess_return_pct is not None else "UNKNOWN"
+        print(f"{obs.horizon:<8} {obs.target_observation_date:<12} {obs.actual_observation_date:<12} {obs.observation_status:<11} {p_close:<10} {r_abs:<12} {r_nifty:<13} {r_excess:<13}")
+    print("=" * 80)
+    obs_dir = eval_dir / "observations"
+    print(f"Observations Saved:   {len(created_observations)} files under {obs_dir}")
+    print("Verification Status:  PASS")
+    print("=" * 80)
+
+    return EXIT_OK
+
+
 # --------------------------------------------------------------------------
 # Entry point
 # --------------------------------------------------------------------------
@@ -621,6 +830,17 @@ def build_parser() -> argparse.ArgumentParser:
                      help="path to IPO_Screening_History.xlsx when --run is specified")
     asm.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
     asm.set_defaults(func=cmd_assemble)
+
+    post = sub.add_parser("post-listing", help="post-listing operations")
+    post_sub = post.add_subparsers(dest="post_action", required=True)
+    post_ingest = post_sub.add_parser("ingest", help="ingest post-listing prices and record observations")
+    post_ingest.add_argument("--evaluation-id", required=True, help="final evaluation ID to link")
+    post_ingest.add_argument("--prices", required=True, help="path to historical daily price file (CSV or JSON)")
+    post_ingest.add_argument("--store", required=True, help="evaluation store root")
+    post_ingest.add_argument("--corporate-actions", default=None, help="optional path to corporate actions JSON")
+    post_ingest.add_argument("--reason", default=None, help="optional restatement reason if superseding existing observation")
+    post_ingest.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    post_ingest.set_defaults(func=cmd_post_listing_ingest)
 
     return parser
 

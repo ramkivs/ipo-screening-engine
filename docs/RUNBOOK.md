@@ -473,3 +473,43 @@ Worth knowing, so nobody waits for behaviour that is deliberately absent:
 | `schema/ipo-input.v1.5.schema.json` | The input contract |
 | `fixtures/vishal_nirmiti/` | Golden case: input, expected outputs, RHP provenance |
 | `engine/tools/ipo_screen.py` | The CLI implemented above |
+
+---
+
+## 11. Phase 6A Post-Listing Outcome Ingestion
+
+Phase 6A provides an immutable post-listing observation model and deterministic return engine. It links realized post-listing price outcomes to existing immutable `FINAL` evaluations without modifying pre-listing records.
+
+### 11.1 Post-Listing Ingestion Workflow
+
+To ingest historical Bhavcopy prices and record 1W, 1M, and 6M observations:
+
+```bash
+python3 engine/tools/ipo_screen.py post-listing ingest \
+    --evaluation-id <FINAL_EVALUATION_ID> \
+    --prices <BHAVCOPY_OR_PRICE_FILE> \
+    --store build/evaluations \
+    [-v]
+```
+
+Optional arguments:
+* `--corporate-actions <FILE>`: JSON contract supplying adjustment factors for splits, bonuses, or rights issues.
+* `--reason <STRING>`: Restatement reason when superseding a prior observation.
+
+### 11.2 Storage Structure & Invariants
+
+Observations are saved as linked child artifacts under:
+```
+<store>/<final-evaluation-id>/observations/
+    ├── observation_1w.json
+    ├── observation_1m.json
+    ├── observation_6m.json
+    └── manifest.json
+```
+
+* **Parent Immutability**: `evaluation.json`, `result.json`, `input.json`, and parent `manifest.json` are never modified or overwritten.
+* **Evaluation Status Gate**: Storage refuses attachment if the parent evaluation is not `FINAL` or if `result_hash` mismatches.
+* **Trading Calendar Clamping**: Horizons 1W (7d), 1M (30d), and 6M (180d) automatically clamp non-trading days (weekends, exchange holidays) to the latest preceding valid trading day.
+* **Fail-Closed Arithmetic**: Missing benchmark data yields `None` (UNKNOWN) for benchmark and excess returns, never defaulting to zero.
+* **Deterministic Hashing**: Every observation artifact computes and records a SHA-256 hash over its canonical inputs and results.
+

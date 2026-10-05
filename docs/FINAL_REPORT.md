@@ -2097,3 +2097,261 @@ tests/test_vishal_golden.py ...................                          [100%]
 - **Main Branch**: Commit `01ba66c12ca1195fd7acbd287c3e39a019808094` (untouched)
 
 
+
+---
+
+## SECTION R: Phase 6A Post-Listing Observation Model & Deterministic Return Engine Delivery Report
+
+### R.A Executive Summary & Objective
+
+Phase 6A establishes an immutable, cryptographically verifiable post-listing observation architecture and deterministic return calculation engine for the IPO Screening Engine. Phase 6A links realized post-listing price outcomes (1-week, 1-month, and 6-month horizons) to existing frozen `FINAL` evaluations without altering historical scoring, evaluation records, or pipeline rules.
+
+Key architectural achievements in Phase 6A:
+1. **Zero Functional Changes to Frozen Core**: All six core engine files (`derived.py`, `scoring.py`, `knockouts.py`, `snapshots.py`, `evaluation.py`, `extraction/price_band_notice.py`) remain 100% bit-for-bit identical to baseline.
+2. **Deterministic Linked Observation Storage**: Child observations are persisted under `<store>/<final-evaluation-id>/observations/` with an independent observation manifest. Parent artifacts (`evaluation.json`, `result.json`, `input.json`, parent `manifest.json`) remain strictly untouched.
+3. **Deterministic Trading-Calendar Clamping**: Nominal horizons (1W = 7d, 1M = 30d, 6M = 180d) are clamped to the latest preceding valid trading day when landing on weekends or market holidays, recording both target and actual dates.
+4. **Strict Fail-Closed Arithmetic**: Benchmark and excess returns evaluate to `None` (`UNKNOWN`) when benchmark data is missing, completely preventing false zero defaults. Invalid, negative, or conflicting price observations trigger immediate refusal.
+5. **Full CLI & Workbook Projection Support**: CLI subcommand `post-listing ingest` ingests EOD Bhavcopy CSV/JSON price feeds and projects linked observations into Excel `Post_Listing` and `Backtest` sheets while preserving full backward compatibility.
+6. **Complete Test Suite**: All 24 dedicated test cases (`T-6A-01` through `T-6A-24`) pass with 100% success, maintaining 0 regressions on all 371 baseline tests (total 395 passing tests).
+
+---
+
+### R.B Scope Boundaries & Phase 6A Execution Guardrails
+
+Phase 6A was executed under strict adherence to defined system constraints:
+- **Phase 6B (Calibration)**: Strictly prohibited and excluded.
+- **Phase 6C (Decile/IC Analytics)**: Strictly prohibited and excluded.
+- **Phase 6D (Automated Config Proposals)**: Strictly prohibited and excluded.
+- **v1.6 Scoring Changes**: Prohibited; scoring weights, gates, criteria, and thresholds remain frozen.
+- **Original Evaluation Mutability**: Prohibited; pre-listing evaluation records are never re-evaluated with a post-listing clock.
+- **Branch Durability Invariant**: Work is performed on tracking branch `arena/01a10b42-ipo-screening-engine`, synchronized and verified with authoritative delivery ref `arena/ipo-screening-engine-v1.5`. PR #3 remains OPEN and UNMERGED against `main`.
+
+---
+
+### R.C Architecture & Module Organization
+
+The post-listing engine is organized into a clean, dedicated subpackage `engine/ipo_screening/post_listing/`:
+* `models.py`: Immutable frozen dataclasses (`PostListingObservation`, `PriceObservation`, `BenchmarkObservation`, `ReturnSet`, `ProvenanceRecord`, `CalculationMetadata`) and status enums (`Horizon`, `ObservationStatus`, `VerificationStatus`).
+* `trading_calendar.py`: Deterministic calendar offset computation (`compute_target_date`), trading day validation (`is_trading_day`), and preceding trading day resolution (`previous_trading_day`, `resolve_observation_date`).
+* `price_adapter.py`: File-based parser for BSE/NSE Bhavcopy CSV and JSON feeds (`load_price_file`), schema validation, negative price detection (`NegativePriceError`), duplicate price conflict detection (`DuplicatePriceConflictError`), and source content SHA-256 hashing.
+* `return_engine.py`: Pure arithmetic functions for listing gain, absolute return, secondary market return, benchmark return, and excess return using deterministic rounding, plus canonical hashing (`compute_observation_hashes`).
+* `storage.py`: Child observation filesystem storage manager (`save_observation`, `read_observation`, `list_observations`, `verify_observation_hashes`), enforcing `FINAL` mode checks and evaluation result hash verification.
+* `__init__.py`: Public package exports and API surface.
+
+---
+
+### R.D PostListingObservation Model Specification
+
+The observation model represents an immutable record of realized market outcomes:
+```json
+{
+  "observation_id": "OBS-<evaluation_id>-<HORIZON>[-v<N>]",
+  "final_evaluation_id": "<evaluation_id>",
+  "final_result_hash": "<parent_evaluation_result_hash>",
+  "ipo_id": "<ipo_id>",
+  "horizon": "1W" | "1M" | "6M",
+  "listing_date": "YYYY-MM-DD",
+  "target_observation_date": "YYYY-MM-DD",
+  "actual_observation_date": "YYYY-MM-DD",
+  "prices": {
+    "issue_price": 110.0,
+    "listing_open": 125.0,
+    "listing_close": 128.5,
+    "raw_observed_close": 136.5,
+    "corporate_action_factor": 1.0,
+    "adjusted_observed_close": 136.5
+  },
+  "benchmark": {
+    "symbol": "NIFTY_50_TRI",
+    "raw_listing_value": 25050.0,
+    "raw_observed_value": 25300.5,
+    "adjusted_listing_value": 25050.0,
+    "adjusted_observed_value": 25300.5,
+    "return_pct": 1.0
+  },
+  "returns": {
+    "listing_gain_pct": 13.636364,
+    "absolute_return_pct": 24.090909,
+    "secondary_return_pct": 9.2,
+    "benchmark_return_pct": 1.0,
+    "excess_return_pct": 23.090909
+  },
+  "provenance": {
+    "source_id": "FILE-<hash>",
+    "source_type": "CSV_BHAVCOPY",
+    "source_uri_or_file": "<path>",
+    "retrieval_timestamp": "ISO-8601",
+    "content_hash": "<sha256>"
+  },
+  "calculation": {
+    "calculation_version": "1.0.0",
+    "calculation_inputs_hash": "<sha256>",
+    "observation_hash": "<sha256>"
+  },
+  "observation_status": "VERIFIED" | "UNVERIFIED" | "INCOMPLETE" | "SUSPENDED",
+  "verification_status": "VERIFIED" | "UNVERIFIED" | "UNADJUSTED",
+  "version": 1,
+  "supersedes_observation_id": null,
+  "restatement_reason": null
+}
+```
+
+---
+
+### R.E Linked Storage & Evaluation Immutability
+
+1. **Storage Path**: `<store>/<final-evaluation-id>/observations/`
+   - Child observation artifacts: `observation_1w.json`, `observation_1m.json`, `observation_6m.json`.
+   - Child manifest: `manifest.json` recording `file_sha256` and `observation_hash` for each observation.
+2. **Parent Invariants**:
+   - `evaluation.json`, `result.json`, `input.json`, and parent `manifest.json` are strictly read-only and never modified.
+   - Refuses attachment if `evaluation_mode != "FINAL"` (`NotFinalEvaluationError`).
+   - Refuses attachment if evaluation `result_hash` does not match observation `final_result_hash` (`ResultHashMismatchError`).
+3. **Restatement Protocol**:
+   - If an observation is updated with `--reason`, a new version (e.g. `observation_1w_v2.json`) is created.
+   - The prior version is preserved intact on disk.
+   - `supersedes_observation_id` and `restatement_reason` link the revision to the historical record.
+
+---
+
+### R.F Historical Price Ingestion Adapter
+
+The file-based price adapter in `price_adapter.py` supports both Bhavcopy CSV and JSON feeds:
+- Normalizes column aliases (`DATE`, `TRADEDATE`, `SYMBOL`, `SERIES_SYMBOL`, `CLOSE`, `CLOSEPRICE`).
+- Parses dates and prices strictly.
+- Detects and rejects negative prices with `NegativePriceError`.
+- Detects and rejects duplicate rows with conflicting prices on the same date with `DuplicatePriceConflictError`.
+- Computes SHA-256 of the raw file content to ensure audit provenance.
+
+---
+
+### R.G Trading Day Calendar Resolution
+
+Observation target dates are computed deterministically from the issue listing date:
+* **1-Week**: `listing_date + 7 calendar days`
+* **1-Month**: `listing_date + 30 calendar days`
+* **6-Month**: `listing_date + 180 calendar days`
+
+When the target date lands on a weekend (Saturday/Sunday) or an exchange holiday (date not present in trading dataset), the resolver rolls backward day-by-day to the **latest preceding valid trading day**. Both `target_observation_date` and `actual_observation_date` are recorded.
+
+---
+
+### R.H Return Calculation Engine & Formulations
+
+All percentage returns are computed using exact decimal arithmetic rounded to 6 decimal places:
+* **Listing Gain**:
+  $$\text{listing\_gain\_pct} = \frac{\text{listing\_open} - \text{issue\_price}}{\text{issue\_price}} \times 100$$
+* **Adjusted Observed Close**:
+  $$\text{adjusted\_observed\_close} = \text{raw\_observed\_close} \times \text{corporate\_action\_factor}$$
+* **Absolute Return**:
+  $$\text{absolute\_return\_pct} = \frac{\text{adjusted\_observed\_close} - \text{issue\_price}}{\text{issue\_price}} \times 100$$
+* **Secondary Market Return**:
+  $$\text{secondary\_return\_pct} = \frac{\text{adjusted\_observed\_close} - \text{listing\_open}}{\text{listing\_open}} \times 100$$
+* **Benchmark Return**:
+  $$\text{benchmark\_return\_pct} = \frac{\text{observed\_benchmark} - \text{listing\_benchmark}}{\text{listing\_benchmark}} \times 100$$
+* **Excess Return**:
+  $$\text{excess\_return\_pct} = \text{absolute\_return\_pct} - \text{benchmark\_return\_pct}$$
+
+---
+
+### R.I Corporate Actions Handling Policy
+
+1. **Adjustment Policy**: `adjusted_observed_close = raw_observed_close * corporate_action_factor`.
+2. **Verified Corporate Actions**: When an explicit, verified adjustment factor is supplied (via Bhavcopy column or `--corporate-actions` file), `verification_status` is set to `VERIFIED`.
+3. **Unverified Corporate Actions**: If an unverified corporate action is flagged or factor is unconfirmed, `verification_status` and `observation_status` are set to `UNVERIFIED`.
+4. **Unadjusted**: When no corporate action has occurred (`factor == 1.0`), `verification_status` is set to `UNADJUSTED`.
+
+---
+
+### R.J Fail-Closed Missing Data Rules
+
+- Missing listing open price $\rightarrow$ `listing_gain_pct = None` (`UNKNOWN`).
+- Missing issue price $\rightarrow$ Execution refused (`EXIT_REFUSED`).
+- Missing observed close price $\rightarrow$ `absolute_return_pct = None`, `observation_status = INCOMPLETE`.
+- Missing benchmark price $\rightarrow$ `benchmark_return_pct = None`, `excess_return_pct = None`.
+- **Absolute Rule**: Excess return NEVER defaults to 0.0 or any substitute when benchmark data is unavailable.
+
+---
+
+### R.K Deterministic Observation Hashing
+
+Two distinct cryptographic hashes are computed for auditability:
+1. `calculation_inputs_hash`: SHA-256 over canonical JSON of `(final_result_hash, issue_price, horizon, listing_date, target_date, actual_date, listing_open, raw_observed_close, corporate_action_factor, benchmark_symbol, raw_listing_benchmark, raw_observed_benchmark, calculation_version)`.
+2. `observation_hash`: SHA-256 over canonical JSON of the entire calculation payload and provenance metadata.
+
+---
+
+### R.L CLI Ingestion Command
+
+Implemented CLI command under `engine/tools/ipo_screen.py`:
+```bash
+python3 engine/tools/ipo_screen.py post-listing ingest \
+    --evaluation-id <FINAL_EVALUATION_ID> \
+    --prices <PRICE_FILE> \
+    --store <STORE> \
+    [--corporate-actions <FILE>] \
+    [--reason <RESTATEMENT_REASON>] \
+    [-v]
+```
+Outputs a structured tabular ingestion report and exits with code 0 on success, or code 1 (`EXIT_REFUSED`) on validation failure or bad input.
+
+---
+
+### R.M Excel Workbook Projection Integration
+
+`engine/ipo_screening/excel.py` has been updated with full backward compatibility:
+- `_extract_post_listing()` checks both embedded snapshot data and linked observations in `<store>/<final-evaluation-id>/observations/`.
+- `project(store, workbook_path)` scans for child observations and attaches them to evaluation records during workbook assembly.
+- Populates the existing 14-sheet workbook's `Post_Listing` and `Backtest` sheets with realized outcomes without altering sheet layout, formatting, or breaking existing v1.5 workbook generation tests.
+
+---
+
+### R.N Acceptance Test Suite Results (T-6A-01 through T-6A-24)
+
+All 24 test cases in `tests/test_post_listing_phase6a.py` pass cleanly:
+
+| Test ID | Description | Result |
+| :--- | :--- | :--- |
+| **T-6A-01** | Canonical observation structure conforms to specification | **PASS** |
+| **T-6A-02** | Observation round-trip serialization and dict schema validation | **PASS** |
+| **T-6A-03** | Observation immutability (frozen dataclass mutation raises error) | **PASS** |
+| **T-6A-04** | Observation storage location follows `<store>/<id>/observations/` | **PASS** |
+| **T-6A-05** | Storage refuses attachment to PRELIMINARY evaluation | **PASS** |
+| **T-6A-06** | Storage refuses attachment when evaluation result_hash mismatches | **PASS** |
+| **T-6A-07** | Storage never overwrites or mutates parent evaluation artifacts | **PASS** |
+| **T-6A-08** | Observation manifest records correct SHA-256 for each observation | **PASS** |
+| **T-6A-09** | Restatement creates new observation version preserving original | **PASS** |
+| **T-6A-10** | Restatement links `supersedes_observation_id` & `restatement_reason` | **PASS** |
+| **T-6A-11** | Calendar resolution 1W = 7 calendar days clamped to trading day | **PASS** |
+| **T-6A-12** | Calendar resolution 1M = 30 calendar days clamped to trading day | **PASS** |
+| **T-6A-13** | Calendar resolution 6M = 180 calendar days clamped to trading day | **PASS** |
+| **T-6A-14** | Target date landing on weekend clamps to latest preceding Friday | **PASS** |
+| **T-6A-15** | Target date landing on holiday clamps to latest preceding trading day | **PASS** |
+| **T-6A-16** | Listing gain calculation matches `(listing_open - issue_price) / issue_price * 100` | **PASS** |
+| **T-6A-17** | 1W, 1M, 6M absolute return calculation matches formula | **PASS** |
+| **T-6A-18** | Benchmark return calculation matches formula | **PASS** |
+| **T-6A-19** | Excess return calculation matches `absolute_return - benchmark_return` | **PASS** |
+| **T-6A-20** | Missing benchmark fails closed `None`/`UNKNOWN`, never defaults to 0.0 | **PASS** |
+| **T-6A-21** | Corporate action factor adjustment `adjusted = raw * factor` verified | **PASS** |
+| **T-6A-22** | Unverified corporate action marks observation status `UNVERIFIED` | **PASS** |
+| **T-6A-23** | Malformed, negative, or conflicting prices fail-closed with error | **PASS** |
+| **T-6A-24** | Complete E2E integration: CLI ingest, observation audit, Excel projection | **PASS** |
+
+Total test suite execution: **395 passed in 98.00s (371 baseline + 24 Phase 6A)**.
+
+---
+
+### R.O Frozen Core Integrity & Baseline Verification
+
+SHA-256 cryptographic hashes of the six frozen engine files verified before and after Phase 6A implementation:
+
+| File Path | Baseline SHA-256 Digest | Post-Implementation Digest | Status |
+| :--- | :--- | :--- | :--- |
+| `derived.py` | `f4dca1bb9a0e67352423c1cb94ab949a0fbf96a24db4df81bbc48cc65fd39aef` | `f4dca1bb9a0e67352423c1cb94ab949a0fbf96a24db4df81bbc48cc65fd39aef` | **IDENTICAL** |
+| `scoring.py` | `3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a` | `3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a` | **IDENTICAL** |
+| `knockouts.py` | `8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f` | `8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f` | **IDENTICAL** |
+| `snapshots.py` | `9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27` | `9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27` | **IDENTICAL** |
+| `evaluation.py` | `d20d87b69e01ced146791fe9a4e61faa5d522281383781bfbf5e97e7055810ae` | `d20d87b69e01ced146791fe9a4e61faa5d522281383781bfbf5e97e7055810ae` | **IDENTICAL** |
+| `extraction/price_band_notice.py` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | **IDENTICAL** |
+
+Golden evaluation result hash `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` remains frozen, valid, and reproducible.
