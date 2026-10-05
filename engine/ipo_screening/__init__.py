@@ -32,6 +32,21 @@ from __future__ import annotations
 from .canonical import Evidence, SourceRef, State, Value, Verification
 from .canonical_input import CanonicalInput, build_canonical_input
 from .config_validation import check_config, compile_config, config_fingerprint
+from .connectors import (
+    AnchorAllotmentAdapter,
+    BaseConnectorAdapter,
+    ConnectorCoordinator,
+    ConnectorError,
+    ExternalSnapshot,
+    FreshnessPolicy,
+    FreshnessStatus,
+    GmpSignalAdapter,
+    MarketRegimeAdapter,
+    OfficialSubscriptionAdapter,
+    PeerMultipleAdapter,
+    SourceClass,
+    StaleDataError,
+)
 from .derived import DerivedMetrics, MetricValue, derive
 from .enrichment_engine import (
     DerivedField,
@@ -102,6 +117,19 @@ __all__ = [
     "EnrichmentConflictError",
     "EnrichmentValidationError",
     "PrecedenceViolationError",
+    "SourceClass",
+    "FreshnessStatus",
+    "ExternalSnapshot",
+    "FreshnessPolicy",
+    "ConnectorError",
+    "StaleDataError",
+    "BaseConnectorAdapter",
+    "OfficialSubscriptionAdapter",
+    "GmpSignalAdapter",
+    "MarketRegimeAdapter",
+    "PeerMultipleAdapter",
+    "AnchorAllotmentAdapter",
+    "ConnectorCoordinator",
     "Finding",
     "ValidationError",
     "SchemaValidationError",

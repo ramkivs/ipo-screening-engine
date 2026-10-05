@@ -1,0 +1,12 @@
+{
+  "snapshot_id": "CHIT-GMP-20261004",
+  "provider_id": "CHITTORGARH-TRACKER",
+  "as_of": "2026-10-04T19:26:01Z",
+  "retrieval_timestamp": "2026-10-04T19:30:00Z",
+  "gmp_rupees": 35.0,
+  "gmp_pct": 15.91,
+  "trend": "flat",
+  "est_listing_price": 255.0,
+  "source_type": "SECONDARY_TRACKER",
+  "is_statutory": false
+}

@@ -1339,12 +1339,197 @@ A dedicated test suite in `tests/test_enrichment_engine.py` validates all Phase 
 **Final Phase 5G Status: PASS**
 ---
 
+## O. Phase 5H — Live / External Data Connectors
+
+### O.1 Architectural Overview & Rationale
+
+Phase 5H implements the governed external-data connector boundary (`engine/ipo_screening/connectors/`) feeding the Phase 5G Pre-Score Enrichment Engine. Prior to Phase 5H, market subscription demand, grey market signals (GMP), broad market regimes, and peer valuation multiples were either manually authored in reference JSON fixtures or left undisclosed.
+
+Phase 5H establishes a provider-neutral connector abstraction that acquires, normalizes, validates, timestamps, provenance-binds, and fails-closed external market and peer data WITHOUT embedding provider-specific behavior inside the frozen scoring core.
+
+```
++-----------------------------------------------------------------------------------------+
+|                                    EXTERNAL PROVIDERS                                   |
+|   +-------------------+    +--------------------+    +-------------------------------+  |
+|   | Official Exchange |    | Secondary Aggregator|   | Market Regime / Screener Feeds|  |
+|   | (NSE/BSE Bidding) |    | (GMP Signal Track) |   | (Nifty 50, VIX, Peer Valuation|  |
+|   +---------+---------+    +---------+----------+    +---------------+---------------+  |
++-------------|------------------------|-------------------------------|------------------+
+              |                        |                               |
+              +------------------------v-------------------------------+
+                                       |
+                   +---------------------------------------+
+                   |       Provider Adapters Layer         |
+                   |  (Sanitization, Parsing, Timestamps)  |
+                   +-------------------+-------------------+
+                                       |
+                   +-------------------+-------------------+
+                   |   Provider-Neutral ExternalSnapshot   |
+                   |   - source_class (OFFICIAL/SECONDARY) |
+                   |   - raw_source_hash (SHA-256)         |
+                   |   - as_of / retrieval timestamps      |
+                   |   - verification (VERIFIED/UNVERIFIED)|
+                   |   - freshness (FRESH/STALE/MISSING)   |
+                   |   - secret-scrubbed raw payload       |
+                   +-------------------+-------------------+
+                                       |
+                   +-------------------+-------------------+
+                   |         Freshness Evaluator           |
+                   |  (24h Market, 30d Peers, 72h Anchor)  |
+                   |  Stale != Current; Missing != Fresh   |
+                   +-------------------+-------------------+
+                                       |
+                   +-------------------+-------------------+
+                   |       ConnectorCoordinator            |
+                   |  - Precedence: Official > Secondary   |
+                   |  - Conflicts: Fail-Closed             |
+                   |  - Formatting for Enrichment Engine   |
+                   +-------------------+-------------------+
+                                       |
+             +-------------------------v------------------------------+
+             |                 Phase 5G EnrichmentEngine              |
+             |                 (EnrichmentEngine.assemble)            |
+             +-------------------------+------------------------------+
+                                       |
+             +-------------------------v------------------------------+
+             |                 Frozen Scoring Core                    |
+             |                 (Zero Code Mutations)                  |
+             +--------------------------------------------------------+
+```
+
+### O.2 Provider Adapters & Supported Conceptual Classes
+
+Phase 5H delivers concrete provider adapters implementing `BaseConnectorAdapter`:
+
+1. **Official Exchange Subscription Adapter (`OfficialSubscriptionAdapter`)**:
+   - Class: `SourceClass.OFFICIAL_EXCHANGE`
+   - Normalizes: `qib_x`, `nii_x`, `retail_x`, `overall_x`.
+   - Verification: `Verification.VERIFIED` (Tier 1/2 official exchange data).
+   - Validation: Fails closed on negative multiples (`ConnectorPayloadError`).
+
+2. **GMP / Secondary Market Signal Adapter (`GmpSignalAdapter`)**:
+   - Class: `SourceClass.SECONDARY_TRACKER`
+   - Normalizes: `gmp_rupees`, `pct`, `trend` (`strong`, `flat`, `falling`).
+   - Verification: `Verification.UNVERIFIED` (Tier 3 secondary estimate).
+   - Invariant: Explicitly sets `is_statutory: False`. Unofficial signals are never represented as statutory facts.
+
+3. **Market Regime Adapter (`MarketRegimeAdapter`)**:
+   - Class: `SourceClass.MARKET_REGIME`
+   - Normalizes: `nifty_trend` (`supportive`, `neutral`, `weak`), `vix`, `last_ipo_listing_gains_pct`.
+   - Verification: `Verification.VERIFIED`.
+   - Capping: Preserves at most 5 recent IPO listing gains per schema.
+
+4. **Peer Valuation Multiple Adapter (`PeerMultipleAdapter`)**:
+   - Class: `SourceClass.PEER_MULTIPLE`
+   - Normalizes: Comparable peers list with `pe`, `ev_ebitda`, `pb`, `ps`, `roe_pct`, `roa_pct`, and `recent_sector_ipos`.
+   - Verification: `Verification.VERIFIED`.
+
+5. **Anchor Allotment Adapter (`AnchorAllotmentAdapter`)**:
+   - Class: `SourceClass.ANCHOR_BOOK`
+   - Normalizes: `anchor_names`, `anchor_total_shares`, `amount`, `anchor_lockin_verified`, `quality`.
+   - Verification: `Verification.VERIFIED`.
+
+### O.3 Freshness & Staleness Model
+
+The freshness model evaluates observations against the evaluation instant (`reference_time`):
+- **Market Data (Subscription, GMP, Regime)**: Threshold = 24.0 hours (`MARKET_FRESHNESS_POLICY`).
+- **Peer Valuation Multiples**: Threshold = 30.0 days (`PEER_FRESHNESS_POLICY`).
+- **Anchor Book Circulars**: Threshold = 72.0 hours (`ANCHOR_FRESHNESS_POLICY`).
+- **Freshness Classifications**:
+  - `FRESH`: Age $\le$ staleness threshold.
+  - `STALE`: Age $>$ staleness threshold. (Stale $\ne$ Current).
+  - `FUTURE`: Timestamp is in the future ($> 1$ hour clock skew).
+  - `MISSING`: Timestamp missing or unparseable. (Missing $\ne$ Fresh).
+- **Strict Mode Enforcement**: When `strict_freshness=True`, observations marked `STALE`, `FUTURE`, or `MISSING` raise `StaleDataError` and refuse evaluation.
+
+### O.4 Source Trust & Precedence Hierarchy
+
+The `ConnectorCoordinator` reconciles multiple feeds according to codified precedence:
+1. **Official Exchange Outranks Secondary Aggregators**:
+   - If both an official exchange feed and a secondary market tracker provide subscription data, the official exchange feed is selected.
+2. **Conflicting Authoritative Feeds Fail Closed**:
+   - If two authoritative feeds with equal standing (e.g. two conflicting official exchange feeds) report differing multiples, `ConflictingSourceError` is raised.
+3. **Statutory Facts Protected**:
+   - External connectors cannot alter or overwrite Tier 1 statutory disclosures from the prospectus.
+
+### O.5 Security & Secret Hygiene
+
+Connectors implement automated secret hygiene:
+- All payloads pass through `sanitize_credentials(...)` which recursively scrubs dictionary keys matching `(?i)(api[_-]?key|auth|bearer|credential|password|secret|token|cookie|pwd)` replacing sensitive values with `"***REDACTED***"`.
+- Authorization headers matching `Bearer [token]` are masked.
+- Sanitized representations are verified before payload hash calculation or snapshot persistence.
+- Zero production credentials or secrets are committed or stored in fixtures.
+
+### O.6 Deterministic Fixtures Suite
+
+Phase 5H authors 14 deterministic JSON fixtures in `fixtures/connectors/` covering all required test double scenarios:
+1. `01_valid_subscription.json`: Valid official subscription snapshot (QIB 1.0x, NII 0.34x, Retail 0.16x, Overall 0.22x).
+2. `02_valid_gmp.json`: Valid GMP snapshot (₹35, 15.91%, flat trend).
+3. `03_valid_market_regime.json`: Valid market snapshot (Nifty supportive, VIX 13.5, listing gains).
+4. `04_valid_peer_snapshot.json`: Valid peer snapshot (multiples for KNR Constructions, PNC Infratech).
+5. `05_stale_snapshot.json`: Stale snapshot (> 24 hours old).
+6. `06_missing_timestamp.json`: Snapshot without `as_of` timestamp.
+7. `07_malformed_response.json`: Corrupted payload with negative subscription.
+8. `08_conflicting_provider_a.json` & `08_conflicting_provider_b.json`: Two conflicting authoritative exchange feeds.
+9. `09_timeout_error_sim.json`: Provider timeout and error code simulation.
+10. `10_partial_response.json`: Partial response with Retail known and QIB/NII null.
+11. `11_unknown_values.json`: Genuinely unquoted / unavailable values.
+12. `12_zero_vs_unavailable.json`: Distinction between genuine 0.0x and unavailable None.
+13. `valid_anchor_snapshot.json`: Anchor allotment circular with top-tier institutional funds.
+14. `secret_leak_payload.json`: Payload containing mock API keys and bearer tokens to prove sanitization.
+
+### O.7 Frozen Core Protection & Test Verification
+
+- **Zero Core Modifications**:
+  - `derived.py`: UNTOUCHED (0 bytes changed)
+  - `scoring.py`: UNTOUCHED (0 bytes changed)
+  - `knockouts.py`: UNTOUCHED (0 bytes changed)
+  - `snapshots.py`: UNTOUCHED (0 bytes changed)
+  - `evaluation.py`: UNTOUCHED (0 bytes changed)
+- **Deterministic Golden Result Hash**:
+  `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` strictly preserved.
+- **Test Suite Results**:
+  - Baseline Tests: 307 passed
+  - New Phase 5H Tests: 15 passed in `tests/test_connectors.py`
+  - Total Passing Tests: **322 passed** across all test suites in 122.42s.
+
+### O.8 Phase 5H Gate Reconciliation Checklist
+
+- [PASS] Baseline commit/tree verified (`0e15ac7` / `47a9f4b`)
+- [PASS] Ramki standing authorization applied
+- [PASS] Provider-neutral connector interfaces created (`engine/ipo_screening/connectors/interfaces.py`)
+- [PASS] Provider adapters implemented (`engine/ipo_screening/connectors/adapters.py`)
+  - [PASS] Official Subscription Adapter (NSE/BSE)
+  - [PASS] GMP Signal Adapter (Secondary Tracker)
+  - [PASS] Market Regime Adapter (Nifty 50, VIX)
+  - [PASS] Peer Valuation Multiples Adapter (Screener)
+  - [PASS] Anchor Allotment Adapter (Exchange Circular)
+- [PASS] Connector coordinator implemented (`engine/ipo_screening/connectors/coordinator.py`)
+- [PASS] Deterministic fixtures suite created (14 fixtures in `fixtures/connectors/`)
+- [PASS] Freshness model enforced (24h market, 30d peers, 72h anchor; stale != current)
+- [PASS] Provenance and audit tracking bound to every external snapshot
+- [PASS] Precedence hierarchy preserved (Official > Secondary; conflicts fail closed)
+- [PASS] Strict UNKNOWN semantics verified (missing != 0; error != 0; genuine 0 == 0.0)
+- [PASS] Secret hygiene and credential scrubbing verified
+- [PASS] Caller input immutability verified
+- [PASS] Phase 5G Enrichment Engine integration verified
+- [PASS] Frozen evaluation core untouched (`derived.py`, `scoring.py`, `knockouts.py`, `snapshots.py`, `evaluation.py`)
+- [PASS] Golden hash strictly preserved (`e84f8bc0...`)
+- [PASS] All 307 baseline tests pass
+- [PASS] All 15 new Phase 5H tests pass (322 total tests)
+- [PASS] No CLI work performed (deferred to Phase 5I)
+- [PASS] No UI or browser memory mutations
+- [PASS] No merge to `main`
+
+**Final Phase 5H Status: PASS**
+---
+
 **Awaiting decision, not implementation:** H1 (GCP reference fixture sign-off),
 H2 (EPC versus real estate).
 
 **Delivery & Remote Status:** PR #3 is open on GitHub against `main` from head
 `arena/ipo-screening-engine-v1.5`.
-All 307 tests green (292 baseline + 15 Phase 5G), golden hash frozen, main strictly protected.
+All 322 tests green (307 baseline + 15 Phase 5H), golden hash frozen, main strictly protected.
 
 No merge to `main`. No production deployment.
 

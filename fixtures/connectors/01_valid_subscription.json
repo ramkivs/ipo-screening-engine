@@ -1,0 +1,12 @@
+{
+  "snapshot_id": "NSE-SUB-20261004",
+  "provider_id": "NSE-OFFICIAL-FEED",
+  "as_of": "2026-10-04T19:26:01Z",
+  "retrieval_timestamp": "2026-10-04T19:30:00Z",
+  "qib_x": 1.0,
+  "nii_x": 0.34,
+  "retail_x": 0.16,
+  "overall_x": 0.22,
+  "total_bids_shares": 5806000,
+  "status": "COMPLETED"
+}

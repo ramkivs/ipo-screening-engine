@@ -1,0 +1,6 @@
+{
+  "provider_id": "NSE-TIMEOUT-SIM",
+  "status": "GATEWAY_TIMEOUT",
+  "error_code": 504,
+  "message": "Connection to upstream exchange host timed out after 30000ms"
+}

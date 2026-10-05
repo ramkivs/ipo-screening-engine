@@ -1,0 +1,10 @@
+{
+  "snapshot_id": "PARTIAL-SUB-001",
+  "provider_id": "NSE-OFFICIAL-FEED",
+  "as_of": "2026-10-04T12:00:00Z",
+  "retrieval_timestamp": "2026-10-04T12:05:00Z",
+  "qib_x": null,
+  "nii_x": null,
+  "retail_x": 0.45,
+  "overall_x": null
+}
