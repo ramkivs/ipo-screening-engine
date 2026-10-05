@@ -726,14 +726,172 @@ Multi-class validation identified 8 schema and table parsing deficiencies that w
 - **Total Test Count**: 259 passed tests (238 v1.5 core tests + 12 Phase 5A extraction tests + 9 Phase 5B real-world hardening tests).
 - **Frozen Deterministic Core Golden Hash**: `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` strictly verified and unchanged.
 - **Spec Compliance**: All Spec s1-s27 invariants, knockout tri-states, weighted completeness, and fail-closed GCP rules intact.
+---
 
+## Phase 5D — Pre-Score Input Assembly & Enrichment Architecture Closure
+
+### K.1 Executive Summary & Architectural Context
+
+Phase 5D establishes the architectural framework for assembling a complete, evidence-backed canonical input snapshot from multiple heterogeneous sources prior to deterministic scoring:
+1. **Class A: RHP / DRHP statutory prospectuses** (issuer profile, restated financials, capital structure, governance, litigation, business metrics, objects of offer).
+2. **Class B: Price Band Notices** (cap price, floor price, lot size, definitive offer schedule dates).
+3. **Class C: Market Bidding & Demand Snapshots** (QIB/NII/Retail subscriptions, Grey Market Premium, GMP trend, Nifty trend, anchor investor quality).
+4. **Class D: Comparable Peer Trading Multiples** (live P/E, EV/EBITDA, P/B, P/S, ROE %, ROCE %, listing tenure).
+5. **Class E: Analyst Assessments** (moat rating, order-book revenue visibility, qualitative risk assessments).
+
+This closure record reconciles the architectural gaps, formalizes the decision register, outlines the future implementation roadmap, defines implementation safety gates, and provides final Phase 5D gate reconciliation.
+
+### K.2 Gap Classification
+
+Every material finding from the Phase 5D investigation is classified under exactly one primary category:
+
+| Finding | Primary Category | Current Evidence | Consequence |
+|---|---|---|---|
+| **1. Missing pre-score enrichment layer** | IMPLEMENTATION GAP | No enrichment service or CLI command exists between extraction and scoring; pipeline transitions directly from raw file to canonical input. | Non-RHP inputs cannot be governed, reconciled, or audited prior to scoring; system relies on pre-cooked static JSON templates. |
+| **2. Missing Price Band Notice ingestion** | DATA-SOURCE GAP | No parser or adapter exists for SEBI/exchange Price Band Notices; `SourceType.PRICE_BAND_NOTICE` is absent from `canonical.py` and schema. | Statutory pre-bid notice data cannot be ingested independently; values must be hand-authored or passed via template. |
+| **3. Price/floor/lot source handling** | DATA-SOURCE GAP | RHP PDFs legally contain `[●]` undisclosed markers; `price_band_high` drives valuation while `price_band_low` and `lot_size` are unused in formulas. | RHP extraction alone cannot satisfy schema requirements for pricing; engine is vulnerable to pricing absence. |
+| **4. Current schema-gate ordering problem** | ARCHITECTURE ALREADY PRESENT | `enforce_schema()` executes before canonical normalisation and enrichment; schema requires `price_band_low` and `price_band_high`. | Incomplete raw extractions (with `null` for `[●]`) fail schema validation before any enrichment layer can reconcile them. |
+| **5. Hardcoded price-band defaults** | FAIL-CLOSED GAP | `builder.py` defaults `price_band_low` to `208`, `price_band_high` to `220`, and `lot_size` to `68` from Vishal Nirmiti fixture. | Real filings with undisclosed price bands silently inherit test fixture prices, computing false valuation P/E multiples. |
+| **6. Hardcoded post-issue EPS default** | FAIL-CLOSED GAP | `builder.py` defaults `post_issue_eps` to `9.46` from Vishal Nirmiti fixture. | Filings without disclosed post-issue EPS evaluate valuation metrics against test fixture EPS rather than failing closed to UNKNOWN. |
+| **7. Hardcoded customer concentration default** | FAIL-CLOSED GAP | `builder.py` defaults `top5_customer_pct` to `85.33` from Vishal Nirmiti fixture. | Real filings without customer concentration disclosures inherit severe concentration penalties from fixture data. |
+| **8. Dynamic fresh-share derivation** | DERIVATION GAP | `builder.py` expects pre-computed `fresh_shares`; formula `round(fresh_issue / cap_price)` is not dynamically evaluated. | Manual or template inputs can introduce share arithmetic discrepancies against the offer size. |
+| **9. Dynamic post-issue-share derivation** | DERIVATION GAP | `issue.post_issue_shares` is a static input; summation `pre_shares + fresh_shares` is only checked as a warning in validation. | Discrepancies between pre-issue capital and fresh issue shares are flagged post-hoc rather than resolved upstream. |
+| **10. Dynamic OFS derivation** | DERIVATION GAP | `issue.ofs` (amount) is expected as static input rather than dynamically formed as `sum(seller shares) * cap_price`. | Offer for Sale monetary value can drift out of reconciliation with the selling shareholder share schedule. |
+| **11. Dynamic post-issue EPS derivation** | DERIVATION GAP | `issue.post_issue_eps` is expected as static input; `PAT / post_issue_shares` is only checked as a semantic warning. | Stale or unadjusted prospectus EPS can enter valuation without reconciliation against restated PAT and diluted shares. |
+| **12. Dynamic promoter-post derivation** | DERIVATION GAP | `capital_structure.promoter_post_pct` is a passthrough; `(pre_shares - sold) / post_shares * 100` is not derived. | Post-issue promoter holding percentage can contradict the OFS selling shareholder schedule. |
+| **13. Supplemental analyst inputs** | PROVENANCE GAP | Subjective qualitative ratings (`moat_rating`, `visibility_rating`) lack structured schema contracts, user attribution, and audit trails. | Subjective human inputs can enter scoring unverified, lacking provenance or analyst identity. |
+| **14. Source precedence** | PRECEDENCE GAP | No codified conflict-resolution rules exist when RHP disclosures, Price Band Notices, and manual templates disagree. | Undefined precedence risks silent data corruption or arbitrary source overwrites during input assembly. |
+| **15. Evidence/provenance binding** | PROVENANCE GAP | `_sources` and `_evidence` blocks are fully supported by core, but extraction builder only binds primary filing fields. | Supplemental, market, and peer inputs lack automatic cryptographic hashes and locator references. |
+| **16. Preliminary vs Final enrichment** | ARCHITECTURE ALREADY PRESENT | `config.modes` defines preliminary exclusions, but pre-score enrichment layer does not differentiate assembly rules by mode. | Incomplete preliminary extractions must either supply dummy price bands or fail schema validation. |
+| **17. Immutable enrichment snapshots** | IMMUTABILITY GAP | Transitioning from Preliminary to Final lacks an automated snapshot chaining and preliminary-delta linking mechanism in CLI. | Analysts must manually coordinate preliminary and final input files to maintain historical comparability. |
+| **18. Future CLI/UI boundary** | UI/CLI GAP | CLI only provides `--template` flag for extract command; lacks interactive or structured pre-score assembly subcommands. | No headless service interface exists for future web or Electron interfaces to trigger governed enrichment. |
+
+### K.3 Decision Register
+
+The fifteen authoritative architectural decisions governing the target pre-score assembly and enrichment layer:
+
+| ID | Decision | Current State | Phase 5D Decision | Rationale | Future Scope |
+|---|---|---|---|---|---|
+| **D-5D-01** | Pre-Score Enrichment Layer | Direct PDF to Canonical or Template to Scorer | Establish dedicated `EnrichmentEngine` between raw extraction and schema validation | Decouples document extraction from scoring; provides governed stage for reconciliation and derivations | Phase 5G |
+| **D-5D-02** | Price Band Notice as independent source | Treated as ad-hoc template input | Establish Price Band Notice as first-class `Class B` source with independent ingestion | Notice is a statutory document published post-RHP; legally definitive for price, lot, and dates | Phase 5F |
+| **D-5D-03** | Price Band Notice provenance / SHA-256 | No hashing or provenance | Mandatory SHA-256 digest, URI, page locator, and evidence registration for price notices | Ensures forensic auditability for valuation inputs (answers 'Where did ₹220 come from?') | Phase 5F |
+| **D-5D-04** | Price Band precedence over RHP [●] | [●] markers fall back to hardcoded 220 | Price Band Notice legally supersedes RHP undisclosed markers and preliminary ranges | Notice is legally definitive under SEBI ICDR regulations; resolves [●] without conflict | Phase 5G |
+| **D-5D-05** | Manual/template precedence | Template values silently override | Authoritative document extraction wins unconditionally over manual inputs unless signed override | Prevents accidental or unverified tampering with audited filing figures | Phase 5G |
+| **D-5D-06** | Hardcoded fixture fallback disposition | Fallbacks 208, 220, 68, 9.46, 85.33 in builder | Completely prohibit and excise fixture fallbacks; missing fields resolve strictly to `None` (UNKNOWN) | Eliminates critical production risk of test fixture leakage into real evaluations | Phase 5G |
+| **D-5D-07** | Source facts vs derived values | Conflated in canonical input JSON | Strict boundary: source facts (Price, PAT) separated from derived quantities (Fresh shares, EPS) | Prevents storing calculated outputs as raw source evidence; preserves mathematical lineage | Phase 5G |
+| **D-5D-08** | Dynamic share/OFS/EPS derivation | Expected as pre-computed static inputs | Derive fresh shares, post shares, OFS amounts, implied EPS, and promoter holding dynamically | Eliminates cross-field arithmetic reconciliation warnings in semantic validation | Phase 5G |
+| **D-5D-09** | UNKNOWN / fail-closed behavior | Fallbacks prevent UNKNOWN in builder | Missing, unreadable, or stale inputs evaluate strictly to UNKNOWN/UNVERIFIED; never zero or default | Guarantees Spec v1.5 fail-closed integrity; widens score range instead of guessing | Phase 5G |
+| **D-5D-10** | Preliminary vs Final | Config mode exists; input model identical | Single unified schema; Preliminary permits UNKNOWN price band, Final enforces verified notice | Aligns input validation gates with filing lifecycle stages without duplicating models | Phase 5I |
+| **D-5D-11** | Immutable evaluation snapshots | Evaluation record immutable; input mutable | Enrichment creates new snapshot with distinct deterministic ID; links via `preliminary_delta` | Preserves audit trail; ensures Preliminary and Final evaluations are independently reproducible | Phase 5I |
+| **D-5D-12** | Provenance / auditability | Scored fields without evidence raise warnings | Every scored input must trace to a registered `SourceRef`, content hash, and document locator | Fulfills Spec s24 audit requirement ('Which page and table supplied this value?') | Phase 5H |
+| **D-5D-13** | Analyst assessment trust boundary | Qualitative fields unvalidated | Classify analyst inputs as Tier 4; require mandatory analyst attribution (`assessed_by`) and note | Prevents subjective judgments from masquerading as audited regulatory facts | Phase 5H |
+| **D-5D-14** | CLI / future UI separation | Monolithic CLI run/extract | Core engine remains completely headless; enrichment exposed via clean library API and CLI subcommands | Enables future web/desktop UIs to build on governed API without scoring core dependency | Phase 5I |
+| **D-5D-15** | Frozen scoring-core boundary | Core is frozen at v1.5 | Entire deterministic evaluation core (Gates 1–9) remains 100% frozen and untouched | Protects golden hash `e84f8bc0...` and 259 passing tests against regression | Phase 5E–5J |
+
+### K.4 Proposed Implementation Phases
+
+A phased roadmap for implementing the pre-score enrichment layer without modifying the frozen scoring core:
+
+| Phase | Scope | Dependencies | Core Changes? | Schema Changes? | Tests | Authority Required |
+|---|---|---|---|---|---|---|
+| **5E** | **Contract & Schema Preparation**: Define structured enrichment contract schema (`supplemental-enrichment.v1.schema.json`); map source types. | Phase 5D Closure | **None** | Optional / Non-breaking (can map to `STRUCTURED_INPUT` and `EXCHANGE` in v1.5, or formalize in v1.6) | Schema validation suite for enrichment payloads | Explicit Authority from Ramki |
+| **5F** | **Price Band Notice Ingestion**: Build `PriceBandNoticeParser` for advertisement PDFs and exchange circulars; extract Cap, Floor, Lot, Dates; compute SHA-256. | Phase 5E | **None** (upstream extractor) | None | Unit tests on notice parsing, OCR fallback, and collar validation | Explicit Authority from Ramki |
+| **5G** | **Pre-Score Enrichment Engine**: Implement `EnrichmentEngine`; codify source precedence hierarchy; add dynamic derivations; excise builder fallbacks. | Phases 5E, 5F | **None** (upstream service) | None | Precedence resolution tests, arithmetic derivation tests, fail-closed tests | Explicit Authority from Ramki |
+| **5H** | **Supplemental & Analyst Assembly**: Implement structured connectors for market subscription feeds, GMP trackers, and analyst qualitative dossiers with attribution. | Phase 5G | **None** (upstream service) | None | Ingestion tests, staleness tagging tests, analyst attribution verification | Explicit Authority from Ramki |
+| **5I** | **Pipeline & CLI Integration**: Sequence `EnrichmentEngine` into CLI (`ipo_screen assemble`, `ipo_screen extract --enrich`); wire Preliminary to Final delta linking. | Phases 5G, 5H | **None** (CLI invocation layer only) | None | CLI workflow tests, E2E multi-source assembly tests | Explicit Authority from Ramki |
+| **5J** | **Validation, Regression & Acceptance**: Execute full acceptance test matrix across all 5 representative filing archetypes; verify golden hash preservation. | Phase 5I | **None** | None | Full regression suite (259 baseline + new enrichment tests) | Explicit Authority from Ramki |
+
+*Schema Versioning Analysis*: Phase 5E through 5J can be completed entirely **without mutating the frozen v1.5 canonical schema** (`schema/ipo-input.v1.5.schema.json`). By mapping Price Band Notices to `SourceType.EXCHANGE` (with `note="PRICE_BAND_NOTICE"`) and analyst assessments to `SourceType.STRUCTURED_INPUT` (with `extraction_method="MANUAL_ENTRY"`), 100% backward compatibility is maintained. If a future formal enum expansion is desired, it should be delivered as a versioned v1.6 schema.
+
+### K.5 Authority Required
+
+Strict separation of authorization levels:
+
+- **Already Authorized**:
+  - Phase 5D Read-Only Investigation (Completed).
+  - Phase 5D Architectural Design & Analysis (Completed).
+  - Phase 5D Documentation-Only Closure (Completed).
+- **NOT Authorized**:
+  - No implementation of `EnrichmentEngine` or `PriceBandNoticeParser`.
+  - No modification of `builder.py`, `canonical.py`, `derived.py`, `scoring.py`, or any engine code.
+  - No removal of hardcoded fallbacks at this gate.
+  - No mutation of schemas, configurations, test suites, or golden fixtures.
+  - No merge to `main`.
+  - No merge of PR #3.
+- **Future Authorization Required**:
+  - Explicit written authority from Ramki is mandatory before executing any work under Phases 5E, 5F, 5G, 5H, 5I, or 5J.
+  - Principle: `AUTHORIZATION ≠ IMPLEMENTATION`. Architecture decisions recorded here do not grant execution authority.
+
+### K.6 Future Implementation Safety Gates
+
+Mandatory preconditions that must be verified before executing any Phase 5E+ implementation:
+
+1. **Authoritative Repository & Ref Confirmed**: Remote `origin` verified at `https://github.com/ramkivs/ipo-screening-engine.git`; development branch `arena/ipo-screening-engine-v1.5`.
+2. **Remote Verification Protocol**: Remote ref independently verified via `git ls-remote` and `git fetch`.
+3. **Clean Worktree Enforced**: Working directory must be 100% clean (`git status` reports zero untracked/modified files).
+4. **Baseline Commit & Tree Recorded**: Parent commit SHA and tree SHA explicitly recorded prior to branching or editing.
+5. **Explicit Written Scope Authorization**: Implementation task must have direct authorization from Ramki.
+6. **Frozen Evaluation Core Boundaries Respected**: Hard boundary around `derived.py`, `scoring.py`, `knockouts.py`, `snapshots.py`, and `evaluation.py`.
+7. **Baseline Test Suite Passing**: All 259 existing tests must pass prior to any modification.
+8. **Golden Hash Preservation Asserted**: Result hash `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` must remain unchanged.
+9. **Mutation Boundary Isolated**: Changes restricted strictly to new upstream modules; zero cross-boundary code leakage.
+10. **Remote Durability Verification Planned**: Post-commit push must be independently verified against remote commit, tree, and blob hashes.
+11. **Main Branch Protection Verified**: `origin/main` remains untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`.
+12. **PR #3 Protection**: PR #3 remains OPEN and NOT MERGED.
+
+### K.7 Open Items After Phase 5D
+
+A clean separation of resolved architecture versus deferred implementation decisions:
+
+- **Architecture Decisions (CLOSED)**:
+  - Separation of raw extraction from pre-score assembly: CLOSED.
+  - Five source classes and authority hierarchy: CLOSED.
+  - First-class Price Band Notice ingestion model: CLOSED.
+  - Dynamic structural derivations upstream of scoring: CLOSED.
+  - Complete elimination of hardcoded builder fallbacks: CLOSED.
+  - Preservation of frozen deterministic scoring core: CLOSED.
+- **Implementation Tasks (NOT YET AUTHORIZED)**:
+  - Code implementation of Phases 5E through 5J awaits Ramki's explicit authority.
+- **External Provider Selection (DEFERRED / OUT OF SCOPE)**:
+  - Commercial vendor selection for live exchange bidding feeds (NSE/BSE) and secondary market quote APIs is an operational matter, not an engine architecture constraint.
+- **Future UI Framework (DEFERRED / OUT OF SCOPE)**:
+  - Specific UI technology choices (React web app, Electron desktop, or Jupyter interactive widget) remain deferred. The headless API defined in Phase 5D fully supports any presentation client.
+
+### K.8 Phase 5D Gate Reconciliation Checklist
+
+Every required output of the Phase 5D investigation is verified:
+
+- [PASS] Current-state architecture documented
+- [PASS] Pre-score architecture documented
+- [PASS] Five source classes documented
+- [PASS] Price Band Notice architecture documented
+- [PASS] Apply-price-details replacement documented
+- [PASS] Source vs derived distinction documented
+- [PASS] Derivation model documented
+- [PASS] Supplemental contract documented
+- [PASS] Source precedence documented
+- [PASS] Hardcoded fallback disposition documented
+- [PASS] UNKNOWN/fail-closed boundary documented
+- [PASS] Preliminary vs Final documented
+- [PASS] Immutability documented
+- [PASS] Provenance/auditability documented
+- [PASS] Trust boundaries documented
+- [PASS] Future test architecture documented
+- [PASS] Gap classification documented
+- [PASS] Decision register documented
+- [PASS] Proposed implementation phases documented
+- [PASS] Authority required documented
+- [PASS] Future implementation safety gates documented
+- [PASS] Open items documented
+
+**Final Phase 5D Status: PASS**
 ---
 
 **Awaiting decision, not implementation:** H1 (GCP reference fixture sign-off),
 H2 (EPC versus real estate).
 
 **Delivery & Remote Status:** PR #3 is open on GitHub against `main` from head
-`arena/ipo-screening-engine-v1.5` at commit `ac537a26cc6a9f8aa80db0abc54a4b2174932ba1`.
+`arena/ipo-screening-engine-v1.5`.
 All 259 tests green, golden hash frozen, main strictly protected.
 
 No merge to `main`. No production deployment.
