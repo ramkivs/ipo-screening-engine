@@ -1,0 +1,317 @@
+{
+  "config_version": "1.4.0",
+  "spec_version": "1.4",
+  "_conventions": {
+    "bands": "[operator, value, score]; evaluated top-down, first match wins, else 'else' score. Operators: > >= < <= ==",
+    "categorical": "map of bucket -> score; bucket names are produced by derived_metrics",
+    "penalty_kind": "criteria with kind=penalty carry min (negative) and add 0 to module max; module score floors at 0",
+    "missing_data": "a criterion whose metric is null scores 0 and is listed in scorecard.missing"
+  },
+  "currency": "INR_CRORES",
+  "units": { "INR_CRORES": 1, "INR_LAKHS": 0.01, "INR_MILLIONS": 0.1, "INR_BILLIONS": 100 },
+
+  "modes": {
+    "preliminary": { "exclude": ["qib_subscription", "nii_subscription", "overall_subscription", "gmp_trend", "retail_nii_penalty"], "scale": false, "verdict_label": "provisional" },
+    "final": { "exclude": [], "scale": false, "verdict_label": "final" }
+  },
+
+  "profile_resolution": {
+    "input_profiles": ["standard", "financial", "epc_real_estate", "cyclical"],
+    "auto_rules": [
+      { "profile": "loss_making", "unless_profile": ["financial"], "when": { "metric": "pat_latest", "op": "<", "value": 0 } }
+    ]
+  },
+
+  "thresholds": {
+    "hot_market": { "lookback_ipos": 5, "min_count": 3, "listing_gain_pct": 20 },
+    "sector_ipo_band_pct": 10,
+    "growth_share_min_pct": 75,
+    "near_ipo_price_pct": 10,
+    "margin_spike_bps": 500,
+    "low_base_margin_ratio": 0.5,
+    "staleness_hours": 24,
+    "peer_staleness_days": 30
+  },
+
+  "modules": [
+    {
+      "id": "A", "name": "Financial Quality", "max": 25,
+      "criteria": [
+        { "id": "revenue_cagr", "label": "Revenue CAGR (3Y)", "max": 6, "metric": "revenue_cagr_3y",
+          "rule": { "type": "bands", "bands": [[">", 25, 6], [">=", 15, 4], [">=", 8, 2]], "else": 0 } },
+        { "id": "margin_trend", "label": "Profit trend (EBITDA/PAT margin)", "max": 5, "metric": "margin_trend",
+          "rule": { "type": "categorical", "map": { "expanding": 5, "stable": 3, "volatile": 1, "declining_or_loss": 0 } } },
+        { "id": "roce", "label": "ROCE", "max": 5, "metric": "roce_latest",
+          "rule": { "type": "bands", "bands": [[">", 20, 5], [">=", 15, 3], [">=", 10, 1]], "else": 0 } },
+        { "id": "cfo_quality", "label": "Cash flow quality (CFO / PAT, 3Y)", "max": 5, "metric": "cfo_pat_3y_avg",
+          "rule": { "type": "bands", "bands": [[">", 0.8, 5], [">=", 0.5, 3], [">=", 0, 1]], "else": 0 } },
+        { "id": "leverage", "label": "Leverage (D/E, interest cover)", "max": 4, "metric": "leverage_bucket",
+          "rule": { "type": "categorical", "map": { "strong": 4, "ok": 2, "stretched": 1, "weak": 0 } } }
+      ]
+    },
+    {
+      "id": "B", "name": "Valuation", "max": 20,
+      "criteria": [
+        { "id": "pe_vs_peers", "label": "P/E (post-issue EPS) vs peer median", "max": 8, "metric": "pe_premium_pct",
+          "rule": { "type": "bands", "bands": [["<=", -20, 8], ["<", 0, 6], ["<=", 20, 3], ["<=", 50, 1]], "else": 0 } },
+        { "id": "second_multiple", "label": "EV/EBITDA (or P/B) vs peers", "max": 4, "metric": "second_multiple_premium_pct",
+          "rule": { "type": "bands", "bands": [["<=", -20, 4], ["<", 0, 3], ["<=", 20, 1.5], ["<=", 50, 0.5]], "else": 0 } },
+        { "id": "peg", "label": "PEG", "max": 4, "metric": "peg",
+          "rule": { "type": "bands", "bands": [["<", 1, 4], ["<=", 1.5, 3], ["<=", 2.5, 1]], "else": 0 },
+          "cap_if": { "flag": "low_base_year", "cap": 2 } },
+        { "id": "sector_ipo_relative", "label": "Valuation vs recent same-sector IPOs", "max": 4, "metric": "sector_ipo_relative",
+          "rule": { "type": "categorical", "map": { "cheaper": 4, "in_line": 2, "richer": 0 } } }
+      ]
+    },
+    {
+      "id": "C", "name": "Offer Structure, Proceeds & Pre-IPO", "max": 15,
+      "criteria": [
+        { "id": "fresh_share", "label": "Fresh issue share of offer", "max": 3, "metric": "fresh_share_pct",
+          "rule": { "type": "bands", "bands": [[">", 70, 3], [">=", 40, 2], [">=", 20, 1]], "else": 0 } },
+        { "id": "ofs_seller_type", "label": "OFS seller type", "max": 2, "metric": "ofs_seller_bucket",
+          "rule": { "type": "categorical", "map": { "none_or_small": 2, "pe_vc_exit": 1, "promoter_selling": 0 } } },
+        { "id": "promoter_ofs_pct", "label": "Promoter stake sold in OFS", "max": 2, "metric": "promoter_ofs_pct_of_holding",
+          "rule": { "type": "bands", "bands": [["==", 0, 2], ["<=", 10, 1]], "else": 0 } },
+        { "id": "dilution", "label": "Dilution from fresh issue", "max": 1, "metric": "dilution_ok",
+          "rule": { "type": "categorical", "map": { "true": 1, "false": 0 } }, "zero_if": { "flag": "pure_ofs" } },
+        { "id": "use_of_proceeds", "label": "Use of proceeds", "max": 4, "metric": "use_of_proceeds_bucket",
+          "rule": { "type": "categorical", "map": { "growth": 4, "mixed_ok": 2, "debt_heavy": 1, "blind_heavy": 0 } }, "zero_if": { "flag": "pure_ofs" } },
+        { "id": "pre_ipo_placement", "label": "Pre-IPO placements / discounted allotments", "max": 2, "metric": "pre_ipo_placement_bucket",
+          "rule": { "type": "categorical", "map": { "none_or_near_ipo": 2, "in_between": 1, "deep_discount_12m": 0 } } },
+        { "id": "lockin", "label": "Lock-in", "max": 1, "metric": "lockin_bucket",
+          "rule": { "type": "categorical", "map": { "intact": 1, "weak": 0 } } }
+      ]
+    },
+    {
+      "id": "D", "name": "Promoter & Governance", "max": 15,
+      "criteria": [
+        { "id": "promoter_post_holding", "label": "Post-issue promoter holding", "max": 4, "metric": "promoter_post_pct",
+          "rule": { "type": "bands", "bands": [[">", 60, 4], [">=", 45, 3], [">=", 30, 1]], "else": 0 } },
+        { "id": "litigation", "label": "Promoter track record & litigation", "max": 4, "metric": "litigation_bucket",
+          "rule": { "type": "categorical", "map": { "clean": 4, "minor_civil": 2, "criminal_or_regulatory": 0 } } },
+        { "id": "rpt", "label": "Related-party transactions (% revenue/costs)", "max": 3, "metric": "rpt_pct_revenue",
+          "rule": { "type": "bands", "bands": [["<", 5, 3], ["<=", 15, 1]], "else": 0 } },
+        { "id": "auditor", "label": "Auditor quality & remarks", "max": 2, "metric": "auditor_bucket",
+          "rule": { "type": "categorical", "map": { "clean_reputed": 2, "eom_only": 1, "unstable_or_repeated_eom": 0 } } },
+        { "id": "board_kmp", "label": "Board independence & KMP stability", "max": 2, "metric": "board_kmp_bucket",
+          "rule": { "type": "categorical", "map": { "independent_stable": 2, "other": 1, "high_churn": 0 } },
+          "note": "'other' = 1 fills a gap; the spec defines only 2 and 0" }
+      ]
+    },
+    {
+      "id": "E", "name": "Business & Moat", "max": 15,
+      "criteria": [
+        { "id": "industry_growth", "label": "Industry growth outlook", "max": 5, "metric": "industry_cagr_pct",
+          "rule": { "type": "bands", "bands": [[">", 12, 5], [">=", 8, 3], [">=", 0, 1]], "else": 0 } },
+        { "id": "moat", "label": "Market position & moat", "max": 5, "metric": "moat_rating",
+          "rule": { "type": "categorical", "map": { "leader_with_moat": 5, "strong_niche": 3, "follower": 1, "commoditised": 0 } } },
+        { "id": "concentration", "label": "Customer/supplier concentration (top 5)", "max": 3, "metric": "top5_customer_pct",
+          "rule": { "type": "bands", "bands": [["<", 30, 3], ["<=", 50, 1]], "else": 0 } },
+        { "id": "visibility", "label": "Capacity / order-book visibility", "max": 2, "metric": "visibility_rating",
+          "rule": { "type": "categorical", "map": { "strong": 2, "moderate": 1, "none": 0 } } }
+      ]
+    },
+    {
+      "id": "F", "name": "Market & Demand Signals", "max": 10,
+      "criteria": [
+        { "id": "anchor_quality", "label": "Anchor investor quality", "max": 3, "metric": "anchor_bucket",
+          "rule": { "type": "categorical", "map": { "reputed": 3, "mixed": 1, "unknown": 0 } } },
+        { "id": "qib_subscription", "label": "QIB subscription (final day)", "max": 3, "metric": "qib_x",
+          "rule": { "type": "bands_by_variant", "variant_metric": "market_regime_variant",
+            "variants": {
+              "normal": { "bands": [[">", 20, 3], [">=", 10, 2], [">=", 1, 1]], "else": 0 },
+              "hot": { "bands": [[">", 50, 3], [">=", 20, 2], [">=", 2, 1]], "else": 0 }
+            } } },
+        { "id": "gmp_trend", "label": "GMP trend (sentiment only)", "max": 2, "metric": "gmp_bucket",
+          "rule": { "type": "categorical", "map": { "strong": 2, "flat": 1, "falling": 0 } } },
+        { "id": "market_regime", "label": "Market regime", "max": 2, "metric": "market_regime_bucket",
+          "rule": { "type": "categorical", "map": { "supportive": 2, "neutral": 1, "weak": 0 } } },
+        { "id": "retail_nii_penalty", "label": "Retail/NII under-subscription (Final mode)", "max": 0, "min": -2, "kind": "penalty",
+          "when": { "flag": "retail_or_nii_below_1x" }, "points": -2 }
+      ]
+    }
+  ],
+
+  "sector_overlays": {
+    "financial": {
+      "remove": ["margin_trend", "roce", "cfo_quality", "leverage", "second_multiple"],
+      "add": [
+        { "module": "A", "id": "nim_cost_income", "label": "NIM and cost-to-income trend", "max": 5, "metric": "nim_cost_income_bucket",
+          "rule": { "type": "categorical", "map": { "improving": 5, "stable": 3, "mixed": 1, "deteriorating": 0 } } },
+        { "module": "A", "id": "roa_roe_vs_peers", "label": "ROA / ROE vs listed peers", "max": 5, "metric": "roa_roe_peer_quartile",
+          "rule": { "type": "categorical", "map": { "top_quartile": 5, "median": 3, "bottom_half": 1 } } },
+        { "module": "A", "id": "asset_quality", "label": "Asset quality (GNPA/NNPA, provision coverage)", "max": 5, "metric": "asset_quality_bucket",
+          "rule": { "type": "categorical", "map": { "improving_strong": 5, "stable": 3, "deteriorating": 1, "stressed": 0 } } },
+        { "module": "A", "id": "crar_buffer", "label": "CRAR / Tier 1 buffer over regulatory minimum (pts)", "max": 4, "metric": "crar_buffer_pts",
+          "rule": { "type": "bands", "bands": [[">=", 5, 4], [">=", 2, 2]], "else": 0 } },
+        { "module": "B", "id": "pb_roe_adjusted", "label": "P/B vs peers, ROE-adjusted", "max": 4, "metric": "pb_roe_adjusted_premium_pct",
+          "rule": { "type": "bands", "bands": [["<=", -20, 4], ["<", 0, 3], ["<=", 20, 1.5], ["<=", 50, 0.5]], "else": 0 } }
+      ]
+    },
+    "epc_real_estate": {
+      "remove": ["cfo_quality", "leverage"],
+      "add": [
+        { "module": "A", "id": "cfo_or_orderbook", "label": "CFO/PAT with order-book or pre-sales exemption", "max": 5, "metric": "cfo_pat_3y_avg",
+          "rule": { "type": "bands", "bands": [[">", 0.8, 5], [">=", 0.5, 3], [">=", 0, 1]], "else": 0 },
+          "exempt_if": { "flag": "cfo_exempt", "score": 3 },
+          "note": "exempt score of 3 is an interpretation of 'negative CFO accepted'; calibrate" },
+        { "module": "A", "id": "net_debt_trend_icr", "label": "Net debt/equity trend and project-debt interest cover", "max": 4, "metric": "net_debt_bucket",
+          "rule": { "type": "categorical", "map": { "strong": 4, "ok": 2, "stretched": 1, "weak": 0 } } }
+      ]
+    },
+    "loss_making": {
+      "remove": ["margin_trend", "roce", "cfo_quality", "pe_vs_peers", "peg"],
+      "add": [
+        { "module": "A", "id": "contribution_margin", "label": "Restated contribution margin trend", "max": 5, "metric": "contribution_bucket",
+          "rule": { "type": "categorical", "map": { "expanding_2y_gt300bps": 5, "positive_improving": 3, "positive_flat_or_falling": 1, "negative": 0 } } },
+        { "module": "A", "id": "cash_runway", "label": "Cash runway post-issue (months)", "max": 5, "metric": "cash_runway_months",
+          "rule": { "type": "bands", "bands": [[">=", 24, 5], [">=", 12, 2]], "else": 0 } },
+        { "module": "B", "id": "ps_evsales_vs_peers", "label": "EV/Sales or P/S vs peers", "max": 12, "metric": "ps_premium_pct",
+          "rule": { "type": "bands", "bands": [["<=", -20, 12], ["<", 0, 9], ["<=", 20, 4.5], ["<=", 50, 1.5]], "else": 0 } },
+        { "module": "A", "id": "operating_loss_narrowing", "label": "Operating loss (% of revenue) narrowing", "max": 5, "metric": "loss_narrowing_bucket",
+          "rule": { "type": "categorical", "map": { "two_years": 5, "one_year": 2.5, "widening": 0 } } }
+      ],
+      "note": "margin_trend removed so each underlying metric is scored once: operating loss trend (A), contribution margin (A), cash runway (A); P/S carries the full 12 valuation points formerly split with PEG"
+    },
+    "cyclical": {
+      "metric_override": {
+        "margin_trend": "margin_trend_5y_avg",
+        "pe_vs_peers": "pe_premium_mid_cycle_pct",
+        "second_multiple": "ev_ebitda_mid_cycle_premium_pct"
+      }
+    }
+  },
+
+  "structure_overlays": {
+    "retail_heavy": {
+      "when": { "metric": "qib_quota_pct", "op": "<=", "value": 10 },
+      "note": "QIB portion <=10% of the offer: no anchor book and QIB subscription carries no signal, so both items are replaced",
+      "remove": ["anchor_quality", "qib_subscription"],
+      "add": [
+        { "module": "F", "id": "overall_subscription", "label": "Overall subscription at close", "max": 3, "metric": "overall_x",
+          "rule": { "type": "bands", "bands": [[">", 10, 3], [">=", 3, 2], [">=", 1, 1]], "else": 0 } },
+        { "module": "F", "id": "nii_subscription", "label": "NII subscription at close", "max": 3, "metric": "nii_x",
+          "rule": { "type": "bands_by_variant", "variant_metric": "market_regime_variant",
+            "variants": {
+              "normal": { "bands": [[">", 20, 3], [">=", 10, 2], [">=", 1, 1]], "else": 0 },
+              "hot": { "bands": [[">", 50, 3], [">=", 20, 2], [">=", 2, 1]], "else": 0 }
+            } } }
+      ]
+    }
+  },
+
+  "knockouts": [
+    { "id": "K1", "label": "Qualified/adverse/disclaimer opinion, going concern, or negative net worth",
+      "when": { "any": [
+        { "metric": "auditor_opinion", "op": "in", "value": ["qualified", "adverse", "disclaimer"] },
+        { "flag": "going_concern_uncertainty" },
+        { "metric": "net_worth_latest", "op": "<", "value": 0 } ] } },
+    { "id": "K2", "label": "Promoter pledge >25% or active SEBI/ED action",
+      "when": { "any": [
+        { "metric": "promoter_pledge_pct", "op": ">", "value": 25 },
+        { "flag": "sebi_ed_action_active" } ] } },
+    { "id": "K3", "label": "OFS >80% with declining profits",
+      "when": { "all": [
+        { "metric": "ofs_share_pct", "op": ">", "value": 80 },
+        { "flag": "profit_declining" } ] } },
+    { "id": "K4", "label": "Promoters + PE/VC sell >50% of combined holding, promoters exit/<20%, and weak financials",
+      "when": { "all": [
+        { "metric": "pe_promoter_sold_pct_combined", "op": ">", "value": 50 },
+        { "any": [ { "flag": "promoter_full_exit" }, { "metric": "promoter_post_pct", "op": "<", "value": 20 } ] },
+        { "any": [ { "flag": "profit_declining" }, { "metric": "roce_latest", "op": "<", "value": 10 }, { "metric": "cfo_pat_3y_avg", "op": "<", "value": 0.5 } ] } ] } },
+    { "id": "K5", "label": "Contingent liabilities >50% of net worth (or unquantified)",
+      "when": { "any": [
+        { "metric": "contingent_liab_pct_networth", "op": ">", "value": 50 },
+        { "flag": "contingent_liab_unquantified" } ] } },
+    { "id": "K6", "label": "Related parties drive >40% of revenue growth",
+      "when": { "metric": "rpt_pct_of_revenue_growth", "op": ">", "value": 40 } }
+  ],
+
+  "penalties": {
+    "max_total": -15,
+    "items": [
+      { "id": "margin_spike", "label": "Margin up >500 bps YoY in either of the last two FYs", "points": -3, "when": { "flag": "margin_spike_pre_ipo" } },
+      { "id": "receivable_days_up", "label": "Receivable days up >30% YoY", "points": -3, "when": { "metric": "receivable_days_yoy_pct", "op": ">", "value": 30 } },
+      { "id": "auditor_cfo_exit", "label": "Auditor/CFO resignation in last 2 years", "points": -3, "when": { "flag": "auditor_or_cfo_exit_2y" } },
+      { "id": "discounted_allotments", "label": "Heavy non-pro-rata discounted allotments/ESOPs within 18 months before DRHP (pro-rata bonus/rights excluded)", "points": -2, "when": { "flag": "heavy_discounted_allotments_18m" } },
+      { "id": "unreconciled_metrics", "label": "Adjusted metrics with no Ind AS reconciliation", "points": -2, "when": { "flag": "adjusted_metrics_unreconciled" } },
+      { "id": "regulatory_dependence", "label": "Regulatory dependence (single licence, price control)", "points": -2, "when": { "flag": "regulatory_dependence" } },
+      { "id": "eom_caro", "label": "Emphasis of Matter / CARO remarks", "scale": { "low": -1, "medium": -2, "high": -3 }, "metric": "eom_materiality" }
+    ]
+  },
+
+  "caps": [
+    { "id": "pure_ofs", "label": "No fresh issue", "when": { "flag": "pure_ofs" }, "max_score": 60 }
+  ],
+
+  "verdict": {
+    "bands": [
+      { "min": 75, "verdict": "APPLY" },
+      { "min": 60, "verdict": "APPLY_SELECTIVELY" },
+      { "min": 45, "verdict": "NEUTRAL" }
+    ],
+    "else": "AVOID",
+    "knockout_verdict": "AVOID",
+    "preliminary_range": "low = sum(min of excluded penalty criteria); high = sum(max of excluded scoring criteria); flag band_may_change if [score+low, score+high] crosses a band edge"
+  },
+
+  "confidence": { "high_min_completeness_pct": 95, "medium_min_completeness_pct": 80, "low_verdict": "INSUFFICIENT_DATA" },
+
+  "validation": {
+    "assert_module_sums": true,
+    "assert_total": 100,
+    "unit_conversion_ratio_flag": 10,
+    "proceeds_limits_pct_of_fresh": { "gcp_max": 25, "unidentified_acquisition_max": 25, "combined_max": 35 },
+    "ofs_6_2_limits_pct_of_holding": { "holder_gt_20pct_max_sell": 50, "holder_lt_20pct_max_sell": 10 },
+    "source_cross_check_tolerance_pct": 5
+  },
+
+  "derived_metrics": {
+    "pat_latest": "PAT of latest restated FY (INR_CRORES)",
+    "revenue_cagr_3y": "((rev[t]/rev[t-3])^(1/3) - 1) * 100",
+    "margin_trend": "expanding: EBITDA and PAT margin both up each year; declining_or_loss: latest PAT<=0 or both margins down; volatile: direction flips with range >300 bps; else stable",
+    "roce_latest": "EBIT / (net worth + debt) latest FY, %; disclosed ROCE overrides if present",
+    "cfo_pat_3y_avg": "sum(CFO, 3Y) / sum(PAT, 3Y); null if sum(PAT)<=0",
+    "leverage_bucket": "strong: D/E<0.5 and ICR>5; ok: D/E<1; stretched: 1<=D/E<=2; weak: D/E>2",
+    "pe_premium_pct": "(issue price / post-issue EPS) / peer median P/E - 1, x100; positive = premium",
+    "second_multiple_premium_pct": "same on EV/EBITDA; P/B if EBITDA not meaningful",
+    "peg": "post-issue P/E / 3Y PAT CAGR (%); null if CAGR<=0; recomputed on 3Y-average margin when low_base_year",
+    "low_base_year": "earliest-year PAT margin < low_base_margin_ratio x latest-year margin",
+    "sector_ipo_relative": "post-issue P/E vs median of last 4 same-sector IPOs: cheaper < -sector_ipo_band_pct; richer > +band; else in_line",
+    "fresh_share_pct": "fresh / (fresh + ofs) x 100",
+    "ofs_share_pct": "100 - fresh_share_pct",
+    "pure_ofs": "fresh == 0",
+    "ofs_seller_bucket": "promoter_selling if any promoter or promoter_group seller sold >0;  else pe_vc_exit if any PE/VC sells >=25% of its holding; else none_or_small",
+    "promoter_ofs_pct_of_holding": "promoter shares sold / promoter pre-issue shares x 100",
+    "pe_promoter_sold_pct_combined": "(promoter + PE/VC shares sold) / (their pre-issue shares) x 100",
+    "promoter_full_exit": "promoter post-issue shares == 0",
+    "dilution_pct": "fresh shares / post-issue shares x 100",
+    "dilution_ok": "dilution_pct < 25 or use_of_proceeds_bucket == growth",
+    "use_of_proceeds_bucket": "blind_heavy: (gcp + unidentified acquisition)/fresh > 20%; else debt_heavy: debt repayment/fresh > 50%; else growth: (capex + R&D)/fresh >= growth_share_min_pct; else mixed_ok",
+    "pre_ipo_placement_bucket": "deep_discount_12m: any placement in 12M before issue open at >25% below issue price; none_or_near_ipo: none, or all within near_ipo_price_pct of issue price; else in_between",
+    "lockin_bucket": "intact: promoter lock-in in place and no early unlock of large pre-IPO holders; else weak",
+    "promoter_post_pct": "promoter + promoter group holding post-issue, %",
+    "litigation_bucket": "clean / minor_civil / criminal_or_regulatory (promoters, directors, company)",
+    "rpt_pct_revenue": "related-party transactions / revenue, latest FY, %",
+    "rpt_pct_of_revenue_growth": "share of revenue growth attributable to related parties, %",
+    "auditor_bucket": "clean_reputed: reputed firm, unqualified, no change; eom_only: Emphasis of Matter/CARO/disputed tax only; unstable_or_repeated_eom: auditor change in 3Y or repeated EoM",
+    "eom_materiality": "low / medium / high by size of matter relative to net worth",
+    "board_kmp_bucket": "independent_stable: independent-majority board, no KMP exit in 2Y; high_churn: >=2 KMP exits in 2Y; else other",
+    "industry_cagr_pct": "forward industry CAGR from independent industry report in RHP, %",
+    "top5_customer_pct": "top-5 customers (or suppliers, whichever is higher) as % of revenue/cost",
+    "market_regime_variant": "hot if >= min_count of last lookback_ipos listed above listing_gain_pct; else normal",
+    "retail_or_nii_below_1x": "retail or NII subscription < 1.0x at close",
+    "profit_declining": "PAT down YoY in latest FY, or PAT CAGR (3Y) < 0",
+    "margin_spike_pre_ipo": "EBITDA margin rise exceeds margin_spike_bps in either of the last two FYs",
+    "receivable_days_yoy_pct": "(receivable days latest / prior - 1) x 100",
+    "cfo_exempt": "cfo_pat_3y_avg < 0 and (order book >= 2x revenue (EPC) or collections >= pre-sales trend (real estate)) and receivable days YoY < 15%",
+    "contingent_liab_pct_networth": "contingent liabilities / net worth x 100",
+    "crar_buffer_pts": "CRAR (or Tier 1) minus regulatory minimum, percentage points",
+    "cash_runway_months": "(post-issue cash and equivalents) / (average monthly operating cash burn, latest FY)",
+    "contribution_bucket": "expanding_2y_gt300bps: positive and up >300 bps YoY two years running; positive_improving; positive_flat_or_falling; negative",
+    "loss_narrowing_bucket": "two_years: operating loss % of revenue narrowed 2 consecutive years; one_year: latest year only; widening: otherwise",
+    "qib_quota_pct": "QIB share of the offer, % (issue.quota_pct.qib); <=10 triggers the retail_heavy structure overlay",
+    "overall_x": "overall subscription multiple at close (market.subscription.overall_x)",
+    "nii_x": "NII subscription multiple at close (market.subscription.nii_x)"
+  }
+}

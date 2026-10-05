@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IPO Scorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{--bg:#fff;--fg:#1b1b1f;--mut:#666;--bd:#d8d8de;--ac:#2557d6;--ok:#1a7f4b;--bad:#b3261e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15161a;--fg:#e8e8ec;--mut:#9a9aa4;--bd:#34353c;--ac:#8aa8ff;--ok:#5fd39a;--bad:#ff8a80}}
+:root[data-theme="dark"]{--bg:#15161a;--fg:#e8e8ec;--mut:#9a9aa4;--bd:#34353c;--ac:#8aa8ff;--ok:#5fd39a;--bad:#ff8a80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,sans-serif;margin:0 auto;padding:16px;max-width:900px}
+h1{font-size:20px;margin:0 0 4px}.m{color:var(--mut)}label{display:block;margin:10px 0 4px;font-weight:600}
+input,select,button,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:6px 8px;max-width:100%}
+button{background:var(--ac);color:var(--bg);border:0;cursor:pointer;padding:8px 16px;margin-top:12px}
+.box{border:1px solid var(--bd);border-radius:8px;padding:12px;margin-top:14px}
+.big{font-size:22px;font-weight:700}.ok{color:var(--ok)}.bad{color:var(--bad)}
+.w{overflow-x:auto}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--bd);padding:4px 6px;text-align:left;white-space:nowrap}
+pre{overflow-x:auto;font-size:12px}
+</style></head><body>
+<h1>IPO Scorer</h1>
+<div class="m">Engine for Spec v1.4 / Config 1.4.0. Load the config and an input JSON (see ipo-input.schema.json), choose a mode, run.</div>
+<div class="box"><b>Step 1 (optional): extract from an RHP/DRHP PDF</b>
+<div class="m">Reads the PDF in your browser, asks an AI model (your choice below) to fill the fields from the key sections, and shows the JSON with page references for you to check.</div>
+<label>AI provider for extraction</label>
+<select id="pv"><option value="manual">Manual: copy prompt to any chatbot, paste reply</option><option value="key">Anthropic API key (direct from browser)</option><option value="app">Claude in-app (only inside Claude)</option></select>
+<span id="kb" style="display:none"><input type="password" id="ak" placeholder="sk-ant-..." autocomplete="off" style="width:220px"> <input id="mdl" value="claude-sonnet-5-5" style="width:170px"></span>
+<div class="m">The key is used only for requests from this page and is never saved.</div>
+<div id="mp" class="box" style="display:none"><b id="mpt"></b><div class="m">1) Copy this prompt into any AI chat. 2) Paste its JSON reply below. 3) Submit.</div>
+<textarea id="mpp" rows="5" readonly style="width:100%;font-family:monospace;font-size:12px"></textarea><br><button id="mpc">Copy prompt</button>
+<textarea id="mpr" rows="6" placeholder="Paste the JSON reply here" style="width:100%;font-family:monospace;font-size:12px;margin-top:8px"></textarea><br><button id="mps">Submit reply</button> <button id="mpk" style="background:var(--mut)">Skip this part</button></div>
+<input type="file" id="fp" accept=".pdf"><br><button id="ex">Extract</button><div id="st" class="m"></div>
+<div id="jb"><label>Price band notice: cap (higher), floor (lower), lot</label>
+<input type="number" id="ph" placeholder="Cap (higher)" style="width:110px"> <input type="number" id="pl" placeholder="Floor (lower)" style="width:90px"> <input type="number" id="lot" placeholder="Lot" style="width:70px"> <button id="pa">Apply price &amp; details</button><div class="m">Fill the details below (anything the RHP does not state), then click Apply. Apply rebuilds the JSON from the AI replies, so do any hand-editing of the JSON afterwards.</div><div id="mf" class="box"></div>
+<textarea id="jt" rows="14" placeholder="Extracted JSON appears here. You can also paste or edit your own JSON here." style="width:100%;margin-top:8px;font-family:monospace;font-size:12px"></textarea>
+<button id="us">Use this JSON as the Input</button> <button id="dl" style="background:var(--mut)">Download JSON</button><div id="ev" class="m"></div></div></div>
+<label>Config (ipo-config.json) <span class="m" style="font-weight:400">- remembered in this browser after first use</span></label><input type="file" id="fc" accept=".json">
+<label>Input (IPO JSON)</label><input type="file" id="fi" accept=".json">
+<label>Mode</label><select id="md"><option value="preliminary">preliminary</option><option value="final">final</option></select><br>
+<button id="go">Score</button>
+<div id="out"></div>
+<script>
+const med=a=>{a=a.filter(x=>x!=null&&isFinite(x)).sort((x,y)=>x-y);if(!a.length)return null;const k=a.length>>1;return a.length%2?a[k]:(a[k-1]+a[k])/2};
+const sm=a=>a.reduce((s,x)=>s+(x||0),0);
+const pct=(a,b)=>a==null||b==null||b==0?null:a/b*100;
+const OPS={'>':(a,b)=>a>b,'>=':(a,b)=>a>=b,'<':(a,b)=>a<b,'<=':(a,b)=>a<=b,'==':(a,b)=>a==b,in:(a,b)=>b.includes(a)};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function derive(i,c){
+ const f=c.units[i.financials.reporting_unit]||1,k=x=>x==null?null:x*f,th=c.thresholds;
+ const P=i.financials.periods.filter(p=>!p.is_stub).map(p=>{const o={...p};for(const n of['revenue','ebitda','ebit','pat','net_worth','total_debt','interest_expense','cfo','capex','cash_and_equivalents'])o[n]=k(p[n]);return o});
+ const L=P[P.length-1],E=P[0],pv=P[P.length-2]||{},n=P.length-1;
+ const iss=i.issue,cap=i.capital_structure,g=i.governance||{},b=i.business||{},mk=i.market||{},m={};
+ const fresh=k(iss.fresh_issue),ofs=k(iss.ofs);
+ const cg=(x,y)=>x>0&&y>0&&n>0?(Math.pow(x/y,1/n)-1)*100:null;
+ const mg=(p,x)=>p[x]==null||!p.revenue?null:p[x]/p.revenue*100,em=P.map(p=>mg(p,'ebitda')),pm=P.map(p=>mg(p,'pat'));
+ const dif=a=>a.slice(1).map((x,j)=>x-a[j]),de=dif(em),dp=dif(pm);
+ m.pat_latest=L.pat;m.net_worth_latest=L.net_worth;m.revenue_cagr_3y=cg(L.revenue,E.revenue);
+ m.margin_trend=em.concat(pm).some(x=>x==null)?null:(L.pat<=0||(de.every(x=>x<0)&&dp.every(x=>x<0)))?'declining_or_loss':(de.every(x=>x>0)&&dp.every(x=>x>0))?'expanding':(de.some(x=>x>0)&&de.some(x=>x<0)&&Math.max(...em)-Math.min(...em)>3)?'volatile':'stable';
+ m.roce_latest=L.disclosed_roce_pct??pct(L.ebit,L.net_worth+L.total_debt);
+ const l3=P.slice(-3);m.cfo_pat_3y_avg=sm(l3.map(p=>p.pat))>0?sm(l3.map(p=>p.cfo))/sm(l3.map(p=>p.pat)):null;
+ const D=L.net_worth>0?L.total_debt/L.net_worth:null,ic=L.interest_expense>0?(L.ebit??L.ebitda)/L.interest_expense:99;
+ m.leverage_bucket=D==null?null:D<.5&&ic>5?'strong':D<1?'ok':D<=2?'stretched':'weak';
+ const px=iss.price_band_high,eps=iss.post_issue_eps,mc=iss.post_issue_shares&&px?px*iss.post_issue_shares/1e7:null,pe=eps>0&&px?px/eps:null;
+ const PR=(v,pk)=>{const q=med((i.peers||[]).map(p=>p[pk]));return v==null||!q?null:(v/q-1)*100};
+ const ev=mc==null?null:mc+(L.total_debt||0)-(L.cash_and_equivalents||0),eve=L.ebitda>0&&ev!=null?ev/L.ebitda:null;
+ const pb=mc==null||!(L.net_worth+(fresh||0)>0)?null:mc/(L.net_worth+(fresh||0)),ps=mc==null||!L.revenue?null:mc/L.revenue;
+ m.pe_premium_pct=PR(pe,'pe');
+ m.second_multiple_premium_pct=eve!=null&&i.peers.some(p=>p.ev_ebitda)?PR(eve,'ev_ebitda'):PR(pb,'pb');
+ m.ps_premium_pct=PR(ps,'ps');
+ const pg=cg(L.pat,E.pat);m.peg=pe!=null&&pg>0?pe/pg:null;
+ m.low_base_year=pm[0]!=null&&pm[0]<th.low_base_margin_ratio*pm[pm.length-1];
+ const sp=med((i.recent_sector_ipos||[]).map(x=>x.pe_at_issue)),bd=th.sector_ipo_band_pct;
+ m.sector_ipo_relative=pe==null||!sp?null:pe<sp*(1-bd/100)?'cheaper':pe>sp*(1+bd/100)?'richer':'in_line';
+ const S=iss.ofs_sellers||[],T=t=>S.filter(s=>s.type===t),pr=S.filter(s=>s.type==='promoter'||s.type==='promoter_group'),vc=T('pe_vc');
+ const sold=sm(pr.concat(vc).map(s=>s.shares_sold)),pre=sm(pr.concat(vc).map(s=>s.pre_issue_shares)),psold=sm(pr.map(s=>s.shares_sold)),ppre=sm(pr.map(s=>s.pre_issue_shares));
+ m.fresh_share_pct=fresh!=null&&ofs!=null&&fresh+ofs>0?fresh/(fresh+ofs)*100:null;m.ofs_share_pct=m.fresh_share_pct==null?null:100-m.fresh_share_pct;m.pure_ofs=fresh===0;
+ m.ofs_seller_bucket=psold>0?'promoter_selling':vc.some(s=>s.pre_issue_shares>0&&s.shares_sold/s.pre_issue_shares>=.25)?'pe_vc_exit':'none_or_small';
+ m.promoter_ofs_pct_of_holding=ppre>0?psold/ppre*100:0;
+ m.pe_promoter_sold_pct_combined=pre>0?sold/pre*100:0;m.promoter_full_exit=cap.promoter_post_pct===0;
+ const U={};(i.use_of_proceeds||[]).forEach(u=>U[u.category]=(U[u.category]||0)+k(u.amount));
+ const fr=x=>fresh>0?(U[x]||0)/fresh*100:0;
+ m.use_of_proceeds_bucket=fresh>0?(fr('gcp')+fr('acquisition_unidentified')>20?'blind_heavy':fr('debt_repayment')>50?'debt_heavy':fr('growth_capex')+fr('rnd')>=th.growth_share_min_pct?'growth':'mixed_ok'):null;
+ m.dilution_pct=iss.fresh_shares&&iss.post_issue_shares?iss.fresh_shares/iss.post_issue_shares*100:null;
+ m.dilution_ok=m.dilution_pct==null&&m.use_of_proceeds_bucket!=='growth'?null:(m.dilution_pct<25||m.use_of_proceeds_bucket==='growth');
+ const od=new Date(iss.open_date),pl=(cap.pre_ipo_placements||[]).filter(p=>od>=new Date(p.date)&&(od-new Date(p.date))/864e5<=365);
+ m.pre_ipo_placement_bucket=pl.some(p=>p.price<.75*px)?'deep_discount_12m':pl.every(p=>p.price>=(1-th.near_ipo_price_pct/100)*px)?'none_or_near_ipo':'in_between';
+ m.lockin_bucket=cap.promoter_lockin_in_place==null?null:(cap.promoter_lockin_in_place&&!cap.large_holders_unlocked_early?'intact':'weak');
+ m.promoter_post_pct=cap.promoter_post_pct;m.promoter_pledge_pct=cap.promoter_pledge_pct;
+ Object.assign(m,{litigation_bucket:g.litigation_bucket,rpt_pct_revenue:g.rpt_pct_revenue,rpt_pct_of_revenue_growth:g.rpt_pct_of_revenue_growth,auditor_opinion:g.auditor_opinion,going_concern_uncertainty:g.going_concern_uncertainty,sebi_ed_action_active:g.sebi_ed_action_active,eom_materiality:g.eom_materiality,auditor_or_cfo_exit_2y:g.auditor_or_cfo_exit_2y});
+ m.auditor_bucket=g.auditor_opinion==null?null:g.auditor_changed_3y?'unstable_or_repeated_eom':g.auditor_opinion==='unqualified'&&g.auditor_reputed?'clean_reputed':'eom_only';
+ m.board_kmp_bucket=g.kmp_exits_2y==null?null:g.kmp_exits_2y>=2?'high_churn':g.board_independent_majority&&g.kmp_exits_2y===0?'independent_stable':'other';
+ Object.assign(m,{industry_cagr_pct:b.industry_cagr_pct,moat_rating:b.moat_rating,visibility_rating:b.visibility_rating,regulatory_dependence:b.regulatory_dependence});
+ const t5=[b.top5_customer_pct,b.top5_supplier_pct].filter(x=>x!=null);m.top5_customer_pct=t5.length?Math.max(...t5):null;
+ const sb=mk.subscription||{},rg=mk.regime||{},hm=th.hot_market,gl=rg.last_ipo_listing_gains_pct||[];
+ m.anchor_bucket=(mk.anchor||{}).quality;m.qib_x=sb.qib_x;m.nii_x=sb.nii_x;m.overall_x=sb.overall_x;m.qib_quota_pct=(iss.quota_pct||{}).qib;m.gmp_bucket=(mk.gmp||{}).trend;m.market_regime_bucket=rg.nifty_trend;
+ m.market_regime_variant=gl.slice(-hm.lookback_ipos).filter(x=>x>hm.listing_gain_pct).length>=hm.min_count?'hot':'normal';
+ m.retail_or_nii_below_1x=sb.nii_x!=null&&sb.retail_x!=null?(sb.nii_x<1||sb.retail_x<1):null;
+ m.profit_declining=pv.pat!=null?(L.pat<pv.pat||pg<0):null;
+ m.contingent_liab_pct_networth=pct(k(i.financials.contingent_liabilities),L.net_worth);m.contingent_liab_unquantified=i.financials.contingent_liabilities_unquantified;
+ const qs=[1,2].map(j=>em.length>j?em[em.length-j]-em[em.length-j-1]:null).filter(x=>x!=null&&!isNaN(x));m.margin_spike_pre_ipo=qs.length?qs.some(x=>x*100>th.margin_spike_bps):null;
+ m.receivable_days_yoy_pct=pv.receivable_days?(L.receivable_days/pv.receivable_days-1)*100:null;
+ m.heavy_discounted_allotments_18m=cap.discounted_allotments_18m_before_drhp;m.adjusted_metrics_unreconciled=i.financials.adjusted_metrics_unreconciled;
+ const cm=P.map(p=>p.contribution_margin_pct),ol=P.map(p=>p.operating_loss_pct_revenue),a=cm.length,z=ol.length;
+ m.contribution_bucket=cm.slice(-3).some(x=>x==null)||a<3?null:cm[a-1]<=0?'negative':(cm[a-1]-cm[a-2]>3&&cm[a-2]-cm[a-3]>3)?'expanding_2y_gt300bps':cm[a-1]>cm[a-2]?'positive_improving':'positive_flat_or_falling';
+ m.loss_narrowing_bucket=ol.slice(-3).some(x=>x==null)||z<3?null:(ol[z-1]<ol[z-2]&&ol[z-2]<ol[z-3])?'two_years':ol[z-1]<ol[z-2]?'one_year':'widening';
+ const burn=L.cfo<0?-L.cfo/12:0;m.cash_runway_months=L.cash_and_equivalents==null?null:burn>0?(L.cash_and_equivalents+(fresh||0))/burn:999;
+ return Object.assign(m,i.metric_overrides||{});
+}
+
+const cond=(w,m)=>w.all?w.all.every(x=>cond(x,m)):w.any?w.any.some(x=>cond(x,m)):w.flag?!!m[w.flag]:(v=>v!=null&&OPS[w.op](v,w.value))(m[w.metric]);
+
+function item(c,m,ex){
+ const r={id:c.id,label:c.label,max:c.max,metric:c.metric,score:0};
+ if(ex.includes(c.id))return{...r,excluded_by_mode:true,reason:'excluded in this mode'};
+ if(c.kind==='penalty'){const h=cond(c.when,m);return{...r,score:h?c.points:0,reason:h?'triggered':'not triggered'}}
+ if(c.zero_if&&cond(c.zero_if,m))return{...r,reason:'zeroed (no fresh issue)'};
+ if(c.exempt_if&&m[c.exempt_if.flag])return{...r,score:c.exempt_if.score,reason:'exempt'};
+ const v=m[c.metric],ru=c.rule;r.value=v??null;
+ if(v==null)return{...r,missing:true,reason:'missing'};
+ let s=0,bn;
+ if(ru.type==='categorical'){const x=ru.map[String(v)];if(x==null)return{...r,missing:true,reason:'unknown bucket '+v};s=x;bn=String(v)}
+ else{const bs=ru.type==='bands'?ru:ru.variants[m[ru.variant_metric]||'normal'],h=bs.bands.find(x=>OPS[x[0]](v,x[1]));s=h?h[2]:bs.else;bn=h?h[0]+' '+h[1]:'else'}
+ if(c.cap_if&&m[c.cap_if.flag]&&s>c.cap_if.cap){s=c.cap_if.cap;r.capped_by=c.cap_if.flag}
+ return{...r,score:s,band:bn,reason:'matched '+bn};
+}
+
+function score(inp,cfg,mode){
+ const m=derive(inp,cfg),ex=cfg.modes[mode].exclude,val=[];let prof=inp.sector_profile;
+ const ar=cfg.profile_resolution.auto_rules.find(a=>!a.unless_profile.includes(prof)&&cond(a.when,m));if(ar)prof=ar.profile;
+ const ov=cfg.sector_overlays[prof]||{},all=[],so=Object.entries(cfg.structure_overlays||{}).filter(([k,x])=>cond(x.when,m)),rm=(ov.remove||[]).concat(...so.map(([k,x])=>x.remove||[])),ad=(ov.add||[]).concat(...so.map(([k,x])=>x.add||[]));
+ const modules=cfg.modules.map(md=>{
+  const cr=md.criteria.filter(c=>!rm.includes(c.id)).concat(ad.filter(a=>a.module===md.id)).map(c=>ov.metric_override&&ov.metric_override[c.id]?{...c,metric:ov.metric_override[c.id]}:c);
+  all.push(...cr);const items=cr.map(c=>item(c,m,ex)),mx=sm(cr.filter(c=>c.kind!=='penalty').map(c=>c.max));
+  if(mx!==md.max)val.push('module '+md.id+' max '+mx+' != '+md.max);
+  return{id:md.id,name:md.name,score:Math.max(0,sm(items.map(x=>x.score))),max:md.max,items};
+ });
+ if(sm(modules.map(x=>x.max))!==cfg.validation.assert_total)val.push('modules do not sum to total');
+ const pi=cfg.penalties.items.map(p=>({id:p.id,points:p.scale?(p.scale[m[p.metric]]||0):cond(p.when,m)?p.points:0,reason:p.label})).filter(p=>p.points);
+ const pt=Math.max(cfg.penalties.max_total,sm(pi.map(p=>p.points))),raw=sm(modules.map(x=>x.score));
+ const caps=cfg.caps.map(c=>({id:c.id,applied:cond(c.when,m),max_score:c.max_score}));
+ let fin=Math.max(0,raw+pt);caps.filter(c=>c.applied).forEach(c=>fin=Math.min(fin,c.max_score));
+ const ko=cfg.knockouts.map(k=>({id:k.id,label:k.label,triggered:cond(k.when,m)})),hit=ko.some(k=>k.triggered);
+ const vd=s=>{const x=cfg.verdict.bands.find(b=>s>=b.min);return x?x.verdict:cfg.verdict.else};
+ const avail=sm(all.filter(c=>!ex.includes(c.id)&&c.kind!=='penalty').map(c=>c.max));
+ const lo=sm(all.filter(c=>ex.includes(c.id)&&c.kind==='penalty').map(c=>c.min)),hi=sm(all.filter(c=>ex.includes(c.id)&&c.kind!=='penalty').map(c=>c.max));
+ const sc=modules.flatMap(x=>x.items).filter(x=>!x.excluded_by_mode&&x.max>0),comp=sc.length?sc.filter(x=>!x.missing).length/sc.length*100:0;
+ const cf=cfg.confidence,wn=[];(inp.peers||[]).forEach(p=>{if(p.as_of&&(Date.now()-new Date(p.as_of))/864e5>cfg.thresholds.peer_staleness_days)wn.push('Peer '+p.name+' multiples dated '+p.as_of+' are stale; refresh before relying on valuation scores')});if(inp.financials.periods.filter(p=>!p.is_stub).length<4)wn.push('Growth rates use fewer than 3 years of data');
+ const mp=sc.filter(x=>x.missing).reduce((a,x)=>a+x.max,0);let ce=Math.max(0,raw+mp+pt);caps.filter(c=>c.applied).forEach(c=>ce=Math.min(ce,c.max_score));
+ const conf=comp>=cf.high_min_completeness_pct?'High':comp>=cf.medium_min_completeness_pct?'Medium':'Low',vlo=hit?cfg.verdict.knockout_verdict:vd(fin),vhi=hit?cfg.verdict.knockout_verdict:vd(ce);
+ return{meta:{ipo_id:inp.ipo_id,mode,config_version:cfg.config_version,spec_version:cfg.spec_version,input_hash:hash(JSON.stringify(inp)),generated_at:new Date().toISOString()},
+  profile:{resolved:prof,overlays_applied:so.map(x=>x[0])},knockouts:ko,modules,penalties:{total:pt,items:pi},caps,
+  result:{score_raw:raw,score_final:fin,points_available:avail,
+   projected_range:mode==='preliminary'?{low:fin+lo,high:fin+hi,band_may_change:vd(Math.max(0,fin+lo))!==vd(fin+hi)}:undefined,
+   verdict:hit||conf!=='Low'||vlo===vhi?vlo:cfg.confidence.low_verdict,verdict_floor:vlo,verdict_ceiling:vhi,score_ceiling:ce,missing_points:mp,verdict_label:cfg.modes[mode].verdict_label,verdict_driver:hit?'knockout':(conf==='Low'&&vlo!==vhi)?'data':caps.some(c=>c.applied)?'cap':'score',
+   confidence:conf,data_completeness_pct:Math.round(comp)},
+  missing:sc.filter(x=>x.missing).map(x=>x.metric||x.id),validation:{errors:val,warnings:wn}};
+}
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(16)}
+
+function check(inp,cfg){
+ const e=[];
+ if(!cfg||!cfg.modules||!cfg.units)e.push('The config file does not look like ipo-config.json.');
+ if(!inp||inp.modules||inp.$schema)e.push('The input file looks like a config or schema, not an IPO input. Check the files are in the right slots.');
+ else{for(const k of['issue','financials','capital_structure','peers'])if(!inp[k])e.push('Input is missing "'+k+'".');
+  const f=inp.financials;if(f&&(!f.reporting_unit||!Array.isArray(f.periods)||f.periods.length<3))e.push('financials needs reporting_unit and at least 3 periods.')}
+ return e}
+
+const SEC={offer:[/^the offer$/,2],cap:[/^capital structure$/,22],obj:[/^objects of the offer$/,4],basis:[/^basis for offer price$/,12],fin:[/^summary of restated financial (statements|information)$/,6],rpt:[/^summary of related party transactions$/,4],lit:[/^outstanding litigation and material developments$/,5],mgmt:[/^our management$/,30],ind:[/^industry overview$/,40],bus:[/^our business$/,45]};
+function locate(pg){const r={};for(const[k,[re,n]]of Object.entries(SEC)){const i=pg.findIndex((t,j)=>j>14&&t.split('\n').map(s=>s.trim().toLowerCase().replace(/\s+/g,' ')).filter(Boolean).slice(0,8).some(s=>re.test(s)));if(i>=0){const KEEP={cap:/promoters?,? along with|promoter group hold|lock.?in|pledge|encumb|shareholding pattern|pre.?offer and post.?offer/i,mgmt:/comprises \d+ \(|changes in key managerial/i,basis:/comparison of accounting ratios|return on capital employed|\bROCE\b/i,ind:/CAGR[\s\S]{0,500}(20(29|30|31)|forecast|projected)|(20(29|30|31)|forecast|projected)[\s\S]{0,500}CAGR/i,bus:/top (five|5|ten|10) customers|customer concentration|largest customers/i}[k];r[k]={from:i+1,text:pg.slice(i,i+n).map((t,j)=>[i+j+1,t]).filter(([p,t],j)=>!KEEP||(k==='cap'&&j<2)||KEEP.test(t)).slice(0,k==='ind'?3:k==='bus'?3:k==='mgmt'?3:k==='basis'?3:99).map(([p,t])=>'[[PAGE '+p+']]\n'+t).join('\n')}}}
+const eo=pg.map((t,j)=>[j+1,t]).filter(([p,t])=>p>60&&/emphasis of matter/i.test(t)).slice(0,2);if(eo.length)r.eom={from:eo[0][0],text:eo.map(([p,t])=>'[[PAGE '+p+']]\n'+t).join('\n')};return r}
+const strip=o=>Object.fromEntries(Object.entries(o).filter(([k,v])=>v!=null));
+function build(B,pr,mn){mn=mn||{};
+ const a=B.a||{},b=B.b||{},c=B.c||{},d=B.d||{},e=B.e||{},u=b._unit||a._unit||'INR_LAKHS',F={INR_CRORES:1e7,INR_LAKHS:1e5,INR_MILLIONS:1e6,INR_BILLIONS:1e9}[u]||1e5,ev=[],nt=[];
+ const P=(b.periods||[]).map(p=>{const y=(String(p.fy).match(/\d{4}/)||[''])[0],o={...p};o.receivable_days=p.revenue&&p.trade_receivables?+(p.trade_receivables/p.revenue*365).toFixed(1):null;o.disclosed_roce_pct=(c.roce||{})[y]??null;delete o.trade_receivables;if(p.pbt!=null&&p.finance_costs!=null&&p.other_income!=null){o.interest_expense=p.finance_costs;o.ebit=+(p.pbt-(p.exceptional_items||0)+p.finance_costs-p.other_income).toFixed(2);o.ebitda=p.depreciation!=null?+(o.ebit+p.depreciation).toFixed(2):null}['pbt','finance_costs','other_income','depreciation','exceptional_items'].forEach(k=>delete o[k]);return strip(o)});
+ if((b.periods||[]).some(p=>p.pbt!=null))nt.push('EBIT = PBT - exceptional items + finance costs - other income; EBITDA = EBIT + depreciation. Computed by the page from the printed lines, so it is the same every run.');
+ const L=P[P.length-1]||{},ai=a.issue||{},I={...ai},S=(ai.ofs_sellers||[]).map((x,i)=>i===0?{...x,...strip({type:mn.seller_type,pre_issue_shares:mn.seller_pre})}:x),cs={...(a.capital_structure||{})};
+ I.ofs_sellers=S;const sold=S.reduce((s,x)=>s+(x.shares_sold||0),0),ps=S.filter(x=>x.type==='promoter'||x.type==='promoter_group').reduce((s,x)=>s+(x.shares_sold||0),0);
+ if(pr.ph&&pr.pl&&pr.pl>pr.ph){pr={...pr,ph:pr.pl,pl:pr.ph};nt.push('Cap and floor looked swapped, so they were corrected (cap is the higher price).')}
+ if(pr.ph){I.price_band_high=pr.ph;I.price_band_low=pr.pl||pr.ph;if(pr.lot)I.lot_size=pr.lot;I.fresh_shares=Math.round(I.fresh_issue*F/pr.ph);I.post_issue_shares=(a.pre_issue_shares||0)+I.fresh_shares;I.ofs=+(sold*pr.ph/F).toFixed(2);if(L.pat)I.post_issue_eps=+(L.pat*F/I.post_issue_shares).toFixed(2);if(a.promoter_group_pre_shares)cs.promoter_post_pct=+((a.promoter_group_pre_shares-ps)/I.post_issue_shares*100).toFixed(2)}
+ else nt.push('Enter the cap price to compute share counts, post-issue EPS and promoter post-issue holding.');
+ const U=(a.use_of_proceeds||[]).map(x=>({...x}));U.forEach(x=>{if(x.category==='gcp'&&x.amount==null&&I.fresh_issue){x.amount=+(I.fresh_issue*.25).toFixed(2);nt.push('General corporate purposes amount is blank in the RHP; assumed at the 25% ICDR ceiling.')}});
+ const dg=d.governance||{},crim=dg.criminal_cases_vs_promoters_or_company||dg.regulatory_actions;
+ const G=strip({auditor_opinion:b.auditor_opinion,auditor_changed_3y:dg.auditor_changed_3y,litigation_bucket:dg.criminal_cases_vs_promoters_or_company==null&&dg.civil_case_count==null?null:crim?'criminal_or_regulatory':dg.civil_case_count>0?'minor_civil':'clean',sebi_ed_action_active:dg.sebi_ed_action_active,rpt_pct_revenue:dg.rpt_pct_revenue!=null?dg.rpt_pct_revenue:dg.rpt_total!=null&&L.revenue?+(dg.rpt_total/L.revenue*100).toFixed(2):null,board_independent_majority:(e.board||{}).board_independent_majority,kmp_exits_2y:(e.board||{}).kmp_exits_2y});
+ if((e.board||{}).cfo_changed_2y)nt.push('A new CFO was appointed in the last two years. If the previous CFO left, the spec applies a -3 auditor/CFO exit penalty; then set governance.auditor_or_cfo_exit_2y to true.');
+ if((e.business||{}).industry_scope)nt.push('Industry CAGR scope: '+e.business.industry_scope+'. Check it is the right market for the issuer.');
+ const J={ipo_id:(a.company_name||'IPO').toUpperCase().replace(/\W+/g,'-'),company_name:a.company_name||'',board:'mainboard',icdr_route:a.icdr_route||'6(1)',sector_profile:'standard',issue:strip(I),financials:strip({reporting_unit:u,periods:P,contingent_liabilities:b.contingent_liabilities}),capital_structure:strip(cs),use_of_proceeds:U,governance:G,business:strip({...(e.business||{}),industry_scope:undefined}),peers:(c.peers||[]).map(p=>{const o={...p};if(p.closing_price>0&&p.nav_per_share>0)o.pb=+(p.closing_price/p.nav_per_share).toFixed(2);if(p.ronw_pct!=null)o.roe_pct=p.ronw_pct;delete o.closing_price;delete o.nav_per_share;delete o.ronw_pct;return strip(o)})};
+ applyMN(J,mn);
+ ['a','b','c','d','e'].forEach(k=>Object.entries((B[k]||{})._evidence||{}).forEach(([f,p])=>ev.push(k.toUpperCase()+'.'+f+': PDF page '+p)));
+ return{J,ev,nt}}
+const rd=id=>new Promise((ok,no)=>{const f=document.getElementById(id).files[0];if(!f)return no(new Error('Select both files'));const r=new FileReader();r.onload=()=>{try{ok(JSON.parse(r.result))}catch(e){no(new Error(f.name+': '+e.message))}};r.readAsText(f)});
+const rdc=async()=>{if(document.getElementById('fc').files[0]){const c=await rd('fc');try{localStorage.setItem('ipoCfg',JSON.stringify(c))}catch(e){}return c}try{const c=localStorage.getItem('ipoCfg');if(c)return JSON.parse(c)}catch(e){}throw new Error('Select the config file')};
+document.getElementById('go').onclick=async()=>{
+ const o=document.getElementById('out');
+ try{
+  const[cfg,inp]=await Promise.all([rdc(),window.__inp?Promise.resolve(window.__inp):rd('fi')]),er=check(inp,cfg);if(er.length)throw new Error(er.join(' '));
+  const s=score(inp,cfg,document.getElementById('md').value),r=s.result;
+  let h='<div class="box"><div class="big '+(r.verdict==='AVOID'?'bad':r.verdict==='INSUFFICIENT_DATA'?'m':'ok')+'">'+esc(r.verdict)+' ('+esc(r.verdict_label)+')</div>';
+  h+='<div>Score <b>'+r.score_final+'</b> / '+r.points_available+' &middot; raw '+r.score_raw+' &middot; penalties '+s.penalties.total+' &middot; profile '+esc(s.profile.resolved)+' &middot; confidence '+r.confidence+' ('+r.data_completeness_pct+'% data)</div>';
+  if(r.projected_range)h+='<div class="m">Final will land between '+r.projected_range.low+' and '+r.projected_range.high+(r.projected_range.band_may_change?' &mdash; verdict band may change':'')+'</div>';
+  h+='<div>Driver: '+esc(r.verdict_driver)+'</div>'+(r.verdict_floor!==r.verdict_ceiling?'<div class="m">With the missing data the verdict ranges from '+esc(r.verdict_floor)+' (floor '+r.score_final+') to '+esc(r.verdict_ceiling)+' (ceiling '+r.score_ceiling+', if all '+r.missing_points+' missing points were earned)</div>':'')+'</div>';
+  const kt=s.knockouts.filter(k=>k.triggered);if(kt.length)h+='<div class="box bad"><b>Knockouts</b><br>'+kt.map(k=>esc(k.id+': '+k.label)).join('<br>')+'</div>';
+  if(s.penalties.items.length)h+='<div class="box"><b>Penalties</b><br>'+s.penalties.items.map(p=>esc(p.points+' '+p.reason)).join('<br>')+'</div>';
+  if(s.validation.errors.length)h+='<div class="box bad">'+s.validation.errors.map(esc).join('<br>')+'</div>';
+  if(s.validation.warnings.length)h+='<div class="box m"><b>Warnings</b><br>'+s.validation.warnings.map(esc).join('<br>')+'</div>';
+  s.modules.forEach(md=>{h+='<div class="box"><b>'+esc(md.id+'. '+md.name)+'</b> &mdash; '+md.score+' / '+md.max+'<div class="w"><table>'+md.items.map(x=>'<tr><td>'+esc(x.label||x.id)+'</td><td>'+x.score+' / '+x.max+'</td><td class="m">'+esc(x.value!=null&&typeof x.value==='number'?Math.round(x.value*100)/100:x.value??'')+'</td><td class="m">'+esc(x.reason)+(x.capped_by?' (capped)':'')+'</td></tr>').join('')+'</table></div></div>'});
+  if(s.missing.length)h+='<div class="box m">Missing: '+s.missing.map(esc).join(', ')+'</div>';
+  h+='<details class="box"><summary>Scorecard JSON</summary><pre>'+esc(JSON.stringify(s,null,1))+'</pre></details>';
+  o.innerHTML=h;
+ }catch(e){o.innerHTML='<div class="box bad">'+esc(e.message)+'</div>'}
+};
+
+const $=id=>document.getElementById(id),st=t=>$('st').textContent=t;let BL={};
+const SHA='{"company_name":"","icdr_route":"6(1)|6(2)","pre_issue_shares":0,"promoter_group_pre_shares":0,"issue":{"fresh_issue":0,"quota_pct":{"qib":0,"nii":0,"retail":0},"open_date":"YYYY-MM-DD","close_date":"YYYY-MM-DD","ofs_sellers":[{"name":"","type":"promoter|promoter_group|pe_vc|other","pre_issue_shares":0,"shares_sold":0}]},"capital_structure":{"promoter_pre_pct":0,"promoter_pledge_pct":0,"promoter_lockin_in_place":true,"pre_ipo_placements":[{"date":"YYYY-MM-DD","price":0,"shares":0}],"discounted_allotments_18m_before_drhp":false},"use_of_proceeds":[{"category":"growth_capex|rnd|working_capital|debt_repayment|acquisition_identified|acquisition_unidentified|gcp|other","amount":0}],"_unit":"INR_LAKHS|INR_CRORES|INR_MILLIONS","_evidence":{"field":"page"}}',
+RA='fresh_issue is the rupee amount of the Fresh Offer. List gcp with amount null if it is blank. quota_pct is each category as % of the offer (QIB, non-institutional, retail). ofs_sellers is the selling shareholders with their pre-offer shares and shares offered. pre_ipo_placements is [] if none.',
+SHB='{"periods":[{"fy":"FY2024","revenue":0,"pbt":0,"exceptional_items":0,"finance_costs":0,"depreciation":0,"other_income":0,"pat":0,"net_worth":0,"total_debt":0,"cfo":0,"capex":0,"cash_and_equivalents":0,"trade_receivables":0}],"contingent_liabilities":0,"auditor_opinion":"unqualified|emphasis_of_matter|qualified|adverse|disclaimer","_unit":"INR_LAKHS","_evidence":{"field":"page"}}',
+RB='Periods oldest first, three fiscal years from the restated statements. Check each column header against its date; headers can be mislabelled. revenue = revenue from operations. pbt = profit before tax. exceptional_items = exceptional gain/(loss) net, as a signed number, 0 if none. finance_costs, depreciation (depreciation and amortization expenses) and other_income are copied exactly as printed in the restated statement of profit and loss. Do NOT calculate EBITDA or EBIT; the page does that. No calculations are allowed. pat = profit after tax. net_worth = total equity. total_debt = current + non-current borrowings. interest_expense = finance costs. cfo = net cash from operating activities. capex = purchase of property, plant and equipment as a positive number. trade_receivables from the balance sheet. contingent_liabilities = total contingent liabilities, latest year. auditor_opinion = emphasis_of_matter if the text mentions emphasis of matter items in the audit reports, qualified/adverse/disclaimer if so stated, otherwise unqualified; use null only if the text does not say.',
+SHC='{"peers":[{"name":"","pe":0,"closing_price":0,"nav_per_share":0,"ronw_pct":0,"as_of":"YYYY-MM-DD"}],"roce":{"2026":0},"_unit":"","_evidence":{"field":"page"}}',
+RC='peers are listed comparable companies only, not the issuer, with their P/E, closing price, NAV per equity share, RoNW % and the date of the price used, copied from the peer comparison table. EV/EBITDA is not in the RHP; do not invent it. roce is the issuer\'s own disclosed ROCE % by fiscal year.',
+SHD='{"governance":{"auditor_changed_3y":false,"rpt_total":0,"rpt_pct_revenue":0,"criminal_cases_vs_promoters_or_company":false,"regulatory_actions":false,"civil_case_count":0,"sebi_ed_action_active":false},"_unit":"","_evidence":{"field":"page"}}',
+RD='rpt_pct_revenue = the Total row of related-party sales/revenue as printed as % of revenue from operations, latest fiscal year (a number such as 6.67). rpt_total = the same total in the document unit, if shown. criminal_cases_vs_promoters_or_company is true if the litigation table lists criminal proceedings against the company or promoters. Leave anything not stated as null.',
+SHE='{"board":{"board_independent_majority":true,"kmp_exits_2y":0,"cfo_changed_2y":false},"business":{"industry_cagr_pct":0,"industry_scope":"","top5_customer_pct":0},"_unit":"","_evidence":{"field":"page"}}',
+RE='board_independent_majority is true only if independent directors are more than half of the board. kmp_exits_2y = count of KMP/senior management resignations or cessations in the last two years (0 if the table lists only appointments). cfo_changed_2y = true if a Chief Financial Officer was appointed in the last two years. industry_cagr_pct = forecast CAGR of the issuer main industry (the forecast figure, not the historical one). industry_scope = one short phrase saying whether that CAGR is global or India and which period. top5_customer_pct = share of revenue from the top five customers, latest year. Leave anything not stated as null.';
+async function pdfPages(f,onp){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';const d=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise,o=[];for(let i=1;i<=d.numPages;i++){const t=await(await d.getPage(i)).getTextContent();o.push(t.items.map(x=>x.str+(x.hasEOL?'\n':' ')).join(''));if(i%25==0)onp(i,d.numPages)}return o}
+function findObj(o,k){if(o&&typeof o==='object'){if(k in o)return o;for(const v of Object.values(o)){const r=findObj(v,k);if(r)return r}}return null}
+function parseJ(t){t=String(t).replace(/```json|```/g,'').trim();const b=t.lastIndexOf('}');if(b<0)throw new Error('No JSON found in the reply.');let a=t.indexOf('{');try{return JSON.parse(t.slice(a,b+1))}catch(e0){const st=[];for(let k=0;k<t.length;k++)if(t[k]==='{'&&(k===0||/\s/.test(t[k-1])))st.push(k);for(let k=st.length-1;k>=0;k--){try{return JSON.parse(t.slice(st[k],b+1))}catch(e){}}throw e0}}
+$('pv').onchange=()=>{$('kb').style.display=$('pv').value==='key'?'inline':'none'};
+$('pv').value=window.claude?'app':'manual';$('pv').onchange();
+async function getLLM(){const p=$('pv').value;
+ if(p==='app'){const s=window.claude&&await window.claude.use('sample');if(!s)throw new Error('Claude in-app is not available here. Choose another provider.');return s}
+ if(p==='key'){const k=$('ak').value.trim();if(!k)throw new Error('Enter your Anthropic API key.');
+  return{json:async pr=>{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:$('mdl').value.trim(),max_tokens:8000,messages:[{role:'user',content:pr}]})});const d=await r.json();if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));return parseJ(d.content.map(c=>c.text||'').join(''))}}}
+ return{json:pr=>new Promise((ok,no)=>{$('mpt').textContent=(window.__pl||'Extraction')+' - prompt';$('mp').scrollIntoView({block:'center'});$('mpp').value=pr;$('mpr').value='';$('mp').style.display='block';
+  $('mpc').onclick=async()=>{try{await navigator.clipboard.writeText(pr)}catch(e){$('mpp').select();document.execCommand('copy')}};
+  $('mps').onclick=()=>{try{let j=parseJ($('mpr').value);if(window.__pk&&!(window.__pk in j)){const f=findObj(j,window.__pk);if(f)j=f;else{alert('This reply does not look like '+(window.__pl||'this part')+'. It must contain "'+window.__pk+'". Keys found in your reply: '+(Object.keys(j).join(', ')||'none')+'. Paste the reply for the prompt shown above.');return}}$('mp').style.display='none';st((window.__pl||'Part')+' received OK ('+Object.keys(j).length+' fields). '+(window.__pl&&window.__pl.indexOf('E')<0?'Next part prompt will appear...':'Building the combined JSON...'));ok(j)}catch(e){alert('Could not read that reply: '+e.message)}};
+  $('mpk').onclick=()=>{$('mp').style.display='none';st((window.__pl||'Part')+' skipped.');no(new Error('skipped'))}})}}
+const ask=(sm,tx,sh,ru)=>sm.json('You extract data from an Indian IPO Red Herring Prospectus. Return ONLY JSON in this shape. Use null for anything not stated or shown as [●]. Copy numbers exactly in the document\'s own unit and give that unit as _unit. Do not estimate or calculate unless told. Put the PDF page number (from the [[PAGE n]] markers) for each field in _evidence. '+ru+'\nSHAPE: '+sh+'\nTEXT:\n'+tx);
+function show(){if(!Object.keys(BL).length){st('Nothing to rebuild yet: run Extract first (this button rebuilds from the AI replies and would overwrite pasted JSON).');return}const r=build(BL,{ph:+$('ph').value||null,pl:+$('pl').value||null,lot:+$('lot').value||null},MN());$('jt').value=JSON.stringify(r.J,null,1);$('ev').innerHTML='<b>Where each value came from</b><br>'+r.ev.map(esc).join('<br>')+(r.nt.length?'<br><b>Notes</b><br>'+r.nt.map(esc).join('<br>'):'')+'<br>Left for you: moat_rating, visibility_rating, recent sector IPOs, peers\' EV/EBITDA and P/B, market data, anything not found.';$('jb').style.display='block'}
+$('ex').onclick=async()=>{try{const f=$('fp').files[0];if(!f)throw new Error('Choose the RHP/DRHP PDF first.');if(!window.pdfjsLib)throw new Error('The PDF reader did not load.');
+ const sm=await getLLM();
+ st('Reading pages...');const pg=await pdfPages(f,(i,n)=>st('Reading page '+i+' of '+n+'...')),sc=locate(pg),miss=Object.keys(SEC).filter(k=>!sc[k]);
+ const T=ks=>ks.filter(k=>sc[k]).map(k=>sc[k].text).join('\n'),jobs=[['a',['offer','cap','obj'],SHA,RA],['b',['fin','eom'],SHB,RB],['c',['basis'],SHC,RC],['d',['lit','rpt'],SHD,RD],['e',['mgmt','ind','bus'],SHE,RE]];BL={};
+ for(const[k,ks,sh,ru]of jobs){const tx=T(ks);if(!tx)continue;window.__pl='Part '+k.toUpperCase()+' of 5';window.__pk={a:'issue',b:'periods',c:'peers',d:'governance',e:'board'}[k];st('Asking the AI, part '+k.toUpperCase()+' of 5...');try{BL[k]=await ask(sm,tx,sh,ru)}catch(e){st('Part '+k.toUpperCase()+' failed: '+(e.message||e.code))}}
+ show();st('Done. Parts received: '+(Object.keys(BL).map(x=>x.toUpperCase()).join(', ')||'none')+' of A, B, C, D, E. Sections not found: '+(miss.join(', ')||'none')+'. Check the JSON, enter the cap price, then use it as the Input.')}catch(e){st(e.message||String(e))}};
+$('pa').onclick=show;
+$('dl').onclick=()=>{let q;try{q=JSON.parse($('jt').value)}catch(e){st('JSON error: '+e.message);return}const mm=['issue','financials','capital_structure','peers'].filter(k=>!q[k]);if(mm.length&&!confirm('This JSON is not a complete input (missing: '+mm.join(', ')+'). Download anyway?'))return;const n=(JSON.parse($('jt').value).ipo_id||'ipo-input').replace(/[^\w-]+/g,'-')+'.json',a=document.createElement('a');a.href=URL.createObjectURL(new Blob([$('jt').value],{type:'application/json'}));a.download=n;a.click();URL.revokeObjectURL(a.href)};
+$('us').onclick=()=>{try{const j=JSON.parse($('jt').value),m=['issue','financials','capital_structure','peers'].filter(k=>!j[k]);if(m.length){window.__inp=null;st('Not a complete input. Missing: '+m.join(', ')+'. If this is the reply for one part (for example a block starting with "periods"), paste it into the reply box for that part, not here.');return}window.__inp=j;st('Using this JSON as the Input. Load the config and press Score.')}catch(e){st('JSON error: '+e.message)}};
+$('fi').onchange=()=>{window.__inp=null};
+const FIELDS=[
+['company_name','Company name','text'],['open_date','Issue opens','date'],['close_date','Issue closes','date'],
+['qib','QIB quota %','number'],['retail','Retail quota %','number'],
+['seller_type','Selling shareholder type','select',['promoter','promoter_group','pe_vc','other']],['seller_pre','Seller pre-issue shares','number'],
+['pledge','Promoter pledge %','number'],['lockin','Promoter lock-in in place','select',['yes','no']],['bonus','Bonus/discounted allotments within 18m before DRHP','select',['yes','no']],
+['moat','Moat rating','select',['leader_with_moat','strong_niche','follower','commoditised']],['visibility','Order-book visibility','select',['strong','moderate','none']],
+['sector_ipos','Recent sector IPO P/Es (comma list, up to 4)','text'],
+['anchor_q','Anchor quality','select',['reputed','mixed','unknown']],['nifty','Nifty trend','select',['supportive','neutral','weak']],['last_ipos','Last 5 IPO listing gains % (comma list)','text'],
+['sub_qib','QIB subscription x','number'],['sub_nii','NII subscription x','number'],['sub_retail','Retail subscription x','number'],['sub_overall','Overall subscription x','number'],
+['gmp_pct','GMP %','number'],['gmp_trend','GMP trend','select',['strong','flat','falling']]];
+(function(){$('mf').innerHTML='<b>Details not in the RHP</b><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:6px">'+FIELDS.map(([k,l,t,o])=>'<label style="font-size:12px">'+l+'<br>'+(t==='select'?'<select id="mf_'+k+'" style="width:100%"><option value="">-</option>'+o.map(x=>'<option>'+x+'</option>').join('')+'</select>':'<input id="mf_'+k+'" type="'+t+'" style="width:100%">')+'</label>').join('')+'</div>'})();
+function MN(){const m={};FIELDS.forEach(([k])=>{const v=$('mf_'+k).value.trim();if(v!=='')m[k]=v});return m}
+function applyMN(J,m){const n=x=>+x,yn=x=>x==='yes',L=x=>x.split(',').map(y=>+y.trim()).filter(y=>!isNaN(y)),now=new Date().toISOString();
+ if(m.company_name){J.company_name=m.company_name;J.ipo_id=m.company_name.toUpperCase().replace(/\W+/g,'-')}
+ J.issue=J.issue||{};if(m.open_date)J.issue.open_date=m.open_date;if(m.close_date)J.issue.close_date=m.close_date;
+ if(m.qib||m.retail){J.issue.quota_pct={...(J.issue.quota_pct||{})};if(m.qib)J.issue.quota_pct.qib=n(m.qib);if(m.retail)J.issue.quota_pct.retail=n(m.retail)}
+ J.capital_structure=J.capital_structure||{};if(m.pledge)J.capital_structure.promoter_pledge_pct=n(m.pledge);if(m.lockin)J.capital_structure.promoter_lockin_in_place=yn(m.lockin);if(m.bonus)J.capital_structure.discounted_allotments_18m_before_drhp=yn(m.bonus);
+ J.business=J.business||{};if(m.moat)J.business.moat_rating=m.moat;if(m.visibility)J.business.visibility_rating=m.visibility;
+ if(m.sector_ipos)J.recent_sector_ipos=L(m.sector_ipos).slice(0,4).map((x,i)=>({name:'IPO '+(i+1),pe_at_issue:x}));
+ const mk={};if(m.anchor_q)mk.anchor={as_of:now,quality:m.anchor_q};
+ if(m.sub_qib||m.sub_nii||m.sub_retail||m.sub_overall){mk.subscription={as_of:now};[['qib_x','sub_qib'],['nii_x','sub_nii'],['retail_x','sub_retail'],['overall_x','sub_overall']].forEach(([a,b])=>{if(m[b])mk.subscription[a]=n(m[b])})}
+ if(m.gmp_pct||m.gmp_trend){mk.gmp={as_of:now};if(m.gmp_pct)mk.gmp.pct=n(m.gmp_pct);if(m.gmp_trend)mk.gmp.trend=m.gmp_trend}
+ if(m.nifty||m.last_ipos){mk.regime={as_of:now};if(m.nifty)mk.regime.nifty_trend=m.nifty;if(m.last_ipos)mk.regime.last_ipo_listing_gains_pct=L(m.last_ipos).slice(-5)}
+ if(Object.keys(mk).length)J.market=mk}
+</script></body></html>

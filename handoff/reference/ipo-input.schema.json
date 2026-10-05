@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ipo-input.schema.json",
+  "title": "IPO screening input",
+  "description": "Raw inputs as entered. Monetary values are in the unit named by financials.reporting_unit and are converted to INR_CRORES by the normaliser before scoring. Use null for unknown values; never 0.",
+  "type": "object",
+  "required": ["ipo_id", "company_name", "board", "icdr_route", "sector_profile", "issue", "financials", "capital_structure", "use_of_proceeds", "governance", "business", "peers"],
+  "additionalProperties": false,
+  "$defs": {
+    "num": { "type": ["number", "null"] },
+    "pct": { "type": ["number", "null"], "minimum": -1000, "maximum": 10000 },
+    "date": { "type": ["string", "null"], "format": "date" },
+    "reportingUnit": { "enum": ["INR_CRORES", "INR_LAKHS", "INR_MILLIONS", "INR_BILLIONS"] },
+    "seller": {
+      "type": "object",
+      "required": ["type", "pre_issue_shares", "shares_sold"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "enum": ["promoter", "promoter_group", "pe_vc", "other"] },
+        "pre_issue_shares": { "type": "number", "minimum": 0 },
+        "shares_sold": { "type": "number", "minimum": 0 }
+      }
+    },
+    "period": {
+      "type": "object",
+      "required": ["fy"],
+      "properties": {
+        "fy": { "type": "string", "description": "e.g. FY2025, or 9M-FY2026 for a stub" },
+        "is_stub": { "type": "boolean" },
+        "revenue": { "$ref": "#/$defs/num" },
+        "ebitda": { "$ref": "#/$defs/num" },
+        "ebit": { "$ref": "#/$defs/num" },
+        "pat": { "$ref": "#/$defs/num" },
+        "net_worth": { "$ref": "#/$defs/num" },
+        "total_debt": { "$ref": "#/$defs/num" },
+        "interest_expense": { "$ref": "#/$defs/num" },
+        "cfo": { "$ref": "#/$defs/num" },
+        "capex": { "$ref": "#/$defs/num" },
+        "cash_and_equivalents": { "$ref": "#/$defs/num" },
+        "receivable_days": { "$ref": "#/$defs/num" },
+        "disclosed_roce_pct": { "$ref": "#/$defs/pct" },
+        "contribution_margin_pct": { "$ref": "#/$defs/pct" },
+        "operating_loss_pct_revenue": { "$ref": "#/$defs/pct" },
+        "nim_pct": { "$ref": "#/$defs/pct" },
+        "cost_to_income_pct": { "$ref": "#/$defs/pct" },
+        "gnpa_pct": { "$ref": "#/$defs/pct" },
+        "nnpa_pct": { "$ref": "#/$defs/pct" },
+        "provision_coverage_pct": { "$ref": "#/$defs/pct" },
+        "crar_pct": { "$ref": "#/$defs/pct" },
+        "tier1_pct": { "$ref": "#/$defs/pct" },
+        "roa_pct": { "$ref": "#/$defs/pct" },
+        "roe_pct": { "$ref": "#/$defs/pct" },
+        "order_book": { "$ref": "#/$defs/num" },
+        "pre_sales": { "$ref": "#/$defs/num" },
+        "collections": { "$ref": "#/$defs/num" }
+      }
+    }
+  },
+  "properties": {
+    "ipo_id": { "type": "string" },
+    "company_name": { "type": "string" },
+    "exchange": { "enum": ["NSE", "BSE", "BOTH"] },
+    "board": { "enum": ["mainboard", "sme"] },
+    "icdr_route": { "enum": ["6(1)", "6(2)"] },
+    "sector": { "type": "string" },
+    "sector_profile": { "enum": ["standard", "financial", "epc_real_estate", "cyclical"] },
+    "drhp_filing_date": { "$ref": "#/$defs/date" },
+    "metric_overrides": { "type": "object", "additionalProperties": true, "description": "Manual values for any derived metric or bucket named in ipo-config derived_metrics (e.g. nim_cost_income_bucket, cfo_exempt). Wins over computed values." },
+
+    "issue": {
+      "type": "object",
+      "required": ["price_band_low", "price_band_high", "fresh_issue", "ofs", "open_date", "close_date"],
+      "properties": {
+        "price_band_low": { "type": "number" },
+        "price_band_high": { "type": "number" },
+        "lot_size": { "type": "integer" },
+        "fresh_issue": { "type": "number", "minimum": 0, "description": "in reporting_unit" },
+        "ofs": { "type": "number", "minimum": 0, "description": "in reporting_unit" },
+        "fresh_shares": { "$ref": "#/$defs/num" },
+        "post_issue_shares": { "$ref": "#/$defs/num" },
+        "post_issue_eps": { "$ref": "#/$defs/num", "description": "INR per share, at upper price band" },
+        "open_date": { "type": "string", "format": "date" },
+        "close_date": { "type": "string", "format": "date" },
+        "quota_pct": {
+          "type": "object",
+          "properties": { "anchor": { "$ref": "#/$defs/pct" }, "qib": { "$ref": "#/$defs/pct" }, "nii": { "$ref": "#/$defs/pct" }, "retail": { "$ref": "#/$defs/pct" } }
+        },
+        "employee_discount_pct": { "$ref": "#/$defs/pct" },
+        "shareholder_discount_pct": { "$ref": "#/$defs/pct" },
+        "ofs_sellers": { "type": "array", "items": { "$ref": "#/$defs/seller" } }
+      }
+    },
+
+    "financials": {
+      "type": "object",
+      "required": ["reporting_unit", "periods"],
+      "properties": {
+        "reporting_unit": { "$ref": "#/$defs/reportingUnit" },
+        "periods": { "type": "array", "minItems": 3, "maxItems": 6, "items": { "$ref": "#/$defs/period" }, "description": "oldest first; 3 full FYs plus optional stub; cyclical profile needs 5 FYs" },
+        "adjusted_metrics_unreconciled": { "type": "boolean" },
+        "contingent_liabilities": { "$ref": "#/$defs/num" },
+        "contingent_liabilities_unquantified": { "type": "boolean" }
+      }
+    },
+
+    "capital_structure": {
+      "type": "object",
+      "required": ["promoter_pre_pct", "promoter_post_pct"],
+      "properties": {
+        "promoter_pre_pct": { "$ref": "#/$defs/pct" },
+        "promoter_post_pct": { "$ref": "#/$defs/pct" },
+        "promoter_pledge_pct": { "$ref": "#/$defs/pct" },
+        "promoter_lockin_in_place": { "type": "boolean" },
+        "large_holders_unlocked_early": { "type": "boolean" },
+        "pre_ipo_placements": {
+          "type": "array",
+          "items": { "type": "object", "required": ["date", "price"], "properties": { "date": { "type": "string", "format": "date" }, "price": { "type": "number" }, "shares": { "type": "number" } } }
+        },
+        "discounted_allotments_18m_before_drhp": { "type": "boolean", "description": "heavy ESOP/bonus/rights/preferential allotments at a discount within 18 months before DRHP filing" }
+      }
+    },
+
+    "use_of_proceeds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["category", "amount"],
+        "properties": {
+          "category": { "enum": ["growth_capex", "rnd", "working_capital", "debt_repayment", "acquisition_identified", "acquisition_unidentified", "gcp", "other"] },
+          "amount": { "type": "number", "minimum": 0, "description": "in reporting_unit" }
+        }
+      }
+    },
+
+    "governance": {
+      "type": "object",
+      "properties": {
+        "auditor_opinion": { "enum": ["unqualified", "emphasis_of_matter", "qualified", "adverse", "disclaimer"] },
+        "going_concern_uncertainty": { "type": "boolean" },
+        "eom_materiality": { "enum": ["none", "low", "medium", "high"] },
+        "auditor_changed_3y": { "type": "boolean" },
+        "auditor_reputed": { "type": "boolean" },
+        "auditor_or_cfo_exit_2y": { "type": "boolean" },
+        "litigation_bucket": { "enum": ["clean", "minor_civil", "criminal_or_regulatory"] },
+        "sebi_ed_action_active": { "type": "boolean" },
+        "rpt_pct_revenue": { "$ref": "#/$defs/pct" },
+        "rpt_pct_of_revenue_growth": { "$ref": "#/$defs/pct" },
+        "board_independent_majority": { "type": "boolean" },
+        "kmp_exits_2y": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+
+    "business": {
+      "type": "object",
+      "properties": {
+        "industry_cagr_pct": { "$ref": "#/$defs/pct" },
+        "moat_rating": { "enum": ["leader_with_moat", "strong_niche", "follower", "commoditised"] },
+        "top5_customer_pct": { "$ref": "#/$defs/pct" },
+        "top5_supplier_pct": { "$ref": "#/$defs/pct" },
+        "visibility_rating": { "enum": ["strong", "moderate", "none"] },
+        "regulatory_dependence": { "type": "boolean" }
+      }
+    },
+
+    "peers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "listed_years": { "type": "number" },
+          "as_of": { "$ref": "#/$defs/date" },
+          "pe": { "$ref": "#/$defs/num" },
+          "ev_ebitda": { "$ref": "#/$defs/num" },
+          "pb": { "$ref": "#/$defs/num" },
+          "ps": { "$ref": "#/$defs/num" },
+          "roe_pct": { "$ref": "#/$defs/pct" },
+          "roa_pct": { "$ref": "#/$defs/pct" }
+        }
+      }
+    },
+    "recent_sector_ipos": {
+      "type": "array",
+      "maxItems": 4,
+      "items": { "type": "object", "properties": { "name": { "type": "string" }, "pe_at_issue": { "$ref": "#/$defs/num" } } }
+    },
+
+    "market": {
+      "type": "object",
+      "description": "Time-stamped market data. Each block carries its own as_of so staleness and look-ahead can be checked.",
+      "properties": {
+        "anchor": {
+          "type": "object",
+          "properties": {
+            "as_of": { "type": "string", "format": "date-time" },
+            "quality": { "enum": ["reputed", "mixed", "unknown"] },
+            "amount": { "$ref": "#/$defs/num" }
+          }
+        },
+        "subscription": {
+          "type": "object",
+          "properties": {
+            "as_of": { "type": "string", "format": "date-time" },
+            "qib_x": { "$ref": "#/$defs/num" },
+            "nii_x": { "$ref": "#/$defs/num" },
+            "retail_x": { "$ref": "#/$defs/num" },
+            "overall_x": { "$ref": "#/$defs/num" }
+          }
+        },
+        "gmp": {
+          "type": "object",
+          "properties": {
+            "as_of": { "type": "string", "format": "date-time" },
+            "pct": { "$ref": "#/$defs/pct" },
+            "trend": { "enum": ["strong", "flat", "falling"] }
+          }
+        },
+        "regime": {
+          "type": "object",
+          "properties": {
+            "as_of": { "type": "string", "format": "date-time" },
+            "nifty_trend": { "enum": ["supportive", "neutral", "weak"] },
+            "last_ipo_listing_gains_pct": { "type": "array", "maxItems": 5, "items": { "type": "number" }, "description": "listing gains of the last 5 mainboard IPOs" }
+          }
+        }
+      }
+    }
+  }
+}
