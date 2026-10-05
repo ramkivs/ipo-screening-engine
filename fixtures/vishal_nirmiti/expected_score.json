@@ -1,0 +1,559 @@
+{
+  "available_points": 73.0,
+  "base_score": 38.0,
+  "caps_applied": [],
+  "completeness_breakdown": {
+    "critical_data_missing": [
+      "going_concern_uncertainty"
+    ],
+    "critical_data_pct": 80.0,
+    "knockout_completeness_pct": 50.0,
+    "knockout_unverified": [
+      "K1",
+      "K5",
+      "K6"
+    ],
+    "market_pct": 100.0,
+    "market_points_unknown": 0,
+    "overall_pct": 73.0,
+    "profile": "standard",
+    "structure_overlays": [
+      "retail_heavy"
+    ],
+    "valuation_pct": 20.0,
+    "valuation_points_unknown": 16.0,
+    "weighting": "POINTS"
+  },
+  "completeness_pct": 73.0,
+  "confidence": "Low",
+  "final_score": 35.0,
+  "insufficient_data": true,
+  "lower_bound": 25.0,
+  "mode": "final",
+  "modules": [
+    {
+      "available_points": 25.0,
+      "criteria": [
+        {
+          "band": ">= 15",
+          "criterion_id": "revenue_cagr",
+          "formula": "((revenue[latest] / revenue[latest-2]) ^ (1/2) - 1) * 100",
+          "kind": "criterion",
+          "label": "Revenue CAGR (2Y from 3 FY observations)",
+          "max": 6.0,
+          "metric": "revenue_cagr_2y_from_3fy",
+          "module": "A",
+          "reason": "matched >= 15",
+          "score": 4.0,
+          "state": "SCORED",
+          "value": 18.085175453226654
+        },
+        {
+          "band": "stable",
+          "criterion_id": "margin_trend",
+          "formula": "expanding: EBITDA and PAT margin both up each year; declining_or_loss: latest PAT<=0 or both margins down; volatile: direction flips with range >300 bps; else stable",
+          "kind": "criterion",
+          "label": "Profit trend (EBITDA/PAT margin)",
+          "max": 5.0,
+          "metric": "margin_trend",
+          "module": "A",
+          "reason": "matched stable",
+          "score": 3.0,
+          "state": "SCORED",
+          "value": "stable"
+        },
+        {
+          "band": "> 20",
+          "criterion_id": "roce",
+          "formula": "ROCE = EBIT / Capital Employed, where Capital Employed = total equity + total borrowings (RHP 'Basis for Offer Price' definitions); a disclosed ROCE overrides",
+          "kind": "criterion",
+          "label": "ROCE",
+          "max": 5.0,
+          "metric": "roce_latest",
+          "module": "A",
+          "reason": "matched > 20",
+          "score": 5.0,
+          "state": "SCORED",
+          "value": 28.02
+        },
+        {
+          "band": "> 0.8",
+          "criterion_id": "cfo_quality",
+          "formula": "sum(CFO over the full FY observations) / sum(PAT over the same observations); a cumulative ratio, not the arithmetic mean of annual CFO/PAT ratios",
+          "kind": "criterion",
+          "label": "Cash flow quality (cumulative CFO / cumulative PAT)",
+          "max": 5.0,
+          "metric": "cfo_pat_cumulative",
+          "module": "A",
+          "reason": "matched > 0.8",
+          "score": 5.0,
+          "state": "SCORED",
+          "value": 1.7881897553619628
+        },
+        {
+          "band": "stretched",
+          "criterion_id": "leverage",
+          "formula": "strong: D/E<0.5 and ICR>5; ok: D/E<1; stretched: 1<=D/E<=2; weak: D/E>2",
+          "kind": "criterion",
+          "label": "Leverage (D/E, interest cover)",
+          "max": 4.0,
+          "metric": "leverage_bucket",
+          "module": "A",
+          "reason": "matched stretched",
+          "score": 1.0,
+          "state": "SCORED",
+          "value": "stretched"
+        }
+      ],
+      "max": 25.0,
+      "module_id": "A",
+      "name": "Financial Quality",
+      "score": 18.0,
+      "unknown_points": 0
+    },
+    {
+      "available_points": 4.0,
+      "criteria": [
+        {
+          "criterion_id": "pe_vs_peers",
+          "formula": "(issue price / post-issue EPS) / (median VALID peer P/E) - 1, x100",
+          "kind": "criterion",
+          "label": "P/E (post-issue EPS) vs peer median",
+          "max": 8.0,
+          "metric": "pe_premium_pct",
+          "module": "B",
+          "reason": "no VALID peer multiple is available; valuation cannot be scored as current. Rejected peers: GPT Infraprojects Limited: STALE (peer multiple dated 2026-07-23 is beyond the 30-day staleness limit); Indian Hume Pipe Company Limited: STALE (peer multiple dated 2026-07-23 is beyond the 30-day staleness limit)",
+          "state": "UNKNOWN"
+        },
+        {
+          "criterion_id": "second_multiple",
+          "formula": "issuer EV/EBITDA vs the median VALID peer EV/EBITDA; P/B if EBITDA is not meaningful",
+          "kind": "criterion",
+          "label": "EV/EBITDA (or P/B) vs peers",
+          "max": 4.0,
+          "metric": "second_multiple_premium_pct",
+          "module": "B",
+          "reason": "no VALID peer multiple is available; valuation cannot be scored as current. Rejected peers: GPT Infraprojects Limited: STALE (peer multiple dated 2026-07-23 is beyond the 30-day staleness limit); Indian Hume Pipe Company Limited: STALE (peer multiple dated 2026-07-23 is beyond the 30-day staleness limit)",
+          "state": "UNKNOWN"
+        },
+        {
+          "band": "< 1",
+          "capped_by": "low_base_year",
+          "criterion_id": "peg",
+          "formula": "post-issue P/E / PAT CAGR (2Y from 3 FY), %",
+          "kind": "criterion",
+          "label": "PEG",
+          "max": 4.0,
+          "metric": "peg",
+          "module": "B",
+          "reason": "matched < 1; capped at 2.0 by low_base_year",
+          "score": 2.0,
+          "state": "SCORED",
+          "value": 0.13742292019449137
+        },
+        {
+          "criterion_id": "sector_ipo_relative",
+          "formula": "post-issue P/E vs the median of the last 4 same-sector IPOs: cheaper below -band, richer above +band, else in_line",
+          "kind": "criterion",
+          "label": "Valuation vs recent same-sector IPOs",
+          "max": 4.0,
+          "metric": "sector_ipo_relative",
+          "module": "B",
+          "reason": "no recent same-sector IPO valuations were supplied, so the relative test cannot be evaluated",
+          "state": "UNKNOWN"
+        }
+      ],
+      "max": 20.0,
+      "module_id": "B",
+      "name": "Valuation",
+      "score": 2.0,
+      "unknown_points": 16.0
+    },
+    {
+      "available_points": 11.0,
+      "criteria": [
+        {
+          "band": "> 70",
+          "criterion_id": "fresh_share",
+          "formula": "fresh / (fresh + ofs) x 100",
+          "kind": "criterion",
+          "label": "Fresh issue share of offer",
+          "max": 3.0,
+          "metric": "fresh_share_pct",
+          "module": "C",
+          "reason": "matched > 70",
+          "score": 3.0,
+          "state": "SCORED",
+          "value": 81.46067415730337
+        },
+        {
+          "band": "promoter_selling",
+          "criterion_id": "ofs_seller_type",
+          "formula": "promoter_selling if any promoter/promoter-group seller sold >0; else pe_vc_exit if any PE/VC sells >=25% of its holding; else none_or_small",
+          "kind": "criterion",
+          "label": "OFS seller type",
+          "max": 2.0,
+          "metric": "ofs_seller_bucket",
+          "module": "C",
+          "reason": "matched promoter_selling",
+          "score": 0.0,
+          "state": "SCORED",
+          "value": "promoter_selling"
+        },
+        {
+          "band": "else",
+          "criterion_id": "promoter_ofs_pct",
+          "formula": "promoter shares sold / sum(pre-issue shares of promoter and promoter-group sellers) x 100",
+          "kind": "criterion",
+          "label": "Promoter stake sold in OFS",
+          "max": 2.0,
+          "metric": "promoter_ofs_pct_of_holding",
+          "module": "C",
+          "reason": "matched else",
+          "score": 0.0,
+          "state": "SCORED",
+          "value": 100.0
+        },
+        {
+          "band": "true",
+          "criterion_id": "dilution",
+          "formula": "dilution_pct < 25 or use_of_proceeds_bucket == growth",
+          "kind": "criterion",
+          "label": "Dilution from fresh issue",
+          "max": 1.0,
+          "metric": "dilution_ok",
+          "module": "C",
+          "reason": "matched true",
+          "score": 1.0,
+          "state": "SCORED",
+          "value": true
+        },
+        {
+          "criterion_id": "use_of_proceeds",
+          "formula": "blind_heavy: (gcp + unidentified acquisition)/fresh > 20%; else debt_heavy: debt repayment/fresh > 50%; else growth: (capex + R&D)/fresh >= growth_share_min_pct; else mixed_ok",
+          "kind": "criterion",
+          "label": "Use of proceeds",
+          "max": 4.0,
+          "metric": "use_of_proceeds_bucket",
+          "module": "C",
+          "reason": "the blind_heavy test ((GCP + unidentified acquisition)/fresh > 20%) cannot be evaluated because a GCP or unidentified-acquisition amount is undisclosed. The legal maximum is not substituted, and an undisclosed amount is not read as zero, because either would let a blind-heavy offer pass the test",
+          "state": "UNKNOWN"
+        },
+        {
+          "band": "none_or_near_ipo",
+          "criterion_id": "pre_ipo_placement",
+          "formula": "deep_discount_12m: any placement in the 12 months before the issue open at more than 25% below the issue price; none_or_near_ipo: none, or all within near_ipo_price_pct; else in_between",
+          "kind": "criterion",
+          "label": "Pre-IPO placements / discounted allotments",
+          "max": 2.0,
+          "metric": "pre_ipo_placement_bucket",
+          "module": "C",
+          "reason": "matched none_or_near_ipo",
+          "score": 2.0,
+          "state": "SCORED",
+          "value": "none_or_near_ipo"
+        },
+        {
+          "band": "intact",
+          "criterion_id": "lockin",
+          "formula": "intact: promoter lock-in in place and no early unlock of large pre-IPO holders; else weak",
+          "kind": "criterion",
+          "label": "Lock-in",
+          "max": 1.0,
+          "metric": "lockin_bucket",
+          "module": "C",
+          "reason": "matched intact",
+          "score": 1.0,
+          "state": "SCORED",
+          "value": "intact"
+        }
+      ],
+      "max": 15.0,
+      "module_id": "C",
+      "name": "Offer Structure, Proceeds & Pre-IPO",
+      "score": 7.0,
+      "unknown_points": 4.0
+    },
+    {
+      "available_points": 13.0,
+      "criteria": [
+        {
+          "band": ">= 45",
+          "criterion_id": "promoter_post_holding",
+          "formula": "promoter and promoter-group holding post-issue, %",
+          "kind": "criterion",
+          "label": "Post-issue promoter holding",
+          "max": 4.0,
+          "metric": "promoter_post_pct",
+          "module": "D",
+          "reason": "matched >= 45",
+          "score": 3.0,
+          "state": "SCORED",
+          "value": 49.4
+        },
+        {
+          "band": "criminal_or_regulatory",
+          "criterion_id": "litigation",
+          "formula": "clean / minor_civil / criminal_or_regulatory across promoters, directors and the company",
+          "kind": "criterion",
+          "label": "Promoter track record & litigation",
+          "max": 4.0,
+          "metric": "litigation_bucket",
+          "module": "D",
+          "reason": "matched criminal_or_regulatory",
+          "score": 0.0,
+          "state": "SCORED",
+          "value": "criminal_or_regulatory"
+        },
+        {
+          "band": "<= 15",
+          "criterion_id": "rpt",
+          "formula": "related-party transactions / revenue, latest FY, %",
+          "kind": "criterion",
+          "label": "Related-party transactions (% revenue/costs)",
+          "max": 3.0,
+          "metric": "rpt_pct_revenue",
+          "module": "D",
+          "reason": "matched <= 15",
+          "score": 1.0,
+          "state": "SCORED",
+          "value": 6.67
+        },
+        {
+          "criterion_id": "auditor",
+          "formula": "clean_reputed: unqualified, no auditor change, no EOM; eom_only: EOM/CARO only and no change; unstable_or_repeated_eom: auditor change within 3 years or repeated EOM. A qualified/adverse/disclaimer opinion is a knockout rather than a score.",
+          "kind": "criterion",
+          "label": "Auditor quality & remarks",
+          "max": 2.0,
+          "metric": "auditor_bucket",
+          "module": "D",
+          "reason": "it is not established whether the auditor changed within the last three years",
+          "state": "UNKNOWN"
+        },
+        {
+          "band": "other",
+          "criterion_id": "board_kmp",
+          "formula": "independent_stable: independent-majority board and no KMP exit in 2 years; high_churn: >=2 KMP exits; else other",
+          "kind": "criterion",
+          "label": "Board independence & KMP stability",
+          "max": 2.0,
+          "metric": "board_kmp_bucket",
+          "module": "D",
+          "reason": "matched other",
+          "score": 1.0,
+          "state": "SCORED",
+          "value": "other"
+        }
+      ],
+      "max": 15.0,
+      "module_id": "D",
+      "name": "Promoter & Governance",
+      "score": 5.0,
+      "unknown_points": 2.0
+    },
+    {
+      "available_points": 10.0,
+      "criteria": [
+        {
+          "criterion_id": "industry_growth",
+          "formula": "forward industry CAGR from the independent industry report in the RHP, %",
+          "kind": "criterion",
+          "label": "Industry growth outlook",
+          "max": 5.0,
+          "metric": "industry_cagr_pct",
+          "module": "E",
+          "reason": "the industry CAGR is not scorable because its scope, forecast period, source is not recorded; spec s12 requires value, scope, forecast period and source together",
+          "state": "UNKNOWN"
+        },
+        {
+          "band": "strong_niche",
+          "criterion_id": "moat",
+          "formula": "business.moat_rating",
+          "kind": "criterion",
+          "label": "Market position & moat",
+          "max": 5.0,
+          "metric": "moat_rating",
+          "module": "E",
+          "reason": "matched strong_niche",
+          "score": 3.0,
+          "state": "SCORED",
+          "value": "strong_niche"
+        },
+        {
+          "band": "else",
+          "criterion_id": "concentration",
+          "formula": "the higher of the top-5 customer and top-5 supplier concentration",
+          "kind": "criterion",
+          "label": "Customer/supplier concentration (top 5)",
+          "max": 3.0,
+          "metric": "top5_concentration_pct",
+          "module": "E",
+          "reason": "matched else",
+          "score": 0.0,
+          "state": "SCORED",
+          "value": 85.33
+        },
+        {
+          "band": "strong",
+          "criterion_id": "visibility",
+          "formula": "business.visibility_rating",
+          "kind": "criterion",
+          "label": "Capacity / order-book visibility",
+          "max": 2.0,
+          "metric": "visibility_rating",
+          "module": "E",
+          "reason": "matched strong",
+          "score": 2.0,
+          "state": "SCORED",
+          "value": "strong"
+        }
+      ],
+      "max": 15.0,
+      "module_id": "E",
+      "name": "Business & Moat",
+      "score": 5.0,
+      "unknown_points": 5.0
+    },
+    {
+      "available_points": 10.0,
+      "criteria": [
+        {
+          "band": "flat",
+          "criterion_id": "gmp_trend",
+          "formula": "market.gmp.trend",
+          "kind": "criterion",
+          "label": "GMP trend (sentiment only)",
+          "max": 2.0,
+          "metric": "gmp_bucket",
+          "module": "F",
+          "reason": "matched flat",
+          "score": 1.0,
+          "state": "SCORED",
+          "value": "flat"
+        },
+        {
+          "band": "supportive",
+          "criterion_id": "market_regime",
+          "formula": "market.regime.nifty_trend",
+          "kind": "criterion",
+          "label": "Market regime",
+          "max": 2.0,
+          "metric": "market_regime_bucket",
+          "module": "F",
+          "reason": "matched supportive",
+          "score": 2.0,
+          "state": "SCORED",
+          "value": "supportive"
+        },
+        {
+          "band": "triggered",
+          "criterion_id": "retail_nii_penalty",
+          "kind": "penalty",
+          "label": "Retail/NII under-subscription (Final mode)",
+          "max": 0.0,
+          "metric": null,
+          "min": -2.0,
+          "module": "F",
+          "reason": "triggered",
+          "score": -2.0,
+          "state": "SCORED"
+        },
+        {
+          "band": "else",
+          "criterion_id": "overall_subscription",
+          "formula": "market.subscription.overall_x",
+          "kind": "criterion",
+          "label": "Overall subscription at close",
+          "max": 3.0,
+          "metric": "overall_x",
+          "module": "F",
+          "reason": "matched else",
+          "score": 0.0,
+          "state": "SCORED",
+          "value": 0.22
+        },
+        {
+          "band": "else",
+          "criterion_id": "nii_subscription",
+          "formula": "market.subscription.nii_x",
+          "kind": "criterion",
+          "label": "NII subscription at close",
+          "max": 3.0,
+          "metric": "nii_x",
+          "module": "F",
+          "reason": "matched else",
+          "score": 0.0,
+          "state": "SCORED",
+          "value": 0.34
+        }
+      ],
+      "max": 10.0,
+      "module_id": "F",
+      "name": "Market & Demand Signals",
+      "score": 1.0,
+      "unknown_points": 0
+    }
+  ],
+  "not_applicable_points": 0,
+  "penalties": [
+    {
+      "id": "margin_spike",
+      "label": "Margin up >500 bps YoY in either of the last two FYs",
+      "points": -3.0,
+      "reason": "triggered",
+      "state": "SCORED"
+    },
+    {
+      "id": "receivable_days_up",
+      "label": "Receivable days up >30% YoY",
+      "points": 0.0,
+      "reason": "not triggered",
+      "state": "SCORED"
+    },
+    {
+      "id": "auditor_cfo_exit",
+      "label": "Auditor/CFO resignation in last 2 years",
+      "points": 0.0,
+      "reason": "the trigger could not be evaluated; the penalty is neither applied nor ignored, and is carried in the lower bound",
+      "state": "UNKNOWN"
+    },
+    {
+      "id": "discounted_allotments",
+      "label": "Heavy non-pro-rata discounted allotments/ESOPs within 18 months before DRHP (pro-rata bonus/rights excluded)",
+      "points": 0.0,
+      "reason": "not triggered",
+      "state": "SCORED"
+    },
+    {
+      "id": "unreconciled_metrics",
+      "label": "Adjusted metrics with no Ind AS reconciliation",
+      "points": 0.0,
+      "reason": "the trigger could not be evaluated; the penalty is neither applied nor ignored, and is carried in the lower bound",
+      "state": "UNKNOWN"
+    },
+    {
+      "id": "regulatory_dependence",
+      "label": "Regulatory dependence (single licence, price control)",
+      "points": 0.0,
+      "reason": "the trigger could not be evaluated; the penalty is neither applied nor ignored, and is carried in the lower bound",
+      "state": "UNKNOWN"
+    },
+    {
+      "id": "eom_caro",
+      "label": "Emphasis of Matter / CARO remarks",
+      "points": 0,
+      "reason": "materiality metric eom_materiality is UNKNOWN; the penalty is neither applied nor ignored, and is carried in the lower bound",
+      "state": "UNKNOWN"
+    }
+  ],
+  "penalties_total": -3.0,
+  "plan_hash": "bbf890db351467b184b16e76fbe30248aed4a79a56c0999cb56506d51a6a7b9e",
+  "score_before_caps": 35.0,
+  "total_evaluable_points": 100.0,
+  "unknown_points": 27.0,
+  "unresolved_penalty_points": 10.0,
+  "upper_bound": 62.0,
+  "verdict": "INSUFFICIENT_DATA",
+  "verdict_band_score": "AVOID",
+  "verdict_uncertain": true
+}

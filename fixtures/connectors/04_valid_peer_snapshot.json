@@ -1,0 +1,35 @@
+{
+  "snapshot_id": "SCREENER-PEER-20261004",
+  "provider_id": "PEER-SCREENER",
+  "as_of": "2026-10-04T19:26:01Z",
+  "retrieval_timestamp": "2026-10-04T19:30:00Z",
+  "peers": [
+    {
+      "name": "KNR Constructions Limited",
+      "pe": 16.4,
+      "pb": 2.8,
+      "ev_ebitda": 9.2,
+      "ps": 1.5,
+      "roe_pct": 18.2,
+      "roa_pct": 10.4,
+      "as_of": "2026-10-04T19:26:01Z"
+    },
+    {
+      "name": "PNC Infratech Limited",
+      "pe": 14.1,
+      "pb": 2.1,
+      "ev_ebitda": 8.0,
+      "ps": 1.2,
+      "roe_pct": 16.5,
+      "roa_pct": 9.1,
+      "as_of": "2026-10-04T19:26:01Z"
+    }
+  ],
+  "recent_sector_ipos": [
+    {
+      "name": "G R Infraprojects Limited",
+      "listing_pe": 18.5,
+      "listing_date": "2021-07-19"
+    }
+  ]
+}

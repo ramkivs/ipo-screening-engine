@@ -1,0 +1,361 @@
+{
+  "ipo_id": "VISHAL-NIRMITI-LIMITED",
+  "company_name": "Vishal Nirmiti Limited",
+  "board": "mainboard",
+  "icdr_route": "6(1)",
+  "sector_profile": "standard",
+  "sector": "infrastructure / pre-stressed concrete",
+  "_sources": [
+    {
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "source_type": "RHP",
+      "uri": "handoff/reference/U01122MH1994PLC185445-vishal nirmiti.pdf",
+      "content_hash": "644be76e26d43dcaa26ba11303072cf4543bc7a52f30cd37bf1d2d1d552645f6",
+      "retrieval_timestamp": "2026-10-05T06:30:00Z",
+      "source_timestamp": "2026-09-24T00:00:00Z"
+    },
+    {
+      "source_id": "REF-FIXTURE-VISHAL",
+      "source_type": "STRUCTURED_INPUT",
+      "uri": "handoff/reference/VISHAL-NIRMITI-LIMITED.json",
+      "content_hash": "d739dbd5a195b9f5e0126acd58d1f55f0eed18b55dedfe71288754a94ad68cc7",
+      "retrieval_timestamp": "2026-10-05T06:30:00Z"
+    },
+    {
+      "source_id": "MARKET-TRACKER",
+      "source_type": "MARKET_DATA",
+      "uri": "reference fixture market block (public trackers, as recorded)",
+      "retrieval_timestamp": "2026-10-04T19:26:01Z"
+    },
+    {
+      "source_id": "PEER-SCREENER",
+      "source_type": "PEER_DATA",
+      "uri": "reference fixture peer block (screener/exchange data, as recorded)",
+      "retrieval_timestamp": "2026-07-23T00:00:00Z"
+    }
+  ],
+  "_evidence": {
+    "company_name": {
+      "evidence_id": "EV-company-name",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Cover page",
+      "page": 1,
+      "section": "Cover",
+      "quote": "VISHAL NIRMITI LIMITED",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "issue.fresh_issue": {
+      "evidence_id": "EV-fresh-issue",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Cover page, Fresh Offer",
+      "page": 3,
+      "section": "Cover",
+      "quote": "FRESH OFFER OF UP TO [●] EQUITY SHARES OF FACE VALUE OF ₹ 10/- EACH AGGREGATING UP TO ₹ 14,500.00 LAKHS BY OUR COMPANY (THE “FRESH OFFER”)",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "issue.ofs_sellers[0].pre_issue_shares": {
+      "evidence_id": "EV-ofs-seller",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Cover page, Details of the Offer for Sale",
+      "page": 1,
+      "section": "Cover",
+      "quote": "Vaman Prestressing Company Private Limited Promoter Group Selling Shareholder Up to 15,00,000 Equity Shares of face value of ₹ 10 each",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "issue.ofs_sellers[0].shares_sold": {
+      "evidence_id": "EV-ofs-seller-sold",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Cover page, Details of the Offer for Sale",
+      "page": 1,
+      "section": "Cover",
+      "quote": "Up to 15,00,000 Equity Shares",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "issue.quota_pct.qib": {
+      "evidence_id": "EV-qib-quota",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Definitions, QIB Portion",
+      "page": 13,
+      "section": "Definitions and Abbreviations",
+      "quote": "“QIB Portion” The portion of the Offer being not more than 1% of the Net Offer",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "use_of_proceeds[0].amount": {
+      "evidence_id": "EV-wc",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Objects of the Offer, Schedule of Implementation and Deployment",
+      "page": 129,
+      "section": "Objects of the Offer",
+      "quote": "(A) Funding Working Capital Requirements of the Company; 7,500.00 7,500.00 7,500.00",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "use_of_proceeds[1].amount": {
+      "evidence_id": "EV-debt",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Objects of the Offer, Schedule of Implementation and Deployment",
+      "page": 129,
+      "section": "Objects of the Offer",
+      "quote": "(B) Repayment and/or pre-payment, in part or full of term loans availed by our Company; 1,900.00 1,900.00 1,900.00",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "use_of_proceeds[2].amount": {
+      "evidence_id": "EV-gcp-undisclosed",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Objects of the Offer, Schedule of Implementation and Deployment",
+      "page": 129,
+      "section": "Objects of the Offer",
+      "quote": "Sub-Total (A+B) 9,400.00 | General Corporate Purposes* [●] | Total [●] | *To be determined upon finalisation of the Offer Price and updated in the Prospectus prior to filing with the RoC. The amount utilised for general corporate purposes shall not exceed 25% of the Fresh Offer.",
+      "page_note": "The GCP amount is printed as [●]; 25% of the Fresh Offer is the legal maximum under SEBI ICDR Regulation 7(2) and is a limit, not the amount.",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "capital_structure.promoter_pre_pct": {
+      "evidence_id": "EV-promoter-pre",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Capital Structure, Build-up of Promoters' shareholding",
+      "page": 110,
+      "section": "Capital Structure",
+      "quote": "our Promoters, along with our Promoter Group hold 1,45,37,600 Equity Shares, equivalent to 73.42% of the issued, subscribed and paid-up Equity Share capital of our Company",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "financials.contingent_liabilities": {
+      "evidence_id": "EV-contingent",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Risk Factors / Summary of Contingent Liabilities",
+      "page": 47,
+      "section": "Risk Factors",
+      "quote": "As at March 31, 2026, we had ₹ 2,186.64 lakhs of contingent liabilities.",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "business.top5_customer_pct": {
+      "evidence_id": "EV-top5-customers",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Summary, customer concentration table",
+      "page": 29,
+      "section": "Summary of the Offer Document",
+      "quote": "Top 5 customers 28,879.89 85.33 27,916.40 86.33 22,284.22 87.85",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "financials.periods[2].disclosed_roce_pct": {
+      "evidence_id": "EV-roce",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Basis for Offer Price, Comparison of Accounting Ratios",
+      "page": 146,
+      "section": "Basis for the Offer Price",
+      "quote": "Return on Capital Employed (%)(9) 28.02 30.32 14.60",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "note": "Definition at page 147: ROCE = EBIT / Capital Employed; Capital Employed = total equity + total borrowings."
+    },
+    "financials.periods[2].revenue": {
+      "evidence_id": "EV-revenue-fy26",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Summary of Restated Financial Statements",
+      "page": 73,
+      "section": "Summary of Restated Financial Statements",
+      "quote": "33,867.73",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "financials.periods[2].pat": {
+      "evidence_id": "EV-pat-fy26",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Summary of Restated Financial Statements",
+      "page": 73,
+      "section": "Summary of Restated Financial Statements",
+      "quote": "2,497.50",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "financials.periods[2].cfo": {
+      "evidence_id": "EV-cfo-fy26",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Summary of Restated Financial Statements, cash flow",
+      "page": 74,
+      "section": "Summary of Restated Financial Statements",
+      "quote": "2,715.47",
+      "extraction_method": "DETERMINISTIC_PDF"
+    },
+    "governance.auditor_opinion": {
+      "evidence_id": "EV-eom",
+      "source_id": "RHP-VISHAL-NIRMITI",
+      "locator": "Restated Financial Information, basis of restatement",
+      "page": 357,
+      "section": "Restated Financial Statements",
+      "quote": "do not require any adjustment for qualification as there are no qualification in the underlying audit reports. There are items relating to emphasis of matter and other matter which do not require any adjustments.",
+      "extraction_method": "DETERMINISTIC_PDF"
+    }
+  },
+  "issue": {
+    "price_band_low": 208,
+    "price_band_high": 220,
+    "lot_size": 68,
+    "fresh_issue": 14500,
+    "ofs": 3300,
+    "fresh_shares": 6590909,
+    "post_issue_shares": 26390909,
+    "pre_issue_shares": 19800000,
+    "post_issue_eps": 9.46,
+    "open_date": "2026-09-30",
+    "close_date": "2026-10-05",
+    "quota_pct": {
+      "qib": 1,
+      "nii": 29,
+      "retail": 70
+    },
+    "ofs_sellers": [
+      {
+        "name": "Vaman Prestressing Company Private Limited",
+        "type": "promoter_group",
+        "pre_issue_shares": 1500000,
+        "shares_sold": 1500000,
+        "holding_pct_pre_issue": 7.58,
+        "source_id": "RHP-VISHAL-NIRMITI"
+      }
+    ]
+  },
+  "financials": {
+    "reporting_unit": "INR_LAKHS",
+    "periods": [
+      {
+        "fy": "FY2024",
+        "revenue": 24288.2,
+        "pat": 344.56,
+        "net_worth": 3856.33,
+        "total_debt": 9175.29,
+        "cfo": 2773.05,
+        "capex": 1844.47,
+        "cash_and_equivalents": 23.16,
+        "receivable_days": 55.9,
+        "interest_expense": 1444.07,
+        "ebit": 1397.46,
+        "ebitda": 2314.25
+      },
+      {
+        "fy": "FY2025",
+        "revenue": 31851.62,
+        "pat": 2363.59,
+        "net_worth": 6156.22,
+        "total_debt": 8805.15,
+        "cfo": 3820.17,
+        "capex": 3832.83,
+        "cash_and_equivalents": 19.73,
+        "receivable_days": 53.9,
+        "interest_expense": 1421.72,
+        "ebit": 3901.45,
+        "ebitda": 4648.35
+      },
+      {
+        "fy": "FY2026",
+        "revenue": 33867.73,
+        "pat": 2497.5,
+        "net_worth": 8678.35,
+        "total_debt": 8741.7,
+        "cfo": 2715.47,
+        "capex": 3528.88,
+        "cash_and_equivalents": 16.55,
+        "receivable_days": 68.1,
+        "disclosed_roce_pct": 28.02,
+        "interest_expense": 1504.04,
+        "ebit": 4336.43,
+        "ebitda": 5112.96
+      }
+    ],
+    "contingent_liabilities": 2186.64,
+    "contingent_liabilities_unquantified": null
+  },
+  "capital_structure": {
+    "promoter_pre_pct": 73.42,
+    "promoter_post_pct": 49.4,
+    "promoter_pledge_pct": 0,
+    "promoter_lockin_in_place": true,
+    "large_holders_unlocked_early": false,
+    "pre_ipo_placements": [],
+    "discounted_allotments_18m_before_drhp": false
+  },
+  "use_of_proceeds": [
+    {
+      "category": "working_capital",
+      "amount": 7500
+    },
+    {
+      "category": "debt_repayment",
+      "amount": 1900
+    },
+    {
+      "category": "gcp",
+      "amount": null,
+      "undisclosed_marker": "[●]"
+    }
+  ],
+  "governance": {
+    "auditor_opinion": "emphasis_of_matter",
+    "auditor_changed_3y": null,
+    "auditor_reputed": null,
+    "repeated_eom": null,
+    "eom_materiality": null,
+    "going_concern_uncertainty": null,
+    "litigation_bucket": "criminal_or_regulatory",
+    "sebi_ed_action_active": false,
+    "rpt_pct_revenue": 6.67,
+    "rpt_pct_of_revenue_growth": null,
+    "board_independent_majority": false,
+    "kmp_exits_2y": 0
+  },
+  "business": {
+    "industry_cagr_pct": 3.8,
+    "industry_scope": null,
+    "industry_forecast_period": null,
+    "industry_source": null,
+    "top5_customer_pct": 85.33,
+    "moat_rating": "strong_niche",
+    "visibility_rating": "strong",
+    "regulatory_dependence": null
+  },
+  "peers": [
+    {
+      "name": "GPT Infraprojects Limited",
+      "business_match": "partial",
+      "listed_years": 12,
+      "as_of": "2026-07-23",
+      "pe": 14.83,
+      "pb": 2.73,
+      "roe_pct": 18.25,
+      "source_id": "PEER-SCREENER"
+    },
+    {
+      "name": "Indian Hume Pipe Company Limited",
+      "business_match": "partial",
+      "listed_years": 20,
+      "as_of": "2026-07-23",
+      "pe": 13.86,
+      "pb": 1.32,
+      "roe_pct": 9.51,
+      "source_id": "PEER-SCREENER"
+    }
+  ],
+  "recent_sector_ipos": [],
+  "market": {
+    "anchor": {
+      "as_of": "2026-10-04T19:26:01.569Z",
+      "quality": "unknown",
+      "source_id": "MARKET-TRACKER"
+    },
+    "subscription": {
+      "as_of": "2026-10-04T19:26:01.569Z",
+      "qib_x": 1,
+      "nii_x": 0.34,
+      "retail_x": 0.16,
+      "overall_x": 0.22,
+      "source_id": "MARKET-TRACKER"
+    },
+    "gmp": {
+      "as_of": "2026-10-04T19:26:01.569Z",
+      "pct": 15.91,
+      "trend": "flat",
+      "source_id": "MARKET-TRACKER"
+    },
+    "regime": {
+      "as_of": "2026-10-04T19:26:01.569Z",
+      "nifty_trend": "supportive",
+      "last_ipo_listing_gains_pct": [],
+      "source_id": "MARKET-TRACKER"
+    }
+  }
+}
