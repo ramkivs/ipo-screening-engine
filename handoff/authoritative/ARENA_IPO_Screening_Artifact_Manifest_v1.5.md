@@ -68,7 +68,7 @@ If a Claude artifact conflicts with v1.5, v1.5 wins.
 
 ## Total
 
-**9 files** should be shared.
+**10 files** should be shared.
 
 ------------------------------------------------------------------------
 
