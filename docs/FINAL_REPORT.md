@@ -31,7 +31,7 @@ reference/prototype material only.
 The v1.5 engine is implemented, executable end to end, and verified against a
 golden regression suite of **238 tests**. It scores an IPO from a structured
 input, produces a score with a range and a tri-state knockout gate, freezes the
-run into an immutable record with eight hashed artifacts, and projects fourteen
+run into an immutable record with six hashed payload artifacts (plus manifest), and projects fourteen
 Excel sheets from that record.
 
 **What exists now**

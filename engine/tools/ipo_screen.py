@@ -53,6 +53,7 @@ from ipo_screening.config_validation import check_config, compile_config  # noqa
 from ipo_screening.errors import EngineError  # noqa: E402
 from ipo_screening.evaluation import EvaluationStore  # noqa: E402
 from ipo_screening.excel import SHEET_ORDER, project  # noqa: E402
+from ipo_screening.extraction import DocumentExtractor  # noqa: E402
 from ipo_screening.pipeline import load_config, replay  # noqa: E402
 from ipo_screening.version import (  # noqa: E402
     DEFAULT_CONFIG_PATH,
@@ -308,6 +309,48 @@ def cmd_check_config(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_extract(args: argparse.Namespace) -> int:
+    pdf_path = Path(args.pdf)
+    if not pdf_path.exists():
+        print(f"error: PDF file not found: {pdf_path}", file=sys.stderr)
+        return EXIT_REFUSED
+
+    extractor = DocumentExtractor()
+    template_path = getattr(args, "template", None)
+    canonical, report = extractor.extract_from_pdf(pdf_path, reference_base_path=template_path)
+
+    print("extraction summary")
+    print(f"  document uri     {report.source.uri}")
+    print(f"  source id        {report.source.source_id}")
+    print(f"  content hash     {report.source.content_hash}")
+    print(f"  pages            {report.source.page_count}")
+    print(f"  fields extracted {report.field_count} ({report.verified_count} verified, {report.unknown_count} unknown)")
+    print(f"  time             {report.metadata.get('execution_time_seconds')}s")
+
+    if getattr(args, "output", None):
+        out_path = Path(args.output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(canonical, indent=2), encoding="utf-8")
+        print(f"  canonical json   {out_path}")
+
+    if getattr(args, "run", False):
+        config = load_config(args.config)
+        instant = parse_instant(args.at)
+        store = EvaluationStore(args.store) if args.store else None
+        outcome = evaluate(
+            canonical,
+            config,
+            mode=args.mode,
+            evaluation_datetime=instant,
+            store=store,
+            workbook_path=args.workbook,
+        )
+        print()
+        print_run_report(outcome, verbose=args.verbose)
+
+    return EXIT_OK
+
+
 # --------------------------------------------------------------------------
 # Entry point
 # --------------------------------------------------------------------------
@@ -355,6 +398,28 @@ def build_parser() -> argparse.ArgumentParser:
 
     chk = sub.add_parser("check-config", help="validate the policy configuration")
     chk.set_defaults(func=cmd_check_config)
+
+    ext = sub.add_parser("extract", help="extract canonical JSON from an RHP/DRHP PDF")
+    ext.add_argument("pdf", help="path to RHP/DRHP PDF")
+    ext.add_argument("--template", "--reference", default=None,
+                     help="path to reference template JSON for secondary/tracker data")
+    ext.add_argument("--output", "-o", default=None,
+                     help="path to save generated canonical JSON")
+    ext.add_argument("--run", action="store_true",
+                     help="immediately evaluate the extracted canonical JSON")
+    ext.add_argument("--mode", default="final",
+                     choices=["preliminary", "final", "post_listing_1w",
+                              "post_listing_1m", "post_listing_6m"],
+                     help="evaluation mode when --run is specified (default: final)")
+    ext.add_argument("--at", default=None,
+                     help="evaluation instant, ISO 8601 when --run is specified")
+    ext.add_argument("--store", default=None,
+                     help="evaluation store root when --run is specified")
+    ext.add_argument("--workbook", default=None,
+                     help="path to IPO_Screening_History.xlsx when --run is specified")
+    ext.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    ext.set_defaults(func=cmd_extract)
+
     return parser
 
 
