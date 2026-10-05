@@ -1,5 +1,21 @@
-"""Phase 6A: Post-Listing Observation Model & Deterministic Return Engine package."""
+"""Phase 6A & 6B: Post-Listing Observation Model & Historical Outcome Store package."""
 
+from .dataset import (
+    BacktestDataset,
+    BacktestDatasetManifest,
+    BacktestDatasetRow,
+    ConflictingObservationError,
+    DatasetAssemblyError,
+    DatasetRowStatus,
+    DatasetVerificationError,
+    DuplicateEvaluationError,
+    assemble_dataset,
+    compute_dataset_hash,
+    export_dataset_csv,
+    export_dataset_json,
+    get_effective_observations,
+    verify_dataset,
+)
 from .models import (
     BenchmarkObservation,
     CalculationMetadata,
@@ -53,9 +69,17 @@ from .trading_calendar import (
 )
 
 __all__ = [
+    "BacktestDataset",
+    "BacktestDatasetManifest",
+    "BacktestDatasetRow",
     "BenchmarkObservation",
     "CalculationMetadata",
+    "ConflictingObservationError",
     "DailyPriceRecord",
+    "DatasetAssemblyError",
+    "DatasetRowStatus",
+    "DatasetVerificationError",
+    "DuplicateEvaluationError",
     "DuplicatePriceConflictError",
     "EvaluationNotFoundError",
     "Horizon",
@@ -73,15 +97,20 @@ __all__ = [
     "ReturnSet",
     "VerificationStatus",
     "CALCULATION_VERSION",
+    "assemble_dataset",
     "build_observation",
     "calculate_absolute_return",
     "calculate_benchmark_return",
     "calculate_excess_return",
     "calculate_listing_gain",
     "calculate_secondary_return",
+    "compute_dataset_hash",
     "compute_observation_hashes",
     "compute_target_date",
+    "export_dataset_csv",
+    "export_dataset_json",
     "format_iso_date",
+    "get_effective_observations",
     "get_observations_dir",
     "is_trading_day",
     "list_observations",
@@ -93,5 +122,6 @@ __all__ = [
     "save_observation",
     "sha256_canonical_dict",
     "validate_parent_evaluation",
+    "verify_dataset",
     "verify_observation_hashes",
 ]

@@ -401,6 +401,7 @@ def test_connector_integration_with_enrichment_engine():
 
     # 5. Golden evaluation stability with original golden input
     config = load_config(CONFIG_PATH)
-    outcome = evaluate(base_doc, config, mode="final", evaluation_datetime=base_doc.get("_eval_at"))
+    from conftest import EVAL_AT
+    outcome = evaluate(base_doc, config, mode="final", evaluation_datetime=base_doc.get("_eval_at") or EVAL_AT)
     expected_hash = "e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1"
     assert outcome.record.result_hash == expected_hash

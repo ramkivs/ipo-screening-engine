@@ -513,3 +513,58 @@ Observations are saved as linked child artifacts under:
 * **Fail-Closed Arithmetic**: Missing benchmark data yields `None` (UNKNOWN) for benchmark and excess returns, never defaulting to zero.
 * **Deterministic Hashing**: Every observation artifact computes and records a SHA-256 hash over its canonical inputs and results.
 
+---
+
+## 12. Phase 6B Multi-IPO Historical Outcome Dataset & Assembly
+
+Phase 6B provides the deterministic dataset assembly and audit verification foundation required for downstream backtesting (Phase 6C). It joins immutable pre-listing screening evaluations with post-listing realized outcome observations without recalculating historical scores or mutating evaluation artifacts.
+
+### 12.1 Dataset Assembly Workflow
+
+To assemble a multi-IPO historical outcome dataset from a store of evaluations:
+
+```bash
+python3 engine/tools/ipo_screen.py post-listing dataset \
+    --store build/evaluations \
+    --output build/backtest_dataset.json \
+    [--csv build/backtest_dataset.csv] \
+    [--strict] \
+    [-v]
+```
+
+### 12.2 Dataset Verification Workflow
+
+To audit and verify the cryptographic integrity, schema, and store linkage of a generated dataset:
+
+```bash
+python3 engine/tools/ipo_screen.py post-listing verify-dataset \
+    --dataset build/backtest_dataset.json \
+    [--store build/evaluations] \
+    [-v]
+```
+
+### 12.3 Status & Inclusion Semantics
+
+Each row in the dataset is classified deterministically:
+* `READY`: All three observation horizons (1W, 1M, 6M) are present and verified.
+* `PARTIAL`: At least one horizon is present and verified (e.g. 1W/1M available while 6M is pending).
+* `INCOMPLETE`: Evaluation exists, but no post-listing observations are available yet.
+* `UNVERIFIED`: An observation has unverified corporate actions or unconfirmed adjustments.
+* `INVALID`: Broken linkage, parent result hash mismatch, or corrupted observation hash.
+
+Newer IPOs are never discarded merely because 6M is pending; they enter as `PARTIAL` with unavailable horizons set to `None` (`UNKNOWN`).
+
+### 12.4 Restatement & Versioning Rule
+
+When multiple versions of an observation exist for the same evaluation and horizon:
+* The latest valid superseding version (`supersedes_observation_id`) is selected as the effective observation.
+* Historical superseded versions remain preserved on disk.
+* Unlinked conflicting versions trigger an `INVALID` classification or fail closed under `--strict`.
+
+### 12.5 Deterministic Ordering & Dataset Hash
+
+* **Ordering**: Rows are sorted strictly by `(evaluation_timestamp, ipo_id, final_evaluation_id)`.
+* **Dataset Hash**: SHA-256 computed over the canonical JSON representation of sorted rows, ensuring byte-identical reproducibility independent of filesystem traversal order or generation wall clock.
+* **Scope Firewall**: Statistical calibration, Spearman IC, decile ranking, regression, and scoring changes are strictly out of scope for Phase 6B and deferred to Phase 6C/6D.
+
+

@@ -719,6 +719,79 @@ def cmd_post_listing_ingest(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_post_listing_dataset(args: argparse.Namespace) -> int:
+    try:
+        from ipo_screening.post_listing import (
+            assemble_dataset,
+            export_dataset_json,
+            export_dataset_csv,
+        )
+    except ImportError:
+        from engine.ipo_screening.post_listing import (
+            assemble_dataset,
+            export_dataset_json,
+            export_dataset_csv,
+        )
+
+    try:
+        dataset = assemble_dataset(args.store, strict=args.strict)
+        json_path = export_dataset_json(dataset, args.output)
+        csv_path = None
+        if args.csv:
+            csv_path = export_dataset_csv(dataset, args.csv)
+
+        print("=" * 80)
+        print("HISTORICAL OUTCOME DATASET ASSEMBLED")
+        print("=" * 80)
+        print(f"Store Path:           {args.store}")
+        print(f"Dataset Output JSON:  {json_path}")
+        if csv_path:
+            print(f"Dataset Output CSV:   {csv_path}")
+        print(f"Dataset Hash:         {dataset.manifest.dataset_hash}")
+        print(f"Total Rows (IPOs):    {dataset.manifest.row_count}")
+        print(f"Observations Count:   {dataset.manifest.included_observation_count}")
+        print("-" * 80)
+        print("Status Breakdown:")
+        for status, count in sorted(dataset.manifest.status_counts.items()):
+            print(f"  {status:<16} {count}")
+        print("=" * 80)
+        return EXIT_OK
+    except Exception as e:
+        print(f"error assembling dataset: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+
+
+def cmd_post_listing_verify_dataset(args: argparse.Namespace) -> int:
+    try:
+        from ipo_screening.post_listing import verify_dataset
+    except ImportError:
+        from engine.ipo_screening.post_listing import verify_dataset
+
+    try:
+        res = verify_dataset(args.dataset, store_root=args.store)
+        if res.get("status") == "PASS":
+            print("=" * 80)
+            print("DATASET VERIFICATION AUDIT")
+            print("=" * 80)
+            print(f"Dataset Path:         {args.dataset}")
+            print(f"Dataset Hash:         {res.get('dataset_hash')}")
+            print(f"Row Count:            {res.get('row_count')}")
+            print(f"Ordering Valid:       {res.get('ordering_valid')}")
+            print(f"Hash Match:           {res.get('dataset_hash_match')}")
+            if args.store:
+                print(f"Store Linkage:        VERIFIED against {args.store}")
+            print("=" * 80)
+            print("Audit Status:         ALL PASS")
+            print("=" * 80)
+            return EXIT_OK
+        else:
+            print(f"dataset verification failed: {res.get('reason')}", file=sys.stderr)
+            return EXIT_REFUSED
+    except Exception as e:
+        print(f"error verifying dataset: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+
+
 # --------------------------------------------------------------------------
 # Entry point
 # --------------------------------------------------------------------------
@@ -841,6 +914,20 @@ def build_parser() -> argparse.ArgumentParser:
     post_ingest.add_argument("--reason", default=None, help="optional restatement reason if superseding existing observation")
     post_ingest.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
     post_ingest.set_defaults(func=cmd_post_listing_ingest)
+
+    post_dataset = post_sub.add_parser("dataset", help="assemble multi-IPO historical outcome dataset")
+    post_dataset.add_argument("--store", required=True, help="evaluation store root")
+    post_dataset.add_argument("--output", "-o", required=True, help="path to output dataset JSON file")
+    post_dataset.add_argument("--csv", default=None, help="optional path to output dataset CSV file")
+    post_dataset.add_argument("--strict", action="store_true", help="fail-closed on any duplicate IPO or invalid observation")
+    post_dataset.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    post_dataset.set_defaults(func=cmd_post_listing_dataset)
+
+    post_verify = post_sub.add_parser("verify-dataset", help="verify integrity of historical outcome dataset")
+    post_verify.add_argument("--dataset", required=True, help="path to dataset JSON file")
+    post_verify.add_argument("--store", default=None, help="optional evaluation store root to verify source linkage")
+    post_verify.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    post_verify.set_defaults(func=cmd_post_listing_verify_dataset)
 
     return parser
 

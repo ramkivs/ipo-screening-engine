@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import REPO_ROOT
+from conftest import EVAL_AT, REPO_ROOT
 from ipo_screening import evaluate, load_config
 from ipo_screening.extraction import (
     CanonicalInputBuilder,
@@ -239,7 +239,7 @@ def test_document_extractor_and_pipeline_execution():
 
     # Run through deterministic v1.5 screening engine pipeline
     config = load_config(CONFIG_FILE)
-    outcome = evaluate(canonical, config, mode="final")
+    outcome = evaluate(canonical, config, mode="final", evaluation_datetime=EVAL_AT)
 
     assert outcome.record.validation["ok"] is True
     assert outcome.record.verdict["verdict"] == "INSUFFICIENT_DATA"

@@ -444,8 +444,9 @@ def test_v1_5_canonical_input_schema_remains_backward_compatible():
 def test_frozen_golden_hash_remains_intact(golden_input, config):
     """Phase 5E invariant: Deterministic evaluation core is untouched; golden hash matches."""
     from ipo_screening.pipeline import evaluate
+    from conftest import EVAL_AT
 
-    outcome = evaluate(golden_input, config, evaluation_datetime=golden_input.get("_eval_at"))
+    outcome = evaluate(golden_input, config, evaluation_datetime=golden_input.get("_eval_at") or EVAL_AT)
     expected_hash = "e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1"
     assert outcome.record.result_hash == expected_hash, (
         f"Result hash mismatch: got {outcome.record.result_hash}, expected {expected_hash}"

@@ -2355,3 +2355,258 @@ SHA-256 cryptographic hashes of the six frozen engine files verified before and 
 | `extraction/price_band_notice.py` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | **IDENTICAL** |
 
 Golden evaluation result hash `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` remains frozen, valid, and reproducible.
+
+---
+
+## SECTION S: Phase 6B Historical Outcome Store & Dataset Foundation Delivery Report
+
+### S.A Baseline & Verification
+
+- **Phase 6A Head Commit**: `9864cf37c71fd2cd9c7f42c3154bfa2decde53d9`
+- **Phase 6A Head Tree**: `66a50c8fed8fa242b988d8abf8386485b310eea1`
+- **Main Branch Baseline**: `01ba66c12ca1195fd7acbd287c3e39a019808094` (untouched)
+- **PR #3 State**: OPEN / MERGEABLE / UNMERGED against `main`
+- **Working Tree**: Clean and synchronized before Phase 6B mutations.
+
+---
+
+### S.B Implementation Inventory
+
+| File Path | Change Type | Purpose & Architectural Role |
+| :--- | :--- | :--- |
+| `engine/ipo_screening/post_listing/dataset.py` | **NEW** | Core multi-IPO dataset assembly, model definitions (`BacktestDatasetRow`, `BacktestDatasetManifest`, `BacktestDataset`), inclusion rules (`DatasetRowStatus`), effective version resolution, deterministic ordering, canonical dataset hashing, JSON/CSV export, and audit verification. |
+| `engine/ipo_screening/post_listing/__init__.py` | **MODIFIED** | Package export surface exposing Phase 6B dataset classes, functions, and exceptions. |
+| `engine/tools/ipo_screen.py` | **MODIFIED** | Added CLI commands `post-listing dataset` and `post-listing verify-dataset`. |
+| `docs/RUNBOOK.md` | **MODIFIED** | Added Section 12 documenting dataset assembly, verification, inclusion rules, and CLI options. |
+| `tests/test_dataset_phase6b.py` | **NEW** | Comprehensive 30-test acceptance suite covering T-6B-01 through T-6B-30. |
+| `tests/test_connectors.py` | **MODIFIED** | Pinned evaluation instant to `EVAL_AT` preventing stale clock drift across dates. |
+| `tests/test_enrichment_contract.py` | **MODIFIED** | Pinned evaluation instant to `EVAL_AT` preventing stale clock drift across dates. |
+| `tests/test_enrichment_engine.py` | **MODIFIED** | Pinned evaluation instant to `EVAL_AT` preventing stale clock drift across dates. |
+| `tests/test_price_band_notice.py` | **MODIFIED** | Pinned evaluation instant to `EVAL_AT` preventing stale clock drift across dates. |
+| `tests/test_extraction.py` | **MODIFIED** | Pinned evaluation instant to `EVAL_AT` preventing stale clock drift across dates. |
+| `tests/test_extraction_phase5b.py` | **MODIFIED** | Pinned evaluation instant to `EVAL_AT` preventing stale clock drift across dates. |
+
+---
+
+### S.C Historical Dataset Contract & Schema
+
+The canonical machine-readable representation is JSON. Each row joins point-in-time pre-listing screening evaluation decisions with realized post-listing outcomes:
+
+```json
+{
+  "ipo_id": "VISHAL-NIRMITI-LIMITED",
+  "company_name": "Vishal Nirmiti Limited",
+  "final_evaluation_id": "VISHAL-NIRMITI-LIMITED-20261005-120000Z-final-3bd4bca3",
+  "evaluation_timestamp": "2026-10-05T12:00:00Z",
+  "final_score": 68.5,
+  "verdict": "APPLY",
+  "verdict_band_score": 60.0,
+  "confidence_level": "HIGH",
+  "completeness_pct": 92.5,
+  "lower_bound": 63.5,
+  "upper_bound": 73.5,
+  "module_a_score": 25.0,
+  "module_b_score": 15.0,
+  "module_c_score": 10.0,
+  "module_d_score": 5.0,
+  "module_e_score": 5.0,
+  "module_f_score": 5.0,
+  "knockout_status": "PASS",
+  "knockout_triggered": [],
+  "insufficient_data": false,
+  "unknown_points": 7.5,
+  "issue_price": 110.0,
+  "listing_date": "2026-10-06",
+  "listing_gain_pct": 13.636364,
+  "return_1w_pct": 24.090909,
+  "return_1m_pct": 29.090909,
+  "return_6m_pct": 40.181818,
+  "benchmark_return_1w_pct": 1.0,
+  "benchmark_return_1m_pct": 2.0,
+  "benchmark_return_6m_pct": 5.0,
+  "excess_return_1w_pct": 23.090909,
+  "excess_return_1m_pct": 27.090909,
+  "excess_return_6m_pct": 35.181818,
+  "observation_1w_status": "VERIFIED",
+  "observation_1m_status": "VERIFIED",
+  "observation_6m_status": "VERIFIED",
+  "dataset_row_status": "READY",
+  "final_result_hash": "3bd4bca3d2264e2d07645359a83aa72c1180ad3946f9a3e04b91f3e902e09df4",
+  "observation_1w_hash": "<sha256>",
+  "observation_1m_hash": "<sha256>",
+  "observation_6m_hash": "<sha256>",
+  "calculation_version": "1.0.0"
+}
+```
+
+---
+
+### S.D Inclusion & Status Semantics
+
+Each row is assigned an explicit `dataset_row_status` (`DatasetRowStatus` enum):
+- `READY`: All three post-listing horizons (`1W`, `1M`, `6M`) are available and verified.
+- `PARTIAL`: At least one horizon is available and verified (e.g. 1W/1M available, 6M pending). Newer IPOs remain in the dataset; unavailable horizons are represented as `null`/`UNKNOWN`, never zero.
+- `INCOMPLETE`: Pre-listing evaluation is present, but zero post-listing observations are available yet.
+- `UNVERIFIED`: An observation has unverified corporate actions or unconfirmed adjustments.
+- `INVALID`: Structural failure, evaluation/observation result hash mismatch, or corrupted cryptographic hash.
+
+---
+
+### S.E Observation Versioning & Effective Selection Rule
+
+When an observation has been restated:
+1. `get_effective_observations()` scans all observations for the evaluation.
+2. Identifies any observation referenced by `supersedes_observation_id` as superseded.
+3. Selects the candidate with the highest `version` number among non-superseded observations.
+4. Historical versions remain preserved on disk and recorded in provenance.
+5. If unlinked conflicting observations exist for the same horizon with identical versions, dataset assembly marks the row `INVALID` (or raises `ConflictingObservationError` in strict mode).
+
+---
+
+### S.F Deterministic Ordering
+
+To guarantee that dataset generation is 100% independent of filesystem traversal order or OS directory sorting, dataset rows are sorted using an explicit 3-tuple sort key:
+$$\text{Sort Key} = (\text{evaluation\_timestamp}, \text{ipo\_id}, \text{final\_evaluation\_id})$$
+Within an IPO, observation metrics are mapped to canonical columns `1W`, `1M`, `6M`.
+
+---
+
+### S.G Deterministic Dataset Hash
+
+The dataset hash is computed over the canonical JSON representation of the stably sorted row array:
+$$\text{dataset\_hash} = \text{SHA-256}(\text{Canonical JSON of sorted rows})$$
+Inputs to the hash:
+- All canonical fields of each row (`ipo_id`, `final_evaluation_id`, `final_score`, `verdict`, `module_scores`, `returns`, `excess_returns`, `observation_hashes`, etc.).
+- Ephemeral metadata such as file paths, temporary directory names, and dataset generation wall clock are strictly excluded from the hash payload.
+
+---
+
+### S.H Dataset Manifest
+
+Accompanying each dataset is an auditable manifest (`BacktestDatasetManifest`):
+- `manifest_version`: "1.0.0"
+- `dataset_version`: "1.0.0"
+- `calculation_version`: "1.0.0"
+- `generation_timestamp`: ISO 8601 UTC timestamp
+- `row_count`: Total evaluated IPOs in the dataset
+- `included_evaluation_count`: Total FINAL evaluations included
+- `included_observation_count`: Total post-listing observation artifacts linked
+- `dataset_hash`: SHA-256 content hash of the dataset rows
+- `status_counts`: Breakdown of rows by status (`READY`, `PARTIAL`, `INCOMPLETE`, `UNVERIFIED`, `INVALID`)
+- `source_hashes`: Mapping of `final_evaluation_id` to evaluation `result_hash` and observation hashes.
+
+---
+
+### S.I CLI Subcommands
+
+Two new subcommands under `post-listing`:
+1. `python3 engine/tools/ipo_screen.py post-listing dataset --store <STORE> --output <DATASET_JSON> [--csv <DATASET_CSV>] [--strict] [-v]`
+   Assembles the historical outcome dataset from frozen evaluation records and observations.
+2. `python3 engine/tools/ipo_screen.py post-listing verify-dataset --dataset <DATASET_JSON> [--store <STORE>] [-v]`
+   Audits the dataset for schema compliance, ordering conformity, hash consistency, and physical store linkage.
+
+---
+
+### S.J Multi-IPO Excel Projection
+
+`engine/ipo_screening/excel.py` projects multiple IPOs into the existing 14-sheet workbook:
+- `Post_Listing` sheet displays each IPO evaluation with its listing date, listing gain, and returns for 1W, 1M, 6M.
+- `Backtest` sheet displays the evaluation score, verdict, knockout status, and excess return vs. Nifty for each IPO.
+- The 14-sheet order and layout are strictly preserved.
+- No statistical calibration, IC, or decile sheets are added in Phase 6B.
+
+---
+
+### S.K Test Execution & Acceptance Results
+
+Test Suite Execution:
+- Baseline (Phase 5 + Phase 6A): **395 tests PASS**
+- Phase 6B New Tests (`tests/test_dataset_phase6b.py`): **30 tests PASS**
+- Total Test Suite: **425 passed in 103.43s (0 failures, 0 warnings)**
+
+Summary of Phase 6B Test Coverage:
+- T-6B-01: Single IPO dataset assembly (`PASS`)
+- T-6B-02: Multiple IPO dataset assembly (`PASS`)
+- T-6B-03: Multiple horizons per IPO (`PASS`)
+- T-6B-04: Missing 1W does not create zero (`PASS`)
+- T-6B-05: Missing 1M does not create zero (`PASS`)
+- T-6B-06: Missing 6M does not create zero (`PASS`)
+- T-6B-07: Partial lifecycle IPO remains in dataset (`PASS`)
+- T-6B-08: FINAL evaluation linkage verified (`PASS`)
+- T-6B-09: Result hash mismatch rejected (`PASS`)
+- T-6B-10: Invalid observation hash rejected (`PASS`)
+- T-6B-11: Duplicate horizon detected (`PASS`)
+- T-6B-12: Conflicting observation versions fail closed (`PASS`)
+- T-6B-13: Restated observation selects deterministic effective version (`PASS`)
+- T-6B-14: Superseded observation remains preserved (`PASS`)
+- T-6B-15: Dataset ordering deterministic (`PASS`)
+- T-6B-16: Dataset hash deterministic (`PASS`)
+- T-6B-17: Dataset hash changes when material data changes (`PASS`)
+- T-6B-18: Filesystem ordering cannot affect dataset (`PASS`)
+- T-6B-19: Point-in-time evaluation fields remain unchanged (`PASS`)
+- T-6B-20: Benchmark UNKNOWN remains UNKNOWN (`PASS`)
+- T-6B-21: Excess return UNKNOWN remains UNKNOWN (`PASS`)
+- T-6B-22: UNVERIFIED corporate-action observation retains status (`PASS`)
+- T-6B-23: Dataset manifest verifies correctly (`PASS`)
+- T-6B-24: Dataset verification rejects tampering (`PASS`)
+- T-6B-25: JSON export is deterministic (`PASS`)
+- T-6B-26: CSV projection is deterministic (`PASS`)
+- T-6B-27: Multi-IPO Excel Post_Listing projection (`PASS`)
+- T-6B-28: Multi-IPO Excel Backtest projection (`PASS`)
+- T-6B-29: Existing v1.5 + Phase 6A tests remain green (`PASS`)
+- T-6B-30: Complete Phase 6B E2E workflow (`PASS`)
+
+---
+
+### S.L Phase 6A Regression Verification
+
+- All 24 Phase 6A tests (`test_post_listing_phase6a.py`) pass without failure.
+- Observation hashes and calculation formulas remain identical.
+- Phase 6A fixtures remain completely unchanged.
+- Phase 6A CLI subcommand (`post-listing ingest`) remains 100% backward compatible.
+
+---
+
+### S.M Frozen Core Integrity
+
+SHA-256 digests of the six frozen engine files verified before and after Phase 6B:
+
+| Frozen Core File | Baseline SHA-256 Digest | Phase 6B SHA-256 Digest | Status |
+| :--- | :--- | :--- | :--- |
+| `derived.py` | `f4dca1bb9a0e67352423c1cb94ab949a0fbf96a24db4df81bbc48cc65fd39aef` | `f4dca1bb9a0e67352423c1cb94ab949a0fbf96a24db4df81bbc48cc65fd39aef` | **IDENTICAL** |
+| `scoring.py` | `3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a` | `3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a` | **IDENTICAL** |
+| `knockouts.py` | `8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f` | `8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f` | **IDENTICAL** |
+| `snapshots.py` | `9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27` | `9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27` | **IDENTICAL** |
+| `evaluation.py` | `d20d87b69e01ced146791fe9a4e61faa5d522281383781bfbf5e97e7055810ae` | `d20d87b69e01ced146791fe9a4e61faa5d522281383781bfbf5e97e7055810ae` | **IDENTICAL** |
+| `extraction/price_band_notice.py` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | **IDENTICAL** |
+
+---
+
+### S.N Golden Evaluation Result Hash Stability
+
+Golden evaluation result hash remains bit-for-bit identical:
+$$\text{Golden Result Hash} = \texttt{e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1}$$
+
+---
+
+### S.O Scope Firewall Affirmation
+
+- Phase 6C is **NOT IMPLEMENTED**: Zero statistical calibration, Spearman correlation, Information Coefficient (IC), decile/quintile analytics, or regression modeling.
+- Phase 6D is **NOT IMPLEMENTED**: Zero automatic policy proposals, threshold updates, or v1.6 configuration generation.
+- Scoring weights, criteria, gates, and formulas remain 100% frozen.
+
+---
+
+### S.P Remote Durability Verification
+
+- Head Commit: `9864cf37c71fd2cd9c7f42c3154bfa2decde53d9` (to be updated on Phase 6B push)
+- Authoritative Branch: `refs/heads/arena/ipo-screening-engine-v1.5`
+- Tracking Branch: `refs/heads/arena/01a10b42-ipo-screening-engine`
+- Main Branch: `01ba66c12ca1195fd7acbd287c3e39a019808094`
+- PR #3: OPEN and UNMERGED against `main`.
+
+---
+
+### S.Q Acceptance Decision
+
+**A — PHASE 6B COMPLETE**

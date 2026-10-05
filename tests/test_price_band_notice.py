@@ -359,7 +359,8 @@ def test_phase_5e_contract_compatibility(parser):
 def test_golden_hash_preservation_regression(golden_input, config):
     """Phase 5F Invariant: Deterministic scoring core and golden hash are untouched."""
     from ipo_screening.pipeline import evaluate
+    from conftest import EVAL_AT
 
-    outcome = evaluate(golden_input, config, evaluation_datetime=golden_input.get("_eval_at"))
+    outcome = evaluate(golden_input, config, evaluation_datetime=golden_input.get("_eval_at") or EVAL_AT)
     expected_hash = "e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1"
     assert outcome.record.result_hash == expected_hash

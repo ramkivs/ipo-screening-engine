@@ -533,12 +533,13 @@ def test_reconciled_canonical_input_scorable(golden_input_dict):
     """Spec: Enriched canonical input is directly evaluatable by frozen v1.5 evaluate()."""
     result = EnrichmentEngine.assemble(base_input=golden_input_dict, mode="final")
     config = load_config(CONFIG_PATH)
+    from conftest import EVAL_AT
 
     outcome = evaluate(
         result.canonical_input,
         config,
         mode="final",
-        evaluation_datetime=golden_input_dict.get("_eval_at"),
+        evaluation_datetime=golden_input_dict.get("_eval_at") or EVAL_AT,
     )
     assert outcome.record.validation["ok"] is True
     # Golden hash must remain exactly identical
