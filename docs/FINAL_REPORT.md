@@ -2610,3 +2610,262 @@ $$\text{Golden Result Hash} = \texttt{e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc61
 ### S.Q Acceptance Decision
 
 **A — PHASE 6B COMPLETE**
+
+---
+
+## T. Phase 6C — Historical Backtest Analytics & Statistical Diagnostics
+
+### T.A Executive Summary of Phase 6C
+
+Phase 6C implements the historical backtest analytics and statistical diagnostic engine for the IPO Screening Engine. Consuming the canonical multi-IPO historical outcome dataset established in Phase 6B, Phase 6C computes rigorous, deterministic, point-in-time safe statistical diagnostics across 1W, 1M, and 6M horizons without altering historical evaluations, rescoring IPOs, or mutating production screening rules.
+
+Key capabilities delivered in Phase 6C:
+1. **Dataset Analytical Loader**: Loads Phase 6B canonical outcome datasets deterministically without re-evaluating pre-listing inputs.
+2. **Horizon-Specific Eligibility Filtering**: Enforces strict eligibility criteria per horizon (1W, 1M, 6M), transparently accounting for excluded, pending, and partial lifecycle records.
+3. **Sample-Size Maturity Gate**: Enforces sample maturity tiering (`DESCRIPTIVE_ONLY` for $N < 30$, `EXPLORATORY` for $30 \le N < 100$, and `STATISTICALLY_ACTIONABLE_FOR_DIAGNOSTICS` for $N \ge 100$).
+4. **Descriptive Statistics**: Deterministic $N$, mean, median, min, max, standard deviation, quartiles (Q1, Q3), directional counts, positive rates, and excess return distributions.
+5. **Spearman Rank Correlation & Rank-IC**: Fractional (average) ranking to handle ties without bias, exact Spearman rank correlation, degenerate variance handling, and documented Rank-IC metadata.
+6. **Decile & Quintile Bucket Diagnostics**: Evaluates performance monotonically across score deciles and quintiles; falls back cleanly to `INSUFFICIENT_DATA` if $N < K$.
+7. **Hit-Rate Diagnostics**: Measures absolute and excess win-rates overall and broken down across authoritative verdict classes (`APPLY`, `WATCH`, `AVOID`, `INSUFFICIENT_DATA`).
+8. **Module-Level Diagnostics**: Evaluates the predictive power of each individual scoring module (Modules A-F) against realized returns.
+9. **Benchmark & Excess Return Analytics**: Preserves `UNKNOWN` semantics for missing benchmark data without zero-filling.
+10. **Temporal Vintage & Holdout Diagnostics**: Segregates records by evaluation year and executes chronological development vs. holdout partitions when sample maturity permits.
+11. **Point-in-Time Safety & Leakage Audit Engine**: 8-point automated audit verifying timestamp ordering, predictor independence, observation validity, and absence of forward leakage.
+12. **Canonical Hash & Verification**: Emits deterministic JSON and summary CSV artifacts, with verification command `post-listing verify-analysis`.
+
+---
+
+### T.B Design Principles & Point-in-Time Guarantees
+
+Phase 6C operates under non-negotiable architectural invariants:
+- **Zero Input Mutation**: Historical screening scores, module scores, knockouts, confidence metrics, and verdicts are consumed as frozen immutable facts.
+- **Strict Separation of Diagnostic Evidence vs. Production Scoring**: Phase 6C generates empirical evidence and diagnostic metrics; it never modifies weights, thresholds, or formulas.
+- **Fail-Closed Missing Data Handling**: Missing values are preserved as `None` (`UNKNOWN`) and pairwise excluded from correlation arrays; they are never defaulted to zero.
+- **Deterministic Pure Arithmetic**: Rank calculations, correlations, quantile partitions, and descriptive metrics rely solely on deterministic standard library arithmetic without external floating-point ambiguity.
+
+---
+
+### T.C Sample-Size Maturity Gates & Policy Implementation
+
+Statistical diagnostics must not overstate confidence when historical data is scarce. Phase 6C codifies sample size maturity tiers:
+
+$$\text{Sample Maturity} = \begin{cases} 
+\texttt{DESCRIPTIVE\_ONLY} & \text{if } N < 30 \\ 
+\texttt{EXPLORATORY} & \text{if } 30 \le N < 100 \\ 
+\texttt{STATISTICALLY\_ACTIONABLE\_FOR\_DIAGNOSTICS} & \text{if } N \ge 100 
+\end{cases}$$
+
+- In the `DESCRIPTIVE_ONLY` tier, correlation coefficients and ICs are accompanied by warnings that sample power is insufficient for statistical significance.
+- In the `EXPLORATORY` tier, directional relationships may be observed but are flagged as sensitive to small sample shifts.
+- Only in the `STATISTICALLY_ACTIONABLE_FOR_DIAGNOSTICS` tier are findings considered robust for governance consideration.
+
+---
+
+### T.D Mathematical Formulations & Determinism
+
+#### 1. Fractional (Average) Ranking with Ties
+Given a sequence of values $X = [x_1, \dots, x_n]$, sorted values are grouped by equivalence (within tolerance $10^{-12}$). If a group of $k$ tied values spans 1-based ranks from $i$ to $i + k - 1$, each element receives the average rank:
+$$R(x) = \frac{1}{k} \sum_{j=0}^{k-1} (i + j) = i + \frac{k - 1}{2}$$
+
+#### 2. Deterministic Spearman Rank Correlation ($\rho$)
+Applying the Pearson correlation formula on the computed fractional ranks:
+$$\rho = \frac{\sum_{i=1}^n (R(x_i) - \bar{R}_x)(R(y_i) - \bar{R}_y)}{\sqrt{\sum_{i=1}^n (R(x_i) - \bar{R}_x)^2 \sum_{i=1}^n (R(y_i) - \bar{R}_y)^2}}$$
+
+- **Degenerate Handling**: If $\sum (R(x_i) - \bar{R}_x)^2 = 0$ or $\sum (R(y_i) - \bar{R}_y)^2 = 0$ (all values identical), correlation is set to `0.0` with status `UNDEFINED_ZERO_VARIANCE`.
+- **Sample Size Gate**: If $N < 3$, status is marked `INSUFFICIENT_DATA` and correlation is `None`.
+
+#### 3. Rank Information Coefficient (IC)
+Defined as the Spearman rank correlation between pre-listing predictors and realized outcome returns:
+$$\text{IC} = \rho(\text{Predictor}, \text{Outcome})$$
+- Metadata: `method = "SPEARMAN_RANK_CORRELATION"`, `tie_policy = "AVERAGE_RANK"`, `missing_value_policy = "PAIRWISE_EXCLUDE"`.
+
+---
+
+### T.E Decile & Quintile Bucket Methodology
+
+- Scores are ranked deterministically with multi-column tie breaking: `(final_score, evaluation_timestamp, ipo_id)`.
+- **Quintiles ($K=5$)** and **Deciles ($K=10$)**: Observations are partitioned into $K$ contiguous buckets of size $\lfloor N / K \rfloor$.
+- **Small-Sample Fail-Closed Fallback**: If $N < K$, bucket calculation is aborted, status is set to `INSUFFICIENT_DATA`, and an empty bucket list is returned (prohibiting artificial bucket synthesis from insufficient samples).
+
+---
+
+### T.F Hit-Rate & Outcome Diagnostics
+
+- **Hit Definition**: Realized outcome $> 0.00\%$.
+- **Miss Definition**: Realized outcome $\le 0.00\%$.
+- **Hit Rate**:
+$$\text{Hit Rate} = \frac{\text{Hits}}{N} \times 100\%$$
+- Evaluated across 1W, 1M, and 6M horizons for both absolute returns and excess returns.
+- Segmented by verdict classes: `APPLY`, `WATCH`, `AVOID`, `INSUFFICIENT_DATA`. Empty groups return status `NO_DATA`.
+
+---
+
+### T.G Module-Level Diagnostic Performance
+
+Each individual scoring module is analyzed independently against realized outcomes:
+- **Module A**: Financial Quality (`module_a_score`)
+- **Module B**: Valuation (`module_b_score`)
+- **Module C**: Governance (`module_c_score`)
+- **Module D**: Issue Structure (`module_d_score`)
+- **Module E**: Market Sentiment (`module_e_score`)
+- **Module F**: Lead Manager (`module_f_score`)
+
+Outputs include sample size ($N$), Spearman rank correlation ($\rho$), mean return, positive rate, and status.
+
+---
+
+### T.H Benchmark & Excess Return Treatment
+
+- Benchmark Symbol: `NIFTY_50_TRI`.
+- Excess return is strictly:
+$$\text{Excess Return} = \text{Realized Return} - \text{Benchmark Return}$$
+- When benchmark data is missing, excess return evaluates to `None` (`UNKNOWN`).
+- The benchmark diagnostics layer computes metrics solely across pairwise valid records, explicitly preserving `UNKNOWN` semantics without defaulting to zero.
+
+---
+
+### T.I Temporal Vintage & Out-of-Sample Holdout Analytics
+
+- **Vintage Analysis**: Groups records by calendar year of evaluation timestamp (`2024`, `2025`, `2026`). Computes mean score, mean returns, positive rates, and excess returns per vintage.
+- **Temporal Holdout Diagnostic**:
+  - Earlier vintages are assigned to `development`, latest vintage to `holdout`.
+  - Gate: Requires $\ge 2$ distinct vintages and total $N \ge 30$.
+  - If coverage is insufficient, status is set to `INSUFFICIENT_DATA` (never falsely claiming `PASS`).
+
+---
+
+### T.J Point-in-Time Safety & Leakage Audit Engine
+
+The analytical engine executes an automated 8-point data leakage audit on every analysis run:
+1. `timestamp_ordering`: `evaluation_timestamp` date $\le$ `listing_date`.
+2. `predictor_independence`: `final_score` and module scores contain no post-listing fields.
+3. `observation_temporal_validity`: Observation actual dates $\ge$ `listing_date`.
+4. `final_linkage_intact`: Each row has verified non-empty `final_evaluation_id` and `final_result_hash`.
+5. `observation_hashes_valid`: Observation hashes are non-empty 64-character SHA-256 hex strings.
+6. `no_config_drift`: Engine calculation version matches `1.0.0`.
+7. `no_future_leakage`: Realized returns derive solely from post-listing market prices.
+8. `row_status_valid`: No dataset row is marked `INVALID`.
+
+If all 8 checks pass, `leakage_audit_passed = True` and analysis status is `PASS`. If any check fails, status is `FAIL` and acceptance is blocked.
+
+---
+
+### T.K Canonical Analytical Model, Serialization & Cryptographic Hash
+
+- Root Artifact: `BacktestAnalysis`.
+- **Analysis Content Hash**:
+$$\text{analysis\_hash} = \text{SHA-256}(\text{Canonical JSON of analysis results excluding ephemeral timestamps})$$
+- Serialized to canonical indented JSON (`export_analysis_json`) and tabular CSV summary (`export_analysis_csv`).
+- CLI subcommands:
+  - `python3 engine/tools/ipo_screen.py post-listing analyze --dataset <DS> --output <OUT> [--csv <CSV>]`
+  - `python3 engine/tools/ipo_screen.py post-listing verify-analysis --analysis <AN> [--dataset <DS>]`
+
+---
+
+### T.L Acceptance Test Matrix (T-6C-01 through T-6C-40)
+
+The Phase 6C test suite (`tests/test_analytics_phase6c.py`) provides 100% automated coverage across 40 distinct test specifications:
+
+| Test ID | Test Specification | Result |
+| :--- | :--- | :--- |
+| **T-6C-01** | Dataset analytical loader loads valid canonical dataset without triggering rescoring | **PASS** |
+| **T-6C-02** | Horizon-specific eligibility filtering correctly filters 1W, 1M, 6M returns | **PASS** |
+| **T-6C-03** | Excluded row accounting correctly partitions INVALID vs COMPLETE vs PARTIAL | **PASS** |
+| **T-6C-04** | Sample-size maturity classifier: $N < 30$ returns `DESCRIPTIVE_ONLY` | **PASS** |
+| **T-6C-05** | Sample-size maturity classifier: $30 \le N < 100$ returns `EXPLORATORY` | **PASS** |
+| **T-6C-06** | Sample-size maturity classifier: $N \ge 100$ returns `STATISTICALLY_ACTIONABLE_FOR_DIAGNOSTICS` | **PASS** |
+| **T-6C-07** | Descriptive statistics: $N$, mean, median, min, max, std | **PASS** |
+| **T-6C-08** | Descriptive statistics: positive, negative, zero counts and positive rate | **PASS** |
+| **T-6C-09** | Descriptive statistics: excess returns (mean excess, median excess, positive excess rate) | **PASS** |
+| **T-6C-10** | Fractional (average) ranking computation handles ties accurately | **PASS** |
+| **T-6C-11** | Fractional ranking computation handles all distinct values | **PASS** |
+| **T-6C-12** | Spearman rank correlation between `final_score` and 1W return | **PASS** |
+| **T-6C-13** | Spearman rank correlation with zero variance handles status `UNDEFINED_ZERO_VARIANCE` | **PASS** |
+| **T-6C-14** | Spearman rank correlation handles $N < 3$ as `INSUFFICIENT_DATA` | **PASS** |
+| **T-6C-15** | Information Coefficient (Rank-IC) diagnostics for `final_score` across 1W, 1M, 6M | **PASS** |
+| **T-6C-16** | Information Coefficient metadata fields (`method`, `tie_policy`, `missing_value_policy`) | **PASS** |
+| **T-6C-17** | Quantile bucket calculation for quintiles (5 buckets) | **PASS** |
+| **T-6C-18** | Quantile bucket calculation for deciles (10 buckets) | **PASS** |
+| **T-6C-19** | Quantile analysis fallback to `INSUFFICIENT_DATA` when $N < \text{num\_buckets}$ | **PASS** |
+| **T-6C-20** | Quantile deterministic tie ordering using score, timestamp, ipo_id | **PASS** |
+| **T-6C-21** | Hit rate calculation overall for positive returns and excess returns | **PASS** |
+| **T-6C-22** | Hit rate calculation grouped by verdict (`APPLY`, `WATCH`, `AVOID`) | **PASS** |
+| **T-6C-23** | Hit rate handles empty group with status `NO_DATA` | **PASS** |
+| **T-6C-24** | Module diagnostics for Module A (Financial Quality) across horizons | **PASS** |
+| **T-6C-25** | Module diagnostics for Modules B through F | **PASS** |
+| **T-6C-26** | Benchmark diagnostics records `NIFTY_50_TRI` benchmark return and excess return | **PASS** |
+| **T-6C-27** | Benchmark diagnostics preserves `UNKNOWN` semantics when benchmark return is missing | **PASS** |
+| **T-6C-28** | Temporal vintage diagnostics groups records by evaluation calendar year | **PASS** |
+| **T-6C-29** | Temporal holdout diagnostic splits earlier vs latest vintage when $N \ge 30$ and $\ge 2$ vintages | **PASS** |
+| **T-6C-30** | Temporal holdout diagnostic returns `INSUFFICIENT_DATA` when vintages $< 2$ or $N < 30$ | **PASS** |
+| **T-6C-31** | Point-in-time leakage audit: timestamp ordering check passes when eval $\le$ listing | **PASS** |
+| **T-6C-32** | Point-in-time leakage audit: detects eval date after listing date and fails | **PASS** |
+| **T-6C-33** | Point-in-time leakage audit: detects invalid row status and reports finding | **PASS** |
+| **T-6C-34** | Point-in-time leakage audit: checks final evaluation linkage integrity | **PASS** |
+| **T-6C-35** | Deterministic analytical hash computation is reproducible and independent of generation time | **PASS** |
+| **T-6C-36** | Verification audit: verifies valid analysis JSON against canonical content hash | **PASS** |
+| **T-6C-37** | Verification audit: detects tampering with descriptive statistics or coefficients | **PASS** |
+| **T-6C-38** | Verification audit: verifies cross-linkage to original dataset file and flags hash mismatch | **PASS** |
+| **T-6C-39** | CLI command `post-listing analyze` generates JSON and CSV deliverables successfully | **PASS** |
+| **T-6C-40** | CLI command `post-listing verify-analysis` audits analysis deliverable and returns `EXIT_OK` | **PASS** |
+
+---
+
+### T.M Phase 6A & 6B Regression Verification
+
+- All 24 Phase 6A tests (`test_post_listing_phase6a.py`) pass without failure.
+- All 30 Phase 6B tests (`test_dataset_phase6b.py`) pass without failure.
+- Total post-listing regression suite (Phase 6A + 6B + 6C): 94 / 94 tests passing.
+- Total repository test suite: 465 / 465 tests passing.
+
+---
+
+### T.N Frozen Core Integrity Verification
+
+SHA-256 digests of the six frozen engine files verified before and after Phase 6C:
+
+| Frozen Core File | Baseline SHA-256 Digest | Phase 6C SHA-256 Digest | Status |
+| :--- | :--- | :--- | :--- |
+| `derived.py` | `f4dca1bb9a0e67352423c1cb94ab949a0fbf96a24db4df81bbc48cc65fd39aef` | `f4dca1bb9a0e67352423c1cb94ab949a0fbf96a24db4df81bbc48cc65fd39aef` | **IDENTICAL** |
+| `scoring.py` | `3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a` | `3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a` | **IDENTICAL** |
+| `knockouts.py` | `8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f` | `8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f` | **IDENTICAL** |
+| `snapshots.py` | `9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27` | `9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27` | **IDENTICAL** |
+| `evaluation.py` | `d20d87b69e01ced146791fe9a4e61faa5d522281383781bfbf5e97e7055810ae` | `d20d87b69e01ced146791fe9a4e61faa5d522281383781bfbf5e97e7055810ae` | **IDENTICAL** |
+| `extraction/price_band_notice.py` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | **IDENTICAL** |
+
+---
+
+### T.O Golden Evaluation Result Hash Stability
+
+Golden evaluation result hash remains bit-for-bit identical:
+$$\text{Golden Result Hash} = \texttt{e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1}$$
+
+---
+
+### T.P Absolute Scope Firewall Affirmation
+
+- Phase 6C is strictly analytical diagnostics.
+- Phase 6D is **NOT IMPLEMENTED**:
+  - Zero weight optimization.
+  - Zero threshold optimization.
+  - Zero knockout modification.
+  - Zero verdict band adjustments.
+  - Zero configuration mutation or v1.6 proposals.
+  - Zero production rule tuning.
+- All scoring formulas, weights, criteria, and governance gates remain 100% frozen.
+
+---
+
+### T.Q Remote Durability Verification
+
+- Authoritative Branch: `refs/heads/arena/ipo-screening-engine-v1.5`
+- Session Tracking Branch: `refs/heads/arena/01a10b42-ipo-screening-engine`
+- Target Base: `main` at `01ba66c12ca1195fd7acbd287c3e39a019808094`
+- Pull Request #3 Status: **OPEN, MERGEABLE, and UNMERGED**.
+
+---
+
+### T.R Final Phase 6C Acceptance Decision
+
+**A — PHASE 6C COMPLETE**
+

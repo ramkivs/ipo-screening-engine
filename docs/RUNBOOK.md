@@ -567,4 +567,74 @@ When multiple versions of an observation exist for the same evaluation and horiz
 * **Dataset Hash**: SHA-256 computed over the canonical JSON representation of sorted rows, ensuring byte-identical reproducibility independent of filesystem traversal order or generation wall clock.
 * **Scope Firewall**: Statistical calibration, Spearman IC, decile ranking, regression, and scoring changes are strictly out of scope for Phase 6B and deferred to Phase 6C/6D.
 
+---
+
+## 13. Phase 6C Historical Backtest Analytics & Statistical Diagnostics
+
+Phase 6C provides the deterministic analytical diagnostics engine that consumes the Phase 6B historical outcome dataset and produces point-in-time safe, reproducible backtest analytics. It adheres strictly to the Phase 6D scope firewall: generates statistical evidence only without rescoring historical IPOs, tuning weights, or modifying screening configurations.
+
+### 13.1 Analysis Execution Workflow
+
+To run comprehensive historical backtest diagnostics over a Phase 6B canonical dataset:
+
+```bash
+python3 engine/tools/ipo_screen.py post-listing analyze \
+    --dataset build/backtest_dataset.json \
+    --output build/backtest_analysis.json \
+    [--csv build/backtest_analysis_summary.csv] \
+    [-v]
+```
+
+### 13.2 Analysis Verification Workflow
+
+To audit and cryptographically verify the canonical integrity and dataset linkage of an analytical artifact:
+
+```bash
+python3 engine/tools/ipo_screen.py post-listing verify-analysis \
+    --analysis build/backtest_analysis.json \
+    [--dataset build/backtest_dataset.json] \
+    [-v]
+```
+
+### 13.3 Diagnostic Capabilities & Statistical Methodology
+
+1. **Sample-Size Maturity Classification**:
+   * `N < 30`: `DESCRIPTIVE_ONLY` (insufficient statistical power for definitive inference).
+   * `30 <= N < 100`: `EXPLORATORY` (preliminary directional signals, requires cautious interpretation).
+   * `N >= 100`: `STATISTICALLY_ACTIONABLE_FOR_DIAGNOSTICS` (sufficient sample maturity for diagnostic evaluation).
+
+2. **Descriptive Statistics**:
+   * Computes sample size ($N$), arithmetic mean, median, min, max, sample standard deviation ($N-1$ Bessel-corrected), and quartiles (Q1, Q3).
+   * Records directional count breakdowns (positive, negative, zero) and positive rate percentages.
+   * Reports benchmark and excess return statistics preserving `UNKNOWN` semantics (never defaulting missing values to zero).
+
+3. **Spearman Rank Correlation & Rank Information Coefficient (IC)**:
+   * Predictors: `final_score`, `module_a_score` through `module_f_score`.
+   * Realized Outcomes: 1W return, 1M return, 6M return, excess returns vs NIFTY 50 TRI, and listing day gain.
+   * Method: Exact Pearson correlation on fractional (average) ranks to handle ties without bias.
+   * Degeneracy Handling: Constant/zero-variance inputs return correlation `0.0` with status `UNDEFINED_ZERO_VARIANCE`. Sample size $N < 3$ returns status `INSUFFICIENT_DATA`.
+   * Rank-IC: Documented method `SPEARMAN_RANK_CORRELATION`, tie policy `AVERAGE_RANK`, missing value policy `PAIRWISE_EXCLUDE`.
+
+4. **Decile & Quintile Bucket Analysis**:
+   * Evaluates realized outcomes across 10 deciles and 5 quintiles of pre-listing screening scores.
+   * Deterministic Tie Policy: Sorts by `(final_score, evaluation_timestamp, ipo_id)`.
+   * Small Sample Fallback: If eligible observations $N < K$ (where $K=10$ for deciles or $K=5$ for quintiles), status is marked `INSUFFICIENT_DATA` and empty buckets are emitted (never artificially synthesizing buckets from fewer observations).
+
+5. **Hit-Rate Diagnostics**:
+   * Measures win-rate (positive absolute return and positive excess return) across 1W, 1M, and 6M horizons.
+   * Breaks down hit-rates by authoritative verdict classes (`APPLY`, `WATCH`, `AVOID`, `INSUFFICIENT_DATA`).
+
+6. **Module-Level & Temporal Diagnostics**:
+   * Module Diagnostics: Independently evaluates the predictive relationship of each Module A-F against 1W, 1M, and 6M outcomes.
+   * Temporal Vintage Analysis: Groups outcome and screening statistics by evaluation calendar year (vintage).
+   * Temporal Holdout Diagnostic: Partitions earlier vintages as development and the latest vintage as holdout when $N \ge 30$ and $\ge 2$ vintages exist; emits `INSUFFICIENT_DATA` if coverage is inadequate.
+
+7. **Point-in-Time Safety & Leakage Audit**:
+   * 8-check deterministic audit verifying that evaluation timestamps strictly precede or coincide with listing dates, no future fields are leaked into screening predictors, evaluation linkages are intact, and observation hashes are valid.
+   * If any check fails, the audit status is marked `FAIL` and analytical acceptance is blocked.
+
+8. **Deterministic Content Hashing**:
+   * Analytical manifest computes SHA-256 over the canonical JSON of the analytical results, excluding ephemeral execution wall-clock timestamps.
+
+
 

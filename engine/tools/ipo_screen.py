@@ -792,6 +792,84 @@ def cmd_post_listing_verify_dataset(args: argparse.Namespace) -> int:
         return EXIT_REFUSED
 
 
+def cmd_post_listing_analyze(args: argparse.Namespace) -> int:
+    try:
+        from ipo_screening.post_listing import (
+            analyze_dataset,
+            export_analysis_csv,
+            export_analysis_json,
+            load_dataset_json,
+        )
+    except ImportError:
+        from engine.ipo_screening.post_listing import (
+            analyze_dataset,
+            export_analysis_csv,
+            export_analysis_json,
+            load_dataset_json,
+        )
+
+    try:
+        dataset = load_dataset_json(args.dataset)
+        analysis = analyze_dataset(dataset)
+        json_path = export_analysis_json(analysis, args.output)
+        csv_path = None
+        if args.csv:
+            csv_path = export_analysis_csv(analysis, args.csv)
+
+        print("=" * 80)
+        print("HISTORICAL BACKTEST ANALYTICS EXECUTED")
+        print("=" * 80)
+        print(f"Dataset Input:        {args.dataset}")
+        print(f"Analysis Output JSON: {json_path}")
+        if csv_path:
+            print(f"Analysis Output CSV:  {csv_path}")
+        print(f"Analysis Hash:        {analysis.manifest.analysis_hash}")
+        print(f"Dataset Hash:         {analysis.manifest.dataset_hash}")
+        print(f"Sample Maturity (1W): {analysis.manifest.sample_maturity_1w}")
+        print(f"Sample Maturity (1M): {analysis.manifest.sample_maturity_1m}")
+        print(f"Sample Maturity (6M): {analysis.manifest.sample_maturity_6m}")
+        print(f"Leakage Audit:        {'PASS' if analysis.manifest.leakage_audit_passed else 'FAIL'}")
+        print("-" * 80)
+        print(f"Total Rows:           {analysis.manifest.total_dataset_rows}")
+        print(f"Eligible 1W:          {analysis.manifest.eligible_1w_count}")
+        print(f"Eligible 1M:          {analysis.manifest.eligible_1m_count}")
+        print(f"Eligible 6M:          {analysis.manifest.eligible_6m_count}")
+        print("=" * 80)
+        return EXIT_OK
+    except Exception as e:
+        print(f"error analyzing dataset: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+
+
+def cmd_post_listing_verify_analysis(args: argparse.Namespace) -> int:
+    try:
+        from ipo_screening.post_listing import verify_analysis
+    except ImportError:
+        from engine.ipo_screening.post_listing import verify_analysis
+
+    try:
+        res = verify_analysis(args.analysis, dataset_path=args.dataset)
+        if res.get("status") == "PASS":
+            print("=" * 80)
+            print("BACKTEST ANALYSIS AUDIT")
+            print("=" * 80)
+            print(f"Analysis Path:        {args.analysis}")
+            print(f"Analysis Hash:        {res.get('analysis_hash')}")
+            print(f"Hash Match:           {res.get('analysis_hash_match')}")
+            if args.dataset:
+                print(f"Dataset Linkage:      VERIFIED against {args.dataset}")
+            print("=" * 80)
+            print("Audit Status:         ALL PASS")
+            print("=" * 80)
+            return EXIT_OK
+        else:
+            print(f"analysis verification failed: {res.get('reason')}", file=sys.stderr)
+            return EXIT_REFUSED
+    except Exception as e:
+        print(f"error verifying analysis: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+
+
 # --------------------------------------------------------------------------
 # Entry point
 # --------------------------------------------------------------------------
@@ -928,6 +1006,19 @@ def build_parser() -> argparse.ArgumentParser:
     post_verify.add_argument("--store", default=None, help="optional evaluation store root to verify source linkage")
     post_verify.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
     post_verify.set_defaults(func=cmd_post_listing_verify_dataset)
+
+    post_analyze = post_sub.add_parser("analyze", help="run historical backtest diagnostics and analytics")
+    post_analyze.add_argument("--dataset", required=True, help="path to dataset JSON file")
+    post_analyze.add_argument("--output", "-o", required=True, help="path to output analysis JSON file")
+    post_analyze.add_argument("--csv", default=None, help="optional path to output summary CSV file")
+    post_analyze.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    post_analyze.set_defaults(func=cmd_post_listing_analyze)
+
+    post_verify_analysis = post_sub.add_parser("verify-analysis", help="verify integrity and hashes of backtest analysis")
+    post_verify_analysis.add_argument("--analysis", required=True, help="path to analysis JSON file")
+    post_verify_analysis.add_argument("--dataset", default=None, help="optional path to dataset JSON file to verify linkage")
+    post_verify_analysis.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    post_verify_analysis.set_defaults(func=cmd_post_listing_verify_analysis)
 
     return parser
 

@@ -578,6 +578,17 @@ def export_dataset_json(dataset: BacktestDataset, output_path: str | Path) -> Pa
     return out_file
 
 
+def load_dataset_json(path: str | Path) -> BacktestDataset:
+    """Load a BacktestDataset from canonical JSON file."""
+    p = Path(path)
+    if not p.is_file():
+        raise FileNotFoundError(f"dataset file not found: {p}")
+    with p.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    return BacktestDataset.from_dict(data)
+
+
+
 CSV_FIELD_NAMES = [
     "ipo_id",
     "company_name",
