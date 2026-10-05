@@ -636,5 +636,88 @@ python3 engine/tools/ipo_screen.py post-listing verify-analysis \
 8. **Deterministic Content Hashing**:
    * Analytical manifest computes SHA-256 over the canonical JSON of the analytical results, excluding ephemeral execution wall-clock timestamps.
 
+---
+
+## 14. Phase 6D Governed Calibration Proposal & Shadow Evaluation Operations
+
+Phase 6D provides the governed calibration proposal engine that consumes Phase 6B historical datasets and Phase 6C backtest analytics to formulate auditable, point-in-time safe calibration proposals and optional inactive v1.6 configuration drafts.
+
+### 14.1 Fundamental Governance Invariant
+
+```
+EVIDENCE -> PROPOSAL != APPROVAL != IMPLEMENTATION != ACTIVATION
+```
+
+* **No Automatic Policy Mutation**: Phase 6D never modifies active screening configs, weights, formulas, or verdict thresholds.
+* **Ramki Approval Boundary**: The Program Authority is Ramki. Any activation or promotion to production requires separate, explicit authorization from Ramki.
+* **Active Config Invariant**: `config/ipo-config.v1.5.0.json` remains authoritative and unchanged.
+
+### 14.2 Calibration Proposal Generation Workflow
+
+To generate a governed calibration proposal from historical datasets and analytical diagnostics:
+
+```bash
+python3 engine/tools/ipo_screen.py post-listing calibrate-propose \
+    --dataset build/backtest_dataset.json \
+    --analysis build/backtest_analysis.json \
+    --config config/ipo-config.v1.5.0.json \
+    --output build/calibration_proposal.json \
+    [--draft-config build/ipo-config.v1.6.0-draft.json] \
+    [--objective BALANCED_DIAGNOSTIC] \
+    [-v]
+```
+
+### 14.3 Proposal Verification Workflow
+
+To audit and cryptographically verify the canonical integrity and linkage of a calibration proposal:
+
+```bash
+python3 engine/tools/ipo_screen.py post-listing verify-proposal \
+    --proposal build/calibration_proposal.json \
+    [--analysis build/backtest_analysis.json] \
+    [--dataset build/backtest_dataset.json] \
+    [--config config/ipo-config.v1.5.0.json] \
+    [-v]
+```
+
+### 14.4 In-Memory Shadow Evaluation Workflow
+
+To execute an in-memory shadow rescoring comparison between active v1.5 and a candidate proposal without mutating stored evaluations:
+
+```bash
+python3 engine/tools/ipo_screen.py post-listing shadow-evaluate \
+    --proposal build/calibration_proposal.json \
+    --dataset build/backtest_dataset.json \
+    [--config config/ipo-config.v1.5.0.json] \
+    [--output build/shadow_evaluation.json] \
+    [-v]
+```
+
+### 14.5 Calibration Maturity Gates
+
+Proposals are classified strictly according to sample size, temporal vintage coverage, and integrity:
+
+1. `CALIBRATION_INELIGIBLE`:
+   * $N < 30$ valid samples, leakage audit failure, or broken cryptographic linkages.
+   * Prohibits calibration proposal generation; baseline v1.5 configuration remains unchanged.
+
+2. `CALIBRATION_EXPLORATORY`:
+   * $30 \le N < 100$, or $< 3$ historical vintages.
+   * Research-only exploration; strictly prohibited from generating a v1.6 draft config or being submitted for production governance review.
+
+3. `CALIBRATION_CANDIDATE`:
+   * $N \ge 100$, $\ge 3$ distinct historical vintages, verified chronological development/holdout partition, and passed leakage audit.
+   * Eligible to generate an inactive v1.6 configuration draft (`1.6.0-draft`, `DRAFT_INACTIVE`).
+
+4. `CALIBRATION_READY_FOR_HUMAN_REVIEW`:
+   * High-confidence candidate proposals where all non-regression checks pass and holdout evidence confirms stability. Submitted to Ramki for human governance review with status `PENDING_HUMAN_REVIEW`.
+
+### 14.6 Overfitting Safeguards
+
+* **Development vs. Holdout Separation**: Candidates are formed exclusively on historical development partitions. Holdout partitions are evaluated strictly out-of-sample; tuning on holdout data is prohibited.
+* **Holdout Degradation Rejection**: If a candidate improves development metrics but materially degrades holdout performance, it is automatically rejected and logged in `rejected_candidates`.
+* **Knockout Firewall**: `knockout_proposals` strictly defaults to empty. Any alteration to knockout logic requires separate, explicit evidence and is flagged `REQUIRES_EXPLICIT_GOVERNANCE_REVIEW`.
+
+
 
 

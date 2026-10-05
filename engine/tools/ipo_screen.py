@@ -870,6 +870,170 @@ def cmd_post_listing_verify_analysis(args: argparse.Namespace) -> int:
         return EXIT_REFUSED
 
 
+def cmd_post_listing_calibrate_propose(args: argparse.Namespace) -> int:
+    try:
+        from ipo_screening.post_listing import (
+            BacktestAnalysis,
+            export_proposal_json,
+            export_v1_6_draft_json,
+            generate_calibration_proposal,
+            generate_v1_6_draft_config,
+            load_dataset_json,
+        )
+    except ImportError:
+        from engine.ipo_screening.post_listing import (
+            BacktestAnalysis,
+            export_proposal_json,
+            export_v1_6_draft_json,
+            generate_calibration_proposal,
+            generate_v1_6_draft_config,
+            load_dataset_json,
+        )
+
+    try:
+        # Load dataset
+        dataset = load_dataset_json(args.dataset)
+
+        # Load analysis
+        with Path(args.analysis).open("r", encoding="utf-8") as f:
+            analysis_dict = json.load(f)
+        analysis = BacktestAnalysis.from_dict(analysis_dict)
+
+        # Load baseline config
+        cfg_path = args.config or str(Path(__file__).resolve().parents[2] / DEFAULT_CONFIG_PATH)
+        with Path(cfg_path).open("r", encoding="utf-8") as f:
+            baseline_cfg = json.load(f)
+
+        objective = getattr(args, "objective", None) or "BALANCED_DIAGNOSTIC"
+
+        proposal = generate_calibration_proposal(
+            dataset,
+            analysis,
+            baseline_cfg,
+            objective=objective,
+        )
+
+        json_path = export_proposal_json(proposal, args.output)
+
+        draft_cfg_path = None
+        if args.draft_config:
+            if proposal.draft_config_status == "GENERATED_INACTIVE_DRAFT":
+                draft_dict = generate_v1_6_draft_config(proposal, baseline_cfg)
+                draft_cfg_path = export_v1_6_draft_json(draft_dict, args.draft_config)
+            else:
+                print(f"notice: v1.6 draft config not generated (maturity: {proposal.maturity_gate})", file=sys.stderr)
+
+        print("=" * 80)
+        print("GOVERNED CALIBRATION PROPOSAL GENERATED")
+        print("=" * 80)
+        print(f"Proposal Output:      {json_path}")
+        if draft_cfg_path:
+            print(f"Draft Config Output:  {draft_cfg_path} (INACTIVE)")
+        print(f"Proposal Hash:        {proposal.proposal_hash}")
+        print(f"Dataset Hash:         {proposal.source_dataset_hash}")
+        print(f"Analysis Hash:        {proposal.source_analysis_hash}")
+        print(f"Maturity Gate:        {proposal.maturity_gate}")
+        print(f"Proposal Status:      {proposal.status}")
+        print(f"Approval Status:      {proposal.approval_status}")
+        print(f"Objective:            {proposal.objective}")
+        print("-" * 80)
+        print(f"Recommendation:       {proposal.recommendation}")
+        print("=" * 80)
+        return EXIT_OK
+    except Exception as e:
+        print(f"error generating calibration proposal: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+
+
+def cmd_post_listing_verify_proposal(args: argparse.Namespace) -> int:
+    try:
+        from ipo_screening.post_listing import verify_proposal
+    except ImportError:
+        from engine.ipo_screening.post_listing import verify_proposal
+
+    try:
+        res = verify_proposal(
+            args.proposal,
+            analysis_path=args.analysis,
+            dataset_path=args.dataset,
+            config_path=args.config,
+        )
+        if res.get("status") == "PASS":
+            print("=" * 80)
+            print("CALIBRATION PROPOSAL AUDIT")
+            print("=" * 80)
+            print(f"Proposal Path:        {args.proposal}")
+            print(f"Proposal Hash:        {res.get('proposal_hash')}")
+            print(f"Hash Match:           {res.get('proposal_hash_match')}")
+            print(f"Maturity Gate:        {res.get('maturity_gate')}")
+            print(f"Approval Status:      {res.get('approval_status')}")
+            if args.analysis:
+                print(f"Analysis Linkage:     VERIFIED against {args.analysis}")
+            if args.dataset:
+                print(f"Dataset Linkage:      VERIFIED against {args.dataset}")
+            if args.config:
+                print(f"Config Linkage:       VERIFIED against {args.config}")
+            print("=" * 80)
+            print("Audit Status:         ALL PASS")
+            print("=" * 80)
+            return EXIT_OK
+        else:
+            print(f"proposal verification failed: {res.get('reason')}", file=sys.stderr)
+            return EXIT_REFUSED
+    except Exception as e:
+        print(f"error verifying proposal: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+
+
+def cmd_post_listing_shadow_evaluate(args: argparse.Namespace) -> int:
+    try:
+        from ipo_screening.post_listing import (
+            CalibrationProposal,
+            load_dataset_json,
+            run_shadow_evaluation,
+        )
+    except ImportError:
+        from engine.ipo_screening.post_listing import (
+            CalibrationProposal,
+            load_dataset_json,
+            run_shadow_evaluation,
+        )
+
+    try:
+        dataset = load_dataset_json(args.dataset)
+        with Path(args.proposal).open("r", encoding="utf-8") as f:
+            proposal_dict = json.load(f)
+        proposal = CalibrationProposal.from_dict(proposal_dict)
+
+        cfg_path = args.config or str(Path(__file__).resolve().parents[2] / DEFAULT_CONFIG_PATH)
+        with Path(cfg_path).open("r", encoding="utf-8") as f:
+            baseline_cfg = json.load(f)
+
+        shadow_res = run_shadow_evaluation(proposal, dataset, baseline_cfg)
+
+        if args.output:
+            out_file = Path(args.output)
+            out_file.parent.mkdir(parents=True, exist_ok=True)
+            with out_file.open("w", encoding="utf-8") as handle:
+                json.dump(shadow_res.to_dict(), handle, indent=2, sort_keys=True)
+                handle.write("\n")
+
+        print("=" * 80)
+        print("SHADOW EVALUATION EXECUTED (IN-MEMORY ONLY)")
+        print("=" * 80)
+        print(f"Total Evaluated:      {shadow_res.total_evaluated}")
+        print(f"Baseline Mean Score:  {shadow_res.baseline_mean_score}")
+        print(f"Proposed Mean Score:  {shadow_res.proposed_mean_score}")
+        print(f"Score Delta Mean:     {shadow_res.score_mean_delta}")
+        print(f"Verdict Shifts:       {shadow_res.verdict_shifts_count} (Up: {shadow_res.upgraded_count}, Down: {shadow_res.downgraded_count}, Unchanged: {shadow_res.unchanged_count})")
+        print(f"Knockout Deltas:      {shadow_res.knockout_deltas}")
+        print("=" * 80)
+        return EXIT_OK
+    except Exception as e:
+        print(f"error during shadow evaluation: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+
+
 # --------------------------------------------------------------------------
 # Entry point
 # --------------------------------------------------------------------------
@@ -1019,6 +1183,32 @@ def build_parser() -> argparse.ArgumentParser:
     post_verify_analysis.add_argument("--dataset", default=None, help="optional path to dataset JSON file to verify linkage")
     post_verify_analysis.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
     post_verify_analysis.set_defaults(func=cmd_post_listing_verify_analysis)
+
+    post_calib = post_sub.add_parser("calibrate-propose", help="generate governed calibration proposal")
+    post_calib.add_argument("--dataset", required=True, help="path to dataset JSON file")
+    post_calib.add_argument("--analysis", required=True, help="path to analysis JSON file")
+    post_calib.add_argument("--config", default=None, help="path to baseline v1.5 config JSON file")
+    post_calib.add_argument("--output", "-o", required=True, help="path to output proposal JSON file")
+    post_calib.add_argument("--draft-config", default=None, help="optional path to output v1.6 draft config JSON")
+    post_calib.add_argument("--objective", default="BALANCED_DIAGNOSTIC", help="optimization objective")
+    post_calib.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    post_calib.set_defaults(func=cmd_post_listing_calibrate_propose)
+
+    post_verify_prop = post_sub.add_parser("verify-proposal", help="verify integrity and hashes of calibration proposal")
+    post_verify_prop.add_argument("--proposal", required=True, help="path to proposal JSON file")
+    post_verify_prop.add_argument("--analysis", default=None, help="optional path to analysis JSON to verify linkage")
+    post_verify_prop.add_argument("--dataset", default=None, help="optional path to dataset JSON to verify linkage")
+    post_verify_prop.add_argument("--config", default=None, help="optional path to config JSON to verify linkage")
+    post_verify_prop.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    post_verify_prop.set_defaults(func=cmd_post_listing_verify_proposal)
+
+    post_shadow = post_sub.add_parser("shadow-evaluate", help="run deterministic shadow evaluation of proposal against dataset")
+    post_shadow.add_argument("--proposal", required=True, help="path to proposal JSON file")
+    post_shadow.add_argument("--dataset", required=True, help="path to dataset JSON file")
+    post_shadow.add_argument("--config", default=None, help="optional path to baseline v1.5 config JSON")
+    post_shadow.add_argument("--output", "-o", default=None, help="optional path to output shadow evaluation JSON")
+    post_shadow.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    post_shadow.set_defaults(func=cmd_post_listing_shadow_evaluate)
 
     return parser
 

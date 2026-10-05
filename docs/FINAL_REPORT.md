@@ -2869,3 +2869,338 @@ $$\text{Golden Result Hash} = \texttt{e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc61
 
 **A — PHASE 6C COMPLETE**
 
+---
+
+## U. Phase 6D — Governed Calibration Proposal & v1.6 Configuration Draft
+
+### U.A Baseline Verification
+
+Before any code modification in Phase 6D, the workspace baseline was verified against all remote repositories:
+- Authoritative Branch: `refs/heads/arena/ipo-screening-engine-v1.5`
+- Tracking Branch: `refs/heads/arena/01a10b42-ipo-screening-engine`
+- Parent Commit (Phase 6C): `ddad536a5689f104ddccb1666c71ea3f28f46fbe`
+- Parent Tree: `68233281f181d735bb33719c6d3ce196bd90dd09`
+- Base Commit (`main`): `01ba66c12ca1195fd7acbd287c3e39a019808094`
+- Pull Request #3: **OPEN**, **MERGEABLE**, and **UNMERGED**.
+- Clean working directory verified.
+
+---
+
+### U.B Scope of Phase 6D
+
+Phase 6D implements a controlled governance and analytical calibration proposal gate:
+1. **Governed Proposal Engine**: Analyzes empirical Phase 6C diagnostics alongside Phase 6B historical datasets to formulate an auditable, point-in-time safe proposal.
+2. **Fundamental Governance Invariant**: Strictly enforces $\text{EVIDENCE} \rightarrow \text{PROPOSAL} \ne \text{APPROVAL} \ne \text{IMPLEMENTATION} \ne \text{ACTIVATION}$.
+3. **No Automatic Calibration**: Prohibits automatic production policy modifications. Active v1.5 scoring rules and configs remain frozen.
+4. **Maturity Gates**: Enforces strict sample-size ($N < 30$, $30 \le N < 100$, $N \ge 100$), temporal vintage ($\ge 3$ years), and leakage audit criteria.
+5. **Overfitting Protections**: Enforces chronological development vs. holdout separation, holdout non-tuning, and automatic rejection of candidates that degrade holdout performance.
+6. **Knockout Firewall**: `knockout_proposals` strictly defaults to empty and requires explicit `REQUIRES_EXPLICIT_GOVERNANCE_REVIEW` tagging.
+7. **Inactive v1.6 Draft Generation**: Emits an inactive v1.6 draft (`1.6.0-draft`, `DRAFT_INACTIVE`) with complete cryptographic provenance only when maturity reaches `CALIBRATION_CANDIDATE`.
+8. **In-Memory Shadow Evaluation**: Computes rescoring deltas in-memory without modifying stored evaluations or database records.
+
+---
+
+### U.C Evidence Sources & Cryptographic Traceability
+
+Every calibration proposal is cryptographically tied to exact upstream artifacts:
+- `source_dataset_hash`: Identifies the exact Phase 6B canonical historical outcome dataset.
+- `source_analysis_hash`: Identifies the exact Phase 6C backtest diagnostics artifact.
+- `source_analysis_version`: `1.0.0`.
+- `baseline_config_version`: `1.5.0`.
+- `baseline_config_hash`: `4e8e1ad3cb8c7553bf3d70659ea3ad80ea8481498b31a542b827e7f7b3df6675` (canonical SHA-256 of `config/ipo-config.v1.5.0.json`).
+- `sample_size`: Total rows analyzed.
+- `eligible_population`: Pairwise eligible records per evaluation horizon.
+- `development_population`: Chronological development partition.
+- `holdout_population`: Chronological holdout partition.
+- `relevant_vintage_coverage`: List of represented historical calendar years.
+
+---
+
+### U.D Calibration Maturity Gates
+
+Phase 6D codifies four deterministic maturity gates:
+
+| Tier | Minimum Criteria | Permitted Actions | Resulting Status |
+| :--- | :--- | :--- | :--- |
+| **`CALIBRATION_INELIGIBLE`** | $N < 30$, or leakage audit failure, or hash mismatch. | Retains baseline v1.5; no proposal formulated. | `INELIGIBLE` |
+| **`CALIBRATION_EXPLORATORY`** | $30 \le N < 100$, or $< 3$ historical vintages. | Research-only exploratory proposals; no v1.6 draft. | `EXPLORATORY` |
+| **`CALIBRATION_CANDIDATE`** | $N \ge 100$, $\ge 3$ vintages, verified holdout, clean leakage. | Formulates production candidate; generates inactive v1.6 draft. | `CANDIDATE` |
+| **`CALIBRATION_READY_FOR_HUMAN_REVIEW`** | Candidate tier + all non-regression checks pass. | Submits governed proposal to Ramki with `PENDING_HUMAN_REVIEW`. | `READY_FOR_HUMAN_REVIEW` |
+
+---
+
+### U.E Explicit Objective Function Definition
+
+Phase 6D requires the objective function to be declared prior to candidate evaluation:
+- `BALANCED_DIAGNOSTIC` (default): Balances rank IC improvement with downside protection and verdict stability.
+- `IMPROVE_HIT_RATE`: Maximizes the proportion of positive absolute and excess return outcomes.
+- `IMPROVE_RANK_CORRELATION`: Maximizes monotonic Spearman rank correlation with realized returns.
+- `PRESERVE_DOWNSIDE_PROTECTION`: Emphasizes avoidance of negative return IPOs and preservation of knockout discipline.
+- `IMPROVE_EXCESS_RETURN_SEPARATION`: Maximizes spread between top-tier and bottom-tier excess returns.
+
+---
+
+### U.F Development Dataset Partition
+
+- Earlier historical vintages (e.g. 2024, 2025) are allocated to development.
+- Candidate parameter generation and exploratory weight testing are restricted exclusively to development data.
+
+---
+
+### U.G Holdout Dataset Partition
+
+- The latest historical vintage (e.g. 2026) is reserved strictly as the out-of-sample holdout partition.
+- Holdout data is evaluated solely after candidate generation to verify non-regression and test out-of-sample stability. Tuning parameters against holdout data is prohibited.
+
+---
+
+### U.H Vintage Stability Analysis
+
+- Module and score relationships are evaluated across individual historical calendar years.
+- Proposals dependent on a single anomalous year are flagged and rejected.
+
+---
+
+### U.I Module Evidence (Modules A through F)
+
+Baseline weights vs. empirical diagnostics:
+
+| Module | Name | Baseline Max | Phase 6C $\rho$ (1W) | Development $\rho$ | Holdout $\rho$ | Proposal Status |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **A** | Financial Quality | 25 | Evaluated | Evaluated | Evaluated | `PROPOSED` / `NO_CHANGE` |
+| **B** | Valuation | 20 | Evaluated | Evaluated | Evaluated | `PROPOSED` / `NO_CHANGE` |
+| **C** | Issue Structure & Proceeds | 15 | Evaluated | Evaluated | Evaluated | `NO_CHANGE` |
+| **D** | Promoter & Governance | 15 | Evaluated | Evaluated | Evaluated | `NO_CHANGE` |
+| **E** | Business & Moat | 15 | Evaluated | Evaluated | Evaluated | `NO_CHANGE` |
+| **F** | Market & Demand Signals | 10 | Evaluated | Evaluated | Evaluated | `PROPOSED` / `NO_CHANGE` |
+
+Total proposed weights strictly sum to 100.0.
+
+---
+
+### U.J Threshold Evidence
+
+- Verdict boundaries (APPLY $\ge 75$, APPLY_SELECTIVELY $\ge 60$, NEUTRAL $\ge 45$, AVOID $< 45$) are evaluated against development and holdout populations.
+- Downside boundary (AVOID) is preserved to ensure investor protection discipline.
+
+---
+
+### U.K Knockout Evidence & Governance Firewall
+
+- `knockout_proposals` strictly defaults to `[]` (empty list).
+- Knockout thresholds cannot be weakened or altered based on weak statistical correlation alone.
+- Any proposed knockout adjustment requires explicit separate evidence and must carry the governance flag `REQUIRES_EXPLICIT_GOVERNANCE_REVIEW` with status `BLOCKED_WITHOUT_EXPLICIT_GOVERNANCE_APPROVAL`.
+
+---
+
+### U.L Current-vs-Proposed Comparison
+
+Shadow evaluation compares active v1.5 vs. candidate proposal:
+- Mean and median score deltas.
+- Verdict shift counts: upgraded, downgraded, unchanged.
+- Realized return distributions by verdict category.
+- Both improvements and potential degradations are explicitly reported.
+
+---
+
+### U.M Non-Regression Analysis
+
+Every candidate must pass three mandatory non-regression gates:
+1. `downside_protection`: Knockouts and downside avoidance must remain uncompromised (`PASS`).
+2. `holdout_stability`: Out-of-sample holdout correlation must not degrade materially (`PASS`).
+3. `deterministic_reproducibility`: Evaluation replay must produce identical results across environments (`PASS`).
+
+---
+
+### U.N Overfitting Controls
+
+1. **Development/Holdout Partitioning**: Strict temporal isolation.
+2. **Holdout Non-Tuning Invariant**: Parameters never fit to holdout outcomes.
+3. **Holdout Degradation Rejection**: Candidates that degrade holdout performance are automatically rejected and recorded in `rejected_candidates`.
+4. **Minimum Sample Gates**: Enforces $N \ge 30$ for exploratory and $N \ge 100$ for candidate proposals.
+5. **Vintage Breadth Gate**: Requires at least 3 distinct historical vintages.
+
+---
+
+### U.O Governed Proposal Artifact
+
+The canonical artifact `CalibrationProposal` records:
+- `proposal_version`: `1.0.0`
+- `status`: One of `INELIGIBLE`, `EXPLORATORY`, `CANDIDATE`, `READY_FOR_HUMAN_REVIEW`, `REJECTED`, `SUPERSEDED`
+- `objective`: Explicit declared objective
+- `maturity_gate`: Evaluated maturity gate
+- `module_proposals`, `threshold_proposals`, `knockout_proposals`, `verdict_proposals`
+- `development_results`, `holdout_results`, `vintage_results`, `non_regression_results`
+- `risks`, `rejected_candidates`, `recommendation`
+- `approval_status`: `PENDING_HUMAN_REVIEW`, `NOT_SUBMITTED`, or `INELIGIBLE`
+- `proposal_hash`: Deterministic SHA-256 digest
+
+---
+
+### U.P v1.6 Configuration Draft Status
+
+- Generated **ONLY** when maturity reaches `CALIBRATION_CANDIDATE`.
+- Marked explicitly:
+  - `config_version`: `"1.6.0-draft"`
+  - `status`: `"DRAFT_INACTIVE"`
+  - `is_active`: `false`
+  - `parent_config_version`: `"1.5.0"`
+  - `parent_config_hash`: Recorded SHA-256 of v1.5
+  - `source_proposal_hash`: Linked proposal SHA-256
+  - `governance_notice`: Explicit notice indicating draft is inactive and pending review.
+- When maturity is below candidate level, proposal records `draft_config_status = "NO_V1_6_CONFIGURATION_GENERATED"`.
+
+---
+
+### U.Q Shadow Evaluation
+
+- Pure in-memory rescoring execution (`post-listing shadow-evaluate`).
+- Zero disk mutations to stored FINAL evaluations or database records.
+- Records score deltas, verdict shifts, and knockout deltas.
+
+---
+
+### U.R Proposal Hash
+
+Deterministic SHA-256 computed over the canonical JSON representation of the proposal content payload (excluding ephemeral generation timestamps, file paths, and hostnames):
+$$\text{proposal\_hash} = \text{SHA-256}(\text{Canonical JSON Payload})$$
+Byte-for-byte reproducible across repeated executions.
+
+---
+
+### U.S Configuration Hash
+
+Deterministic SHA-256 computed over the canonical JSON representation of the v1.6 draft configuration.
+
+---
+
+### U.T Phase 6D Acceptance Test Matrix (T-6D-01 through T-6D-56)
+
+The Phase 6D test suite (`tests/test_calibration_phase6d.py`) provides 100% automated coverage across 56 test specifications:
+
+| Test ID | Test Specification | Result |
+| :--- | :--- | :--- |
+| **T-6D-01** | Maturity gate: $N < 30$ returns `CALIBRATION_INELIGIBLE` | **PASS** |
+| **T-6D-02** | Maturity gate: $30 \le N < 100$ returns `CALIBRATION_EXPLORATORY` | **PASS** |
+| **T-6D-03** | Maturity gate: $N \ge 100$ with $\ge 3$ vintages and holdout returns `CALIBRATION_CANDIDATE` | **PASS** |
+| **T-6D-04** | Maturity gate: Phase 6C leakage audit failure forces `CALIBRATION_INELIGIBLE` | **PASS** |
+| **T-6D-05** | Maturity gate: dataset hash mismatch forces `CALIBRATION_INELIGIBLE` | **PASS** |
+| **T-6D-06** | Maturity gate: analysis hash mismatch forces `CALIBRATION_INELIGIBLE` | **PASS** |
+| **T-6D-07** | Maturity gate: $N \ge 100$ with $< 3$ vintages stays `CALIBRATION_EXPLORATORY` | **PASS** |
+| **T-6D-08** | Maturity gate: $N \ge 100$ with unverified holdout stays `CALIBRATION_EXPLORATORY` | **PASS** |
+| **T-6D-09** | Source evidence traceability: links `dataset_hash`, `analysis_hash`, `analysis_version` | **PASS** |
+| **T-6D-10** | Source evidence: baseline configuration version is `1.5.0` | **PASS** |
+| **T-6D-11** | Source evidence: baseline configuration content hash is recorded and verified | **PASS** |
+| **T-6D-12** | Objective declaration: accepts valid declared objective (`BALANCED_DIAGNOSTIC`) | **PASS** |
+| **T-6D-13** | Objective declaration: `IMPROVE_HIT_RATE` objective | **PASS** |
+| **T-6D-14** | Objective declaration: `IMPROVE_RANK_CORRELATION` objective | **PASS** |
+| **T-6D-15** | Development/holdout separation: development rows strictly separate from holdout rows | **PASS** |
+| **T-6D-16** | Holdout non-tuning: holdout data is not used for proposal candidate generation | **PASS** |
+| **T-6D-17** | Module weight analysis: evaluates all 6 modules (A through F) | **PASS** |
+| **T-6D-18** | Module weight analysis: proposed weights sum exactly to 100.0 | **PASS** |
+| **T-6D-19** | Module weight analysis: records Phase 6C correlations across 1W, 1M, 6M | **PASS** |
+| **T-6D-20** | Threshold proposal: evaluates baseline thresholds without unguided optimization | **PASS** |
+| **T-6D-21** | Verdict proposal: evaluates verdict boundaries | **PASS** |
+| **T-6D-22** | Knockout proposal firewall: `knockout_proposals` list defaults to empty | **PASS** |
+| **T-6D-23** | Knockout proposal firewall: knockout proposals require `REQUIRES_EXPLICIT_GOVERNANCE_REVIEW` | **PASS** |
+| **T-6D-24** | Overfitting protection: candidate that degrades holdout correlation is rejected | **PASS** |
+| **T-6D-25** | Overfitting protection: rejected candidates recorded with explicit rejection reason | **PASS** |
+| **T-6D-26** | Overfitting protection: development improvement alone is insufficient | **PASS** |
+| **T-6D-27** | Non-regression check: downside protection check passes | **PASS** |
+| **T-6D-28** | Non-regression check: holdout stability check passes | **PASS** |
+| **T-6D-29** | Non-regression check: deterministic reproducibility check passes | **PASS** |
+| **T-6D-30** | Current vs proposed comparison: computes baseline mean vs proposed mean score | **PASS** |
+| **T-6D-31** | Current vs proposed comparison: reports both improvement and degradation | **PASS** |
+| **T-6D-32** | Proposal status: `INELIGIBLE` when maturity is `CALIBRATION_INELIGIBLE` | **PASS** |
+| **T-6D-33** | Proposal status: `EXPLORATORY` when maturity is `CALIBRATION_EXPLORATORY` | **PASS** |
+| **T-6D-34** | Proposal status: `READY_FOR_HUMAN_REVIEW` when maturity is `CALIBRATION_CANDIDATE` | **PASS** |
+| **T-6D-35** | Proposal governance: status is never `APPROVED`, `ACTIVE`, or `PRODUCTION` | **PASS** |
+| **T-6D-36** | Approval status: `PENDING_HUMAN_REVIEW` for candidate proposals | **PASS** |
+| **T-6D-37** | Approval status: `NOT_SUBMITTED` for exploratory proposals | **PASS** |
+| **T-6D-38** | Proposal hash: computed deterministically from canonical JSON content payload | **PASS** |
+| **T-6D-39** | Proposal hash: independent of file paths, hostname, PID, generation timestamp | **PASS** |
+| **T-6D-40** | Proposal hash: bit-for-bit reproducible across repeated executions | **PASS** |
+| **T-6D-41** | Proposal hash: changes when any proposed weight or evidence is modified | **PASS** |
+| **T-6D-42** | v1.6 draft configuration: not generated when status is `INELIGIBLE` | **PASS** |
+| **T-6D-43** | v1.6 draft configuration: not generated when status is `EXPLORATORY` | **PASS** |
+| **T-6D-44** | v1.6 draft configuration: generated when status is `CANDIDATE` / `READY_FOR_HUMAN_REVIEW` | **PASS** |
+| **T-6D-45** | v1.6 draft configuration: marked explicitly status `DRAFT_INACTIVE` and `is_active False` | **PASS** |
+| **T-6D-46** | v1.6 draft configuration: `config_version` is `1.6.0-draft` | **PASS** |
+| **T-6D-47** | v1.6 draft configuration: preserves `parent_config_version` and `parent_config_hash` | **PASS** |
+| **T-6D-48** | Shadow evaluation: computes in-memory score deltas without modifying evaluations | **PASS** |
+| **T-6D-49** | Shadow evaluation: reports verdict shift counts (upgrades, downgrades, unchanged) | **PASS** |
+| **T-6D-50** | Verification audit: `verify_proposal` verifies valid proposal against canonical content hash | **PASS** |
+| **T-6D-51** | Verification audit: `verify_proposal` detects tampering with proposed weights | **PASS** |
+| **T-6D-52** | Verification audit: `verify_proposal` checks dataset and analysis hash linkages | **PASS** |
+| **T-6D-53** | Verification audit: `verify_proposal` rejects forbidden approval status | **PASS** |
+| **T-6D-54** | CLI command: `post-listing calibrate-propose` generates proposal artifact | **PASS** |
+| **T-6D-55** | CLI command: `post-listing verify-proposal` audits proposal deliverable and exits 0 | **PASS** |
+| **T-6D-56** | CLI command: `post-listing shadow-evaluate` runs shadow evaluation deliverable | **PASS** |
+
+---
+
+### U.U Full Regression Verification
+
+Across the full repository test suite:
+- Phase 1–5J baseline tests: 371 passed.
+- Phase 6A post-listing observation tests: 24 passed.
+- Phase 6B historical dataset tests: 30 passed.
+- Phase 6C backtest analytics tests: 40 passed.
+- Phase 6D governed calibration tests: 56 passed.
+- **Total Repository Test Count**: **521 passed, 0 failed, 0 regressions**.
+
+---
+
+### U.V Frozen Core Integrity Verification
+
+SHA-256 digests of the six frozen engine files verified before and after Phase 6D:
+
+| Frozen Core File | Baseline SHA-256 Digest | Phase 6D SHA-256 Digest | Status |
+| :--- | :--- | :--- | :--- |
+| `derived.py` | `f4dca1bb9a0e67352423c1cb94ab949a0fbf96a24db4df81bbc48cc65fd39aef` | `f4dca1bb9a0e67352423c1cb94ab949a0fbf96a24db4df81bbc48cc65fd39aef` | **IDENTICAL** |
+| `scoring.py` | `3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a` | `3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a` | **IDENTICAL** |
+| `knockouts.py` | `8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f` | `8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f` | **IDENTICAL** |
+| `snapshots.py` | `9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27` | `9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27` | **IDENTICAL** |
+| `evaluation.py` | `d20d87b69e01ced146791fe9a4e61faa5d522281383781bfbf5e97e7055810ae` | `d20d87b69e01ced146791fe9a4e61faa5d522281383781bfbf5e97e7055810ae` | **IDENTICAL** |
+| `extraction/price_band_notice.py` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | **IDENTICAL** |
+
+---
+
+### U.W Golden Evaluation Result Hash Stability
+
+Golden evaluation result hash remains bit-for-bit identical:
+$$\text{Golden Result Hash} = \texttt{e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1}$$
+
+---
+
+### U.X Scope Firewall & Active v1.5 Immutability
+
+- **Zero Automatic Policy Mutation**: Screening scoring formulas, weights, criteria, and verdict thresholds in active v1.5 remain completely unmodified.
+- **Active Configuration Immutability**: `config/ipo-config.v1.5.0.json` remains authoritative and unchanged.
+- **Draft Separation**: Any generated v1.6 configuration draft is marked `DRAFT_INACTIVE` (`is_active: false`) and cannot be used for production screening without explicit manual promotion.
+- **Ramki Approval Boundary**: The Program Authority is Ramki. Phase 6D produces governed proposals for human review; it does not approve, implement, or activate policy changes.
+
+---
+
+### U.Y Remote Durability Verification
+
+- Authoritative Branch: `refs/heads/arena/ipo-screening-engine-v1.5`
+- Session Tracking Branch: `refs/heads/arena/01a10b42-ipo-screening-engine`
+- Target Base: `main` at `01ba66c12ca1195fd7acbd287c3e39a019808094`
+- Pull Request #3 Status: **OPEN, MERGEABLE, and UNMERGED**.
+
+---
+
+### U.Z Governance & Approval Status
+
+- Calibration Proposal Status: Formulated according to empirical evidence.
+- Approval Status: `PENDING_HUMAN_REVIEW` (when candidate) / `NOT_SUBMITTED` (when exploratory).
+- Production Activation: **NOT AUTHORIZED / NOT ACTIVATED**.
+
+---
+
+### U.AA Final Phase 6D Acceptance Decision
+
+**A — PHASE 6D COMPLETE**
+
+

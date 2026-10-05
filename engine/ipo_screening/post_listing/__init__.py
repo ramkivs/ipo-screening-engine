@@ -1,4 +1,4 @@
-"""Phase 6A, 6B & 6C: Post-Listing Observation Model, Historical Outcome Store & Backtest Analytics package."""
+"""Phase 6A, 6B, 6C & 6D: Post-Listing Observation Model, Historical Outcome Store, Backtest Analytics & Governed Calibration package."""
 
 from .analytics import (
     ANALYSIS_CALCULATION_VERSION,
@@ -28,6 +28,31 @@ from .analytics import (
     export_analysis_csv,
     export_analysis_json,
     verify_analysis,
+)
+from .calibration import (
+    ApprovalStatus,
+    BASELINE_CONFIG_VERSION,
+    CalibrationMaturity,
+    CalibrationObjective,
+    CalibrationProposal,
+    KnockoutProposal,
+    ModuleWeightProposal,
+    NonRegressionResult,
+    ProposalStatus,
+    RejectedCandidate,
+    ShadowEvaluationResult,
+    ThresholdProposal,
+    VerdictProposal,
+    classify_calibration_maturity,
+    compute_config_content_hash,
+    compute_proposal_content_hash,
+    export_proposal_json,
+    export_v1_6_draft_json,
+    generate_calibration_proposal,
+    generate_v1_6_draft_config,
+    rescore_row,
+    run_shadow_evaluation,
+    verify_proposal,
 )
 from .dataset import (
     BacktestDataset,
@@ -183,4 +208,28 @@ __all__ = [
     "export_analysis_csv",
     "export_analysis_json",
     "verify_analysis",
+    # Phase 6D Governed Calibration exports
+    "ApprovalStatus",
+    "BASELINE_CONFIG_VERSION",
+    "CalibrationMaturity",
+    "CalibrationObjective",
+    "CalibrationProposal",
+    "KnockoutProposal",
+    "ModuleWeightProposal",
+    "NonRegressionResult",
+    "ProposalStatus",
+    "RejectedCandidate",
+    "ShadowEvaluationResult",
+    "ThresholdProposal",
+    "VerdictProposal",
+    "classify_calibration_maturity",
+    "compute_config_content_hash",
+    "compute_proposal_content_hash",
+    "export_proposal_json",
+    "export_v1_6_draft_json",
+    "generate_calibration_proposal",
+    "generate_v1_6_draft_config",
+    "rescore_row",
+    "run_shadow_evaluation",
+    "verify_proposal",
 ]
