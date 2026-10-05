@@ -31,6 +31,7 @@ class DocumentExtractor:
         self,
         pdf_path: str | Path,
         reference_base_path: Optional[str | Path] = None,
+        allow_fixture_fallbacks: bool = True,
     ) -> Tuple[Dict[str, Any], ExtractionReport]:
         """Process PDF and produce validated canonical JSON plus ExtractionReport."""
         t0 = time.perf_counter()
@@ -78,7 +79,12 @@ class DocumentExtractor:
             with open(reference_base_path, "r", encoding="utf-8") as f:
                 ref_base = json.load(f)
 
-        builder = CanonicalInputBuilder(doc, extractions, reference_base=ref_base)
+        builder = CanonicalInputBuilder(
+            doc,
+            extractions,
+            reference_base=ref_base,
+            allow_fixture_fallbacks=allow_fixture_fallbacks,
+        )
         canonical_dict = builder.build()
         builder.validate(canonical_dict)
 

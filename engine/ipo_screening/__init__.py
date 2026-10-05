@@ -33,6 +33,16 @@ from .canonical import Evidence, SourceRef, State, Value, Verification
 from .canonical_input import CanonicalInput, build_canonical_input
 from .config_validation import check_config, compile_config, config_fingerprint
 from .derived import DerivedMetrics, MetricValue, derive
+from .enrichment_engine import (
+    DerivedField,
+    EnrichmentConflictError,
+    EnrichmentEngine,
+    EnrichmentError,
+    EnrichmentResult,
+    EnrichmentValidationError,
+    FieldDisposition,
+    PrecedenceViolationError,
+)
 from .errors import (
     ConfigValidationError,
     Finding,
@@ -84,6 +94,14 @@ __all__ = [
     "config_fingerprint",
     "classify_peers",
     "build_market_snapshot",
+    "EnrichmentEngine",
+    "EnrichmentResult",
+    "DerivedField",
+    "FieldDisposition",
+    "EnrichmentError",
+    "EnrichmentConflictError",
+    "EnrichmentValidationError",
+    "PrecedenceViolationError",
     "Finding",
     "ValidationError",
     "SchemaValidationError",

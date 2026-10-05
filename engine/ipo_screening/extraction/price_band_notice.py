@@ -714,11 +714,11 @@ class PriceBandNoticeParser:
 
         open_patterns: Sequence[re.Pattern[str]] = (
             re.compile(
-                r"(?:bid/offer|issue|bid/issue|offer)\s+opens\s+on\s*[:\-]?\s*([^\n\r]+)",
+                r"(?:bid/offer|issue|bid/issue|offer|bid)\s+opens\s*(?:on\s*)?[:\-]?\s*([^\n\r]+)",
                 re.IGNORECASE,
             ),
             re.compile(
-                r"(?:bid/offer|issue|bid/issue|offer)\s+opening\s+date\s*[:\-]?\s*([^\n\r]+)",
+                r"(?:bid/offer|issue|bid/issue|offer|bid)\s+opening\s+date\s*[:\-]?\s*([^\n\r]+)",
                 re.IGNORECASE,
             ),
             re.compile(
@@ -729,11 +729,11 @@ class PriceBandNoticeParser:
 
         close_patterns: Sequence[re.Pattern[str]] = (
             re.compile(
-                r"(?:bid/offer|issue|bid/issue|offer)\s+closes\s+on\s*[:\-]?\s*([^\n\r]+)",
+                r"(?:bid/offer|issue|bid/issue|offer|bid)\s+closes\s*(?:on\s*)?[:\-]?\s*([^\n\r]+)",
                 re.IGNORECASE,
             ),
             re.compile(
-                r"(?:bid/offer|issue|bid/issue|offer)\s+closing\s+date\s*[:\-]?\s*([^\n\r]+)",
+                r"(?:bid/offer|issue|bid/issue|offer|bid)\s+closing\s+date\s*[:\-]?\s*([^\n\r]+)",
                 re.IGNORECASE,
             ),
             re.compile(

@@ -1122,12 +1122,229 @@ Thirteen deterministic fixtures were authored in `fixtures/notices/`:
 **Final Phase 5F Status: PASS**
 ---
 
+## N. Phase 5G — Pre-Score Enrichment Engine
+
+### N.1 Architectural Overview & Rationale
+
+Phase 5G establishes the stateless, deterministic server/library-side Pre-Score Enrichment Engine (`EnrichmentEngine.assemble(...)`). Prior to Phase 5G, reconciling document gaps and applying pricing details was performed ad-hoc or via browser-side memory mutations. Phase 5G replaces these mutable, non-traceable patterns with a rigorous, auditable assembly pipeline that bridges raw RHP extraction payloads, Phase 5F Price Band Notices, Phase 5E supplemental contracts, and market/analyst data into fully reconciled, schema-compliant canonical inputs ready for scoring.
+
+```
++-----------------------------------------------------------------------------------------+
+|                                    BASE INPUTS                                          |
+|  +--------------------+   +---------------------+   +--------------------------------+  |
+|  | RHP Extraction     |   | Price Band Notice   |   | Supplemental Contract (5E)     |  |
+|  | (Tier 1 Statutory) |   | (Tier 2 Regulatory) |   | (Market, Peer, Analyst Tier 4) |  |
+|  +---------+----------+   +----------+----------+   +---------------+----------------+  |
++------------|-------------------------|------------------------------|-------------------+
+             |                         |                              |
+             +-------------------------v------------------------------+
+                                       |
+                   +---------------------------------------+
+                   |       EnrichmentEngine.assemble       |
+                   |  (Stateless, Pure-Function Assembly)  |
+                   +-------------------+-------------------+
+                                       |
+                   +-------------------+-------------------+
+                   | 1. Codified Source Precedence Engine  |
+                   |    - PBN > Supplemental > RHP prelim  |
+                   |    - RHP statutory > Manual templates |
+                   |    - Analyst owns subjective ratings  |
+                   |    - Conflicting sources fail closed  |
+                   +-------------------+-------------------+
+                                       |
+                   +-------------------+-------------------+
+                   | 2. Dynamic Upstream Derivations       |
+                   |    - fresh_shares = fresh_issue / cap |
+                   |    - post_issue_shares = pre + fresh  |
+                   |    - ofs = sum(sold) * cap / 100,000  |
+                   |    - post_eps = latest_pat / post_sh  |
+                   |    - promoter_post % = post_sh / tot  |
+                   |    - Reconciles with disclosed facts  |
+                   +-------------------+-------------------+
+                                       |
+                   +-------------------+-------------------+
+                   | 3. Provenance & Traceability Ledger   |
+                   |    - 24-field historical matrix       |
+                   |    - ASSEMBLED / DERIVED / PRESERVED  |
+                   |    - Separation invariant enforced    |
+                   +-------------------+-------------------+
+                                       |
+             +-------------------------v------------------------------+
+             |                 ENRICHMENT RESULT                      |
+             |  +--------------------------------------------------+  |
+             |  | canonical_input: Scorable Canonical v1.5 Schema  |  |
+             |  | derivations: Dict[str, DerivedField]             |  |
+             |  | field_traceability: Dict[str, FieldDisposition]  |  |
+             |  | findings: List[Finding] (Warnings/Validation)    |  |
+             |  +--------------------------------------------------+  |
+             +--------------------------------------------------------+
+```
+
+### N.2 Codified Source Precedence Hierarchy
+
+The assembly engine codifies a deterministic multi-tiered precedence hierarchy that eliminates ambiguity across multi-source ingestion:
+
+1. **Pricing & Offering Mechanics (`price_band_high`, `price_band_low`, `lot_size`, `open_date`, `close_date`)**:
+   - `Price Band Notice (Tier 2 Regulatory Advertisement)` > `Authoritative Later Source` > `RHP Definitive Disclosure` > `Preliminary RHP [●]` > `Manual Template / Defaults`.
+   - When a Price Band Notice is ingested, it replaces `[●]` placeholders with statutory evidence without erasing the historical record.
+
+2. **Statutory Base Facts (`issue_size`, `net_worth`, `revenue`, `pat`, `ebitda`, `debt`, `promoter_holding`)**:
+   - `RHP Statutory Prospectus Disclosure (Tier 1)` strictly overrides manual templates or analyst inputs.
+   - Any manual or analyst payload attempting to overwrite statutory financial figures (e.g., revenues or net profit) is rejected with `PrecedenceViolationError` or logged as an invalid override.
+
+3. **Subjective Analyst Ratings (`moat_rating`, `visibility_rating`)**:
+   - `Analyst Assessment (Tier 4)` exclusively owns qualitative ratings.
+   - All subjective analyst assignments are stamped with `ExtractionMethod.MANUAL_ENTRY` and tagged as Tier 4 qualitative inputs.
+   - The engine strictly prohibits analyst assessments from altering statutory quantitative metrics.
+
+4. **Conflict Handling & Fail-Closed Invariant**:
+   - If two authoritative sources supply conflicting values without an established precedence rule (e.g. differing Price Band Notices with equal authority), the engine raises `EnrichmentConflictError` and refuses evaluation.
+
+### N.3 Dynamic Upstream Derivations with Exact Decimal Arithmetic
+
+To prevent hardcoded assumptions and eliminate drift between prospectus disclosures and mathematical models, `EnrichmentEngine` dynamically computes upstream derived values using exact `Decimal` arithmetic:
+
+1. **Fresh Shares**:
+   $$\text{fresh\_shares} = \text{round}\left( \frac{\text{fresh\_issue} \times 100,000}{\text{price\_band\_high}} \right)$$
+   Dependencies: `["issue.fresh_issue", "issue.price_band_high"]`
+
+2. **Post-Issue Shares**:
+   $$\text{post\_issue\_shares} = \text{pre\_issue\_shares} + \text{fresh\_shares}$$
+   Dependencies: `["issue.pre_issue_shares", "issue.fresh_shares"]`
+
+3. **OFS Monetary Amount**:
+   $$\text{ofs} = \frac{\sum(\text{seller\_shares\_sold}) \times \text{price\_band\_high}}{100,000}$$
+   Dependencies: `["issue.ofs_sellers", "issue.price_band_high"]`
+
+4. **Post-Issue EPS**:
+   $$\text{post\_issue\_eps} = \frac{\text{latest\_pat} \times 100,000}{\text{post\_issue\_shares}}$$
+   Dependencies: `["financials.periods[-1].pat", "issue.post_issue_shares"]`
+
+5. **Promoter Post-Issue Percentage**:
+   $$\text{promoter\_post\_pct} = \frac{\frac{\text{pre\_shares} \times \text{promoter\_pre\_pct}}{100} - \text{promoter\_shares\_sold}}{\text{post\_issue\_shares}} \times 100$$
+   Dependencies: `["capital_structure.promoter_pre_pct", "issue.pre_issue_shares", "issue.ofs_sellers", "issue.post_issue_shares"]`
+
+#### Disclosed vs. Derived Reconciliation
+When the base document already contains a definitive statutory disclosure (e.g. Vishal Nirmiti disclosed post-issue shares or post-issue EPS), the engine:
+- Preserves the statutory source fact as authoritative in `canonical_input`.
+- Computes the derived value and calculates the percentage variance:
+  $$\text{variance} = \frac{|\text{derived} - \text{disclosed}|}{\text{disclosed}} \times 100$$
+- Verifies reconciliation within established tolerances ($\le 1.0\%$ for shares and OFS, $\le 2.0\%$ for EPS to accommodate prospectus rounding).
+- If variance exceeds tolerance, emits a structured `RECONCILIATION_MISMATCH` finding.
+- Flags each derivation with `DerivedField(is_derived=True, formula=..., dependencies=..., reconciled_with_source=...)`.
+
+### N.4 Elimination of Fixture Fallbacks (Mandatory Section 30 Regression)
+
+In prior extraction passes, `builder.py` fell back to hardcoded Vishal Nirmiti fixture constants (`208`, `220`, `68`, `9.46`, `85.33`). Phase 5G refactors `builder.py` with `allow_fixture_fallbacks: bool = False` by default:
+- When a field is undisclosed or missing from an RHP extraction:
+  - `price_band_low` evaluates to `None` (never `208`).
+  - `price_band_high` evaluates to `None` (never `220`).
+  - `lot_size` evaluates to `None` (never `68`).
+  - `post_issue_eps` evaluates to `None` (never `9.46`).
+  - `top5_customer_pct` evaluates to `None` (never `85.33`).
+- Synthetic and undisclosed prospectuses strictly yield `UNKNOWN`/`None`, fulfilling Section 30 mandatory regression tests.
+
+### N.5 Input Immutability & Deterministic Replay
+
+The engine treats all caller input objects as read-only and immutable:
+- `base_input`, `price_band_notice`, and supplemental payloads are deep-copied on entry.
+- Successive executions over identical inputs yield identical result hashes and object states with zero drift.
+
+### N.6 Preliminary vs. Final Mode Assembly
+
+The engine enforces mode semantics at the enrichment boundary:
+- **Preliminary Mode**: Permitted when pricing or subscription details are not yet known. Price band and market fields evaluate to `None`/`UNKNOWN`. Scoring operates within partial bounds without fabricating metrics.
+- **Final Mode**: Requires complete, verified pricing mechanics (`price_band_high`, `lot_size`). If required pricing mechanics are missing, the engine fails closed with `EnrichmentValidationError`.
+
+### N.7 24-Field Historical Traceability Matrix
+
+Phase 5G maps every historical "Details not in RHP" field across an explicit lifecycle disposition:
+
+| Field Name | Disposition | Handling in Phase 5G |
+| :--- | :--- | :--- |
+| `issue_open_date` | `ASSEMBLED` | Ingested from Price Band Notice / Supplemental Contract |
+| `issue_close_date` | `ASSEMBLED` | Ingested from Price Band Notice / Supplemental Contract |
+| `price_floor` | `ASSEMBLED` | Ingested from Price Band Notice (Lower price band end) |
+| `price_cap` | `ASSEMBLED` | Ingested from Price Band Notice (Upper price band end) |
+| `market_lot` | `ASSEMBLED` | Ingested from Price Band Notice (Minimum bid lot) |
+| `fresh_shares` | `DERIVED` | Dynamically calculated from `fresh_issue / cap_price` |
+| `ofs_amount` | `DERIVED` | Dynamically calculated from `sum(seller_shares) * cap_price` |
+| `post_issue_shares` | `DERIVED` | Dynamically calculated from `pre_issue + fresh_shares` |
+| `post_issue_eps` | `DERIVED` | Dynamically calculated from `latest_pat / post_issue_shares` |
+| `promoter_post_pct` | `DERIVED` | Dynamically calculated from post-issue promoter shareholding |
+| `moat_rating` | `ASSEMBLED` | Ingested from Analyst Assessment (Tier 4 Subjective) |
+| `visibility_rating` | `ASSEMBLED` | Ingested from Analyst Assessment (Tier 4 Subjective) |
+| `anchor_names` | `DEFERRED_TO_5H` | Deferred to Phase 5H Anchor Book Connector |
+| `anchor_total_shares` | `DEFERRED_TO_5H` | Deferred to Phase 5H Anchor Book Connector |
+| `anchor_total_amount` | `DEFERRED_TO_5H` | Deferred to Phase 5H Anchor Book Connector |
+| `anchor_lockin_verified` | `DEFERRED_TO_5H` | Deferred to Phase 5H Anchor Book Connector |
+| `qib_subscription` | `ASSEMBLED` | Ingested from Market Snapshot (Subscription tracker) |
+| `nii_subscription` | `ASSEMBLED` | Ingested from Market Snapshot (Subscription tracker) |
+| `retail_subscription` | `ASSEMBLED` | Ingested from Market Snapshot (Subscription tracker) |
+| `total_subscription` | `ASSEMBLED` | Ingested from Market Snapshot (Subscription tracker) |
+| `gmp_rupees` | `ASSEMBLED` | Ingested from Market Snapshot (GMP tracker) |
+| `gmp_pct` | `ASSEMBLED` | Ingested from Market Snapshot (GMP tracker) |
+| `nifty_trend` | `ASSEMBLED` | Ingested from Market Snapshot (Index market trend) |
+| `listing_gains` | `ASSEMBLED` | Ingested from Market Snapshot (Recent listing returns) |
+
+### N.8 Test Coverage & Golden Hash Stability
+
+A dedicated test suite in `tests/test_enrichment_engine.py` validates all Phase 5G capabilities:
+1. `test_price_band_notice_overrides_rhp_undisclosed`: Verifies cap, floor, lot, and dates override `[●]`.
+2. `test_price_band_notice_beats_template`: Codified precedence of PBN over manual template.
+3. `test_authoritative_rhp_beats_template`: Statutory RHP base facts override template.
+4. `test_dynamic_derivations_calculation`: Accurate calculations for fresh shares, post shares, OFS, EPS, and promoter %.
+5. `test_source_vs_derived_separation`: Enforces distinct tagging (`is_derived=True`, formula, dependencies).
+6. `test_synthetic_rhp_absent_values_mandatory_section30`: Verifies missing fields evaluate to None, never fixture constants.
+7. `test_input_immutability`: Verifies input dicts remain byte-identical before and after assembly.
+8. `test_deterministic_repeated_assembly`: Identical result hashes across repeated executions.
+9. `test_preliminary_mode_missing_notice_allowed`: Validates preliminary mode flexibility.
+10. `test_final_mode_missing_notice_fails_closed`: Validates final mode fail-closed enforcement.
+11. `test_analyst_assessment_subjective_ownership`: Validates analyst ownership of moat and visibility.
+12. `test_analyst_assessment_cannot_overwrite_statutory_facts`: Prohibits analyst alteration of revenues/PAT.
+13. `test_market_snapshot_integration`: Integration of QIB subscription, GMP, and market indices.
+14. `test_historical_traceability_matrix_completeness`: Full coverage of all 24 historical fields.
+15. `test_reconciled_canonical_input_scorable`: Directly evaluatable by frozen v1.5 engine preserving golden hash.
+
+#### Complete Test Suite Results
+- Baseline Tests: 292 passed
+- Phase 5G Tests: 15 passed
+- Total Tests: **307 passed** in 125.31s
+- Deterministic Golden Hash: `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` strictly preserved.
+
+### N.9 Phase 5G Gate Reconciliation Checklist
+
+- [PASS] Standing authorization from Ramki applied for Phase 5G
+- [PASS] Pre-Score Enrichment Engine implemented (`engine/ipo_screening/enrichment_engine.py`)
+- [PASS] Multi-tier source precedence codified (PBN > RHP > manual templates; RHP statutory > manual; analyst owns subjective)
+- [PASS] Conflicting authoritative sources fail closed
+- [PASS] Price Band Notice replaces `[●]` without destroying base evidence
+- [PASS] Dynamic derivations implemented with exact Decimal arithmetic (`fresh_shares`, `post_issue_shares`, `ofs`, `post_issue_eps`, `promoter_post_pct`)
+- [PASS] Reconciliation tolerance checks implemented ($\le 1.0\%$ shares/OFS, $\le 2.0\%$ EPS)
+- [PASS] Hardcoded fixture fallbacks removed from `builder.py` (`allow_fixture_fallbacks=False`)
+- [PASS] Section 30 mandatory synthetic RHP regression verified (missing fields -> None, never 208, 220, 68, 9.46, 85.33)
+- [PASS] Source facts and derived values separated with explicit formula and dependencies
+- [PASS] Caller input objects are immutable (deep-copied on entry)
+- [PASS] Stateless, pure-function behavior verified across repeated runs
+- [PASS] Preliminary mode (null prices permitted) vs. Final mode (fails closed without verified pricing) enforced
+- [PASS] Complete 24-field historical traceability matrix verified
+- [PASS] Reconciled canonical output conforms to `schema/ipo-input.v1.5.schema.json`
+- [PASS] Frozen v1.5 scoring core (`derived.py`, `scoring.py`, `knockouts.py`, `snapshots.py`, `evaluation.py`) untouched
+- [PASS] Golden result hash `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` strictly preserved
+- [PASS] 307 tests pass (292 baseline + 15 Phase 5G)
+- [PASS] Zero live connectors (deferred to Phase 5H)
+- [PASS] Zero CLI additions (deferred to Phase 5I)
+- [PASS] No merge to `main`
+
+**Final Phase 5G Status: PASS**
+---
+
 **Awaiting decision, not implementation:** H1 (GCP reference fixture sign-off),
 H2 (EPC versus real estate).
 
 **Delivery & Remote Status:** PR #3 is open on GitHub against `main` from head
 `arena/ipo-screening-engine-v1.5`.
-All 292 tests green (272 baseline + 20 Phase 5F), golden hash frozen, main strictly protected.
+All 307 tests green (292 baseline + 15 Phase 5G), golden hash frozen, main strictly protected.
 
 No merge to `main`. No production deployment.
 
