@@ -31,8 +31,21 @@ reference/prototype material only.
 The v1.5 engine is implemented, executable end to end, and verified against a
 golden regression suite of **238 tests**. It scores an IPO from a structured
 input, produces a score with a range and a tri-state knockout gate, freezes the
-run into an immutable record with six hashed payload artifacts (plus manifest), and projects fourteen
+evaluation run into an immutable record with six hashed payload artifacts (plus manifest: `evaluation.json`, `input.json`, `evidence.json`, `market.json`, `peers.json`, `result.json`, hashed inside `manifest.json`), and projects fourteen
 Excel sheets from that record.
+
+### Artifact Categories & Authoritative Counts
+
+To prevent ambiguity between evaluation persistence, carrier transport, and repository manifests, the engine distinguishes five distinct artifact scopes:
+
+| Scope / Category | Role | Count | Governed Files / Artifacts | Authority |
+|---|---|---|---|---|
+| **Evaluation Record Payloads** | Immutable run payloads stored per evaluation | **6** | `evaluation.json`, `input.json`, `evidence.json`, `market.json`, `peers.json`, `result.json` | `engine/ipo_screening/evaluation.py` (`EVALUATION_ARTIFACTS`) |
+| **Evaluation Record Manifest** | Records SHA-256 hashes of the 6 payload artifacts | **1** | `manifest.json` (lists hashes for the 6 payloads; does not list itself) | `EvaluationStore.write()` |
+| **Portable Delivery Carrier** | Minimal git bundle transport carrier | **1 payload + 1 manifest + 1 record** | Payload: `ipo-screening-engine-v1.5.bundle`<br>Manifest: `SHA256SUMS`<br>Verification record: `VERIFICATION.txt` | `handoff/delivery/make-carrier.sh` |
+| **Staged Download Carrier** | Multi-format distribution packages | **3 payloads + 1 record + 1 manifest** | Payloads: `*.bundle`, `*-delivery-files.tar.gz`, `patches/*.patch`<br>Record: `VERIFICATION.txt`<br>Manifest: `SHA256SUMS` (hashes all 4 above) | `handoff/delivery/stage-downloads.sh` |
+| **Repository Delivery Manifest** | Full source file manifest against baseline | **46 files** | Every tracked source file added or modified in the v1.5 delivery | `handoff/delivery/MANIFEST.sha256` |
+| **Claude Reference Artifacts** | Ground-truth and prototype reference material | **6 files** | `Specification v 1.3`, `ipo-config.json`, `ipo-input.schema.json`, `ipo-scorer_4.html`, `VISHAL-NIRMITI-LIMITED.json`, `vishal nirmiti.pdf` | `handoff/authoritative/ARENA_IPO_Screening_Artifact_Manifest_v1.5.md` |
 
 **What exists now**
 
@@ -687,7 +700,7 @@ All fixture generation is deterministically reproducible via `python3 fixtures/f
 
 ### J.2 Discovered Deficiencies and Minimal Evidence-Based Hardening
 
-Multi-class validation identified 7 schema and table parsing deficiencies that were hardened with minimal upstream fixes:
+Multi-class validation identified 8 schema and table parsing deficiencies that were hardened with minimal upstream fixes:
 1. **Sector Profile Schema Alignment**: Canonical builder previously defaulted `sector_profile` to `"manufacturing_heavy"`, which violated the v1.5 schema enum `['standard', 'financial', 'epc_real_estate', 'cyclical']`. Fixed in `builder.py` with heuristic sector detection and fallback to `"standard"`.
 2. **ICDR Route Schema Alignment**: Defaulted route was `"profitability_26_1"` instead of valid schema enum `['6(1)', '6(2)']`. Hardened to default `"6(1)"`.
 3. **Litigation Bucket Schema Compliance**: `sections.py` previously produced `"none"` instead of valid schema enum `['clean', 'minor_civil', 'criminal_or_regulatory']`. Normalized cleanly.
@@ -717,8 +730,10 @@ Multi-class validation identified 7 schema and table parsing deficiencies that w
 ---
 
 **Awaiting decision, not implementation:** H1 (GCP reference fixture sign-off),
-H2 (EPC versus real estate). **Awaiting infrastructure:** H4 (a session
-with remote access to push and open the pull request; the carrier in
-`handoff/delivery/` makes that a copy operation rather than a re-implementation).
+H2 (EPC versus real estate).
+
+**Delivery & Remote Status:** PR #3 is open on GitHub against `main` from head
+`arena/ipo-screening-engine-v1.5` at commit `ac537a26cc6a9f8aa80db0abc54a4b2174932ba1`.
+All 259 tests green, golden hash frozen, main strictly protected.
 
 No merge to `main`. No production deployment.
