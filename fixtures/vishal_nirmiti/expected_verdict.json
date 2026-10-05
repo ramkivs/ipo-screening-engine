@@ -1,0 +1,56 @@
+{
+  "confidence": {
+    "breakdown": {
+      "critical_data_missing": [
+        "going_concern_uncertainty"
+      ],
+      "critical_data_pct": 80.0,
+      "knockout_completeness_pct": 50.0,
+      "knockout_unverified": [
+        "K1",
+        "K5",
+        "K6"
+      ],
+      "market_pct": 100.0,
+      "market_points_unknown": 0,
+      "overall_pct": 73.0,
+      "profile": "standard",
+      "structure_overlays": [
+        "retail_heavy"
+      ],
+      "valuation_pct": 20.0,
+      "valuation_points_unknown": 16.0,
+      "weighting": "POINTS"
+    },
+    "completeness_pct": 73.0,
+    "level": "Low",
+    "weighting": "POINTS"
+  },
+  "config_version": "1.5.0",
+  "engine_version": "1.5.0",
+  "hashes": {
+    "input_snapshot_hash": "4388606993c604bb56d5f3cab1e9b061414fbfca63c6ac2c7b4e2638484f0614",
+    "market_snapshot_hash": "605f48ea5159ca7d71f7a045ac871a331d6e263cc7ebf2cb32b491274cb2c3cb",
+    "peer_snapshot_hash": "79deb530f65c8708b52626757017c114ddce6ebb008ac94f847f03e14cbd736a",
+    "result_hash": "e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1",
+    "source_manifest_hash": "3bd2a7b2f803afb46b0a2e4e455b8176c938c3c2c34164b37cac31c93de55fd7"
+  },
+  "score_range": {
+    "available_points": 73.0,
+    "base_score": 38.0,
+    "final_score": 35.0,
+    "lower_bound": 25.0,
+    "total_evaluable_points": 100.0,
+    "unknown_points": 27.0,
+    "unresolved_penalty_points": 10.0,
+    "upper_bound": 62.0
+  },
+  "spec_version": "1.5",
+  "verdict": {
+    "band_score": "AVOID",
+    "insufficient_data": true,
+    "mode_label": "final",
+    "uncertain": true,
+    "verdict": "INSUFFICIENT_DATA"
+  }
+}

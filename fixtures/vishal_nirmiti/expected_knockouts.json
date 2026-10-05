@@ -1,0 +1,205 @@
+{
+  "all_clear": false,
+  "any_triggered": false,
+  "completeness_pct": 50.0,
+  "results": [
+    {
+      "explanation": "The supplied input does not establish whether going_concern_uncertainty applies: the supplied input does not establish whether going-concern uncertainty exists.",
+      "label": "Qualified/adverse/disclaimer opinion, going concern, or negative net worth",
+      "leaves": [
+        {
+          "detail": "auditor_opinion = 'emphasis_of_matter' in ['qualified', 'adverse', 'disclaimer'] -> False",
+          "kind": "metric",
+          "reference": "auditor_opinion",
+          "truth": "FALSE",
+          "value": "emphasis_of_matter"
+        },
+        {
+          "detail": "the supplied input does not establish whether going-concern uncertainty exists",
+          "kind": "flag",
+          "reference": "going_concern_uncertainty",
+          "truth": "UNKNOWN"
+        },
+        {
+          "detail": "net_worth_latest = 86.7835 < 0 -> False",
+          "kind": "metric",
+          "reference": "net_worth_latest",
+          "truth": "FALSE",
+          "value": 86.7835
+        }
+      ],
+      "missing": [
+        "going_concern_uncertainty"
+      ],
+      "required": [
+        "auditor_opinion",
+        "going_concern_uncertainty",
+        "net_worth_latest"
+      ],
+      "rule_id": "K1",
+      "state": "UNVERIFIED"
+    },
+    {
+      "explanation": "Every condition in the rule has been evaluated against supplied inputs and none is met.",
+      "label": "Promoter pledge >25% or active SEBI/ED action",
+      "leaves": [
+        {
+          "detail": "promoter_pledge_pct = 0.0 > 25 -> False",
+          "kind": "metric",
+          "reference": "promoter_pledge_pct",
+          "truth": "FALSE",
+          "value": 0.0
+        },
+        {
+          "detail": "sebi_ed_action_active = False",
+          "kind": "flag",
+          "reference": "sebi_ed_action_active",
+          "truth": "FALSE",
+          "value": false
+        }
+      ],
+      "missing": [],
+      "required": [
+        "promoter_pledge_pct",
+        "sebi_ed_action_active"
+      ],
+      "rule_id": "K2",
+      "state": "CLEAR"
+    },
+    {
+      "explanation": "Every condition in the rule has been evaluated against supplied inputs and none is met.",
+      "label": "OFS >80% with declining profits",
+      "leaves": [
+        {
+          "detail": "ofs_share_pct = 18.539325842696627 > 80 -> False",
+          "kind": "metric",
+          "reference": "ofs_share_pct",
+          "truth": "FALSE",
+          "value": 18.539325842696627
+        },
+        {
+          "detail": "profit_declining = False",
+          "kind": "flag",
+          "reference": "profit_declining",
+          "truth": "FALSE",
+          "value": false
+        }
+      ],
+      "missing": [],
+      "required": [
+        "ofs_share_pct",
+        "profit_declining"
+      ],
+      "rule_id": "K3",
+      "state": "CLEAR"
+    },
+    {
+      "explanation": "Every condition in the rule has been evaluated against supplied inputs and none is met.",
+      "label": "Promoters + PE/VC sell >50% of combined holding, promoters exit/<20%, and weak financials",
+      "leaves": [
+        {
+          "detail": "pe_promoter_sold_pct_combined = 100.0 > 50 -> True",
+          "kind": "metric",
+          "reference": "pe_promoter_sold_pct_combined",
+          "truth": "TRUE",
+          "value": 100.0
+        },
+        {
+          "detail": "promoter_full_exit = False",
+          "kind": "flag",
+          "reference": "promoter_full_exit",
+          "truth": "FALSE",
+          "value": false
+        },
+        {
+          "detail": "promoter_post_pct = 49.4 < 20 -> False",
+          "kind": "metric",
+          "reference": "promoter_post_pct",
+          "truth": "FALSE",
+          "value": 49.4
+        },
+        {
+          "detail": "profit_declining = False",
+          "kind": "flag",
+          "reference": "profit_declining",
+          "truth": "FALSE",
+          "value": false
+        },
+        {
+          "detail": "roce_latest = 28.02 < 10 -> False",
+          "kind": "metric",
+          "reference": "roce_latest",
+          "truth": "FALSE",
+          "value": 28.02
+        },
+        {
+          "detail": "cfo_pat_cumulative = 1.7881897553619628 < 0.5 -> False",
+          "kind": "metric",
+          "reference": "cfo_pat_cumulative",
+          "truth": "FALSE",
+          "value": 1.7881897553619628
+        }
+      ],
+      "missing": [],
+      "required": [
+        "pe_promoter_sold_pct_combined",
+        "promoter_full_exit",
+        "promoter_post_pct",
+        "profit_declining",
+        "roce_latest",
+        "cfo_pat_cumulative"
+      ],
+      "rule_id": "K4",
+      "state": "CLEAR"
+    },
+    {
+      "explanation": "The supplied input does not establish whether contingent_liab_unquantified applies: the supplied input does not establish whether any material contingent liability is unquantified.",
+      "label": "Contingent liabilities >50% of net worth (or unquantified)",
+      "leaves": [
+        {
+          "detail": "contingent_liab_pct_networth = 25.19649472537982 > 50 -> False",
+          "kind": "metric",
+          "reference": "contingent_liab_pct_networth",
+          "truth": "FALSE",
+          "value": 25.19649472537982
+        },
+        {
+          "detail": "the supplied input does not establish whether any material contingent liability is unquantified",
+          "kind": "flag",
+          "reference": "contingent_liab_unquantified",
+          "truth": "UNKNOWN"
+        }
+      ],
+      "missing": [
+        "contingent_liab_unquantified"
+      ],
+      "required": [
+        "contingent_liab_pct_networth",
+        "contingent_liab_unquantified"
+      ],
+      "rule_id": "K5",
+      "state": "UNVERIFIED"
+    },
+    {
+      "explanation": "The supplied input does not establish whether rpt_pct_of_revenue_growth applies: the related-party contribution to revenue growth is not disclosed.",
+      "label": "Related parties drive >40% of revenue growth",
+      "leaves": [
+        {
+          "detail": "the related-party contribution to revenue growth is not disclosed",
+          "kind": "metric",
+          "reference": "rpt_pct_of_revenue_growth",
+          "truth": "UNKNOWN"
+        }
+      ],
+      "missing": [
+        "rpt_pct_of_revenue_growth"
+      ],
+      "required": [
+        "rpt_pct_of_revenue_growth"
+      ],
+      "rule_id": "K6",
+      "state": "UNVERIFIED"
+    }
+  ],
+  "status": "UNVERIFIED"
+}
