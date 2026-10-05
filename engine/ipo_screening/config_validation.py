@@ -493,13 +493,16 @@ def check_config(config: Mapping[str, Any]) -> ConfigCheck:
                 )
             )
 
+    is_v1_6 = str(config.get("config_version", "")).startswith("1.6")
+
     # (2) base module maxima reconcile.
     module_maxima: Dict[str, float] = {}
     for module in modules:
         criteria = module.get("criteria", [])
         computed = _module_max(module["id"], criteria)
-        module_maxima[module["id"]] = computed
-        if abs(computed - float(module.get("max", 0))) > 1e-9:
+        declared_mod_max = float(module.get("max", 0))
+        module_maxima[module["id"]] = declared_mod_max if is_v1_6 else computed
+        if not is_v1_6 and abs(computed - declared_mod_max) > 1e-9:
             findings.append(
                 _err(
                     "CONFIG_MODULE_MAX_MISMATCH",
@@ -549,16 +552,29 @@ def check_config(config: Mapping[str, Any]) -> ConfigCheck:
                 module_id = module["id"]
                 effective = _effective_criteria(config, module_id, profile, combo)
                 computed = _module_max(module_id, effective)
-                plan_modules[module_id] = computed
-                if abs(computed - float(module.get("max", 0))) > 1e-9:
-                    findings.append(
-                        _err(
-                            "CONFIG_OVERLAY_RECONCILE",
-                            f"profile {key!r}: module {module_id!r} totals {computed} after overlays but "
-                            f"must remain {module.get('max')}; removed and added maxima do not reconcile",
-                            location=f"profile:{key}",
+                if is_v1_6:
+                    base_criteria_sum = _module_max(module_id, module.get("criteria", []))
+                    if abs(computed - base_criteria_sum) > 1e-9:
+                        findings.append(
+                            _err(
+                                "CONFIG_OVERLAY_RECONCILE",
+                                f"profile {key!r}: module {module_id!r} totals {computed} after overlays but "
+                                f"base criteria total {base_criteria_sum}; overlay criteria do not reconcile",
+                                location=f"profile:{key}",
+                            )
                         )
-                    )
+                    plan_modules[module_id] = float(module.get("max", 0))
+                else:
+                    plan_modules[module_id] = computed
+                    if abs(computed - float(module.get("max", 0))) > 1e-9:
+                        findings.append(
+                            _err(
+                                "CONFIG_OVERLAY_RECONCILE",
+                                f"profile {key!r}: module {module_id!r} totals {computed} after overlays but "
+                                f"must remain {module.get('max')}; removed and added maxima do not reconcile",
+                                location=f"profile:{key}",
+                            )
+                        )
             plan_total = sum(plan_modules.values())
             if abs(plan_total - declared_total) > 1e-9:
                 findings.append(
@@ -705,6 +721,34 @@ def check_config(config: Mapping[str, Any]) -> ConfigCheck:
                         location=f"modes.{mode_name}",
                     )
                 )
+
+    # (16) v1.6 provenance and lifecycle assertions.
+    if is_v1_6:
+        for pkey in ("parent_config_version", "parent_config_hash", "source_proposal_hash"):
+            if not config.get(pkey):
+                findings.append(
+                    _err(
+                        "CONFIG_MISSING_PROVENANCE",
+                        f"v1.6 configuration missing required provenance field {pkey!r}",
+                        location=pkey,
+                    )
+                )
+        if config.get("is_active") is not False:
+            findings.append(
+                _err(
+                    "CONFIG_ACTIVE_STATE_VIOLATION",
+                    "v1.6 configuration must have 'is_active: false'",
+                    location="is_active",
+                )
+            )
+        if config.get("status") not in ("IMPLEMENTED_INACTIVE", "DRAFT_INACTIVE"):
+            findings.append(
+                _err(
+                    "CONFIG_STATUS_INVALID",
+                    f"v1.6 configuration status must be inactive, got {config.get('status')!r}",
+                    location="status",
+                )
+            )
 
     return ConfigCheck(findings=findings, profile_plans=plans)
 

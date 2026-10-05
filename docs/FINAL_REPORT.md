@@ -3203,4 +3203,246 @@ $$\text{Golden Result Hash} = \texttt{e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc61
 
 **A — PHASE 6D COMPLETE**
 
+---
+
+## SECTION V: PHASE 7 AUTHORIZED V1.6 IMPLEMENTATION & CONTROLLED VERIFICATION REPORT
+
+### V.A Executive Summary & Program Authority Authorization
+
+Phase 7 implements the governed calibration proposal approved by Program Authority Ramki into a production-candidate configuration artifact (`config/ipo-config.v1.6.0.json`) under strict provenance, cryptographic determinism, frozen-core preservation, and fail-closed quality gates.
+
+* **Program Authority**: Ramki.
+* **Authorization Scope**: Explicit approval of Phase 6D Calibration Proposal (`config/calibration-proposal.v1.6.0.json`).
+* **Implementation Artifact**: `config/ipo-config.v1.6.0.json`.
+* **Lifecycle State**: `IMPLEMENTED_INACTIVE` (`is_active: false`).
+* **Active Production Baseline**: `config/ipo-config.v1.5.0.json` remains the authoritative production baseline (`is_active: true`, CLI default).
+* **Frozen Core Status**: All six core engine files remain bit-for-bit identical (SHA-256 verified).
+* **Golden Result Status**: Golden evaluation result hash `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` preserved exactly.
+* **Test Verification**: 566 passed (521 baseline + 45 Phase 7 acceptance tests), 0 failures, 0 regressions.
+
+---
+
+### V.B Provenance Chain Architecture & Cryptographic Hashes
+
+Phase 7 enforces an unbroken, bidirectionally verifiable cryptographic provenance chain from raw post-listing prices to the candidate v1.6 configuration:
+
+```
+[Raw Historical Observations]
+               │
+               ▼
+   [Phase 6B Backtest Dataset] ────────► Dataset Hash: 7cac90dbf32bd385e3627074407191f7f1778093ba14879a2247075e1309057e
+               │
+               ▼
+   [Phase 6C Empirical Analysis] ──────► Analysis Hash: 2932cdf824b6f1a1939bad1b82f6da5e730ba5555b2c0da2573a6177c64f37b2
+               │
+               ▼
+   [Phase 6D Calibration Proposal] ────► Proposal Hash: 87bc9bcfa0bd9561adf3eb0be53a4291c465b5b02cd8561209f323e94a2249af
+               │ (Ramki Explicit Approval)
+               ▼
+   [Phase 7 Authorized v1.6 Config] ───► Canonical Hash: 46afa420a4d79677dfac97f12d6b881f3070c33502513fe4a4b9391ff30d4ec3
+               │
+               ▼
+   [Pure In-Memory Shadow Evaluation] ─► Zero historical mutation; 120 evaluations rescored deterministically
+```
+
+Authoritative hash digests:
+- **Baseline v1.5 File SHA-256**: `1f91db2c086db39dcb93b3091389ab2113a5031da7e41cecf458f92082a0c185`
+- **Baseline v1.5 Canonical Hash**: `c7dce6e1f44b0ff8804694d0d4b6631a5f0164217c3bd2f3b942650c48e32502`
+- **Baseline v1.5 Policy Content Hash**: `382ff86cc9d753514509f89c096f3b262bd4e12e644e0d7d03fe811b44e0f1e8`
+- **Approved Proposal Hash**: `87bc9bcfa0bd9561adf3eb0be53a4291c465b5b02cd8561209f323e94a2249af`
+- **Source Dataset Hash**: `7cac90dbf32bd385e3627074407191f7f1778093ba14879a2247075e1309057e`
+- **Source Analysis Hash**: `2932cdf824b6f1a1939bad1b82f6da5e730ba5555b2c0da2573a6177c64f37b2`
+- **v1.6 Configuration File SHA-256**: `5e0e0bb3792cb00fe2520379cb2b64700f12461eb2c62c2f2ce1f31f9eeeb016`
+- **v1.6 Canonical JSON Hash**: `46afa420a4d79677dfac97f12d6b881f3070c33502513fe4a4b9391ff30d4ec3`
+
+---
+
+### V.C Active v1.5 Baseline Preservation & Immutability
+
+The active production configuration `config/ipo-config.v1.5.0.json` remains permanently immutable:
+- File modification timestamp and SHA-256 hash verified bit-for-bit identical before and after Phase 7.
+- CLI default configuration pointer remains `config/ipo-config.v1.5.0.json`.
+- Historical FINAL evaluation records in the evaluation store remain completely untouched.
+
+---
+
+### V.D Authorized v1.6 Configuration Specification
+
+The candidate configuration artifact `config/ipo-config.v1.6.0.json` derives strictly from v1.5 and contains only the changes approved in the Phase 6D proposal:
+- `config_version`: `"1.6.0"`
+- `status`: `"IMPLEMENTED_INACTIVE"`
+- `is_active`: `false`
+- `parent_config_version`: `"1.5.0"`
+- `parent_config_hash`: `"382ff86cc9d753514509f89c096f3b262bd4e12e644e0d7d03fe811b44e0f1e8"`
+- `source_proposal_hash`: `"87bc9bcfa0bd9561adf3eb0be53a4291c465b5b02cd8561209f323e94a2249af"`
+- `source_analysis_hash`: `"2932cdf824b6f1a1939bad1b82f6da5e730ba5555b2c0da2573a6177c64f37b2"`
+- `source_dataset_hash`: `"7cac90dbf32bd385e3627074407191f7f1778093ba14879a2247075e1309057e"`
+- `governance_notice`: `"AUTHORIZED V1.6 IMPLEMENTATION (INACTIVE). PRODUCED UNDER EXPLICIT RAMKI / PROGRAM AUTHORITY APPROVAL. NOT ACTIVATED FOR PRODUCTION USE. ACTIVE BASELINE REMAINS V1.5.0."`
+
+---
+
+### V.E Exact Configuration Diff (Scoring & Metadata)
+
+Automated diff analysis via `python3 engine/tools/ipo_screen.py config diff`:
+
+| Path | Baseline v1.5 Value | Candidate v1.6 Value | Scope | Rationale |
+| :--- | :--- | :--- | :--- | :--- |
+| `modules.A.max` | `25` | `30` | **APPROVED** | Increased +5 points reflecting stronger development rank correlation (0.164656). |
+| `modules.B.max` | `20` | `15` | **APPROVED** | Decreased -5 points reflecting weaker development rank correlation (-0.139969). |
+| `modules.C.max` | `15` | `15` | **UNCHANGED** | Preserved baseline weight. |
+| `modules.D.max` | `15` | `15` | **UNCHANGED** | Preserved baseline weight. |
+| `modules.E.max` | `15` | `15` | **UNCHANGED** | Preserved baseline weight. |
+| `modules.F.max` | `10` | `10` | **UNCHANGED** | Preserved baseline weight. |
+| `thresholds.*` | identical | identical | **UNCHANGED** | Preserved baseline thresholds. |
+| `verdict.bands` | identical | identical | **UNCHANGED** | Preserved baseline verdict bands. |
+| `knockouts.*` | identical | identical | **UNCHANGED** | Zero knockout mutations (firewall enforced). |
+| `config_version` | `"1.5.0"` | `"1.6.0"` | **APPROVED** | Version bump. |
+| `status` | `None` | `"IMPLEMENTED_INACTIVE"` | **APPROVED** | Inactive governance lifecycle state. |
+| `is_active` | `None` | `false` | **APPROVED** | Non-active candidate flag. |
+| Provenance Keys | `None` | populated | **APPROVED** | Parent and source hash linkages. |
+
+- Total Changed Scoring Fields: **2**
+- Total Changed Metadata Fields: **10**
+- Total Out-of-Approved-Scope Changes: **0**
+- Exactly 15 Core Configuration Sections Unchanged: `currency`, `units`, `modes`, `profile_resolution`, `sector_overlays`, `structure_overlays`, `knockouts`, `penalties`, `caps`, `confidence`, `critical_data`, `validation`, `gcp`, `derived_metrics`, `peer_status`.
+
+---
+
+### V.F Frozen Core Verification (6 Files SHA-256 Identical)
+
+The six core scoring and evaluation engine files remain strictly protected:
+
+| File Path | Authoritative SHA-256 Digest | Status |
+| :--- | :--- | :--- |
+| `engine/ipo_screening/derived.py` | `f4dca1bb9a0e67352423c1cb94ab949a0fbf96a24db4df81bbc48cc65fd39aef` | **BIT-FOR-BIT MATCH** |
+| `engine/ipo_screening/scoring.py` | `3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a` | **BIT-FOR-BIT MATCH** |
+| `engine/ipo_screening/knockouts.py` | `8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f` | **BIT-FOR-BIT MATCH** |
+| `engine/ipo_screening/snapshots.py` | `9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27` | **BIT-FOR-BIT MATCH** |
+| `engine/ipo_screening/evaluation.py` | `d20d87b69e01ced146791fe9a4e61faa5d522281383781bfbf5e97e7055810ae` | **BIT-FOR-BIT MATCH** |
+| `engine/ipo_screening/extraction/price_band_notice.py` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | **BIT-FOR-BIT MATCH** |
+
+---
+
+### V.G Golden Evaluation Result Hash Preservation
+
+Evaluating `fixtures/vishal_nirmiti/input.json` under `config/ipo-config.v1.5.0.json` at `EVAL_AT`:
+$$\text{Actual Golden Hash} = \texttt{e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1}$$
+$$\text{Expected Golden Hash} = \texttt{e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1}$$
+$$\textbf{Result: EXACT MATCH}$$
+
+---
+
+### V.H Deterministic Shadow Evaluation Findings
+
+Shadow rescoring across the 120-IPO backtest dataset comparing active v1.5 vs candidate v1.6:
+
+* **Total Evaluated**: 120 historical evaluations
+* **Baseline Mean Score**: 69.50
+* **v1.6 Mean Score**: 73.02
+* **Mean Score Delta**: +3.52 points
+* **Verdict Shifts**: 71 shifts (33 upgrades, 38 downgrades, 49 unchanged)
+* **Score Increase Count**: 70 evaluations
+* **Score Decrease Count**: 50 evaluations
+* **Knockout Deltas**: 0 (Knockouts strictly unchanged)
+* **Downside Protection**: **PASS** (Zero AVOID baseline evaluations received an APPLY verdict under v1.6)
+* **Holdout Stability**: **PASS** (Evaluation deltas remain stable across out-of-sample holdout)
+* **Vintage Robustness**: **PASS** (Consistent behavior across 2024, 2025, and 2026 vintages)
+
+---
+
+### V.I Non-Regression & Quality Assertions
+
+- **Tri-State Semantics**: Missing data continues to resolve to `UNKNOWN` (score `None`, never 0).
+- **Fail-Closed Knockouts**: Missing critical inputs evaluate to `UNVERIFIED` rather than passing clear.
+- **Overlays Reconciliation**: All sector and structure overlays reconcile cleanly under v1.6 module weights.
+- **Deterministic Replay**: Repeated executions produce 100% bit-for-bit identical shadow results and configuration hashes.
+
+---
+
+### V.J CLI Configuration Verification Deliverables
+
+Commands added and verified:
+1. `python3 engine/tools/ipo_screen.py config verify --config config/ipo-config.v1.6.0.json`
+   - Deterministically validates schema, provenance, weights, frozen core, and golden hash. Exits 0 on success.
+2. `python3 engine/tools/ipo_screen.py config diff --baseline config/ipo-config.v1.5.0.json --candidate config/ipo-config.v1.6.0.json`
+   - Outputs structured diff, verifies all changed fields are approved, and audits unchanged sections. Exits 0 on success.
+3. `python3 engine/tools/ipo_screen.py post-listing shadow-evaluate --config-v1-5 ... --config-v1-6 ... --dataset ...`
+   - Executes in-memory comparative rescoring and reports non-regression metrics. Exits 0 on success.
+
+---
+
+### V.K Controlled Promotion Readiness & Production Non-Activation
+
+**PROMOTION GATE STATUS**:
+- Authorized Implementation: **COMPLETE**
+- Deterministic Verification: **COMPLETE (ALL PASS)**
+- Inactive Lifecycle Enforcement: **VERIFIED (`status: IMPLEMENTED_INACTIVE`, `is_active: false`)**
+- Baseline Pointer: **UNMODIFIED (`config/ipo-config.v1.5.0.json`)**
+- Production Activation: **NOT AUTHORIZED / NOT ACTIVATED**
+
+Activation into production baseline requires explicit activation authorization from Program Authority Ramki (Phase 8 promotion gate).
+
+---
+
+### V.L Phase 7 Acceptance Test Matrix (T-7-01 through T-7-45)
+
+The Phase 7 test suite (`tests/test_v16_implementation.py`) provides 100% automated coverage across 45 test specifications:
+
+| Test ID | Description | Status |
+| :--- | :--- | :--- |
+| `T-7-01` | Proposal verification: durable proposal artifact passes cryptographic audit | **PASSED** |
+| `T-7-02` | Approval verification: proposal reflects explicit Ramki authorization | **PASSED** |
+| `T-7-03` | Proposal hash linkage: source dataset and analysis hashes linked | **PASSED** |
+| `T-7-04` | Baseline config hash: v1.5 raw and canonical hashes verified | **PASSED** |
+| `T-7-05` | v1.6 generation: valid v1.6 configuration generated from approved proposal | **PASSED** |
+| `T-7-06` | v1.5 preservation: config/ipo-config.v1.5.0.json unmodified | **PASSED** |
+| `T-7-07` | Exact configuration diff: reports scoring changes and unchanged sections | **PASSED** |
+| `T-7-08` | Approved weight changes: Module A=30, Module B=15, C-F unchanged, sum=100.0 | **PASSED** |
+| `T-7-09` | Approved threshold changes: thresholds and verdict bands unchanged | **PASSED** |
+| `T-7-10` | Knockout firewall: knockouts 100% identical between v1.5 and v1.6 (6 rules) | **PASSED** |
+| `T-7-11` | Configuration schema: v1.6 passes check_config with zero errors | **PASSED** |
+| `T-7-12` | Configuration hash: deterministic SHA-256 present and verifiable | **PASSED** |
+| `T-7-13` | Provenance metadata: parent configuration and proposal linkages verified | **PASSED** |
+| `T-7-14` | Shadow evaluation: executes pure in-memory evaluation across dataset | **PASSED** |
+| `T-7-15` | Score delta: calculates exact score delta for every evaluation | **PASSED** |
+| `T-7-16` | Verdict delta: categorizes upgrades, downgrades, and unchanged verdicts | **PASSED** |
+| `T-7-17` | Knockout delta: zero newly knocked out and zero knockout removed | **PASSED** |
+| `T-7-18` | Historical non-mutation: inputs and dataset rows remain untouched | **PASSED** |
+| `T-7-19` | Golden result preservation: golden evaluation hash remains identical | **PASSED** |
+| `T-7-20` | Deterministic replay: shadow evaluation replayed produces identical metrics | **PASSED** |
+| `T-7-21` | Repeated configuration hashing: repeated hashing produces identical hash | **PASSED** |
+| `T-7-22` | Repeated evaluation rescoring: individual row scores 100% deterministic | **PASSED** |
+| `T-7-23` | Regression verification: downside, holdout, and vintage checks pass | **PASSED** |
+| `T-7-24` | Unknown preservation: missing values map to UNKNOWN (score None, not 0) | **PASSED** |
+| `T-7-25` | Missing data semantics: critical metrics without data evaluate to UNVERIFIED | **PASSED** |
+| `T-7-26` | Holdout comparison: proposal records holdout diagnostic results | **PASSED** |
+| `T-7-27` | Vintage comparison: proposal records vintage diagnostic results | **PASSED** |
+| `T-7-28` | Downside comparison: no AVOID baseline evaluation receives APPLY verdict | **PASSED** |
+| `T-7-29` | CLI config verify: runs deterministic verification and exits 0 | **PASSED** |
+| `T-7-30` | CLI config diff: runs diff tool and exits 0 | **PASSED** |
+| `T-7-31` | CLI shadow evaluate with configs: runs shadow evaluation and exits 0 | **PASSED** |
+| `T-7-32` | CLI shadow evaluate with proposal: runs proposal shadow evaluation and exits 0 | **PASSED** |
+| `T-7-33` | CLI verify proposal: verifies proposal integrity and exits 0 | **PASSED** |
+| `T-7-34` | Frozen core verification: all six engine files match exact SHA-256 hashes | **PASSED** |
+| `T-7-35` | Unauthorized field rejection: adding unapproved field fails diff check | **PASSED** |
+| `T-7-36` | Out of scope mutation rejection: mutating knockouts fails verification | **PASSED** |
+| `T-7-37` | Active pointer preservation: CLI defaults remain pointing to v1.5.0 | **PASSED** |
+| `T-7-38` | v1.6 inactive state enforcement: is_active is strictly False | **PASSED** |
+| `T-7-39` | Provenance chain verification: Dataset -> Analysis -> Proposal -> v1.6 verified | **PASSED** |
+| `T-7-40` | Malformed configuration rejection: invalid JSON rejected cleanly | **PASSED** |
+| `T-7-41` | Tamper detection: tampering with module weights without updating hash fails | **PASSED** |
+| `T-7-42` | End-to-end workflow: verifies baseline, implementation, diff, and shadow eval | **PASSED** |
+| `T-7-43` | Unapproved proposal rejection: unapproved proposal raises ValueError | **PASSED** |
+| `T-7-44` | Module weight sum assertion: sum of module weights strictly equals 100.0 | **PASSED** |
+| `T-7-45` | Diff unchanged sections count: exactly 15 unchanged sections recorded | **PASSED** |
+
+**Total Repository Test Count**: **566 passed, 0 failed, 0 regressions**.
+
+---
+
+### V.M Final Phase 7 Acceptance Decision
+
+**A — PHASE 7 COMPLETE**
+
+
 

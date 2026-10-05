@@ -714,9 +714,96 @@ Proposals are classified strictly according to sample size, temporal vintage cov
 
 ### 14.6 Overfitting Safeguards
 
+* **Overfitting Safeguards**:
 * **Development vs. Holdout Separation**: Candidates are formed exclusively on historical development partitions. Holdout partitions are evaluated strictly out-of-sample; tuning on holdout data is prohibited.
 * **Holdout Degradation Rejection**: If a candidate improves development metrics but materially degrades holdout performance, it is automatically rejected and logged in `rejected_candidates`.
 * **Knockout Firewall**: `knockout_proposals` strictly defaults to empty. Any alteration to knockout logic requires separate, explicit evidence and is flagged `REQUIRES_EXPLICIT_GOVERNANCE_REVIEW`.
+
+---
+
+## 15. Phase 7: Authorized v1.6 Implementation & Promotion Preparation
+
+Phase 7 establishes the controlled, authorized implementation of the Phase 6D calibration proposal approved by Program Authority Ramki into a production-candidate configuration (`config/ipo-config.v1.6.0.json`).
+
+```
++---------------------------------------------------------------------------------------------------+
+|                                  PHASE 7 GOVERNANCE LIFECYCLE                                    |
+|                                                                                                   |
+|  Phase 6D Proposal  -->  Explicit Ramki Approval  -->  v1.6 Implementation  --> Deterministic    |
+|  (Empirically gated)     (Durable artifact)            (status: INACTIVE)       Verification      |
+|                                                                                        |          |
+|                                                                                        v          |
+|  Controlled Promotion Readiness  <--  In-Memory Shadow Evaluation  <--  Frozen Core Verification  |
+|  (Awaiting explicit activation)       (Zero historical mutation)        (6 files sha256 match)    |
++---------------------------------------------------------------------------------------------------+
+```
+
+### 15.1 Configuration Lifecycle State
+
+The repository strictly preserves dual configuration states:
+* **Active Baseline**: `config/ipo-config.v1.5.0.json` remains the authoritative production configuration (`is_active: true`, CLI default).
+* **Authorized Candidate**: `config/ipo-config.v1.6.0.json` is implemented but marked inactive (`status: IMPLEMENTED_INACTIVE`, `is_active: false`).
+
+### 15.2 Configuration Verification Workflow
+
+To verify that the authorized v1.6 configuration strictly derives from the approved proposal and v1.5 baseline, satisfies all schema constraints, preserves the frozen core, and maintains provenance linkage:
+
+```bash
+python3 engine/tools/ipo_screen.py config verify \
+    --config config/ipo-config.v1.6.0.json \
+    --proposal config/calibration-proposal.v1.6.0.json \
+    --baseline config/ipo-config.v1.5.0.json \
+    [-o build/v16_verification_report.json] \
+    [-v]
+```
+
+### 15.3 Configuration Diff Workflow
+
+To inspect the exact machine-readable and human-readable difference between v1.5 baseline and v1.6 candidate:
+
+```bash
+python3 engine/tools/ipo_screen.py config diff \
+    --baseline config/ipo-config.v1.5.0.json \
+    --candidate config/ipo-config.v1.6.0.json \
+    [--proposal config/calibration-proposal.v1.6.0.json] \
+    [-o build/config_diff.json] \
+    [-v]
+```
+
+**Approved Diff Summary**:
+* `modules.A.max`: 25 -> 30 (+5 points reflecting stronger development rank correlation).
+* `modules.B.max`: 20 -> 15 (-5 points reflecting weaker development rank correlation).
+* Modules C, D, E, F: Unchanged (15, 15, 15, 10). Total = 100.0.
+* Thresholds & Verdict Bands: Unchanged.
+* Knockouts: Unchanged (zero mutations).
+* 15 Core Sections Unchanged: `currency`, `units`, `modes`, `profile_resolution`, `sector_overlays`, `structure_overlays`, `knockouts`, `penalties`, `caps`, `confidence`, `critical_data`, `validation`, `gcp`, `derived_metrics`, `peer_status`.
+
+### 15.4 v1.5 vs v1.6 Shadow Evaluation Workflow
+
+To run a comparative shadow rescoring of historical IPO evaluations under v1.6 against the active v1.5 baseline without mutating any stored records:
+
+```bash
+python3 engine/tools/ipo_screen.py post-listing shadow-evaluate \
+    --config-v1-5 config/ipo-config.v1.5.0.json \
+    --config-v1-6 config/ipo-config.v1.6.0.json \
+    --dataset build/backtest_dataset.json \
+    [-o build/v16_shadow_report.json] \
+    [-v]
+```
+
+### 15.5 Promotion Readiness Checklist
+
+Before activating v1.6 as the production baseline in a subsequent phase:
+1. [x] Phase 6D Proposal explicitly approved by Program Authority Ramki.
+2. [x] Durable approved proposal saved at `config/calibration-proposal.v1.6.0.json`.
+3. [x] v1.6 configuration implemented at `config/ipo-config.v1.6.0.json` with status `IMPLEMENTED_INACTIVE`.
+4. [x] Frozen Core files verified bit-for-bit identical (6 files SHA-256 matched).
+5. [x] Golden Result hash verified identical (`e84f8bc0...`).
+6. [x] CLI `config verify` passes with exit code 0.
+7. [x] Comparative shadow evaluation confirms downside protection and holdout stability.
+8. [x] Comprehensive test suite passes (566 passed, 0 failures).
+9. [ ] Explicit activation authorization from Ramki (Phase 8 promotion gate).
+
 
 
 

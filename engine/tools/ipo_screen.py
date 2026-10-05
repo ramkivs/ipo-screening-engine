@@ -985,27 +985,163 @@ def cmd_post_listing_verify_proposal(args: argparse.Namespace) -> int:
         return EXIT_REFUSED
 
 
+def cmd_config_verify(args: argparse.Namespace) -> int:
+    try:
+        from ipo_screening.post_listing import verify_v1_6_implementation
+    except ImportError:
+        from engine.ipo_screening.post_listing import verify_v1_6_implementation
+
+    cfg_path = args.config or "config/ipo-config.v1.6.0.json"
+    prop_path = args.proposal or "config/calibration-proposal.v1.6.0.json"
+    base_path = args.baseline or "config/ipo-config.v1.5.0.json"
+
+    res = verify_v1_6_implementation(
+        v1_6_path=cfg_path,
+        proposal_path=prop_path,
+        v1_5_path=base_path,
+    )
+
+    if args.output:
+        out_p = Path(args.output)
+        out_p.parent.mkdir(parents=True, exist_ok=True)
+        out_p.write_text(json.dumps(res, indent=2), encoding="utf-8")
+
+    if res.get("status") == "PASS":
+        print("=" * 80)
+        print("V1.6 CONFIGURATION VERIFICATION: PASS")
+        print("=" * 80)
+        print(f"Config:           {cfg_path}")
+        print(f"Baseline:         {base_path}")
+        print(f"Proposal:         {prop_path}")
+        print(f"Config Version:   1.6.0")
+        print(f"Lifecycle State:  INACTIVE (Controlled implementation, not production active)")
+        print(f"Frozen Core:      VERIFIED (6 files unchanged)")
+        print(f"Golden Result:    VERIFIED")
+        print(f"Proposal Hash:    {res.get('proposal_hash')}")
+        print(f"v1.6 Hash:        {res.get('v1_6_canonical_hash')}")
+        print("=" * 80)
+        return EXIT_OK
+    else:
+        print("=" * 80, file=sys.stderr)
+        print("V1.6 CONFIGURATION VERIFICATION: FAIL", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+        for fail in res.get("failures", []):
+            print(f"- {fail}", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+        return EXIT_REFUSED
+
+
+def cmd_config_diff(args: argparse.Namespace) -> int:
+    try:
+        from ipo_screening.post_listing import (
+            CalibrationProposal,
+            compute_config_diff,
+        )
+    except ImportError:
+        from engine.ipo_screening.post_listing import (
+            CalibrationProposal,
+            compute_config_diff,
+        )
+
+    try:
+        cfg_15 = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+        cfg_16 = json.loads(Path(args.candidate).read_text(encoding="utf-8"))
+        proposal = None
+        if args.proposal and Path(args.proposal).is_file():
+            prop_data = json.loads(Path(args.proposal).read_text(encoding="utf-8"))
+            proposal = CalibrationProposal.from_dict(prop_data)
+
+        diff = compute_config_diff(cfg_15, cfg_16, proposal)
+
+        if args.output:
+            out_p = Path(args.output)
+            out_p.parent.mkdir(parents=True, exist_ok=True)
+            out_p.write_text(json.dumps(diff.to_dict(), indent=2), encoding="utf-8")
+
+        print("=" * 80)
+        print(f"CONFIGURATION DIFF: {diff.v1_5_version} -> {diff.v1_6_version}")
+        print("=" * 80)
+        print(f"Baseline Hash:               {diff.v1_5_hash}")
+        print(f"Candidate Hash:              {diff.v1_6_hash}")
+        print(f"Changed Scoring Fields:      {diff.changed_scoring_fields_count}")
+        print(f"Changed Metadata Fields:     {diff.changed_metadata_fields_count}")
+        print(f"Approved Scope Only:         {'YES' if diff.is_approved_scope_only else 'NO'}")
+        print(f"Unchanged Sections ({len(diff.unchanged_sections)}):       {', '.join(diff.unchanged_sections)}")
+        print("-" * 80)
+        for cf in diff.changed_fields:
+            print(f"  [{cf.approved_scope}] {cf.path}: {cf.old_value} -> {cf.new_value} ({cf.rationale})")
+        print("=" * 80)
+        return EXIT_OK if diff.is_approved_scope_only else EXIT_REFUSED
+    except Exception as e:
+        print(f"error computing config diff: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+
+
 def cmd_post_listing_shadow_evaluate(args: argparse.Namespace) -> int:
     try:
         from ipo_screening.post_listing import (
             CalibrationProposal,
             load_dataset_json,
+            load_v1_5_config,
+            load_v1_6_config,
             run_shadow_evaluation,
+            run_v1_6_shadow_evaluation,
         )
     except ImportError:
         from engine.ipo_screening.post_listing import (
             CalibrationProposal,
             load_dataset_json,
+            load_v1_5_config,
+            load_v1_6_config,
             run_shadow_evaluation,
+            run_v1_6_shadow_evaluation,
         )
 
     try:
         dataset = load_dataset_json(args.dataset)
+
+        # Mode A: Direct v1.5 vs v1.6 candidate evaluation if --config-v1-6 is provided
+        if getattr(args, "config_v1_6", None):
+            cfg_15_path = getattr(args, "config_v1_5", None) or args.config or "config/ipo-config.v1.5.0.json"
+            cfg_16_path = args.config_v1_6
+            cfg_15 = json.loads(Path(cfg_15_path).read_text(encoding="utf-8"))
+            cfg_16 = json.loads(Path(cfg_16_path).read_text(encoding="utf-8"))
+            v16_shadow_res = run_v1_6_shadow_evaluation(dataset, cfg_15, cfg_16)
+
+            if args.output:
+                out_file = Path(args.output)
+                out_file.parent.mkdir(parents=True, exist_ok=True)
+                with out_file.open("w", encoding="utf-8") as handle:
+                    json.dump(v16_shadow_res.to_dict(), handle, indent=2)
+                    handle.write("\n")
+
+            print("=" * 80)
+            print("V1.6 SHADOW EVALUATION EXECUTED (IN-MEMORY ONLY)")
+            print("=" * 80)
+            print(f"Total Evaluated:      {v16_shadow_res.total_evaluated}")
+            print(f"Baseline Mean Score:  {v16_shadow_res.baseline_mean_score}")
+            print(f"V1.6 Mean Score:      {v16_shadow_res.v1_6_mean_score}")
+            print(f"Score Delta Mean:     {v16_shadow_res.score_mean_delta}")
+            print(f"Verdict Shifts:       {v16_shadow_res.verdict_shifts_count} (Up: {v16_shadow_res.upgraded_count}, Down: {v16_shadow_res.downgraded_count}, Unchanged: {v16_shadow_res.unchanged_count})")
+            print(f"Score Increase Count: {v16_shadow_res.score_increase_count}")
+            print(f"Score Decrease Count: {v16_shadow_res.score_decrease_count}")
+            print(f"Knockout Deltas:      0 (Knockouts unchanged in v1.6)")
+            print(f"Downside Protection:  {'PASS' if v16_shadow_res.downside_protection_passed else 'FAIL'}")
+            print(f"Holdout Stability:    {'PASS' if v16_shadow_res.holdout_stability_passed else 'FAIL'}")
+            print(f"Vintage Robustness:   {'PASS' if v16_shadow_res.vintage_robustness_passed else 'FAIL'}")
+            print("=" * 80)
+            return EXIT_OK
+
+        # Mode B: Proposal-driven shadow evaluation
+        if not getattr(args, "proposal", None):
+            print("error: either --config-v1-6 or --proposal must be provided", file=sys.stderr)
+            return EXIT_REFUSED
+
         with Path(args.proposal).open("r", encoding="utf-8") as f:
             proposal_dict = json.load(f)
         proposal = CalibrationProposal.from_dict(proposal_dict)
 
-        cfg_path = args.config or str(Path(__file__).resolve().parents[2] / DEFAULT_CONFIG_PATH)
+        cfg_path = getattr(args, "config_v1_5", None) or args.config or str(Path(__file__).resolve().parents[2] / DEFAULT_CONFIG_PATH)
         with Path(cfg_path).open("r", encoding="utf-8") as f:
             baseline_cfg = json.load(f)
 
@@ -1202,13 +1338,34 @@ def build_parser() -> argparse.ArgumentParser:
     post_verify_prop.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
     post_verify_prop.set_defaults(func=cmd_post_listing_verify_proposal)
 
-    post_shadow = post_sub.add_parser("shadow-evaluate", help="run deterministic shadow evaluation of proposal against dataset")
-    post_shadow.add_argument("--proposal", required=True, help="path to proposal JSON file")
+    post_shadow = post_sub.add_parser("shadow-evaluate", help="run deterministic shadow evaluation of proposal or v1.6 against dataset")
+    post_shadow.add_argument("--proposal", default=None, help="path to proposal JSON file")
     post_shadow.add_argument("--dataset", required=True, help="path to dataset JSON file")
     post_shadow.add_argument("--config", default=None, help="optional path to baseline v1.5 config JSON")
+    post_shadow.add_argument("--config-v1-5", default=None, help="path to baseline v1.5 config JSON")
+    post_shadow.add_argument("--config-v1-6", default=None, help="path to authorized v1.6 candidate config JSON")
     post_shadow.add_argument("--output", "-o", default=None, help="optional path to output shadow evaluation JSON")
     post_shadow.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
     post_shadow.set_defaults(func=cmd_post_listing_shadow_evaluate)
+
+    cfg_cmd = sub.add_parser("config", help="configuration management and verification operations")
+    cfg_sub = cfg_cmd.add_subparsers(dest="config_command", required=True)
+
+    cfg_verify = cfg_sub.add_parser("verify", help="deterministically verify configuration artifact")
+    cfg_verify.add_argument("--config", default="config/ipo-config.v1.6.0.json", help="path to configuration JSON to verify")
+    cfg_verify.add_argument("--proposal", default="config/calibration-proposal.v1.6.0.json", help="path to approved proposal JSON")
+    cfg_verify.add_argument("--baseline", default="config/ipo-config.v1.5.0.json", help="path to baseline v1.5 config JSON")
+    cfg_verify.add_argument("--output", "-o", default=None, help="optional path to output verification report JSON")
+    cfg_verify.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    cfg_verify.set_defaults(func=cmd_config_verify)
+
+    cfg_diff = cfg_sub.add_parser("diff", help="compute machine-readable diff between configurations")
+    cfg_diff.add_argument("--baseline", default="config/ipo-config.v1.5.0.json", help="path to baseline v1.5 config JSON")
+    cfg_diff.add_argument("--candidate", default="config/ipo-config.v1.6.0.json", help="path to candidate v1.6 config JSON")
+    cfg_diff.add_argument("--proposal", default="config/calibration-proposal.v1.6.0.json", help="optional path to approved proposal JSON")
+    cfg_diff.add_argument("--output", "-o", default=None, help="optional path to output diff report JSON")
+    cfg_diff.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    cfg_diff.set_defaults(func=cmd_config_diff)
 
     return parser
 

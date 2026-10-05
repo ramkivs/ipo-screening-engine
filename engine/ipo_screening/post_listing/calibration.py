@@ -58,6 +58,8 @@ class CalibrationObjective(str, Enum):
 class ApprovalStatus(str, Enum):
     """Approval boundary marker (Section 20)."""
     PENDING_HUMAN_REVIEW = "PENDING_HUMAN_REVIEW"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
     NOT_SUBMITTED = "NOT_SUBMITTED"
     INELIGIBLE = "INELIGIBLE"
 
