@@ -675,23 +675,31 @@ class EnrichmentEngine:
                 canonical["_sources"].append(src_ref)
                 existing_source_ids.add(src_ref["source_id"])
 
-            # Map subscription and GMP fields
-            for m_key, trac_key in (
-                ("qib_subscription", "qib_subscription"),
-                ("nii_subscription", "nii_subscription"),
-                ("retail_subscription", "retail_subscription"),
-                ("overall_subscription", "overall_subscription"),
-                ("gmp", "gmp"),
-                ("gmp_trend", "gmp_trend"),
-                ("anchor_quality", "anchor_quality"),
-                ("nifty_trend", "nifty_trend"),
-                ("listing_gains", "last_five_ipo_listing_gains"),
-            ):
-                if m_key in m_dict and m_dict[m_key] is not None:
-                    market[m_key] = m_dict[m_key]
-                    evidence[f"market.{m_key}"] = {
+            # Map subscription and GMP fields (supports both flat canonical and connector keys)
+            field_mappings = (
+                ("qib_subscription", ["qib_subscription", "qib_x"], "qib_subscription"),
+                ("nii_subscription", ["nii_subscription", "nii_x"], "nii_subscription"),
+                ("retail_subscription", ["retail_subscription", "retail_x"], "retail_subscription"),
+                ("overall_subscription", ["overall_subscription", "overall_x"], "overall_subscription"),
+                ("gmp", ["gmp", "gmp_rupees", "pct"], "gmp"),
+                ("gmp_trend", ["gmp_trend", "trend"], "gmp_trend"),
+                ("anchor_quality", ["anchor_quality", "quality"], "anchor_quality"),
+                ("nifty_trend", ["nifty_trend"], "nifty_trend"),
+                ("listing_gains", ["listing_gains", "last_ipo_listing_gains_pct"], "last_five_ipo_listing_gains"),
+            )
+
+            for target_key, candidate_keys, trac_key in field_mappings:
+                val = None
+                for ck in candidate_keys:
+                    if ck in m_dict and m_dict[ck] is not None:
+                        val = m_dict[ck]
+                        break
+
+                if val is not None:
+                    market[target_key] = val
+                    evidence[f"market.{target_key}"] = {
                         "source_id": src_ref["source_id"],
-                        "locator": f"Market Snapshot, '{m_key}'",
+                        "locator": f"Market Snapshot, '{target_key}'",
                         "extraction_method": ExtractionMethod.MARKET_DATA.value,
                     }
                     traceability[trac_key] = FieldDisposition.ASSEMBLED.value

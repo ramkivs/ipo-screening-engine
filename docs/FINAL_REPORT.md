@@ -1524,12 +1524,192 @@ Phase 5H authors 14 deterministic JSON fixtures in `fixtures/connectors/` coveri
 **Final Phase 5H Status: PASS**
 ---
 
+## P. Phase 5I — CLI Integration
+
+### P.1 Investigation & Baseline Architecture
+
+Prior to Phase 5I, `engine/tools/ipo_screen.py` supported core evaluation commands (`run`, `replay`, `verify`, `project`, `check-config`) and raw PDF extraction (`extract`), but lacked unified orchestration for the Phase 5F Price Band Notice ingestion, Phase 5G pre-score enrichment, and Phase 5H external connector feeds. Users had no single CLI entry point to assemble or enrich prospectuses without invoking internal Python APIs.
+
+- **Current CLI**: `engine/tools/ipo_screen.py` utilizing standard library `argparse`.
+- **Current Gap**: Missing `--enrich` orchestration flag on `extract` and missing standalone `assemble` command.
+- **Minimum Required Change**:
+  1. Add `--enrich` with `--notice`, `--supplemental`, `--market`, `--peers`, `--analyst`, and `--allow-fixture-fallbacks` options to `extract`.
+  2. Implement `assemble` subparser to coordinate existing `EnrichmentEngine.assemble(...)` without re-extracting PDFs.
+  3. Wire fail-closed exit semantics and secret sanitization on output and error paths.
+
+```
++-----------------------------------------------------------------------------------------+
+|                                  CLI ENTRY POINTS                                       |
+|    +--------------------------------------+   +------------------------------------+    |
+|    |      ipo_screen extract --enrich     |   |         ipo_screen assemble        |    |
+|    |      (PDF Extraction + Enrichment)   |   |     (Pre-extracted Input Assembly) |    |
+|    +------------------+-------------------+   +-----------------+------------------+    |
++-----------------------|-----------------------------------------|-----------------------+
+                        |                                         |
+                        v                                         v
+            +-----------------------+                 +-----------------------+
+            | DocumentExtractor     |                 | Load Base Input JSON  |
+            +-----------+-----------+                 +-----------+-----------+
+                        |                                         |
+                        +--------------------+--------------------+
+                                             |
+                                             v
+                             +-------------------------------+
+                             | Ingest Supplementary Feeds    |
+                             | - PriceBandNoticeParser       |
+                             | - ConnectorCoordinator        |
+                             | - Supplemental / Analyst JSON |
+                             +---------------+---------------+
+                                             |
+                                             v
+                             +-------------------------------+
+                             |   EnrichmentEngine.assemble   |
+                             |  (Precedence, Derivations)    |
+                             +---------------+---------------+
+                                             |
+                                             v
+                             +-------------------------------+
+                             |    Canonical Input JSON       |
+                             |   (Schema-Compliant v1.5)     |
+                             +---------------+---------------+
+                                             |
+                         +-------------------+-------------------+
+                         |                                       |
+                         v                                       v
+            +-------------------------+             +-------------------------+
+            | Write Output Artifact   |             | Optional: --run         |
+            | (Sanitized JSON)        |             | (Frozen Evaluation Core)|
+            +-------------------------+             +-------------------------+
+```
+
+### P.2 Implemented CLI Commands & Exact Syntax
+
+Phase 5I implements two primary orchestration commands without duplicating any underlying business logic:
+
+#### 1. `extract --enrich`
+Extracts raw data from an RHP/DRHP PDF, ingests an authoritative Price Band Notice, normalizes supplemental and external market feeds, and assembles the canonical input document.
+
+**Syntax**:
+```bash
+python3 engine/tools/ipo_screen.py extract <pdf_path> \
+    --enrich \
+    [--notice <pbn_path_or_text>] \
+    [--supplemental <supp_json_path>] \
+    [--market <market_json_path>] \
+    [--peers <peer_json_path>] \
+    [--analyst <analyst_json_path>] \
+    [--mode {preliminary,final}] \
+    [--output <canonical_output_json>] \
+    [--run] [--at <iso_timestamp>]
+```
+
+#### 2. `assemble`
+Takes an already-extracted base canonical JSON and deterministically enriches it with Price Band Notice, market, peer, and analyst data using `EnrichmentEngine.assemble(...)`.
+
+**Syntax**:
+```bash
+python3 engine/tools/ipo_screen.py assemble <base_input_json> \
+    [--notice <pbn_path_or_text>] \
+    [--supplemental <supp_json_path>] \
+    [--market <market_json_path>] \
+    [--peers <peer_json_path>] \
+    [--analyst <analyst_json_path>] \
+    [--mode {preliminary,final}] \
+    [--output <canonical_output_json>] \
+    [--run] [--at <iso_timestamp>]
+```
+
+### P.3 Pipeline Orchestration & Layer Separation
+
+The CLI acts purely as an orchestration boundary:
+- **Zero Duplicated Logic**: Derivations, source precedence, reconciliation tolerances, and schema validations are strictly delegated to `EnrichmentEngine`, `PriceBandNoticeParser`, `ConnectorCoordinator`, and `evaluate`.
+- **Price Band Notice Integration**: The `--notice` argument accepts PDF files, text notices, JSON payloads, or direct notice strings, automatically parsed via `PriceBandNoticeParser`.
+- **Connector Integration**: External feeds passed via `--market` or `--peers` are normalized and reconciled through `ConnectorCoordinator` and mapped to canonical `_sources` and `market` blocks.
+- **Fail-Closed Preliminary vs. Final Semantics**:
+  - `preliminary` mode permits missing pricing and external feeds; missing values evaluate to `None`/`UNKNOWN`.
+  - `final` mode fails closed (`EXIT_REFUSED` = 1) if mandatory pricing mechanics (`price_band_high`, `lot_size`) or verified notice documents are absent.
+
+### P.4 Deterministic Exit Codes & Error Handling
+
+The CLI conforms to the established engine exit conventions:
+- `EXIT_OK (0)`: Operation succeeded.
+- `EXIT_REFUSED (1)`: Validation, enrichment, collar check, or schema failure (e.g. invalid collar spread $> 20\%$, missing pricing in final mode, corrupted payload).
+- `EXIT_USAGE (2)`: Command-line syntax error, missing required arguments, or unknown subcommands.
+- `EXIT_AUDIT_MISMATCH (3)`: Audit hash mismatch on replay/verify.
+
+All exceptions (`EngineError`, `EnrichmentError`, `ConnectorError`, `ValueError`, `FileNotFoundError`) are caught at the entry boundary. Secret tokens, credentials, and API keys are scrubbed before printing actionable error messages to `sys.stderr`.
+
+### P.5 Secret Hygiene & Hardcoded Defaults Elimination
+
+- **Secret Redaction**: Every output written via `--output` and every log message emitted to stdout/stderr is filtered through `sanitize_credentials(...)`. Sensitive keys (`api_key`, `authorization_header`, `password`, `token`) are masked as `"***REDACTED***"`.
+- **No Hidden Defaults (Section 15 & 30)**: CLI execution never injects Vishal Nirmiti fixture fallbacks (`208`, `220`, `68`, `9.46`, `85.33`). Missing fields evaluate strictly to `None` unless `--allow-fixture-fallbacks` is explicitly requested.
+
+### P.6 End-to-End Test Suite & Golden Hash Compatibility
+
+A dedicated integration test suite in `tests/test_cli_phase5i.py` covers all 23 required test scenarios:
+1. `test_cli_help`: Validates CLI help text across main, extract, and assemble parsers.
+2. `test_invalid_command`: Unrecognized subcommand exits with code 2.
+3. `test_missing_required_source`: Missing required positional arguments exit with code 2.
+4. `test_rhp_extraction_invocation`: Validates PDF extraction produces valid canonical JSON.
+5. `test_extract_enrich_happy_path`: End-to-end extraction and enrichment with PBN notice.
+6. `test_price_band_notice_integration`: Verifies PBN notice overrides `[●]` placeholders.
+7. `test_supplemental_enrichment_integration`: Verifies Phase 5E contract ingestion.
+8. `test_external_snapshot_integration`: Ingests market and peer feeds into assembled output.
+9. `test_preliminary_mode`: Preliminary mode permits missing pricing without score fabrication.
+10. `test_final_mode`: Final mode succeeds when verified pricing is present.
+11. `test_final_mode_missing_price_notice_fails_closed`: Final mode exits with code 1 when notice is absent.
+12. `test_stale_external_data`: Stale feeds are flagged and handled without fabricating currency.
+13. `test_malformed_external_data`: Malformed inputs fail closed with code 1.
+14. `test_conflicting_external_sources`: Contradictory notice (> 20% collar spread) fails closed with code 1.
+15. `test_unknown_preservation`: Missing fields remain `None`/null, never coerced to 0 or true.
+16. `test_genuine_zero_preservation`: Genuine 0.0 values (0.0x subscription) are preserved.
+17. `test_deterministic_repeat_execution`: Successive invocations produce byte-identical JSON outputs.
+18. `test_output_artifact_creation`: Verifies `--output` writes valid, formatted JSON.
+19. `test_error_exit_behavior`: Actionable errors printed without dumping raw stack traces.
+20. `test_secret_redaction`: Verifies secrets are never printed or saved into canonical outputs.
+21. `test_hardcoded_default_regression`: Proves 208, 220, 68, 9.46, 85.33 never default.
+22. `test_frozen_core_integrity`: Proves evaluation core files have zero git modifications.
+23. `test_golden_evaluation_regression`: CLI evaluation on Vishal Nirmiti golden input produces exact frozen result hash.
+
+#### Complete Test Suite Results
+- Baseline Tests: 322 passed
+- New Phase 5I Tests: 23 passed in `tests/test_cli_phase5i.py`
+- Total Passing Tests: **345 passed** across all test suites in 130.87s.
+- Deterministic Golden Hash: `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` strictly preserved.
+
+### P.7 Phase 5I Gate Reconciliation Checklist
+
+- [PASS] Baseline commit/tree verified (`f8ed0ba` / `c213de0`)
+- [PASS] Ramki standing authorization applied
+- [PASS] Current CLI investigation completed and gaps recorded
+- [PASS] `extract --enrich` command implemented in `engine/tools/ipo_screen.py`
+- [PASS] `assemble` command implemented in `engine/tools/ipo_screen.py`
+- [PASS] CLI functions as an orchestration boundary only (0 business logic duplicated)
+- [PASS] Price Band Notice component integrated (`PriceBandNoticeParser`)
+- [PASS] Pre-score enrichment engine integrated (`EnrichmentEngine.assemble`)
+- [PASS] External connector layer integrated (`ConnectorCoordinator`)
+- [PASS] Preliminary mode (null prices allowed) vs. Final mode (fails closed) enforced
+- [PASS] Deterministic exit codes enforced (0 success, 1 refused, 2 usage error)
+- [PASS] Fail-closed UNKNOWN semantics preserved (no 208, 220, 68, 9.46, 85.33 defaults)
+- [PASS] Secret hygiene and credential sanitization verified at CLI level
+- [PASS] Deterministic repeated execution verified (byte-identical artifacts)
+- [PASS] Frozen evaluation core untouched (`derived.py`, `scoring.py`, `knockouts.py`, `snapshots.py`, `evaluation.py`)
+- [PASS] Phase 5F parser untouched (`price_band_notice.py`)
+- [PASS] Golden result hash strictly preserved (`e84f8bc0...`)
+- [PASS] All 322 baseline tests pass
+- [PASS] All 23 new Phase 5I tests pass (345 total tests)
+- [PASS] No UI or browser memory mutations
+- [PASS] No merge to `main`
+
+**Final Phase 5I Status: PASS**
+---
+
 **Awaiting decision, not implementation:** H1 (GCP reference fixture sign-off),
 H2 (EPC versus real estate).
 
 **Delivery & Remote Status:** PR #3 is open on GitHub against `main` from head
 `arena/ipo-screening-engine-v1.5`.
-All 322 tests green (307 baseline + 15 Phase 5H), golden hash frozen, main strictly protected.
+All 345 tests green (322 baseline + 23 Phase 5I), golden hash frozen, main strictly protected.
 
 No merge to `main`. No production deployment.
 

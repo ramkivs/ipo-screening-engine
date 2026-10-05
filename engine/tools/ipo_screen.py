@@ -50,10 +50,22 @@ if __package__ in (None, ""):  # allow `python3 engine/tools/ipo_screen.py`
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from ipo_screening.config_validation import check_config, compile_config  # noqa: E402
+from ipo_screening.connectors import (  # noqa: E402
+    ConnectorError,
+    sanitize_credentials,
+)
+from ipo_screening.enrichment_engine import (  # noqa: E402
+    EnrichmentEngine,
+    EnrichmentError,
+    FieldDisposition,
+)
 from ipo_screening.errors import EngineError  # noqa: E402
 from ipo_screening.evaluation import EvaluationStore  # noqa: E402
 from ipo_screening.excel import SHEET_ORDER, project  # noqa: E402
 from ipo_screening.extraction import DocumentExtractor  # noqa: E402
+from ipo_screening.extraction.price_band_notice import (  # noqa: E402
+    PriceBandNoticeParser,
+)
 from ipo_screening.pipeline import load_config, replay  # noqa: E402
 from ipo_screening.version import (  # noqa: E402
     DEFAULT_CONFIG_PATH,
@@ -86,6 +98,37 @@ def parse_instant(text: str | None) -> datetime:
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
     return moment.astimezone(timezone.utc)
+
+
+def load_notice(notice_arg: str | None) -> Any:
+    """Load or parse Price Band Notice from file path, JSON, or text string."""
+    if not notice_arg:
+        return None
+    p = Path(notice_arg)
+    parser = PriceBandNoticeParser()
+    if p.exists() and p.is_file():
+        if p.suffix.lower() == ".pdf":
+            return parser.parse_from_pdf(p)
+        text = p.read_text(encoding="utf-8")
+        if p.suffix.lower() == ".json":
+            try:
+                data = json.loads(text)
+                if isinstance(data, dict) and "price_band_high" in data:
+                    return data
+            except Exception:
+                pass
+        return parser.parse_from_text(text)
+    return parser.parse_from_text(notice_arg)
+
+
+def load_json_or_file(arg: str | None) -> Optional[dict]:
+    """Load dictionary from JSON file path or inline JSON string."""
+    if not arg:
+        return None
+    p = Path(arg)
+    if p.exists() and p.is_file():
+        return json.loads(p.read_text(encoding="utf-8"))
+    return json.loads(arg)
 
 
 def fmt_score(value: float | None) -> str:
@@ -315,9 +358,21 @@ def cmd_extract(args: argparse.Namespace) -> int:
         print(f"error: PDF file not found: {pdf_path}", file=sys.stderr)
         return EXIT_REFUSED
 
+    is_enrich = getattr(args, "enrich", False)
+    allow_fallbacks_arg = getattr(args, "allow_fixture_fallbacks", None)
+    if allow_fallbacks_arg is not None:
+        allow_fallbacks = allow_fallbacks_arg
+    else:
+        # Strict fail-closed UNKNOWN when enriching, backward-compatible for templates
+        allow_fallbacks = False if is_enrich else (True if getattr(args, "template", None) else False)
+
     extractor = DocumentExtractor()
     template_path = getattr(args, "template", None)
-    canonical, report = extractor.extract_from_pdf(pdf_path, reference_base_path=template_path)
+    canonical, report = extractor.extract_from_pdf(
+        pdf_path,
+        reference_base_path=template_path,
+        allow_fixture_fallbacks=allow_fallbacks,
+    )
 
     print("extraction summary")
     print(f"  document uri     {report.source.uri}")
@@ -327,10 +382,46 @@ def cmd_extract(args: argparse.Namespace) -> int:
     print(f"  fields extracted {report.field_count} ({report.verified_count} verified, {report.unknown_count} unknown)")
     print(f"  time             {report.metadata.get('execution_time_seconds')}s")
 
+    if is_enrich:
+        pbn = load_notice(getattr(args, "notice", None))
+        supp = load_json_or_file(getattr(args, "supplemental", None))
+        market = load_json_or_file(getattr(args, "market", None))
+        peers = load_json_or_file(getattr(args, "peers", None))
+        analyst = load_json_or_file(getattr(args, "analyst", None))
+
+        result = EnrichmentEngine.assemble(
+            base_input=canonical,
+            price_band_notice=pbn,
+            supplemental=supp,
+            market_snapshot=market,
+            peer_snapshot=peers,
+            analyst_assessment=analyst,
+            mode=args.mode,
+        )
+        canonical = result.canonical_input
+
+        print()
+        print("enrichment summary")
+        print(f"  company name     {canonical.get('company_name')}")
+        print(f"  ipo id           {canonical.get('ipo_id')}")
+        print(f"  mode             {result.mode}")
+        pb_high = canonical.get("issue", {}).get("price_band_high")
+        pb_low = canonical.get("issue", {}).get("price_band_low")
+        lot = canonical.get("issue", {}).get("lot_size")
+        print(f"  price band       Rs. {pb_low} - {pb_high} (lot: {lot})")
+        print(f"  derivations      {len(result.derivations)} computed")
+        for dpath, df in sorted(result.derivations.items()):
+            rec_str = f"reconciled={df.reconciled_with_source}" if df.reconciled_with_source is not None else "new"
+            print(f"    {dpath:<32} {df.value} ({rec_str})")
+        assembled_count = sum(1 for v in result.field_traceability.values() if v == FieldDisposition.ASSEMBLED.value)
+        unknown_count = sum(1 for v in result.field_traceability.values() if v == FieldDisposition.UNKNOWN.value)
+        print(f"  fields           {assembled_count} assembled, {unknown_count} unknown")
+
     if getattr(args, "output", None):
         out_path = Path(args.output)
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(canonical, indent=2), encoding="utf-8")
+        sanitized = sanitize_credentials(canonical)
+        out_path.write_text(json.dumps(sanitized, indent=2), encoding="utf-8")
         print(f"  canonical json   {out_path}")
 
     if getattr(args, "run", False):
@@ -339,6 +430,71 @@ def cmd_extract(args: argparse.Namespace) -> int:
         store = EvaluationStore(args.store) if args.store else None
         outcome = evaluate(
             canonical,
+            config,
+            mode=args.mode,
+            evaluation_datetime=instant,
+            store=store,
+            workbook_path=args.workbook,
+        )
+        print()
+        print_run_report(outcome, verbose=args.verbose)
+
+    return EXIT_OK
+
+
+def cmd_assemble(args: argparse.Namespace) -> int:
+    input_path = Path(args.input)
+    if not input_path.exists():
+        print(f"error: input file not found: {input_path}", file=sys.stderr)
+        return EXIT_REFUSED
+
+    base_input = json.loads(input_path.read_text(encoding="utf-8"))
+
+    pbn = load_notice(getattr(args, "notice", None))
+    supp = load_json_or_file(getattr(args, "supplemental", None))
+    market = load_json_or_file(getattr(args, "market", None))
+    peers = load_json_or_file(getattr(args, "peers", None))
+    analyst = load_json_or_file(getattr(args, "analyst", None))
+
+    result = EnrichmentEngine.assemble(
+        base_input=base_input,
+        price_band_notice=pbn,
+        supplemental=supp,
+        market_snapshot=market,
+        peer_snapshot=peers,
+        analyst_assessment=analyst,
+        mode=args.mode,
+    )
+
+    print("assembly summary")
+    print(f"  company name     {result.canonical_input.get('company_name')}")
+    print(f"  ipo id           {result.canonical_input.get('ipo_id')}")
+    print(f"  mode             {result.mode}")
+    pb_high = result.canonical_input.get("issue", {}).get("price_band_high")
+    pb_low = result.canonical_input.get("issue", {}).get("price_band_low")
+    lot = result.canonical_input.get("issue", {}).get("lot_size")
+    print(f"  price band       Rs. {pb_low} - {pb_high} (lot: {lot})")
+    print(f"  derivations      {len(result.derivations)} computed")
+    for dpath, df in sorted(result.derivations.items()):
+        rec_str = f"reconciled={df.reconciled_with_source}" if df.reconciled_with_source is not None else "new"
+        print(f"    {dpath:<32} {df.value} ({rec_str})")
+    assembled_count = sum(1 for v in result.field_traceability.values() if v == FieldDisposition.ASSEMBLED.value)
+    unknown_count = sum(1 for v in result.field_traceability.values() if v == FieldDisposition.UNKNOWN.value)
+    print(f"  fields           {assembled_count} assembled, {unknown_count} unknown")
+
+    if getattr(args, "output", None):
+        out_path = Path(args.output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        sanitized = sanitize_credentials(result.canonical_input)
+        out_path.write_text(json.dumps(sanitized, indent=2), encoding="utf-8")
+        print(f"  canonical json   {out_path}")
+
+    if getattr(args, "run", False):
+        config = load_config(args.config)
+        instant = parse_instant(args.at)
+        store = EvaluationStore(args.store) if args.store else None
+        outcome = evaluate(
+            result.canonical_input,
             config,
             mode=args.mode,
             evaluation_datetime=instant,
@@ -403,6 +559,20 @@ def build_parser() -> argparse.ArgumentParser:
     ext.add_argument("pdf", help="path to RHP/DRHP PDF")
     ext.add_argument("--template", "--reference", default=None,
                      help="path to reference template JSON for secondary/tracker data")
+    ext.add_argument("--enrich", action="store_true",
+                     help="enrich extracted document using Price Band Notice and supplemental data")
+    ext.add_argument("--notice", "--pbn", default=None,
+                     help="path to Price Band Notice file (PDF, text, JSON) or text content")
+    ext.add_argument("--supplemental", "--supp", default=None,
+                     help="path to supplemental enrichment JSON contract")
+    ext.add_argument("--market", default=None,
+                     help="path to market demand and GMP snapshot JSON")
+    ext.add_argument("--peers", default=None,
+                     help="path to peer valuation snapshot JSON")
+    ext.add_argument("--analyst", default=None,
+                     help="path to analyst assessment JSON")
+    ext.add_argument("--allow-fixture-fallbacks", action="store_true", default=None,
+                     help="allow test fixture fallbacks (default: False when enriching)")
     ext.add_argument("--output", "-o", default=None,
                      help="path to save generated canonical JSON")
     ext.add_argument("--run", action="store_true",
@@ -420,6 +590,35 @@ def build_parser() -> argparse.ArgumentParser:
     ext.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
     ext.set_defaults(func=cmd_extract)
 
+    asm = sub.add_parser("assemble", help="deterministically assemble canonical JSON from raw inputs and enrichment feeds")
+    asm.add_argument("input", help="path to raw canonical input JSON")
+    asm.add_argument("--notice", "--pbn", default=None,
+                     help="path to Price Band Notice file (PDF, text, JSON) or text content")
+    asm.add_argument("--supplemental", "--supp", default=None,
+                     help="path to supplemental enrichment JSON contract")
+    asm.add_argument("--market", default=None,
+                     help="path to market demand and GMP snapshot JSON")
+    asm.add_argument("--peers", default=None,
+                     help="path to peer valuation snapshot JSON")
+    asm.add_argument("--analyst", default=None,
+                     help="path to analyst assessment JSON")
+    asm.add_argument("--mode", default="final",
+                     choices=["preliminary", "final", "post_listing_1w",
+                              "post_listing_1m", "post_listing_6m"],
+                     help="evaluation mode (default: final)")
+    asm.add_argument("--output", "-o", default=None,
+                     help="path to save assembled canonical JSON")
+    asm.add_argument("--run", action="store_true",
+                     help="immediately evaluate the assembled canonical JSON")
+    asm.add_argument("--at", default=None,
+                     help="evaluation instant, ISO 8601 when --run is specified")
+    asm.add_argument("--store", default=None,
+                     help="evaluation store root when --run is specified")
+    asm.add_argument("--workbook", default=None,
+                     help="path to IPO_Screening_History.xlsx when --run is specified")
+    asm.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
+    asm.set_defaults(func=cmd_assemble)
+
     return parser
 
 
@@ -430,14 +629,16 @@ def main(argv: list[str] | None = None) -> int:
         args.config = str(Path(__file__).resolve().parents[2] / DEFAULT_CONFIG_PATH)
     try:
         return int(args.func(args))
-    except EngineError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+    except (EngineError, EnrichmentError, ConnectorError) as exc:
+        safe_msg = sanitize_credentials(str(exc))
+        print(f"error: {safe_msg}", file=sys.stderr)
         for finding in getattr(exc, "findings", []) or []:
             location = f" [{finding.location}]" if finding.location else ""
             print(f"  {finding.code}{location}: {finding.message}", file=sys.stderr)
         return EXIT_REFUSED
-    except ValueError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+    except (ValueError, FileNotFoundError, json.JSONDecodeError) as exc:
+        safe_msg = sanitize_credentials(str(exc))
+        print(f"error: {safe_msg}", file=sys.stderr)
         return EXIT_REFUSED
 
 
