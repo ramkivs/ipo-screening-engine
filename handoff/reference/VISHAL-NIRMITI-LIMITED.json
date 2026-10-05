@@ -1,0 +1,157 @@
+{
+ "ipo_id": "VISHAL-NIRMITI-LIMITED",
+ "company_name": "Vishal Nirmiti Limited",
+ "board": "mainboard",
+ "icdr_route": "6(1)",
+ "sector_profile": "standard",
+ "issue": {
+  "fresh_issue": 14500,
+  "quota_pct": {
+   "qib": 1,
+   "nii": 29,
+   "retail": 70
+  },
+  "ofs_sellers": [
+   {
+    "name": "Vaman Prestressing Company Private Limited",
+    "type": "promoter_group",
+    "pre_issue_shares": "1500000",
+    "shares_sold": 1500000
+   }
+  ],
+  "price_band_high": 220,
+  "price_band_low": 208,
+  "lot_size": 68,
+  "fresh_shares": 6590909,
+  "post_issue_shares": 26390909,
+  "ofs": 3300,
+  "post_issue_eps": 9.46,
+  "open_date": "2026-09-30",
+  "close_date": "2026-10-05"
+ },
+ "financials": {
+  "reporting_unit": "INR_LAKHS",
+  "periods": [
+   {
+    "fy": "FY2024",
+    "revenue": 24288.2,
+    "pat": 344.56,
+    "net_worth": 3856.33,
+    "total_debt": 9175.29,
+    "cfo": 2773.05,
+    "capex": 1844.47,
+    "cash_and_equivalents": 23.16,
+    "receivable_days": 55.9,
+    "interest_expense": 1444.07,
+    "ebit": 1397.46,
+    "ebitda": 2314.25
+   },
+   {
+    "fy": "FY2025",
+    "revenue": 31851.62,
+    "pat": 2363.59,
+    "net_worth": 6156.22,
+    "total_debt": 8805.15,
+    "cfo": 3820.17,
+    "capex": 3832.83,
+    "cash_and_equivalents": 19.73,
+    "receivable_days": 53.9,
+    "interest_expense": 1421.72,
+    "ebit": 3901.45,
+    "ebitda": 4648.35
+   },
+   {
+    "fy": "FY2026",
+    "revenue": 33867.73,
+    "pat": 2497.5,
+    "net_worth": 8678.35,
+    "total_debt": 8741.7,
+    "cfo": 2715.47,
+    "capex": 3528.88,
+    "cash_and_equivalents": 16.55,
+    "receivable_days": 68.1,
+    "disclosed_roce_pct": 28.02,
+    "interest_expense": 1504.04,
+    "ebit": 4336.43,
+    "ebitda": 5112.96
+   }
+  ],
+  "contingent_liabilities": 2186.64
+ },
+ "capital_structure": {
+  "promoter_pre_pct": 73.42,
+  "pre_ipo_placements": [],
+  "promoter_post_pct": 49.4,
+  "promoter_pledge_pct": 0,
+  "promoter_lockin_in_place": true,
+  "discounted_allotments_18m_before_drhp": false
+ },
+ "use_of_proceeds": [
+  {
+   "category": "working_capital",
+   "amount": 7500
+  },
+  {
+   "category": "debt_repayment",
+   "amount": 1900
+  },
+  {
+   "category": "gcp",
+   "amount": 3625
+  }
+ ],
+ "governance": {
+  "auditor_opinion": "emphasis_of_matter",
+  "litigation_bucket": "criminal_or_regulatory",
+  "sebi_ed_action_active": false,
+  "rpt_pct_revenue": 6.67,
+  "board_independent_majority": false,
+  "kmp_exits_2y": 0
+ },
+ "business": {
+  "industry_cagr_pct": 3.8,
+  "top5_customer_pct": 85.33,
+  "moat_rating": "strong_niche",
+  "visibility_rating": "strong"
+ },
+ "peers": [
+  {
+   "name": "GPT Infraprojects Limited",
+   "pe": 14.83,
+   "as_of": "2026-07-23",
+   "pb": 2.73,
+   "roe_pct": 18.25
+  },
+  {
+   "name": "Indian Hume Pipe Company Limited",
+   "pe": 13.86,
+   "as_of": "2026-07-23",
+   "pb": 1.32,
+   "roe_pct": 9.51
+  }
+ ],
+ "recent_sector_ipos": [],
+ "market": {
+  "anchor": {
+   "as_of": "2026-10-04T19:26:01.569Z",
+   "quality": "unknown"
+  },
+  "subscription": {
+   "as_of": "2026-10-04T19:26:01.569Z",
+   "qib_x": 1,
+   "nii_x": 0.34,
+   "retail_x": 0.16,
+   "overall_x": 0.22
+  },
+  "gmp": {
+   "as_of": "2026-10-04T19:26:01.569Z",
+   "pct": 15.91,
+   "trend": "flat"
+  },
+  "regime": {
+   "as_of": "2026-10-04T19:26:01.569Z",
+   "nifty_trend": "supportive",
+   "last_ipo_listing_gains_pct": []
+  }
+ }
+}
