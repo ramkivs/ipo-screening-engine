@@ -887,11 +887,110 @@ Every required output of the Phase 5D investigation is verified:
 **Final Phase 5D Status: PASS**
 ---
 
+## Phase 5E — Contract & Schema Preparation Implementation Record
+
+### L.1 Purpose & Execution Authority
+
+Phase 5E implements the governed pre-score enrichment contract and source-type mapping required for future Phase 5F–5J implementation under explicit authorization from Ramki:
+- **Contract & Schema Preparation**: Establishes `schema/supplemental-enrichment.v1.schema.json` as a standalone, versioned JSON Schema (Draft 2020-12) for non-RHP inputs.
+- **Backward-Compatible Source Mapping**: Codifies source classification without mutating the frozen `schema/ipo-input.v1.5.schema.json`.
+- **Source vs. Derived Separation**: Establishes strict data-contract distinctions between raw source facts and calculated structural derivations.
+- **Fail-Closed UNKNOWN Semantics**: Replaces ad-hoc fallbacks with schema-level fail-closed nullability.
+- **Frozen Scoring Core**: Zero semantic changes to `derived.py`, `scoring.py`, `knockouts.py`, `snapshots.py`, or `evaluation.py`. Golden hash `e84f8bc0...` remains untouched.
+
+### L.2 Supplemental Enrichment Contract Design
+
+The enrichment contract (`supplemental-enrichment.v1`) defines the interchange format for non-RHP data entering upstream of the canonical builder:
+
+| Component | Target Fields | Provenance Attributes | Validation Invariant |
+|---|---|---|---|
+| **Sources Registry** (`sources`) | Source identity, type, URI, SHA-256 digest, timestamps | `source_id`, `source_type`, `uri`, `content_hash`, `source_timestamp`, `retrieval_timestamp`, `note` | Minimum 1 valid source; valid enum type; optional classification note. |
+| **Price Band Facts** (`price_band`) | `price_band_high`, `price_band_low`, `lot_size`, `open_date`, `close_date` | `source_id`, `locator`, `page`, `section`, `quote`, `extraction_method`, `verification`, `confidence` | Must be raw source facts; `extraction_method` cannot be `DERIVED`; null represents UNKNOWN. |
+| **Market Data** (`market_data`) | Bidding subscriptions (`qib_x`, `nii_x`, `retail_x`, `overall_x`), GMP %, GMP trend, Nifty trend, anchor quality | `as_of`, `source_id`, `extraction_method`, `verification` | Strict timestamping (`as_of`); validated enums; secondary trackers default `UNVERIFIED`. |
+| **Peer Multiples** (`peer_data`) | Secondary market multiples (`pe`, `ev_ebitda`, `pb`, `ps`, `roe_pct`, `roa_pct`) | `as_of`, `source_id` | Validated multiple numbers; timestamped for snapshot classification. |
+| **Analyst Assessment** (`analyst_assessment`) | `moat_rating`, `visibility_rating` | `assessed_by`, `assessment_timestamp`, `assessment_note`, `verification`, `source_id` | Tier-4 judgment; mandatory analyst attribution; verification forced to `UNVERIFIED`. |
+| **Derived Quantities** (`derived`) | `fresh_shares`, `post_issue_shares`, `ofs_amount`, `post_issue_eps`, `promoter_post_pct` | `is_derived: true`, `formula`, `dependencies`, `calculated_value`, `unit` | Mandatory `formula` and `dependencies`; explicitly separated from source facts. |
+
+### L.3 Source-Type Mapping & v1.5 Compatibility
+
+To avoid mutating the frozen v1.5 canonical schema or forcing an uncontrolled bump to v1.6, Phase 5E implements the backward-compatible source-type mapping codified in `engine/ipo_screening/enrichment_contract.py`:
+
+```text
+  ┌─────────────────────────────────────────────────────────────────────────────────┐
+  │                           PHASE 5E SOURCE-TYPE MAPPING                          │
+  │                                                                                 │
+  │   Conceptual Source Class       v1.5 Canonical Enum      Classification Marker  │
+  │  ─────────────────────────     ─────────────────────    ─────────────────────── │
+  │   Class B: Price Band Notice  -> SourceType.EXCHANGE   + note='PRICE_BAND_NOTICE'│
+  │   Class E: Analyst Assessment -> SourceType.STRUCTURED_INPUT                    │
+  │                                                        + method='MANUAL_ENTRY'  │
+  │                                                        + tier='TIER_4' (Attributed)
+  └─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+This mapping allows all downstream validation gates (`enforce_schema`, `validate_semantics`, and evidence registries) to process enriched inputs seamlessly while maintaining 100% backward compatibility.
+
+### L.4 Source Facts vs. Derived Values Invariant
+
+Phase 5E enforces an explicit boundary between source facts and derived quantities:
+- **Source Facts**: Cap price, floor price, pre-issue shares, seller shares sold, and restated PAT represent verifiable legal disclosures. They must specify a valid `source_id` and document `locator`. They are prohibited from declaring `extraction_method="DERIVED"`.
+- **Derived Values**: Fresh share counts, post-issue shares, OFS amounts, implied post-issue EPS, and post-issue promoter holding percentages represent calculated quantities. They must declare `is_derived=True`, an explicit `formula` string, and a list of upstream `dependencies`.
+- **Integrity Gate**: `validate_source_derived_separation()` in `enrichment_contract.py` validates that no derived value masquerades as a source fact.
+
+### L.5 Fail-Closed UNKNOWN Semantics
+
+The contract strictly implements Spec v1.5 fail-closed semantics:
+- Undisclosed, missing, or preliminary fields evaluate to `null` (`None`).
+- Missing values are never defaulted to `0`, `false`, or empty strings.
+- Test fixture values (`208`, `220`, `68`, `9.46`, `85.33`) are strictly forbidden from acting as schema defaults.
+- Detection rule: `validate_fail_closed_unknown()` checks for suspicious unprovenanced fixture values and emits warnings if test constants leak into real evaluations.
+
+### L.6 Explicit Scope Boundaries
+
+The following components are explicitly **NOT implemented** in Phase 5E and remain deferred to their authorized phases:
+- **Phase 5F**: `PriceBandNoticeParser`, notice PDF extraction, and exchange circular scraping.
+- **Phase 5G**: `EnrichmentEngine`, runtime source precedence resolution, and dynamic share derivations.
+- **Phase 5H**: Live market bidding connectors, GMP scrapers, and analyst ingestion forms.
+- **Phase 5I**: CLI `assemble` / `extract --enrich` pipeline wiring and UI integration.
+- **Phase 5J**: Full E2E multi-class acceptance testing.
+
+Phase 5E establishes the contract, schema, dataclasses, and validation rules only.
+
+### L.7 Test Suite & Regression Verification
+
+- **New Phase 5E Tests**: 13 focused unit tests in `tests/test_enrichment_contract.py` covering schema enforcement, classification mapping, provenance validation, analyst attribution, source-vs-derived separation, and fail-closed nullability.
+- **Baseline Test Suite**: All 259 baseline tests passing (238 core + 12 Phase 5A + 9 Phase 5B).
+- **Total Test Count**: 272 passing tests across the entire repository.
+- **Frozen Deterministic Core Golden Hash**: `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` strictly verified and unchanged.
+
+### L.8 Phase 5E Gate Reconciliation Checklist
+
+- [PASS] Baseline commit/tree verified (`49786b1` / `22461e9`)
+- [PASS] Explicit Ramki authorization recorded
+- [PASS] Supplemental enrichment contract created (`schema/supplemental-enrichment.v1.schema.json`)
+- [PASS] Contract is versioned (`1.0`)
+- [PASS] Price Band Notice classification represented compatibly (`EXCHANGE + note=PRICE_BAND_NOTICE`)
+- [PASS] Analyst Assessment classification represented compatibly (`STRUCTURED_INPUT + MANUAL_ENTRY`)
+- [PASS] Source vs derived distinction enforced
+- [PASS] Provenance structure defined and validated
+- [PASS] UNKNOWN representation is fail-closed
+- [PASS] No fixture defaults introduced
+- [PASS] v1.5 canonical scoring schema remains backward compatible
+- [PASS] Frozen scoring core unchanged
+- [PASS] 259 baseline tests pass
+- [PASS] All 13 new Phase 5E tests pass (272 total tests)
+- [PASS] Golden hash unchanged (`e84f8bc0...`)
+- [PASS] Exact diff reviewed
+- [PASS] No Phase 5F/5G/5H/5I/5J implementation performed
+
+**Final Phase 5E Status: PASS**
+---
+
 **Awaiting decision, not implementation:** H1 (GCP reference fixture sign-off),
 H2 (EPC versus real estate).
 
 **Delivery & Remote Status:** PR #3 is open on GitHub against `main` from head
 `arena/ipo-screening-engine-v1.5`.
-All 259 tests green, golden hash frozen, main strictly protected.
+All 272 tests green (259 baseline + 13 Phase 5E), golden hash frozen, main strictly protected.
 
 No merge to `main`. No production deployment.
