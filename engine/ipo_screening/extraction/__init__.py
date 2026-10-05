@@ -1,4 +1,4 @@
-"""Phase 5A Automated Extraction Package for IPO Screening Engine."""
+"""Phase 5A/5F Automated Extraction Package for IPO Screening Engine."""
 
 from .builder import CanonicalInputBuilder
 from .extractor import DocumentExtractor
@@ -20,6 +20,15 @@ from .ocr_adapter import (
     detect_scanned_page,
 )
 from .pdf_source import PDFSourceError, compute_file_sha256, load_pdf_source
+from .price_band_notice import (
+    PriceBandField,
+    PriceBandNoticeClassificationError,
+    PriceBandNoticeError,
+    PriceBandNoticeParseError,
+    PriceBandNoticeParser,
+    PriceBandNoticeResult,
+    PriceCollarValidationError,
+)
 from .sections import SectionExtractor
 from .toc import TOCEntry, TOCRouter
 
@@ -31,6 +40,13 @@ __all__ = [
     "NoOpOcrAdapter",
     "OcrAdapter",
     "PDFSourceError",
+    "PriceBandField",
+    "PriceBandNoticeClassificationError",
+    "PriceBandNoticeError",
+    "PriceBandNoticeParseError",
+    "PriceBandNoticeParser",
+    "PriceBandNoticeResult",
+    "PriceCollarValidationError",
     "RawExtraction",
     "SectionExtractor",
     "SourceDocument",

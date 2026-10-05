@@ -984,6 +984,142 @@ Phase 5E establishes the contract, schema, dataclasses, and validation rules onl
 - [PASS] No Phase 5F/5G/5H/5I/5J implementation performed
 
 **Final Phase 5E Status: PASS**
+
+---
+
+## M. Phase 5F Implementation Record and Gate Reconciliation
+
+**Status**: COMPLETED & VERIFIED  
+**Authorization**: Standing authorization from Ramki (Phase 5F: Price Band Notice Ingestion)  
+**Deliverables**:
+- Upstream Price Band Notice Parser: `engine/ipo_screening/extraction/price_band_notice.py`
+- Package integration and exports: `engine/ipo_screening/extraction/__init__.py`
+- Deterministic notice fixture suite: `fixtures/notices/` (13 fixtures)
+- Phase 5F test suite: `tests/test_price_band_notice.py` (20 tests passing)
+- Durability verification on remote: `refs/heads/arena/ipo-screening-engine-v1.5`
+
+### M.1 Objective & Scope
+
+Phase 5F delivers an upstream, deterministic, evidence-bearing, fail-closed Price Band Notice ingestion parser. It processes exchange circulars and price band advertisements (in PDF or plain text form), extracts primary offering terms, validates regulatory pricing constraints under SEBI ICDR regulations, and emits payload structures compliant with the Phase 5E supplemental contract (`schema/supplemental-enrichment.v1.schema.json`).
+
+Scope boundaries strictly observed:
+- **Zero Scoring Core Changes**: Frozen scoring modules (`derived.py`, `scoring.py`, `knockouts.py`, `snapshots.py`, `evaluation.py`) and schema `schema/ipo-input.v1.5.schema.json` are completely untouched.
+- **Zero Reconciliation Engine**: RHP vs. Price Band Notice precedence resolution is deferred to Phase 5G (`EnrichmentEngine`).
+- **Zero Dynamic Derivations**: Fresh share counts, post-issue shares, OFS amounts, implied post-issue EPS, and PE/PEG calculations are not computed in this phase (deferred to Phase 5G).
+- **Zero Market Connectors**: Live exchange bidding feeds, GMP scrapers, and subscription counters are deferred to Phase 5H.
+
+### M.2 Document Intake & Classification Architecture
+
+The `PriceBandNoticeParser` class handles document intake via two primary paths:
+1. `parse_from_file(file_path)`: Supports both PDF files (via `load_pdf_source` and `pypdf.PdfReader`) and text files.
+2. `parse_from_text(text)`: Directly parses raw circular strings.
+
+#### Document Classification Gate
+To prevent arbitrary filings (e.g., annual reports, preliminary RHPs, or DRHPs without price bands) from misidentifying as Price Band Notices, documents must satisfy strict classification criteria:
+- **Title Patterns**: Document must match recognized announcement headers:
+  - `PRICE BAND NOTICE`, `PRICE BAND ADVERTISEMENT`, `PRICE BAND ANNOUNCEMENT`
+  - `NOTICE TO INVESTORS`, `PRE-BID ADVERTISEMENT`
+  - `THE FLOOR PRICE AND CAP PRICE`, `BID/OFFER PERIOD ... PRICE BAND`
+  - `CORRIGENDUM / ADDENDUM ... PRICE BAND`
+- **Semantic Density**: Document text must contain essential offering terminology (`cap price`, `floor price`, `bid lot`, `price band`, `equity shares`).
+- Documents failing classification raise `PriceBandNoticeClassificationError` (fail closed).
+
+### M.3 Raw Source Fact Extraction & Provenance
+
+The parser extracts 5 primary source facts with explicit evidence locators and quotes:
+1. **Floor Price (`price_band_low`)**: Extracted from explicit floor phrases, price band ranges (`₹X to ₹Y`), or lower-end clauses. Stored in `INR`.
+2. **Cap Price (`price_band_high`)**: Extracted from explicit cap phrases, price band ranges, or upper-end clauses. Stored in `INR`.
+3. **Lot Size (`lot_size`)**: Extracted from bid lot, market lot, or minimum share requirements. Must be a strictly positive integer ($> 0$). Stored in `SHARES`.
+4. **Issue Open Date (`open_date`)**: Normalized from standard Indian notice date formats (`DD/MM/YYYY`, `DD-MM-YYYY`, `DD Month YYYY`, `Month DD, YYYY`, `DD-Mon-YYYY`) to ISO `YYYY-MM-DD`.
+5. **Issue Close Date (`close_date`)**: Normalized to ISO `YYYY-MM-DD`. Validated to ensure `open_date <= close_date`.
+
+#### Provenance and Attribution Invariant
+Every extracted fact is encapsulated in a `PriceBandField` object containing:
+- `raw_text`: Exact verbatim numeric or date string from the source.
+- `page`: 1-based page index.
+- `locator`: Human-readable locator (e.g. `Page 1, 'Price Band Cap'`).
+- `quote`: Source excerpt demonstrating context.
+- `extraction_method`: `DETERMINISTIC_PDF` (or `TEXT` / `OCR`).
+- `verification`: `VERIFIED` when locators are present.
+- `confidence`: `1.0`.
+
+#### Deterministic SHA-256 Calculation
+In compliance with Phase 5D invariant D-5D-03:
+- SHA-256 content hashes are calculated directly from original raw source bytes prior to parsing or decoding (`hashlib.sha256(raw_bytes).hexdigest()`).
+- Source references emit `source_type="EXCHANGE"` and `note="PRICE_BAND_NOTICE"`.
+
+### M.4 SEBI ICDR Price Collar Validation
+
+Under Regulation 127 of the SEBI (Issue of Capital and Disclosure Requirements) Regulations, 2018:
+- The cap price must be strictly greater than the floor price: $\text{cap} > \text{floor} > 0$.
+- The spread between the floor price and cap price must not exceed 20%:
+  $$\frac{\text{cap} - \text{floor}}{\text{floor}} \le 0.20$$
+
+#### Precision and Fail-Closed Collar Semantics
+- Validated using exact Python `Decimal` arithmetic (`Decimal(str(cap))`, `Decimal(str(floor))`).
+- **Zero Adjustment Policy**: If a notice specifies an invalid collar (spread $> 20\%$ or $\text{cap} \le \text{floor}$), the parser raises `PriceCollarValidationError` and fails closed. It never adjusts, rounds, clamps, or substitutes numbers to force compliance.
+
+### M.5 Fail-Closed UNKNOWN Semantics Matrix
+
+The parser rigorously implements the fail-closed UNKNOWN matrix:
+- **Missing Cap Price**: `price_band_high = None` (`has_full_price_band = False`).
+- **Missing Floor Price**: `price_band_low = None` (`has_full_price_band = False`).
+- **Missing Lot Size**: `lot_size = None` (`has_lot_size = False`).
+- **Missing Dates**: `open_date = None`, `close_date = None` (`has_dates = False`).
+- **Conflicting Values**: Multiple distinct price band pairs or lot sizes raise `PriceBandNoticeParseError` (fails closed).
+- **Corrupted OCR / Malformed Numbers**: Unrecognized glyphs (e.g. `1?0`, `2@0`) or alphabetic strings (`NaN`, `XYZ`) evaluate to `None`; negative lookaheads prevent false partial matching.
+- **Forbidden Defaults**: Values are never substituted with fixture defaults (forbidden constants: `208`, `220`, `68`, `9.46`, `85.33`).
+
+### M.6 Supplemental Contract Compatibility
+
+Calling `result.to_enrichment_dict(ipo_id)` serializes the extraction result into a dictionary structure fully compliant with `schema/supplemental-enrichment.v1.schema.json`. Validation against the Phase 5E schema via `validate_enrichment_contract()` produces zero schema errors.
+
+### M.7 Fixture Suite & Test Coverage
+
+Thirteen deterministic fixtures were authored in `fixtures/notices/`:
+1. `clean_notice.txt`: Complete standard Vishal Nirmiti Limited notice.
+2. `alternative_notice.txt`: Lower/upper end language, market lot, DD-Mon-YYYY dates.
+3. `ocr_style_notice.txt`: Pipe-delimited INR amounts, wordy lot sentences.
+4. `missing_cap_notice.txt`: Undisclosed cap `[●]`.
+5. `missing_floor_notice.txt`: Undisclosed floor `[●]`.
+6. `missing_lot_notice.txt`: Price band without lot size.
+7. `missing_date_notice.txt`: Price band without issue dates.
+8. `conflicting_notice.txt`: Multiple contradictory price bands.
+9. `invalid_collar_notice.txt`: Collar spread exceeding 20% (₹100 to ₹130).
+10. `inverted_collar_notice.txt`: Inverted price band (Cap ₹200 $\le$ Floor ₹220).
+11. `malformed_number_notice.txt`: `NaN` and alphabetic numbers.
+12. `ambiguous_ocr_notice.txt`: Corrupted glyphs (`1?0`, `2@0`, `??`).
+13. `non_notice_document.txt`: Non-notice corporate report.
+
+#### Test Execution
+- **New Phase 5F Tests**: 20 comprehensive unit tests in `tests/test_price_band_notice.py`.
+- **Baseline Test Suite**: All 272 existing tests pass untouched.
+- **Total Test Count**: 292 passing tests across all test suites.
+- **Deterministic Golden Result Hash**: `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` verified and strictly unchanged.
+
+### M.8 Phase 5F Gate Reconciliation Checklist
+
+- [PASS] Baseline commit/tree verified (`435073f` / `76db9ae`)
+- [PASS] Explicit Ramki authorization recorded
+- [PASS] Price Band Notice parser implemented (`engine/ipo_screening/extraction/price_band_notice.py`)
+- [PASS] Document classification implemented and non-notices rejected
+- [PASS] Source facts extracted: `price_band_high`, `price_band_low`, `lot_size`, `open_date`, `close_date`
+- [PASS] Explicit provenance tracked: source_id, source_type, note, page, quote, locator, extraction_method
+- [PASS] Deterministic SHA-256 calculated directly from raw source bytes
+- [PASS] SEBI ICDR 20% collar validation enforced via exact Decimal arithmetic
+- [PASS] Invalid collar fails closed without adjustment or clamping
+- [PASS] Inverted collar (cap <= floor) fails closed
+- [PASS] Fail-closed UNKNOWN behavior verified (missing fields -> None, no fixture defaults)
+- [PASS] Conflicting candidates rejected (fail closed)
+- [PASS] Phase 5E contract compatibility verified against Draft 2020-12 schema
+- [PASS] Deterministic notice fixtures created (13 fixtures in `fixtures/notices/`)
+- [PASS] All 272 baseline tests pass
+- [PASS] All 20 new Phase 5F tests pass (292 total tests)
+- [PASS] Golden hash unchanged (`e84f8bc0...`)
+- [PASS] Exact diff reviewed
+- [PASS] No Phase 5G/5H/5I/5J implementation performed
+
+**Final Phase 5F Status: PASS**
 ---
 
 **Awaiting decision, not implementation:** H1 (GCP reference fixture sign-off),
@@ -991,6 +1127,7 @@ H2 (EPC versus real estate).
 
 **Delivery & Remote Status:** PR #3 is open on GitHub against `main` from head
 `arena/ipo-screening-engine-v1.5`.
-All 272 tests green (259 baseline + 13 Phase 5E), golden hash frozen, main strictly protected.
+All 292 tests green (272 baseline + 20 Phase 5F), golden hash frozen, main strictly protected.
 
 No merge to `main`. No production deployment.
+
