@@ -47,22 +47,58 @@ class FinancialTableExtractor:
             ["Restated Statement of Profit and Loss", "Statement of Profit and Loss"],
             start_page,
             end_page,
-            required_content=["revenue from operations", "annexure ii"],
+            required_content=["revenue from operations", "interest income", "interest earned", "total income", "annexure ii"],
         )
+        if pl_page is None and start_page > 1:
+            pl_page, pl_text = self._find_page(
+                ["Restated Statement of Profit and Loss", "Statement of Profit and Loss"],
+                1,
+                end_page,
+                required_content=["revenue from operations", "interest income", "interest earned", "total income", "annexure ii"],
+            )
+
         bs_page, bs_text = self._find_page(
             ["Restated Statement of Assets and Liabilities", "Statement of Assets and Liabilities"],
             start_page,
             end_page,
-            required_content=["total equity", "annexure i"],
+            required_content=["total equity", "equity share capital", "total assets", "annexure i"],
         )
+        if bs_page is None and start_page > 1:
+            bs_page, bs_text = self._find_page(
+                ["Restated Statement of Assets and Liabilities", "Statement of Assets and Liabilities"],
+                1,
+                end_page,
+                required_content=["total equity", "equity share capital", "total assets", "annexure i"],
+            )
+
         cf_page, cf_text = self._find_page(
             ["Restated Statement of Cash flows", "Statement of Cash flows"],
             start_page,
             end_page,
-            required_content=["cash flow from operating activities", "annexure iii"],
+            required_content=["operating activities", "annexure iii"],
         )
-        kpi_page, kpi_text = self._find_page(["Return on Capital Employed", "Key Performance Indicators"], 50, min(end_page, 200))
-        cl_page, cl_text = self._find_page(["Contingent Liabilities and Commitments", "Contingent Liabilities"], 300, end_page)
+        if cf_page is None and start_page > 1:
+            cf_page, cf_text = self._find_page(
+                ["Restated Statement of Cash flows", "Statement of Cash flows"],
+                1,
+                end_page,
+                required_content=["operating activities", "annexure iii"],
+            )
+
+        kpi_start = 50 if self.page_count >= 50 else 1
+        kpi_page, kpi_text = self._find_page(
+            ["Key Performance Indicators", "Key performance indicators", "Return on Capital Employed"],
+            kpi_start,
+            min(self.page_count, 250),
+            required_content=["Return on Capital Employed", "ROCE", "CRAR"],
+        )
+
+        cl_start = 250 if self.page_count >= 250 else 1
+        cl_page, cl_text = self._find_page(
+            ["Contingent Liabilities and Commitments", "Contingent Liabilities"],
+            cl_start,
+            self.page_count,
+        )
 
         # Detect reporting unit from P&L or BS
         unit_text = pl_text or bs_text or ""
@@ -82,7 +118,7 @@ class FinancialTableExtractor:
             )
         )
 
-        # Detect periods (e.g. 31 March 2026, 31 March 2025, 31 March 2024)
+        # Detect periods (e.g. 31 March 2026, 31 March 2025, 31 March 2024 or March 31, 2026)
         years = self._extract_fiscal_years(pl_text or bs_text or "")
         if not years:
             years = ["2026", "2025", "2024"]
@@ -91,15 +127,15 @@ class FinancialTableExtractor:
         pl_items = self._parse_table_lines(
             pl_text or "",
             [
-                ("revenue", [r"revenue from operations"]),
+                ("revenue", [r"revenue from operations", r"interest earned", r"interest income"]),
                 ("total_income", [r"total income\b"]),
                 ("cost_of_materials", [r"cost of material consumed"]),
                 ("employee_expenses", [r"employee benefits expenses", r"employee benefits"]),
-                ("finance_costs", [r"finance costs", r"finance cost"]),
+                ("finance_costs", [r"finance costs", r"finance cost", r"interest expended"]),
                 ("depreciation", [r"depreciation and amortization"]),
                 ("total_expenses", [r"total expenses\b"]),
                 ("pbt", [r"profit/(loss) before tax", r"profit before tax"]),
-                ("pat", [r"profit after tax", r"profit/(loss) for the year"]),
+                ("pat", [r"profit after tax", r"profit/(loss) for the year", r"profit/(loss) after tax"]),
             ],
             len(years),
         )
@@ -111,15 +147,19 @@ class FinancialTableExtractor:
                 ("trade_receivables", [r"trade receivables"]),
                 ("cash_and_equivalents", [r"cash and cash equivalents"]),
                 ("net_worth", [r"total equity\b", r"total equity \(d\)"]),
+                ("total_borrowings", [r"total borrowings\b"]),
             ],
             len(years),
         )
 
-        # Parse non-current and current borrowings
-        borrowings_lines = self._extract_all_borrowings(bs_text or "", len(years))
-        if len(borrowings_lines) >= 2:
-            bs_items["borrowings_non_current"] = borrowings_lines[0]
-            bs_items["borrowings_current"] = borrowings_lines[1]
+        # Parse non-current and current borrowings if total borrowings not already extracted
+        if "total_borrowings" not in bs_items:
+            borrowings_lines = self._extract_all_borrowings(bs_text or "", len(years))
+            if len(borrowings_lines) >= 2:
+                bs_items["borrowings_non_current"] = borrowings_lines[0]
+                bs_items["borrowings_current"] = borrowings_lines[1]
+            elif len(borrowings_lines) == 1:
+                bs_items["total_borrowings"] = borrowings_lines[0]
 
         # Parse Cash Flow items
         cf_items = self._parse_table_lines(
@@ -131,8 +171,12 @@ class FinancialTableExtractor:
             len(years),
         )
 
-        # Parse KPI items (ROCE)
+        # Parse KPI items
         roce_vals = self._parse_kpi_line(kpi_text or "", r"return on capital employed", len(years))
+        crar_vals = self._parse_kpi_line(kpi_text or "", r"crar\b|capital adequacy ratio", len(years))
+        gnpa_vals = self._parse_kpi_line(kpi_text or "", r"gross npa", len(years))
+        nim_vals = self._parse_kpi_line(kpi_text or "", r"net interest margin|nim\b", len(years))
+        cost_income_vals = self._parse_kpi_line(kpi_text or "", r"cost to income", len(years))
 
         # Parse Contingent liabilities
         cl_amount = self._parse_contingent_liabilities(cl_text or "")
@@ -165,9 +209,13 @@ class FinancialTableExtractor:
             pat = self._get_item_val(pl_items, "pat", idx)
             nw = self._get_item_val(bs_items, "net_worth", idx)
 
-            b_nc = self._get_item_val(bs_items, "borrowings_non_current", idx) or 0.0
-            b_cur = self._get_item_val(bs_items, "borrowings_current", idx) or 0.0
-            total_debt = round(b_nc + b_cur, 2) if (b_nc or b_cur) else None
+            tot_b = self._get_item_val(bs_items, "total_borrowings", idx)
+            if tot_b is not None:
+                total_debt = tot_b
+            else:
+                b_nc = self._get_item_val(bs_items, "borrowings_non_current", idx) or 0.0
+                b_cur = self._get_item_val(bs_items, "borrowings_current", idx) or 0.0
+                total_debt = round(b_nc + b_cur, 2) if (b_nc or b_cur) else None
 
             cfo = self._get_item_val(cf_items, "cfo", idx)
             raw_capex = self._get_item_val(cf_items, "capex", idx)
@@ -219,6 +267,14 @@ class FinancialTableExtractor:
 
             if roce_vals and idx < len(roce_vals) and roce_vals[idx] is not None:
                 p_data["disclosed_roce_pct"] = roce_vals[idx]
+            if crar_vals and idx < len(crar_vals) and crar_vals[idx] is not None:
+                p_data["crar_pct"] = crar_vals[idx]
+            if gnpa_vals and idx < len(gnpa_vals) and gnpa_vals[idx] is not None:
+                p_data["gnpa_pct"] = gnpa_vals[idx]
+            if nim_vals and idx < len(nim_vals) and nim_vals[idx] is not None:
+                p_data["nim_pct"] = nim_vals[idx]
+            if cost_income_vals and idx < len(cost_income_vals) and cost_income_vals[idx] is not None:
+                p_data["cost_to_income_pct"] = cost_income_vals[idx]
 
             periods_data.append(p_data)
 
@@ -254,7 +310,11 @@ class FinancialTableExtractor:
         return None, None
 
     def _extract_fiscal_years(self, text: str) -> List[str]:
-        matches = re.findall(r'31\s+March\s+(20[0-9]{2})', text, re.IGNORECASE)
+        matches = re.findall(
+            r'(?:31(?:st)?\s+March[\s,]+|March\s+31(?:st)?[\s,]+|FY\s*|Fiscal\s*)(20[0-9]{2})',
+            text,
+            re.IGNORECASE,
+        )
         seen = set()
         ordered = []
         for m in matches:

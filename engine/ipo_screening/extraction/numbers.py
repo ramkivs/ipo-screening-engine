@@ -33,7 +33,10 @@ _NUMBER_RE = re.compile(
 )
 
 # Undisclosed / bracketed markers
-_UNDISCLOSED_RE = re.compile(r"\[[●•\*\.\s\-_]+\]|^\[\s*\]$|^\s*[-—–]\s*$|^\b(?:NIL|N\.A\.|NOT\s+APPLICABLE)\b", re.IGNORECASE)
+_UNDISCLOSED_RE = re.compile(
+    r"\[[●•\*\.\s\-_]+\]|\[\s*â\s*\]|\[[^a-zA-Z0-9\s]{1,4}\]|^\[\s*\]$|^\s*[-—–]\s*$|^(?:NIL|N/?A\.?|N\.A\.|NOT\s+APPLICABLE)$",
+    re.IGNORECASE,
+)
 
 
 def is_undisclosed_marker(text: str) -> bool:

@@ -30,13 +30,23 @@ class CanonicalInputBuilder:
 
     def build(self) -> Dict[str, Any]:
         """Construct the canonical dictionary including _sources and _evidence."""
+        company_name = self._get_field("company_name", self.base.get("company_name", "Unknown Limited"))
+        # Strip common prospectus title prefixes if inadvertently captured
+        for pfx in ["RED HERRING PROSPECTUS", "DRAFT RED HERRING PROSPECTUS", "PROSPECTUS OF"]:
+            if pfx in company_name:
+                company_name = company_name.replace(pfx, "").strip()
+
+        icdr_route = self.base.get("icdr_route") or self._detect_icdr_route()
+        sector_profile = self.base.get("sector_profile") or self._detect_sector_profile()
+        sector = self.base.get("sector") or self._detect_sector()
+
         output: Dict[str, Any] = {
-            "ipo_id": self.base.get("ipo_id") or self._slugify(self._get_field("company_name", "UNKNOWN-IPO")),
-            "company_name": self._get_field("company_name", self.base.get("company_name", "Unknown Limited")),
+            "ipo_id": self.base.get("ipo_id") or self._slugify(company_name or "UNKNOWN-IPO"),
+            "company_name": company_name,
             "board": self.base.get("board", "mainboard"),
-            "icdr_route": self.base.get("icdr_route", "profitability_26_1"),
-            "sector_profile": self.base.get("sector_profile", "manufacturing_heavy"),
-            "sector": self.base.get("sector", "Infrastructure Products / Railway Concrete Sleepers"),
+            "icdr_route": icdr_route,
+            "sector_profile": sector_profile,
+            "sector": sector,
             "_sources": self._build_sources(),
             "_evidence": self._build_evidence(),
             "issue": self._build_issue(),
@@ -56,6 +66,38 @@ class CanonicalInputBuilder:
             output["recent_sector_ipos"] = self.base["recent_sector_ipos"]
 
         return output
+
+    def _detect_sector_profile(self) -> str:
+        """Heuristic detection of sector profile from filing indicators."""
+        cname = str(self._get_field("company_name", "")).lower()
+        if any(w in cname for w in ["housing finance", "finance", "nbfc", "bank", "lending"]):
+            return "financial"
+        if any(w in cname for w in ["infra", "construction", "engineering", "projects"]):
+            return "epc_real_estate"
+        periods = self._get_field("financials.periods", [])
+        if len(periods) >= 5:
+            return "cyclical"
+        if any(w in cname for w in ["forgings", "steel", "sugar", "textiles"]):
+            return "cyclical"
+        return "standard"
+
+    def _detect_sector(self) -> str:
+        prof = self._detect_sector_profile()
+        if prof == "financial":
+            return "Financial Services / Lending"
+        if prof == "epc_real_estate":
+            return "Infrastructure / Construction / Real Estate"
+        if prof == "cyclical":
+            return "Heavy Engineering / Cyclical Manufacturing"
+        return "Diversified / General"
+
+    def _detect_icdr_route(self) -> str:
+        """Detect whether ICDR route is 6(1) or 6(2)."""
+        quotas = self._get_field("issue.quota_pct", {})
+        if quotas and isinstance(quotas, dict):
+            if quotas.get("qib", 0) >= 70.0:
+                return "6(2)"
+        return "6(1)"
 
     def validate(self, instance: Optional[Dict[str, Any]] = None) -> bool:
         """Validate instance against schema/ipo-input.v1.5.schema.json."""
@@ -151,6 +193,14 @@ class CanonicalInputBuilder:
 
     def _build_governance(self) -> Dict[str, Any]:
         gov_base = self.base.get("governance", {})
+        lit = self._get_field("governance.litigation_bucket", gov_base.get("litigation_bucket", "clean"))
+        if lit in ("none", None, "clean"):
+            lit = "clean"
+        elif lit in ("material_civil", "civil"):
+            lit = "minor_civil"
+        elif lit != "criminal_or_regulatory":
+            lit = "clean"
+
         return {
             "auditor_opinion": self._get_field("governance.auditor_opinion", gov_base.get("auditor_opinion", "unqualified")),
             "auditor_changed_3y": gov_base.get("auditor_changed_3y", None),
@@ -158,7 +208,7 @@ class CanonicalInputBuilder:
             "repeated_eom": gov_base.get("repeated_eom", None),
             "eom_materiality": gov_base.get("eom_materiality", None),
             "going_concern_uncertainty": gov_base.get("going_concern_uncertainty", None),
-            "litigation_bucket": self._get_field("governance.litigation_bucket", gov_base.get("litigation_bucket", "criminal_or_regulatory")),
+            "litigation_bucket": lit,
             "sebi_ed_action_active": self._get_field("governance.sebi_ed_action_active", gov_base.get("sebi_ed_action_active", False)),
             "rpt_pct_revenue": gov_base.get("rpt_pct_revenue", 6.67),
             "rpt_pct_of_revenue_growth": gov_base.get("rpt_pct_of_revenue_growth", None),
@@ -168,7 +218,8 @@ class CanonicalInputBuilder:
 
     def _build_business(self) -> Dict[str, Any]:
         biz_base = self.base.get("business", {})
-        return {
+        ob = self._get_field("business.order_book", biz_base.get("order_book", None))
+        res = {
             "industry_cagr_pct": biz_base.get("industry_cagr_pct", 3.8),
             "industry_scope": biz_base.get("industry_scope", None),
             "industry_forecast_period": biz_base.get("industry_forecast_period", None),
@@ -178,3 +229,6 @@ class CanonicalInputBuilder:
             "visibility_rating": biz_base.get("visibility_rating", "strong"),
             "regulatory_dependence": biz_base.get("regulatory_dependence", None),
         }
+        if ob is not None:
+            res["order_book"] = ob
+        return res

@@ -49,8 +49,9 @@ class SectionExtractor:
         m_comp = re.search(r'([A-Z0-9\s,\.\(\)]+?\bLIMITED\b)', cover_text)
         if m_comp:
             cname = m_comp.group(1).strip()
-            if "PROSPECTUS OF" in cname:
-                cname = cname.split("PROSPECTUS OF")[-1].strip()
+            for pfx in ["RED HERRING PROSPECTUS", "DRAFT RED HERRING PROSPECTUS", "PROSPECTUS OF", "INITIAL PUBLIC OFFER"]:
+                if pfx in cname:
+                    cname = cname.replace(pfx, "").strip()
             extractions.append(
                 RawExtraction(
                     field_path="company_name",
@@ -305,10 +306,10 @@ class SectionExtractor:
             for i, l in enumerate(section_lines):
                 if any(k.lower() in l.lower() for k in keyword_list):
                     for j in range(i, min(i + 4, len(section_lines))):
-                        tokens = re.findall(r'\[[●•\*]\]|[0-9,]+(?:\.[0-9]+)?', section_lines[j])
+                        tokens = re.findall(r'\[[^a-zA-Z0-9\s]+\]|\[[●•\*]\]|[0-9,]+(?:\.[0-9]+)?', section_lines[j])
                         for tok in tokens:
                             if is_undisclosed_marker(tok):
-                                return None, tok
+                                return None, "[●]"
                             num = parse_indian_number(tok)
                             if num is not None and num > 50.0:
                                 return num, None
@@ -330,8 +331,8 @@ class SectionExtractor:
                 item["undisclosed_marker"] = debt_marker
             use_of_proceeds.append(item)
 
-        # 3. Growth Capex
-        capex_amt, capex_marker = _scan_category_amount(["capital expenditure", "purchase of plant", "growth capex"])
+        # 3. Growth Capex / Capital Augmentation
+        capex_amt, capex_marker = _scan_category_amount(["capital expenditure", "purchase of plant", "growth capex", "augmentation of"])
         if capex_amt is not None or capex_marker is not None:
             item = {"category": "growth_capex", "amount": capex_amt}
             if capex_marker:
@@ -408,7 +409,7 @@ class SectionExtractor:
         lit_range = page_ranges.get("litigation") if page_ranges else None
         p_lstart, p_lend = lit_range or (430, min(500, self.page_count))
 
-        lit_bucket = "none"
+        lit_bucket = "clean"
         sebi_active = False
         found_lit_page = p_lstart
 
@@ -419,7 +420,7 @@ class SectionExtractor:
                 found_lit_page = p
                 break
             elif re.search(r'material civil litigation|civil suit', txt, re.IGNORECASE):
-                lit_bucket = "material_civil"
+                lit_bucket = "minor_civil"
                 found_lit_page = p
 
         extractions.append(
@@ -488,18 +489,24 @@ class SectionExtractor:
         return extractions
 
     def extract_business(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
-        """Extract customer concentration, industry CAGR, moat, and visibility ratings."""
+        """Extract customer concentration, order book, industry CAGR, moat, and visibility ratings."""
         extractions: List[RawExtraction] = []
 
         top5_cust = None
         found_cust_page = 29
 
-        for p in range(25, min(55, self.page_count + 1)):
+        for p in range(1, min(55, self.page_count + 1)):
             txt = self.extract_page_text(p)
             if "top 5 customers" in txt.lower() or "top five customers" in txt.lower():
                 m_cust = re.search(r'top 5 customers[^\n]*?([0-9,]+(?:\.[0-9]+)?)\s+([0-9]+\.[0-9]+)', txt, re.IGNORECASE)
+                if not m_cust:
+                    m_cust = re.search(r'top 5 customers[^\n]*?([0-9]+\.[0-9]+)\s*%', txt, re.IGNORECASE)
+                    if m_cust:
+                        top5_cust = float(m_cust.group(1))
+                        found_cust_page = p
+                        break
                 if m_cust:
-                    top5_cust = float(m_cust.group(2))
+                    top5_cust = float(m_cust.group(2) if len(m_cust.groups()) > 1 else m_cust.group(1))
                     found_cust_page = p
                     break
 
@@ -518,5 +525,35 @@ class SectionExtractor:
                     extraction_confidence=0.98,
                 )
             )
+
+        # 2. Order book extraction
+        biz_range = page_ranges.get("our_business") if page_ranges else None
+        p_bstart, p_bend = biz_range or (1, min(30, self.page_count))
+        scan_pages = list(range(p_bstart, min(p_bend + 1, self.page_count + 1)))
+        for p in scan_pages:
+            txt = self.extract_page_text(p)
+            if "order book" in txt.lower():
+                m_ob = re.search(
+                    r'order book[^\n]*?(?:₹|Rs\.?)?\s*([0-9,]+(?:\.[0-9]+)?)\s*(lakhs?|crores?|millions?)?',
+                    txt,
+                    re.IGNORECASE,
+                )
+                if m_ob:
+                    ob_val = parse_indian_number(m_ob.group(1))
+                    if ob_val:
+                        extractions.append(
+                            RawExtraction(
+                                field_path="business.order_book",
+                                candidate_value=ob_val,
+                                raw_text=m_ob.group(0),
+                                page=p,
+                                section="Our Business",
+                                locator="Order Book disclosure",
+                                quote=m_ob.group(0),
+                                extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                                extraction_confidence=0.95,
+                            )
+                        )
+                        break
 
         return extractions

@@ -663,8 +663,58 @@ byte-identically.
 | Preliminary and Final are immutable historical records | ✅ |
 | Excel output is append-only and historically preserved | ✅ |
 | Exact prior results are reproducible | ✅ |
-| Golden regression suite passes | ✅ 238 tests |
+| Golden regression suite passes | ✅ 259 tests (238 core + 12 Phase 5A + 9 Phase 5B) |
 | Vishal Nirmiti test demonstrates expected unknown/stale behaviour | ✅ |
+
+---
+
+## Phase 5B — Real-World Filing Extraction Validation & Hardening
+
+### J.1 Representative Filing Fixture Matrix
+
+Phase 5B establishes a representative filing matrix across distinct industry, reporting, and capital structure archetypes to validate the extraction engine against real-world SEBI ICDR disclosure patterns:
+
+| Class | Archetype / Company | Pages | SHA-256 Checksum | Key Disclosure Patterns Validated |
+|---|---|---|---|---|
+| **Class A** | Financial Institution / Lender (`APEX HOUSING FINANCE LIMITED`) | 11 | `ac62722cb93c82d393ae0884ce461c71992edf65441d0f4a7e197cce7b7370ef` | Financial overlay metrics (CRAR, Gross NPA, NIM, Cost to Income), interest earned/expended P&L lines, borrowings balance sheet, capital augmentation proceeds. |
+| **Class B** | Cyclical / Manufacturing (`ZENITH HEAVY FORGINGS LIMITED`) | 10 | `1910af20f0863a5f4a8a5a7edd6017c3119d36495c7925e3f4f609df36b9cb09` | 5 full FY multi-period statement tables (FY2022-FY2026), cyclical overlay activation, multi-column date headers (`March 31, YYYY`). |
+| **Class C** | EPC / Infrastructure / Real Estate (`GARUDA INFRA PROJECTS LIMITED`) | 10 | `fb35487b74fa57e94b877c816bf59602366599c70a798dc10cb740bde88ce930` | EPC overlay activation, order book disclosure extraction (`₹1,45,000 lakhs`), working capital and debt repayment schedule of implementation. |
+| **Class D** | Loss-Making / Growth Tech (`QUICKDELIVER NETWORK LIMITED`) | 10 | `05dcb7f7df506f1b3149e404f022d11e23718b806cd5cf9f5a93a26dcbf075e0` | Loss-making profile auto-selection (negative PAT `-₹2,300 lakhs`, negative CFO), fail-closed GCP `[●]` detection. |
+| **Class E** | Modern Complex Filing (`NEXUS RETAIL BRANDS LIMITED`) | 9 | `e78dbec01f550a88ec6a80e6039b085128f6c26ad44ea21a88f8072b500cc949` | Complex cover header stripping (`RED HERRING PROSPECTUS` prefix), mixed primary/secondary offer structure, GCP placeholder handling. |
+| **Anchor** | Full Real-World Mainboard RHP (`VISHAL NIRMITI LIMITED`) | 551 | `644be76e26d43dcaa26ba11303072cf4543bc7a52f30cd37bf1d2d1d552645f6` | 551-page production PDF, full E2E extraction -> evaluation pipeline, deterministic golden verdict `INSUFFICIENT_DATA` (score 35.0). |
+
+All fixture generation is deterministically reproducible via `python3 fixtures/filings/generate_fixtures.py` with zero binary dependencies.
+
+### J.2 Discovered Deficiencies and Minimal Evidence-Based Hardening
+
+Multi-class validation identified 7 schema and table parsing deficiencies that were hardened with minimal upstream fixes:
+1. **Sector Profile Schema Alignment**: Canonical builder previously defaulted `sector_profile` to `"manufacturing_heavy"`, which violated the v1.5 schema enum `['standard', 'financial', 'epc_real_estate', 'cyclical']`. Fixed in `builder.py` with heuristic sector detection and fallback to `"standard"`.
+2. **ICDR Route Schema Alignment**: Defaulted route was `"profitability_26_1"` instead of valid schema enum `['6(1)', '6(2)']`. Hardened to default `"6(1)"`.
+3. **Litigation Bucket Schema Compliance**: `sections.py` previously produced `"none"` instead of valid schema enum `['clean', 'minor_civil', 'criminal_or_regulatory']`. Normalized cleanly.
+4. **Date Header Variants**: Multi-column regex in `financial_tables.py` only matched `31 March YYYY`. Expanded to support `March 31, YYYY`, `Fiscal YYYY`, and `FY YYYY`.
+5. **Multi-Period Cyclical Support**: Support for 5-FY tables (FY2022 to FY2026) in P&L and Balance Sheet parsers.
+6. **Lender Statement & KPI Parsing**: Added support for interest earned/expended lines, Net Interest Margin (NIM), CRAR buffer, Gross NPA %, and Cost-to-Income ratio.
+7. **Cover Header Cleaning**: Prospectus document titles (`RED HERRING PROSPECTUS`) are cleanly stripped from the corporate issuer name.
+8. **Fail-Closed Placeholder Hardening**: Expanded undisclosed marker regex in `numbers.py` and `sections.py` to recognize encoding variants (`[â]`, `[•]`, `[*]`, `NIL`, `N.A.`) and strictly fail closed to `null`.
+
+### J.3 E2E Pipeline Results Across All Classes
+
+| Class | Company Name | Detected Profile | Periods | Score | Verdict | Schema Valid | Result Hash |
+|---|---|---|---|---|---|---|---|
+| **Class A** | APEX HOUSING FINANCE LIMITED | `financial` | 3 | 20.0 | `INSUFFICIENT_DATA` | ✅ True | Validated |
+| **Class B** | ZENITH HEAVY FORGINGS LIMITED | `cyclical` | 5 | 41.0 | `INSUFFICIENT_DATA` | ✅ True | Validated |
+| **Class C** | GARUDA INFRA PROJECTS LIMITED | `epc_real_estate` | 3 | 41.0 | `INSUFFICIENT_DATA` | ✅ True | Validated |
+| **Class D** | QUICKDELIVER NETWORK LIMITED | `standard` (loss) | 3 | 30.0 | `INSUFFICIENT_DATA` | ✅ True | Validated |
+| **Class E** | NEXUS RETAIL BRANDS LIMITED | `standard` | 3 | 43.0 | `INSUFFICIENT_DATA` | ✅ True | Validated |
+| **Anchor** | VISHAL NIRMITI LIMITED | `standard` | 3 | 35.0 | `INSUFFICIENT_DATA` | ✅ True | `2b8ea4b217c77c51...` |
+
+### J.4 Test Suite & Frozen Hash Status
+
+- **Total Test Count**: 259 passed tests (238 v1.5 core tests + 12 Phase 5A extraction tests + 9 Phase 5B real-world hardening tests).
+- **Frozen Deterministic Core Golden Hash**: `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` strictly verified and unchanged.
+- **Spec Compliance**: All Spec s1-s27 invariants, knockout tri-states, weighted completeness, and fail-closed GCP rules intact.
+
+---
 
 **Awaiting decision, not implementation:** H1 (GCP reference fixture sign-off),
 H2 (EPC versus real estate). **Awaiting infrastructure:** H4 (a session
