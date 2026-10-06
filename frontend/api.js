@@ -186,7 +186,6 @@ export class ApiClient {
    * @param {File|Blob} file - PDF filing to upload
    * @param {Object} [options] - Ingestion options
    * @param {string} [options.mode] - 'final' or 'preliminary' (default: 'final')
-   * @param {string} [options.referenceBasePath] - Optional reference fixture base path
    * @returns {Promise<Object>} Ingestion response containing evaluation_id, score, verdict, etc.
    */
   async ingestDocument(file, options = {}) {
@@ -204,11 +203,6 @@ export class ApiClient {
 
     if (options.mode) {
       formData.append('mode', options.mode);
-    }
-    if (options.referenceBasePath) {
-      formData.append('reference_base_path', options.referenceBasePath);
-    } else if (options.reference_base_path) {
-      formData.append('reference_base_path', options.reference_base_path);
     }
 
     const url = new URL(

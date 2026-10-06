@@ -785,11 +785,11 @@ class PresentationService:
         file_bytes: bytes,
         filename: str = "filing.pdf",
         mode: str = "final",
-        reference_base_path: Optional[str | Path] = None,
     ) -> IngestionResponse:
         """Process an uploaded PDF filing through extraction and evaluation pipelines.
 
         Enforces:
+        - Zero caller-controlled filesystem paths: reference_base_path is strictly excluded.
         - Bounded payload size (max 50 MB).
         - Magic bytes '%PDF-' validation.
         - Evaluation mode validation ('final' or 'preliminary').
@@ -839,7 +839,6 @@ class PresentationService:
             extractor = DocumentExtractor()
             canonical_dict, extraction_report = extractor.extract_from_pdf(
                 pdf_path=temp_pdf_path,
-                reference_base_path=reference_base_path,
                 allow_fixture_fallbacks=True,
             )
         except Exception as exc:

@@ -420,9 +420,6 @@ paths:
                   enum: [final, preliminary]
                   default: final
                   description: Evaluation mode
-                reference_base_path:
-                  type: string
-                  description: Optional reference base fixture path for fallbacks
       responses:
         '200':
           description: Evaluation already exists (duplicate idempotent return)

@@ -106,9 +106,6 @@ $$\text{Browser Upload (PDF)} \longrightarrow \text{Document Extractor} \longrig
                   enum: [final, preliminary]
                   default: final
                   description: Evaluation mode
-                reference_base_path:
-                  type: string
-                  description: Optional reference base fixture path for fallbacks
       responses:
         '200':
           description: Evaluation already exists (duplicate idempotent return)
@@ -162,11 +159,35 @@ $$\text{Browser Upload (PDF)} \longrightarrow \text{Document Extractor} \longrig
 
 ---
 
-## 4. Invariant Verification & Delivery Metrics
+## 4. Security Boundary Correction: Elimination of Public Server-Side Filesystem Path Input
+
+### Vulnerability Identified
+In initial implementation, the public endpoint `POST /api/v1/ingest/document` accepted an optional form field `reference_base_path` and forwarded it to `DocumentExtractor.extract_from_pdf()`, which performed:
+```python
+if reference_base_path and Path(reference_base_path).exists():
+    with open(reference_base_path, "r", encoding="utf-8") as f:
+        ref_base = json.load(f)
+```
+This opened an arbitrary server filesystem path input on a public presentation boundary.
+
+### Corrective Disposition Delivered
+1. **Public API Contract**: Removed `reference_base_path` from `POST /api/v1/ingest/document`. The route parameter list strictly exposes only `file: UploadFile = File(...)` and `mode: str = Form("final")`.
+2. **Explicit Security Gate**: The HTTP endpoint checks incoming multipart form keys and explicitly rejects any submission containing `reference_base_path` with `HTTP 400 Bad Request` (`SECURITY_VIOLATION_UNAUTHORIZED_PARAMETER`).
+3. **Presentation Service Boundary**: Removed `reference_base_path` from `PresentationService.ingest_document()`. The method invokes extraction without any caller-supplied filesystem path.
+4. **Internal Support Preserved**: Kept `reference_base_path` support inside `DocumentExtractor` strictly for repository-native offline CLI and test workflows (`tests/test_extraction.py`).
+5. **Frontend Client Surface**: Removed `referenceBasePath` / `reference_base_path` handling from `frontend/api.js`. The browser sends only `file` and `mode`.
+6. **Malicious-Path Regression Test**: `tests/test_ui7_ingestion.py` contains deterministic tests proving:
+   - Submission of `reference_base_path` is rejected with `HTTP 400 Bad Request`.
+   - File auditing with `builtins.open` confirms the targeted server file is never opened.
+   - `PresentationService.ingest_document` parameter signature contains zero path arguments.
+
+---
+
+## 5. Invariant Verification & Delivery Metrics
 
 ### Test Suite Execution Summary:
-- **Python Tests**: 67 presentation and golden acceptance tests passed in 2.69s (100%).
-  - `tests/test_ui7_ingestion.py`: 9 passed
+- **Python Tests**: 92 presentation, ingestion, and golden acceptance tests passed in 4.16s (100%).
+  - `tests/test_ui7_ingestion.py`: 13 passed (including 4 security boundary tests)
   - `tests/test_presentation_api.py`: 21 passed
   - `tests/test_ui2_frontend.py`: 7 passed
   - `tests/test_ui3_evidence.py`: 8 passed
@@ -174,7 +195,7 @@ $$\text{Browser Upload (PDF)} \longrightarrow \text{Document Extractor} \longrig
   - `tests/test_ui5_backtest.py`: 8 passed
   - `tests/test_ui6_calibration.py`: 8 passed
   - `tests/test_vishal_golden.py`: 19 passed
-- **Node.js Test Suites**: 53 passed in 0.50s across 7 suites (`api.test.js`, `app.test.js`, `evidence.test.js`, `performance.test.js`, `backtest.test.js`, `calibration.test.js`, `ingest.test.js`).
+- **Node.js Test Suites**: 54 passed across 7 suites (`api.test.js`, `app.test.js`, `evidence.test.js`, `performance.test.js`, `backtest.test.js`, `calibration.test.js`, `ingest.test.js`).
 - **Frozen Core Hash**: Verified identical across all 6 core modules via `verify_frozen_core()`.
 - **Golden Evaluation Hash**:
   $$\text{Golden Hash} = \texttt{e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1}$$

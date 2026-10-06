@@ -237,11 +237,23 @@ def create_router(service: PresentationService) -> APIRouter:
 
     @router.post("/ingest/document", response_model=IngestionResponse, tags=["Ingestion"])
     async def ingest_document(
+        request: Request,
         file: UploadFile = File(...),
         mode: str = Form("final"),
-        reference_base_path: Optional[str] = Form(None),
     ) -> Response:
         """Upload and evaluate an IPO filing document (DRHP/RHP PDF)."""
+        # Strict Security Boundary: reject any attempt to supply caller-controlled server paths
+        form_data = await request.form()
+        if "reference_base_path" in form_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "Bad Request",
+                    "message": "Arbitrary server filesystem path parameter 'reference_base_path' is strictly prohibited on the public ingestion boundary.",
+                    "code": "SECURITY_VIOLATION_UNAUTHORIZED_PARAMETER",
+                },
+            )
+
         if not file or not file.filename:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -274,7 +286,6 @@ def create_router(service: PresentationService) -> APIRouter:
                 file_bytes=contents,
                 filename=file.filename,
                 mode=mode,
-                reference_base_path=reference_base_path,
             )
             res_code = status.HTTP_200_OK if ingest_res.is_duplicate else status.HTTP_201_CREATED
             return JSONResponse(status_code=res_code, content=ingest_res.model_dump())

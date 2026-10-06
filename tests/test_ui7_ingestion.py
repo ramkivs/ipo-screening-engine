@@ -316,3 +316,91 @@ def test_ingest_document_preliminary_mode(test_env):
     body = res.json()
     assert body["evaluation_mode"] == "PRELIMINARY"
     assert body["company_name"] == "APEX HOUSING FINANCE LIMITED"
+
+
+# -----------------------------------------------------------------------------
+# 6. Security Boundary: Public Server-Path Fallback Removal & Protection
+# -----------------------------------------------------------------------------
+
+
+def test_ingest_rejects_unauthorized_reference_base_path_parameter(test_env, tmp_path):
+    """Public ingestion endpoint strictly rejects reference_base_path parameter with HTTP 400."""
+    client = test_env["client"]
+    pdf_bytes = CLASS_A_PDF.read_bytes()
+
+    # Create a safe test fixture file to represent a targeted server file
+    canary_file = tmp_path / "target_fixture.json"
+    canary_file.write_text(json.dumps({"canary": "sensitive_data"}), encoding="utf-8")
+
+    # Client attempts to submit reference_base_path via multipart form
+    res = client.post(
+        "/api/v1/ingest/document",
+        files={"file": ("class_a.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
+        data={
+            "mode": "final",
+            "reference_base_path": str(canary_file),
+        },
+    )
+
+    assert res.status_code == 400
+    body = res.json()
+    assert body["code"] == "SECURITY_VIOLATION_UNAUTHORIZED_PARAMETER"
+    assert "reference_base_path" in body["message"]
+    assert "strictly prohibited" in body["message"]
+
+
+def test_public_ingestion_cannot_trigger_server_file_read(test_env, tmp_path, monkeypatch):
+    """Proves that public ingestion cannot turn a supplied reference_base_path into a server-side file read."""
+    client = test_env["client"]
+    pdf_bytes = CLASS_A_PDF.read_bytes()
+
+    canary_file = tmp_path / "unauthorized_server_file.json"
+    canary_file.write_text(json.dumps({"target": "secret"}), encoding="utf-8")
+
+    opened_files = []
+    import builtins
+    original_open = builtins.open
+
+    def tracking_open(file, *args, **kwargs):
+        opened_files.append(str(file))
+        return original_open(file, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", tracking_open)
+
+    # Attempt malicious submission
+    res = client.post(
+        "/api/v1/ingest/document",
+        files={"file": ("class_a.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
+        data={"mode": "final", "reference_base_path": str(canary_file)},
+    )
+
+    assert res.status_code == 400
+    # Crucial security assertion: the targeted file was never opened
+    assert str(canary_file) not in opened_files
+
+
+def test_service_ingest_document_signature_has_no_path_parameter():
+    """PresentationService.ingest_document must not accept caller-controlled filesystem path parameters."""
+    import inspect
+
+    sig = inspect.signature(PresentationService.ingest_document)
+    param_names = list(sig.parameters.keys())
+
+    assert "reference_base_path" not in param_names
+    assert "base_path" not in param_names
+    assert "path" not in param_names
+    # Expected signature: self, file_bytes, filename, mode
+    assert param_names == ["self", "file_bytes", "filename", "mode"]
+
+
+def test_repository_native_internal_extractor_retains_reference_base_path_support():
+    """DocumentExtractor retains reference_base_path for genuine internal test/CLI workflows."""
+    from ipo_screening.extraction import DocumentExtractor
+
+    extractor = DocumentExtractor()
+    assert hasattr(extractor, "extract_from_pdf")
+    import inspect
+
+    sig = inspect.signature(extractor.extract_from_pdf)
+    assert "reference_base_path" in sig.parameters
+

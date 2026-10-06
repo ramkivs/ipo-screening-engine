@@ -97,6 +97,38 @@ test('UI-7 ApiClient - ingestDocument handles validation errors and payload limi
   }
 });
 
+test('UI-7 ApiClient - ingestDocument does not expose or send reference_base_path parameter', async () => {
+  const originalFetch = globalThis.fetch;
+  let capturedBody = null;
+
+  try {
+    globalThis.fetch = async (url, options) => {
+      capturedBody = options.body;
+      return {
+        ok: true,
+        status: 201,
+        json: async () => ({ evaluation_id: 'test_eval' })
+      };
+    };
+
+    const client = new ApiClient();
+    const fakeFile = new Blob(['%PDF-1.4 mock content']);
+    // Even if caller erroneously attempts to pass reference_base_path in options
+    await client.ingestDocument(fakeFile, {
+      mode: 'final',
+      referenceBasePath: '/tmp/malicious/path.json',
+      reference_base_path: '/tmp/malicious/path.json'
+    });
+
+    assert.ok(capturedBody instanceof FormData);
+    assert.equal(capturedBody.get('reference_base_path'), null, 'FormData must not contain reference_base_path');
+    assert.equal(capturedBody.get('referenceBasePath'), null, 'FormData must not contain referenceBasePath');
+    assert.equal(capturedBody.get('mode'), 'final');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 // -----------------------------------------------------------------------------
 // 2. UI Upload Surface & Workflow Architecture Tests
 // -----------------------------------------------------------------------------
