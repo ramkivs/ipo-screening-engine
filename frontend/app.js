@@ -3289,7 +3289,7 @@ export class App {
         updateStage('stage-extract', 'active');
 
         const mode = modeSelect ? modeSelect.value : 'final';
-        const result = await this.apiClient.ingestDocument(this.selectedIngestFile, { mode });
+        const result = await this.api.ingestDocument(this.selectedIngestFile, { mode });
 
         updateStage('stage-extract', 'completed');
         updateStage('stage-evaluate', 'completed');

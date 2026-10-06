@@ -217,6 +217,96 @@ test('UI-7 App - Helper formatBytes formats file sizes correctly', () => {
   assert.equal(app.formatBytes(50 * 1024 * 1024), '50.0 MB');
 });
 
+test('UI-7 App - UI submission path invokes initialized ApiClient.ingestDocument without wiring errors', async () => {
+  function makeMockElement(id = '') {
+    const listeners = {};
+    return {
+      id,
+      className: '',
+      value: id === 'ingest-mode-select' ? 'final' : '',
+      disabled: false,
+      innerHTML: '',
+      textContent: '',
+      style: {},
+      classList: { add: () => {}, remove: () => {} },
+      addEventListener: (evt, fn) => {
+        listeners[evt] = listeners[evt] || [];
+        listeners[evt].push(fn);
+      },
+      trigger: async (evt, arg) => {
+        if (listeners[evt]) {
+          for (const fn of listeners[evt]) await fn(arg);
+        }
+      },
+      querySelector: () => null,
+      querySelectorAll: () => []
+    };
+  }
+
+  const elements = {
+    '#ingest-dropzone': makeMockElement('ingest-dropzone'),
+    '#ingest-file-input': makeMockElement('ingest-file-input'),
+    '#ingest-file-preview': makeMockElement('ingest-file-preview'),
+    '#ingest-file-name': makeMockElement('ingest-file-name'),
+    '#ingest-file-size': makeMockElement('ingest-file-size'),
+    '#ingest-file-remove-btn': makeMockElement('ingest-file-remove-btn'),
+    '#ingest-mode-select': makeMockElement('ingest-mode-select'),
+    '#ingest-submit-btn': makeMockElement('ingest-submit-btn'),
+    '#ingest-error-box': makeMockElement('ingest-error-box'),
+    '#ingest-outcome-container': makeMockElement('ingest-outcome-container'),
+    '#ingest-stages-list': makeMockElement('ingest-stages-list'),
+    '#stage-ready': makeMockElement('stage-ready'),
+    '#stage-upload': makeMockElement('stage-upload'),
+    '#stage-extract': makeMockElement('stage-extract'),
+    '#stage-evaluate': makeMockElement('stage-evaluate'),
+    '#stage-complete': makeMockElement('stage-complete'),
+  };
+
+  const container = {
+    querySelector: (sel) => elements[sel] || null,
+    querySelectorAll: () => []
+  };
+
+  let capturedFile = null;
+  let capturedOptions = null;
+  const mockApi = {
+    ingestDocument: async (file, options) => {
+      capturedFile = file;
+      capturedOptions = options;
+      return {
+        evaluation_id: 'R-K-FASHION-20261007-120000Z-final-12345678',
+        ipo_id: 'R-K-FASHION',
+        company_name: 'R.K Fashion accessories',
+        evaluation_mode: 'FINAL',
+        result_hash: '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+        final_score: 52.0,
+        verdict: 'CONSIDER',
+        confidence: 'Medium',
+        is_duplicate: false,
+        message: 'Filing successfully evaluated'
+      };
+    }
+  };
+
+  const app = new App(mockApi);
+  app.bindIngestEvents(container);
+
+  // User selects filing PDF (e.g. 16.5 MB real prospectus)
+  const testFile = { name: 'U18109WB2010PLC144256-R.K Fashion accessories.pdf', size: 16.5 * 1024 * 1024, type: 'application/pdf' };
+  app.selectedIngestFile = testFile;
+
+  // Trigger submission
+  await elements['#ingest-submit-btn'].trigger('click');
+
+  // Assert API client was invoked directly without undefined reference error
+  assert.equal(capturedFile, testFile);
+  assert.deepEqual(capturedOptions, { mode: 'final' });
+  assert.equal(elements['#ingest-error-box'].style.display, 'none');
+  assert.equal(elements['#ingest-outcome-container'].style.display, 'block');
+  assert.ok(elements['#ingest-outcome-container'].innerHTML.includes('R.K Fashion accessories'));
+  assert.ok(elements['#ingest-outcome-container'].innerHTML.includes('52.0'));
+});
+
 test('UI-7 App - Zero client-side scoring / calculation invariant', () => {
   const appJsPath = path.resolve(__dirname, '../app.js');
   const appJs = fs.readFileSync(appJsPath, 'utf8');
@@ -225,6 +315,9 @@ test('UI-7 App - Zero client-side scoring / calculation invariant', () => {
   assert.equal(appJs.includes('calculateScore'), false, 'app.js must not calculate scores');
   assert.equal(appJs.includes('deriveVerdict'), false, 'app.js must not derive verdicts');
   assert.equal(appJs.includes('computeResultHash'), false, 'app.js must not compute cryptographic hashes');
+
+  // Verify no erroneous this.apiClient property accesses (must use this.api consistently)
+  assert.equal(appJs.includes('this.apiClient'), false, 'app.js must not reference this.apiClient; use this.api consistently');
 
   // Verify no hardcoded credentials
   assert.equal(appJs.includes('API_KEY'), false);
