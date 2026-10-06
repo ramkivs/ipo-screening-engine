@@ -64,6 +64,8 @@ export class App {
       this.renderScorecard(segments[1]);
     } else if (segments[0] === 'evidence' && segments[1]) {
       this.renderEvidenceExplorer(segments[1], queryString);
+    } else if (segments[0] === 'performance' && segments[1]) {
+      this.renderPerformanceExplorer(segments[1], queryString);
     } else if (segments[0] === 'ipos' && segments[1]) {
       this.renderIpoDetail(segments[1]);
     } else {
@@ -518,11 +520,13 @@ export class App {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
           <a href="#directory" class="btn btn-outline btn-sm">&larr; Back to Directory</a>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <a href="#evidence/${this.escape(evaluationId)}" class="btn btn-primary btn-sm" id="btn-inspect-evidence">
+            <a href="#evidence/${this.escape(evaluationId)}" class="btn btn-outline btn-sm" id="btn-inspect-evidence">
               Inspect Evidence &amp; Provenance &rarr;
             </a>
+            <a href="#performance/${this.escape(evaluationId)}" class="btn btn-primary btn-sm" id="btn-post-listing-performance">
+              Post-Listing Performance &rarr;
+            </a>
             <a href="#ipos/${this.escape(evaluation.ipo_id)}" class="btn btn-outline btn-sm">Lifecycle History</a>
-            <span class="meta-tag">UI-4 Post-Listing (Planned)</span>
           </div>
         </div>
 
@@ -769,9 +773,14 @@ export class App {
       <!-- Top Return Bar -->
       <div class="evidence-header-bar">
         <div class="evidence-header-title">
-          <a href="#evaluations/${this.escape(evaluation.evaluation_id)}" class="btn btn-outline btn-sm" style="margin-bottom: 8px;">
-            &larr; Return to Scorecard
-          </a>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <a href="#evaluations/${this.escape(evaluation.evaluation_id)}" class="btn btn-outline btn-sm">
+              &larr; Return to Scorecard
+            </a>
+            <a href="#performance/${this.escape(evaluation.evaluation_id)}" class="btn btn-outline btn-sm">
+              Performance Explorer &rarr;
+            </a>
+          </div>
           <h2>Evidence &amp; Provenance Explorer</h2>
           <div class="company-subtitle">
             ${this.escape(evaluation.company_name)} &bull; <code>${this.escape(evaluation.ipo_id)}</code>
@@ -1273,6 +1282,474 @@ export class App {
   }
 
   // --------------------------------------------------------------------------
+  // View 5: Post-Listing Observation & Performance Explorer (UI-4)
+  // --------------------------------------------------------------------------
+
+  async renderPerformanceExplorer(evaluationId, queryString = '') {
+    this.setViewActive('performance-view');
+    const container = document.getElementById('performance-view');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div class="state-box">
+        <div class="spinner"></div>
+        <h3>Loading Post-Listing Performance Explorer...</h3>
+        <p>Fetching post-listing price observations and benchmark alpha metrics for <code>${this.escape(evaluationId)}</code>...</p>
+      </div>
+    `;
+
+    try {
+      const [evalRes, perfRes, obsRes, btRes, calRes] = await Promise.allSettled([
+        this.api.getEvaluation(evaluationId),
+        this.api.getPerformance(evaluationId),
+        this.api.getPostListing(evaluationId),
+        this.api.getBacktestAnalytics(),
+        this.api.getCalibrationProposals(),
+      ]);
+
+      if (evalRes.status !== 'fulfilled') {
+        throw evalRes.reason;
+      }
+
+      const evaluation = evalRes.value;
+      const perfSummary = perfRes.status === 'fulfilled' ? perfRes.value : null;
+      const postListing = obsRes.status === 'fulfilled' ? obsRes.value : null;
+      const backtest = btRes.status === 'fulfilled' ? btRes.value : null;
+      const calibration = calRes.status === 'fulfilled' ? calRes.value : null;
+
+      this.renderPerformanceContent(container, {
+        evaluation,
+        perfSummary,
+        postListing,
+        backtest,
+        calibration,
+      });
+    } catch (err) {
+      this.renderError(container, 'Failed to load Post-Listing Performance Explorer', err);
+    }
+  }
+
+  renderPerformanceContent(container, { evaluation, perfSummary, postListing, backtest, calibration }) {
+    const observations = postListing?.observations || [];
+    const horizons = perfSummary?.horizons || {};
+    const oneWeek = horizons.one_week || { status: 'INCOMPLETE' };
+    const oneMonth = horizons.one_month || { status: 'INCOMPLETE' };
+    const sixMonth = horizons.six_month || { status: 'INCOMPLETE' };
+
+    const issuePriceDisplay = perfSummary?.issue_price ? `₹${parseFloat(perfSummary.issue_price).toFixed(2)}` : (evaluation.score?.issue_price ? `₹${parseFloat(evaluation.score.issue_price).toFixed(2)}` : 'UNRECORDED');
+    const listingDateDisplay = perfSummary?.listing_date || 'Pending / Unrecorded';
+
+    container.innerHTML = `
+      <!-- Top Navigation Bar -->
+      <div class="evidence-header-bar">
+        <div class="evidence-header-title">
+          <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+            <a href="#evaluations/${this.escape(evaluation.evaluation_id)}" class="btn btn-outline btn-sm">
+              &larr; Return to Scorecard
+            </a>
+            <a href="#evidence/${this.escape(evaluation.evaluation_id)}" class="btn btn-outline btn-sm">
+              Inspect Evidence &rarr;
+            </a>
+          </div>
+          <h2>Post-Listing Observation &amp; Performance Explorer</h2>
+          <div class="company-subtitle">
+            ${this.escape(evaluation.company_name)} &bull; <code>${this.escape(evaluation.ipo_id)}</code>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <span class="meta-tag">FINAL EVAL: <code>${this.escape(evaluation.evaluation_id)}</code></span>
+          <span class="meta-tag">ENGINE: v${this.escape(evaluation.engine_version)}</span>
+          ${this.renderVerdictBadge(evaluation.verdict ? evaluation.verdict.verdict : 'UNKNOWN')}
+        </div>
+      </div>
+
+      <!-- 1. Executive Performance Summary KPI Strip -->
+      <div class="perf-kpi-grid" role="region" aria-label="Performance Summary KPIs">
+        <div class="perf-kpi-card">
+          <div class="perf-kpi-label">Issue Price</div>
+          <div class="perf-kpi-val">${this.escape(issuePriceDisplay)}</div>
+          <div class="perf-kpi-sub">Listing Date: ${this.escape(listingDateDisplay)}</div>
+        </div>
+
+        <div class="perf-kpi-card">
+          <div class="perf-kpi-label">1-Week Horizon (1W)</div>
+          <div class="perf-kpi-val">${this.formatReturnPct(oneWeek.ipo_return_pct)}</div>
+          <div class="perf-kpi-sub">
+            Excess Alpha: <strong>${this.formatReturnPct(oneWeek.excess_return_pct)}</strong> &bull; ${this.escape(oneWeek.status)}
+          </div>
+        </div>
+
+        <div class="perf-kpi-card">
+          <div class="perf-kpi-label">1-Month Horizon (1M)</div>
+          <div class="perf-kpi-val">${this.formatReturnPct(oneMonth.ipo_return_pct)}</div>
+          <div class="perf-kpi-sub">
+            Excess Alpha: <strong>${this.formatReturnPct(oneMonth.excess_return_pct)}</strong> &bull; ${this.escape(oneMonth.status)}
+          </div>
+        </div>
+
+        <div class="perf-kpi-card">
+          <div class="perf-kpi-label">6-Month Horizon (6M)</div>
+          <div class="perf-kpi-val">${this.formatReturnPct(sixMonth.ipo_return_pct)}</div>
+          <div class="perf-kpi-sub">
+            Excess Alpha: <strong>${this.formatReturnPct(sixMonth.excess_return_pct)}</strong> &bull; ${this.escape(sixMonth.status)}
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Deterministic Performance Timeline -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <div class="card-title">Deterministic Performance Timeline</div>
+          <span class="meta-tag">Offering Progression Chain</span>
+        </div>
+
+        <div class="timeline-wrapper" role="region" aria-label="Lifecycle Performance Timeline">
+          <!-- Step 1: FINAL Evaluation -->
+          <div class="timeline-step completed">
+            <div class="timeline-step-title">
+              <span>1. FINAL Screening</span>
+              <span class="badge badge-clear" style="font-size: 0.68rem;">COMPLETED</span>
+            </div>
+            <div class="timeline-step-date">${this.formatDate(evaluation.evaluation_timestamp)}</div>
+            <div class="timeline-step-metric">
+              Score: <strong>${evaluation.score ? evaluation.score.final_score.toFixed(1) : '—'}</strong> / 100
+            </div>
+            <div style="margin-top: 6px; font-size: 0.75rem;">
+              Verdict: ${this.renderVerdictBadge(evaluation.verdict ? evaluation.verdict.verdict : 'UNKNOWN')}
+            </div>
+          </div>
+
+          <!-- Step 2: Listing Day -->
+          <div class="timeline-step ${observations.length > 0 ? 'completed' : 'incomplete'}">
+            <div class="timeline-step-title">
+              <span>2. Listing Day</span>
+              <span class="badge ${observations.length > 0 ? 'badge-clear' : 'badge-unknown'}" style="font-size: 0.68rem;">
+                ${observations.length > 0 ? 'RECORDED' : 'PENDING'}
+              </span>
+            </div>
+            <div class="timeline-step-date">${this.escape(listingDateDisplay)}</div>
+            <div class="timeline-step-metric">
+              ${observations[0]?.prices?.listing_close ? `Close: ₹${observations[0].prices.listing_close.toFixed(2)}` : 'Awaiting Listing'}
+            </div>
+            <div style="margin-top: 6px; font-size: 0.75rem;">
+              Gain: ${observations[0]?.returns?.listing_gain_pct !== undefined ? this.formatReturnPct(observations[0].returns.listing_gain_pct) : '<span class="return-badge-neutral">UNAVAILABLE</span>'}
+            </div>
+          </div>
+
+          <!-- Step 3: 1-Week Horizon -->
+          <div class="timeline-step ${oneWeek.status === 'RECORDED' ? 'completed' : 'incomplete'}">
+            <div class="timeline-step-title">
+              <span>3. 1-Week (1W)</span>
+              <span class="badge ${oneWeek.status === 'RECORDED' ? 'badge-clear' : 'badge-unknown'}" style="font-size: 0.68rem;">
+                ${this.escape(oneWeek.status)}
+              </span>
+            </div>
+            <div class="timeline-step-date">
+              ${observations.find(o => o.horizon === '1W')?.actual_trading_date || '7d Trading Window'}
+            </div>
+            <div class="timeline-step-metric">
+              Return: ${this.formatReturnPct(oneWeek.ipo_return_pct)}
+            </div>
+            <div style="margin-top: 6px; font-size: 0.75rem;">
+              Excess Alpha: ${this.formatReturnPct(oneWeek.excess_return_pct)}
+            </div>
+          </div>
+
+          <!-- Step 4: 1-Month Horizon -->
+          <div class="timeline-step ${oneMonth.status === 'RECORDED' ? 'completed' : 'incomplete'}">
+            <div class="timeline-step-title">
+              <span>4. 1-Month (1M)</span>
+              <span class="badge ${oneMonth.status === 'RECORDED' ? 'badge-clear' : 'badge-unknown'}" style="font-size: 0.68rem;">
+                ${this.escape(oneMonth.status)}
+              </span>
+            </div>
+            <div class="timeline-step-date">
+              ${observations.find(o => o.horizon === '1M')?.actual_trading_date || '30d Trading Window'}
+            </div>
+            <div class="timeline-step-metric">
+              Return: ${this.formatReturnPct(oneMonth.ipo_return_pct)}
+            </div>
+            <div style="margin-top: 6px; font-size: 0.75rem;">
+              Excess Alpha: ${this.formatReturnPct(oneMonth.excess_return_pct)}
+            </div>
+          </div>
+
+          <!-- Step 5: 6-Month Horizon -->
+          <div class="timeline-step ${sixMonth.status === 'RECORDED' ? 'completed' : 'incomplete'}">
+            <div class="timeline-step-title">
+              <span>5. 6-Month (6M)</span>
+              <span class="badge ${sixMonth.status === 'RECORDED' ? 'badge-clear' : 'badge-unknown'}" style="font-size: 0.68rem;">
+                ${this.escape(sixMonth.status)}
+              </span>
+            </div>
+            <div class="timeline-step-date">
+              ${observations.find(o => o.horizon === '6M')?.actual_trading_date || '180d Trading Window'}
+            </div>
+            <div class="timeline-step-metric">
+              Return: ${this.formatReturnPct(sixMonth.ipo_return_pct)}
+            </div>
+            <div style="margin-top: 6px; font-size: 0.75rem;">
+              Excess Alpha: ${this.formatReturnPct(sixMonth.excess_return_pct)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Multi-Horizon Detailed Observation Cards -->
+      <div style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main);">
+            Detailed Horizon Price &amp; Return Observations
+          </h3>
+          <span class="meta-tag">${observations.length} Recorded Horizons</span>
+        </div>
+
+        ${observations.length === 0 ? `
+          <div class="card">
+            <div class="state-box">
+              <h3>No Post-Listing Observations Recorded</h3>
+              <p>No post-listing price observations have matured or been ingested for this offering yet. Offering may be in pre-listing phase or awaiting observation window closure.</p>
+              <div class="meta-tag" style="margin-top: 10px;">HORIZONS TRACKED: 1W (7d) &bull; 1M (30d) &bull; 6M (180d)</div>
+            </div>
+          </div>
+        ` : `
+          <div class="horizon-grid">
+            ${observations.map(obs => {
+              const caFactor = obs.prices?.corporate_action_factor ?? 1.0;
+              const isAdjusted = Math.abs(caFactor - 1.0) > 0.0001;
+
+              return `
+                <div class="horizon-card">
+                  <div>
+                    <div class="horizon-card-header">
+                      <div class="horizon-card-title">
+                        <span class="badge badge-apply">${this.escape(obs.horizon)}</span>
+                        <span>Horizon Observation</span>
+                      </div>
+                      <span class="badge ${obs.status === 'RECORDED' ? 'badge-clear' : 'badge-unknown'}">
+                        ${this.escape(obs.status)}
+                      </span>
+                    </div>
+
+                    <!-- Trading Schedule Info -->
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
+                      <span>Target Date: <code>${this.escape(obs.target_date)}</code></span>
+                      <span>Trading Date: <code>${this.escape(obs.actual_trading_date)}</code></span>
+                    </div>
+
+                    <!-- Compact Price Metrics Table -->
+                    <table class="price-metric-table">
+                      <tbody>
+                        <tr>
+                          <td class="label-col">Issue Price</td>
+                          <td class="val-col">₹${obs.prices?.issue_price !== undefined ? parseFloat(obs.prices.issue_price).toFixed(2) : this.escape(obs.issue_price)}</td>
+                        </tr>
+                        <tr>
+                          <td class="label-col">Listing Day Open</td>
+                          <td class="val-col">${obs.prices?.listing_open !== null && obs.prices?.listing_open !== undefined ? `₹${obs.prices.listing_open.toFixed(2)}` : '—'}</td>
+                        </tr>
+                        <tr>
+                          <td class="label-col">Listing Day Close</td>
+                          <td class="val-col">${obs.prices?.listing_close !== null && obs.prices?.listing_close !== undefined ? `₹${obs.prices.listing_close.toFixed(2)}` : '—'}</td>
+                        </tr>
+                        <tr>
+                          <td class="label-col">Raw Observed Close</td>
+                          <td class="val-col">${obs.prices?.raw_observed_close !== null && obs.prices?.raw_observed_close !== undefined ? `₹${obs.prices.raw_observed_close.toFixed(2)}` : '—'}</td>
+                        </tr>
+                        <tr>
+                          <td class="label-col">Adjusted Observed Close</td>
+                          <td class="val-col"><strong>${obs.prices?.adjusted_observed_close !== null && obs.prices?.adjusted_observed_close !== undefined ? `₹${obs.prices.adjusted_observed_close.toFixed(2)}` : '—'}</strong></td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <!-- Corporate Action & Adjustment Status -->
+                    <div style="margin-bottom: 12px;">
+                      ${isAdjusted ? `
+                        <span class="ca-pill-adjusted" title="Corporate action detected (splits, bonus, rights)">
+                          &#9888; Factor: ${caFactor.toFixed(4)} (Adjusted)
+                        </span>
+                      ` : `
+                        <span class="ca-pill-clean" title="Zero corporate actions detected">
+                          &#10003; Factor: 1.0000 (Clean / Unadjusted)
+                        </span>
+                      `}
+                    </div>
+
+                    <!-- Returns Breakdown Grid -->
+                    <div class="returns-breakdown-box">
+                      <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">
+                        Deterministic Returns Breakdown
+                      </div>
+                      <div class="returns-breakdown-grid">
+                        <div class="return-metric-cell">
+                          <span class="return-metric-label">Absolute Return</span>
+                          <span class="return-metric-val">${this.formatReturnPct(obs.returns?.absolute_return_pct)}</span>
+                        </div>
+                        <div class="return-metric-cell">
+                          <span class="return-metric-label">Listing Gain</span>
+                          <span class="return-metric-val">${this.formatReturnPct(obs.returns?.listing_gain_pct)}</span>
+                        </div>
+                        <div class="return-metric-cell">
+                          <span class="return-metric-label">Secondary Return</span>
+                          <span class="return-metric-val">${this.formatReturnPct(obs.returns?.secondary_return_pct)}</span>
+                        </div>
+                        <div class="return-metric-cell">
+                          <span class="return-metric-label">Benchmark (${this.escape(obs.benchmark?.symbol || 'BENCHMARK')})</span>
+                          <span class="return-metric-val">${this.formatReturnPct(obs.returns?.benchmark_return_pct ?? obs.benchmark?.return_pct)}</span>
+                        </div>
+                        <div class="return-metric-cell" style="grid-column: 1 / -1; border-top: 1px solid var(--border-color); padding-top: 6px; margin-top: 4px;">
+                          <span class="return-metric-label">Excess Alpha vs Benchmark</span>
+                          <span class="return-metric-val" style="font-size: 1.1rem;">${this.formatReturnPct(obs.returns?.excess_return_pct)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border-color); font-size: 0.72rem; color: var(--text-light); font-family: var(--font-mono);">
+                    Observation ID: <code>${this.escape(obs.observation_id)}</code> (v${obs.version})
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+
+      <!-- 4. Provenance & Observation Audit Panel -->
+      <div class="provenance-panel" role="region" aria-label="Observation Provenance and Fingerprints">
+        <div class="provenance-panel-header">
+          <div class="provenance-panel-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            Cryptographic Observation Provenance Fingerprints
+          </div>
+          <span class="meta-tag">FROZEN OBSERVER STORE</span>
+        </div>
+
+        <div class="provenance-grid">
+          <div class="provenance-item">
+            <span class="provenance-item-label">Final Evaluation Linkage</span>
+            <div class="provenance-hash-row">
+              <span class="provenance-hash" title="${this.escape(evaluation.evaluation_id)}">
+                ${this.escape(evaluation.evaluation_id)}
+              </span>
+              <button class="btn-copy" data-copy="${this.escape(evaluation.evaluation_id)}">Copy</button>
+            </div>
+          </div>
+
+          <div class="provenance-item">
+            <span class="provenance-item-label">Source Manifest Hash</span>
+            <div class="provenance-hash-row">
+              <span class="provenance-hash" title="${this.escape(evaluation.source_manifest_hash)}">
+                ${this.escape(evaluation.source_manifest_hash)}
+              </span>
+              <button class="btn-copy" data-copy="${this.escape(evaluation.source_manifest_hash)}">Copy</button>
+            </div>
+          </div>
+
+          <div class="provenance-item">
+            <span class="provenance-item-label">Evaluation Result Hash</span>
+            <div class="provenance-hash-row">
+              <span class="provenance-hash" title="${this.escape(evaluation.result_hash)}">
+                ${this.escape(evaluation.result_hash)}
+              </span>
+              <button class="btn-copy" data-copy="${this.escape(evaluation.result_hash)}">Copy</button>
+            </div>
+          </div>
+
+          <div class="provenance-item">
+            <span class="provenance-item-label">Benchmark Provider</span>
+            <div class="provenance-hash-row">
+              <span class="provenance-hash">
+                ${this.escape(observations[0]?.benchmark?.symbol || 'NSE NIFTY 50 (Bhavcopy Official)')}
+              </span>
+              <span class="meta-tag">OFFICIAL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Backtest & Calibration Governance Boundaries -->
+      <div class="analytics-callout-grid">
+        <!-- Backtest Analytics Affordance -->
+        <div class="backtest-callout">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+            <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">
+              Aggregate Backtest Analytics Boundary
+            </div>
+            <span class="meta-tag">POPULATION METRICS</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 12px;">
+            <strong>Individual Observation &ne; Aggregate Backtest Analysis:</strong> Individual observations measure single-offering post-listing trajectory. Aggregate backtesting evaluates population rank information coefficient (IC), hit rates, and decile spreads across the full historical universe.
+          </p>
+
+          ${backtest ? `
+            <div style="font-size: 0.78rem; font-family: var(--font-mono); display: flex; flex-direction: column; gap: 4px;">
+              <div>Analysis Hash: <code>${this.escape(backtest.analysis_hash)}</code></div>
+              <div>Dataset Hash: <code>${this.escape(backtest.dataset_hash)}</code></div>
+              <div>Leakage Audit: <span class="badge ${backtest.leakage_audit_passed ? 'badge-clear' : 'badge-avoid'}">${backtest.leakage_audit_passed ? 'PASSED' : 'FAILED'}</span></div>
+            </div>
+          ` : `
+            <div style="font-size: 0.78rem; color: var(--text-muted); background: var(--bg-surface); padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color);">
+              <span class="badge badge-unknown" style="font-size: 0.7rem;">NO RUN ARTIFACT</span>
+              No pre-computed backtest analytics artifact on disk (<code>build/analytics/</code>).
+            </div>
+          `}
+        </div>
+
+        <!-- Calibration Governance Boundary -->
+        <div class="calibration-callout">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+            <div style="font-weight: 700; color: #92400e; font-size: 0.95rem;">
+              Calibration Governance Boundary
+            </div>
+            <span class="meta-tag" style="background: #fde68a; color: #78350f;">GATED LIFECYCLE</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 12px;">
+            <strong>Policy Evolution Principle:</strong> Evidence &rarr; Analysis &rarr; Proposal &ne; Approval &ne; Implementation &ne; Activation. In-browser or automated config mutation is strictly prohibited.
+          </p>
+          <div style="font-size: 0.8rem; background: #fffdf5; padding: 10px; border-radius: 6px; border: 1px solid #fde68a;">
+            <div>Active Scoring Policy: <strong>● v1.5.0 (Executable)</strong></div>
+            <div style="margin-top: 4px;">Candidate Proposal: <strong>○ v1.6.0 (READY_FOR_HUMAN_REVIEW)</strong></div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 6px;">
+              Activation requires formal offline committee ratification. Zero in-browser activation controls.
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Wire up copy buttons if container supports DOM queries
+    if (typeof container.querySelectorAll === 'function') {
+      container.querySelectorAll('.btn-copy').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const text = btn.getAttribute('data-copy');
+          if (text) this.copyToClipboard(text, btn);
+        });
+      });
+    }
+  }
+
+  formatReturnPct(val) {
+    if (val === null || val === undefined || val === '') {
+      return '<span class="return-badge-neutral">UNAVAILABLE</span>';
+    }
+    const num = typeof val === 'number' ? val : parseFloat(val);
+    if (isNaN(num)) {
+      return `<span class="return-badge-neutral">${this.escape(String(val))}</span>`;
+    }
+    if (num > 0) {
+      return `<span class="return-badge-pos">+${num.toFixed(2)}%</span>`;
+    }
+    if (num < 0) {
+      return `<span class="return-badge-neg">${num.toFixed(2)}%</span>`;
+    }
+    return `<span class="return-badge-neutral">0.00%</span>`;
+  }
+
+  // --------------------------------------------------------------------------
   // Lifecycle History (#ipos/{id})
   // --------------------------------------------------------------------------
 
@@ -1402,12 +1879,15 @@ export class App {
                 <td>${this.renderVerdictBadge(e.verdict)}</td>
                 <td>${this.formatDate(e.evaluation_timestamp)}</td>
                 <td>
-                  <div style="display: flex; gap: 6px;">
+                  <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                     <a href="#evaluations/${this.escape(e.evaluation_id)}" class="btn btn-primary btn-sm">
                       Scorecard
                     </a>
                     <a href="#evidence/${this.escape(e.evaluation_id)}" class="btn btn-outline btn-sm">
                       Evidence
+                    </a>
+                    <a href="#performance/${this.escape(e.evaluation_id)}" class="btn btn-outline btn-sm">
+                      Performance
                     </a>
                   </div>
                 </td>
