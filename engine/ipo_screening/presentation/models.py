@@ -296,6 +296,13 @@ class CalibrationProposal(BaseModel):
     module_weight_adjustments: Optional[Dict[str, Any]] = None
     overfitting_safeguards: Optional[Dict[str, Any]] = None
     knockout_firewall_status: Optional[str] = None
+    objective: Optional[str] = None
+    sample_summary: Optional[Dict[str, Any]] = None
+    evidence_summary: Optional[Dict[str, Any]] = None
+    module_proposals: Optional[List[Dict[str, Any]]] = None
+    threshold_proposals: Optional[List[Dict[str, Any]]] = None
+    non_regression_results: Optional[List[Dict[str, Any]]] = None
+    recommendation: Optional[str] = None
 
 
 class CalibrationProposalListResponse(BaseModel):

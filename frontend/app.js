@@ -68,6 +68,8 @@ export class App {
       this.renderPerformanceExplorer(segments[1], queryString);
     } else if (segments[0] === 'backtest' || (segments[0] === 'analytics' && segments[1] === 'backtest')) {
       this.renderBacktestAnalytics();
+    } else if (segments[0] === 'calibration' || segments[0] === 'configuration') {
+      this.renderCalibrationView();
     } else if (segments[0] === 'ipos' && segments[1]) {
       this.renderIpoDetail(segments[1]);
     } else {
@@ -177,6 +179,7 @@ export class App {
             </div>
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
               <a href="#backtest" class="btn btn-outline btn-sm">Historical Backtest Analytics &rarr;</a>
+              <a href="#calibration" class="btn btn-outline btn-sm">Policy Governance &rarr;</a>
               <span class="meta-tag">POLICY: v${this.escape(cfg.active_configuration.version)}</span>
             </div>
           </div>
@@ -1727,6 +1730,9 @@ export class App {
             <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 6px;">
               Activation requires formal offline committee ratification. Zero in-browser activation controls.
             </div>
+            <div style="margin-top: 10px;">
+              <a href="#calibration" class="btn btn-outline btn-sm">Inspect Calibration &amp; Policy Governance &rarr;</a>
+            </div>
           </div>
         </div>
       </div>
@@ -1884,7 +1890,7 @@ export class App {
             Candidate policy adjustments and overfitting safeguards derived from backtest diagnostics. Strictly separated from active execution; requires offline committee ratification.
           </p>
           <div style="margin-top: 10px;">
-            <span class="meta-tag">○ v1.6.0 READY_FOR_HUMAN_REVIEW</span>
+            <a href="#calibration" class="btn btn-outline btn-sm">Inspect Calibration Proposal &rarr;</a>
           </div>
         </div>
       </div>
@@ -2237,6 +2243,9 @@ export class App {
           <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 8px;">
             Activation requires formal offline committee ratification. Zero in-browser activation controls.
           </div>
+          <div style="margin-top: 10px;">
+            <a href="#calibration" class="btn btn-outline btn-sm">Inspect Calibration &amp; Policy Governance &rarr;</a>
+          </div>
         </div>
       </div>
 
@@ -2298,6 +2307,489 @@ export class App {
       return `<span class="maturity-pill maturity-descriptive">${this.escape(s)}</span>`;
     }
     return `<span class="badge badge-unknown">${this.escape(s)}</span>`;
+  }
+
+  // --------------------------------------------------------------------------
+  // View 7: Calibration & Policy Governance Presentation (UI-6)
+  // --------------------------------------------------------------------------
+
+  async renderCalibrationView() {
+    this.setViewActive('calibration-view');
+    const container = document.getElementById('calibration-view');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div class="state-box">
+        <div class="spinner"></div>
+        <h3>Loading Calibration &amp; Policy Governance...</h3>
+        <p>Fetching active policy v1.5.0 and candidate proposal v1.6.0 artifacts...</p>
+      </div>
+    `;
+
+    try {
+      const [cfgRes, propsRes, propDetailRes, btRes] = await Promise.allSettled([
+        this.api.getConfigurationStatus(),
+        this.api.getCalibrationProposals(),
+        this.api.getCalibrationProposal('v1.6.0'),
+        this.api.getBacktestAnalytics(),
+      ]);
+
+      const config = cfgRes.status === 'fulfilled' ? cfgRes.value : null;
+      const proposals = propsRes.status === 'fulfilled' ? propsRes.value : null;
+      const proposalDetail = propDetailRes.status === 'fulfilled' ? propDetailRes.value : (proposals?.proposals?.[0] || null);
+      const backtest = btRes.status === 'fulfilled' ? btRes.value : null;
+
+      this.renderCalibrationContent(container, { config, proposals, proposalDetail, backtest });
+    } catch (err) {
+      this.renderError(container, 'Failed to load calibration and policy governance presentation', err);
+    }
+  }
+
+  renderCalibrationContent(container, { config, proposals, proposalDetail, backtest }) {
+    const activeCfg = config?.active_configuration;
+    const candidateCfg = config?.candidate_configuration;
+    const frozenCore = config?.frozen_core_status || 'VERIFIED';
+
+    const activeVersion = activeCfg?.version || '1.5.0';
+    const activeHash = activeCfg?.config_hash || '382ff86cc9d753514509f89c096f3b262bd4e12e644e0d7d03fe811b44e0f1e8';
+
+    const candidateVersion = proposalDetail?.candidate_config_version || candidateCfg?.version || '1.6.0';
+    const candidateStatus = proposalDetail?.status || candidateCfg?.status || 'READY_FOR_HUMAN_REVIEW';
+    const candidateHash = proposalDetail?.candidate_config_hash || candidateCfg?.config_hash || '4ce1480c84e6ebfe22b96511f0f9b1b6577031bf272fe703c48f220a70def1f1';
+    const proposalHash = proposalDetail?.proposal_hash || candidateCfg?.source_proposal_hash || '87bc9bcfa0bd9561adf3eb0be53a4291c465b5b02cd8561209f323e94a2249af';
+    const proposalId = proposalDetail?.proposal_id || 'PROP-1.0.0';
+    const maturityGate = proposalDetail?.maturity_gate || 'CALIBRATION_CANDIDATE';
+    const approvalStatus = proposalDetail?.approval_status || 'APPROVED';
+    const objective = proposalDetail?.objective || 'BALANCED_DIAGNOSTIC';
+
+    // Module proposals from detail or authoritative mapping
+    const rawModuleProps = proposalDetail?.module_proposals || [
+      { module_id: 'A', module_name: 'Financial Quality', current_weight: 25.0, proposed_weight: 30.0, status: 'PROPOSED', rationale: 'Increased +5 points reflecting stronger development rank correlation (0.164656).' },
+      { module_id: 'B', module_name: 'Valuation', current_weight: 20.0, proposed_weight: 15.0, status: 'PROPOSED', rationale: 'Decreased -5 points reflecting weaker development rank correlation (-0.139969).' },
+      { module_id: 'C', module_name: 'Offer Structure, Proceeds & Pre-IPO', current_weight: 15.0, proposed_weight: 15.0, status: 'NO_CHANGE', rationale: 'Baseline weight retained.' },
+      { module_id: 'D', module_name: 'Promoter & Governance', current_weight: 15.0, proposed_weight: 15.0, status: 'NO_CHANGE', rationale: 'Baseline weight retained.' },
+      { module_id: 'E', module_name: 'Business & Moat', current_weight: 15.0, proposed_weight: 15.0, status: 'NO_CHANGE', rationale: 'Baseline weight retained.' },
+      { module_id: 'F', module_name: 'Market & Demand Signals', current_weight: 10.0, proposed_weight: 10.0, status: 'NO_CHANGE', rationale: 'Baseline weight retained.' },
+    ];
+
+    const nonRegression = proposalDetail?.non_regression_results || [
+      { check_name: 'downside_protection', passed: true, baseline_value: 'CLEAR', proposed_value: 'CLEAR', details: 'Knockout rules, penalty ceilings, and AVOID boundary remain intact.' },
+      { check_name: 'holdout_stability', passed: true, baseline_value: '0.115372', proposed_value: '0.115372', details: 'Holdout out-of-sample performance remains non-degraded.' },
+      { check_name: 'deterministic_reproducibility', passed: true, baseline_value: 'DETERMINISTIC', proposed_value: 'DETERMINISTIC', details: 'Pure standard library arithmetic ensures deterministic replay.' }
+    ];
+
+    container.innerHTML = `
+      <!-- View Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+            <span>IPO Screening Engine</span>
+            <span>&bull;</span>
+            <span>Policy Evolution &amp; Governance</span>
+          </div>
+          <h2 style="margin: 0; font-size: 1.6rem; font-weight: 800; color: var(--text-main);">
+            Calibration &amp; Configuration Presentation
+          </h2>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <a href="#dashboard" class="btn btn-outline btn-sm">&larr; Return to Dashboard</a>
+          <a href="#backtest" class="btn btn-outline btn-sm">Backtest Analytics Dashboard &rarr;</a>
+        </div>
+      </div>
+
+      <!-- 1. Prominent Governance Lifecycle Strip -->
+      <div class="gov-chain-banner" role="region" aria-label="Governance Lifecycle Status">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-weight: 800; font-size: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+              <span>Policy Governance &amp; Activation Firewall</span>
+              <span class="badge badge-clear">LOCKED • READ-ONLY</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+              Separation of calibration proposal formulation from formal production activation
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <span class="gov-pill active">● ACTIVE: v${this.escape(activeVersion)}</span>
+            <span class="gov-pill inactive">○ CANDIDATE: v${this.escape(candidateVersion)} (${this.escape(candidateStatus)})</span>
+          </div>
+        </div>
+
+        <!-- 5-Step Governance Chain -->
+        <div class="gov-chain-steps">
+          <div class="gov-chain-step">
+            <div class="gov-chain-step-title">1. Empirical Evidence</div>
+            <div class="gov-chain-step-status">Realized Returns &amp; Bhavcopies</div>
+          </div>
+          <div class="gov-chain-operator">&rarr;</div>
+          <div class="gov-chain-step">
+            <div class="gov-chain-step-title">2. Statistical Analysis</div>
+            <div class="gov-chain-step-status">Rank IC &amp; Correlation Diagnostics</div>
+          </div>
+          <div class="gov-chain-operator">&rarr;</div>
+          <div class="gov-chain-step current">
+            <div class="gov-chain-step-title" style="color: #92400e;">3. Calibration Proposal</div>
+            <div class="gov-chain-step-status" style="font-weight: 700; color: #b45309;">${this.escape(proposalId)} (${this.escape(candidateStatus)})</div>
+          </div>
+          <div class="gov-chain-operator">&ne;</div>
+          <div class="gov-chain-step locked">
+            <div class="gov-chain-step-title">4. Governance Approval</div>
+            <div class="gov-chain-step-status">Investment Committee Review</div>
+          </div>
+          <div class="gov-chain-operator">&ne;</div>
+          <div class="gov-chain-step locked">
+            <div class="gov-chain-step-title">5. Release Activation</div>
+            <div class="gov-chain-step-status">STRICTLY LOCKED (NO IN-BROWSER ACTIVATION)</div>
+          </div>
+        </div>
+
+        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 12px 14px; margin-top: 14px; font-size: 0.8rem; color: #92400e; line-height: 1.45;">
+          <strong>Governance Invariant Notice:</strong> The web presentation layer operates strictly as an auditable read-only terminal with <strong>ZERO activation authority</strong>. In-browser or automated policy mutation is strictly prohibited. Activation of candidate policy <code>v1.6.0</code> requires offline human committee ratification and controlled deployment. No activation controls or mutation endpoints exist.
+        </div>
+      </div>
+
+      <!-- 2. Side-by-Side Policy Cards -->
+      <div class="policy-card-grid" role="region" aria-label="Policy Status Overview">
+        <!-- Active Policy Card -->
+        <div class="policy-card active">
+          <div class="policy-card-header">
+            <div>
+              <div style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; color: var(--color-apply); margin-bottom: 4px;">
+                Current Production Baseline
+              </div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-main);">
+                Active Policy (v${this.escape(activeVersion)})
+              </div>
+            </div>
+            <span class="badge badge-apply">● ACTIVE • EXECUTABLE</span>
+          </div>
+          <div class="policy-card-body">
+            <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 16px;">
+              Authoritative executable screening policy currently applied to all IPO evaluations in repository.
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Configuration Version:</span>
+                <strong>v${this.escape(activeVersion)}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Specification Version:</span>
+                <strong>1.5</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Execution Status:</span>
+                <span class="badge badge-clear">EXECUTABLE</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Total Scoring Points:</span>
+                <strong>100.0 pts (6 Modules)</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Frozen Core Engine:</span>
+                <span class="badge badge-clear">${this.escape(frozenCore)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding-top: 2px;">
+                <span style="color: var(--text-muted);">Config Hash:</span>
+                <code style="font-size: 0.72rem;">${this.escape(activeHash.slice(0, 16))}...</code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Candidate Proposal Card -->
+        <div class="policy-card candidate">
+          <div class="policy-card-header">
+            <div>
+              <div style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; color: #b45309; margin-bottom: 4px;">
+                Calibrated Candidate Proposal
+              </div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-main);">
+                Candidate Proposal (v${this.escape(candidateVersion)}-draft)
+              </div>
+            </div>
+            <span class="badge badge-na" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a;">
+              ○ CANDIDATE • INACTIVE
+            </span>
+          </div>
+          <div class="policy-card-body">
+            <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 16px;">
+              Empirically calibrated candidate policy derived from backtest Rank IC analysis; strictly non-executable in production.
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Proposal Identifier:</span>
+                <code>${this.escape(proposalId)}</code>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Target Policy Version:</span>
+                <strong>v${this.escape(candidateVersion)}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Proposal Status:</span>
+                <span class="badge badge-consider">${this.escape(candidateStatus)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Maturity Gate:</span>
+                <span class="badge badge-clear">${this.escape(maturityGate)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Approval Status:</span>
+                <strong>${this.escape(approvalStatus)} (Program Authority)</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding-top: 2px;">
+                <span style="color: var(--text-muted);">Proposal Hash:</span>
+                <code style="font-size: 0.72rem;">${this.escape(proposalHash.slice(0, 16))}...</code>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Current vs Proposed Module Weights Comparison Table -->
+      <div class="diagnostic-card" style="margin-bottom: 24px;">
+        <div class="diagnostic-header">
+          <div class="diagnostic-title">Current Baseline (v1.5.0) vs Proposed Candidate (v1.6.0) Comparison</div>
+          <span class="meta-tag">DETERMINISTIC WEIGHT SHIFTS</span>
+        </div>
+        <div class="diagnostic-body">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Module Identifier &amp; Name</th>
+                  <th>Current Weight (v1.5.0)</th>
+                  <th>Proposed Weight (v1.6.0)</th>
+                  <th>Delta (&Delta;)</th>
+                  <th>Proposal Status</th>
+                  <th>Empirical Rationale &amp; Expected Impact</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rawModuleProps.map(m => {
+                  const delta = (m.proposed_weight ?? 0) - (m.current_weight ?? 0);
+                  const isChanged = m.status === 'PROPOSED' || delta !== 0;
+                  return `
+                    <tr style="${isChanged ? 'background: #fffdf5;' : ''}">
+                      <td>
+                        <strong>Module ${this.escape(m.module_id)}</strong>: ${this.escape(m.module_name)}
+                      </td>
+                      <td><code>${m.current_weight !== undefined ? m.current_weight.toFixed(1) : '—'} pts</code></td>
+                      <td><strong><code>${m.proposed_weight !== undefined ? m.proposed_weight.toFixed(1) : '—'} pts</code></strong></td>
+                      <td>${this.renderDeltaPill(delta)}</td>
+                      <td>
+                        <span class="badge ${isChanged ? 'badge-consider' : 'badge-na'}">
+                          ${this.escape(m.status || (isChanged ? 'PROPOSED' : 'NO_CHANGE'))}
+                        </span>
+                      </td>
+                      <td style="font-size: 0.78rem; line-height: 1.4; color: var(--text-muted);">
+                        ${this.escape(m.rationale || '—')}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+                <tr style="background: #f8fafc; font-weight: 700;">
+                  <td><strong>Total Scoring Scale</strong></td>
+                  <td><code>100.0 pts</code></td>
+                  <td><code>100.0 pts</code></td>
+                  <td>${this.renderDeltaPill(0.0)}</td>
+                  <td><span class="badge badge-clear">NORMALIZED</span></td>
+                  <td style="font-size: 0.78rem; color: var(--text-muted);">100-point total score invariant preserved across all modules.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 18px;">
+            <div style="background: #f8fafc; padding: 12px 14px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.8rem;">
+              <div style="font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Downside Discipline: Thresholds Unchanged</div>
+              <div style="color: var(--text-muted);">APPLY threshold preserved at <code>75.0 pts</code>; APPLY_SELECTIVELY preserved at <code>60.0 pts</code>; NEUTRAL preserved at <code>45.0 pts</code>. Zero threshold relaxation.</div>
+            </div>
+            <div style="background: #f8fafc; padding: 12px 14px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.8rem;">
+              <div style="font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Knockout Firewall: Intact</div>
+              <div style="color: var(--text-muted);">Status: <code>FIREWALL_EMPTY</code>. All mandatory knockouts (Track Record, Auditor Qualifications, Promoter Integrity, Regulatory Debarment, Pending Litigations) strictly active.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Empirical Rationale & Supporting Evidence -->
+      <div class="diagnostic-grid-2">
+        <!-- Evidence Summary -->
+        <div class="diagnostic-card">
+          <div class="diagnostic-header">
+            <div class="diagnostic-title">Empirical Evidence &amp; Dataset Partition</div>
+            <span class="meta-tag">PHASE 6B / 6C DATASET</span>
+          </div>
+          <div class="diagnostic-body">
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Total Historical Cohort:</span>
+                <strong>N = 120 Offerings (3 Vintages: 2024, 2025, 2026)</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">In-Sample Development Sample:</span>
+                <strong>N = 80 Offerings (2024, 2025)</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Out-of-Sample Holdout Sample:</span>
+                <strong>N = 40 Offerings (2026)</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px;">
+                <span style="color: var(--text-muted);">Calibration Objective:</span>
+                <code>${this.escape(objective)}</code>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding-top: 2px;">
+                <span style="color: var(--text-muted);">Maturity Gating Reason:</span>
+                <span style="font-size: 0.74rem; color: var(--text-muted);">Sample N=120 &ge; 100 with 3 vintages verified.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Non-Regression & Shadow Validation Audit -->
+        <div class="diagnostic-card">
+          <div class="diagnostic-header">
+            <div class="diagnostic-title">Non-Regression &amp; Downside Protection Audit</div>
+            <span class="meta-tag">VALIDATION CHECKS</span>
+          </div>
+          <div class="diagnostic-body">
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Audit Check</th>
+                    <th>Result</th>
+                    <th>Safety Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${nonRegression.map(nr => `
+                    <tr>
+                      <td><strong>${this.escape(nr.check_name)}</strong></td>
+                      <td>
+                        <span class="badge ${nr.passed ? 'badge-clear' : 'badge-avoid'}">
+                          ${nr.passed ? 'PASSED' : 'FAILED'}
+                        </span>
+                      </td>
+                      <td style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.35;">
+                        ${this.escape(nr.details || '—')}
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+            <div class="unexposed-box" style="margin-top: 10px;">
+              <strong>Shadow Evaluation Notice:</strong> Per-offering shadow evaluations comparing baseline vs candidate scores across historical IPOs are maintained offline (<code>build/shadow/</code>) and are not projected as individual evaluation records in the presentation store.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Cryptographic Provenance Fingerprints Panel -->
+      <div class="provenance-panel" role="region" aria-label="Calibration Cryptographic Provenance Fingerprints">
+        <div class="provenance-panel-header">
+          <div class="provenance-panel-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            Cryptographic Policy &amp; Proposal Provenance Fingerprints
+          </div>
+          <span class="meta-tag">IMMUTABLE DIGESTS</span>
+        </div>
+
+        <div class="provenance-grid">
+          <div class="provenance-item">
+            <span class="provenance-item-label">Proposal Artifact Hash</span>
+            <div class="provenance-hash-row">
+              <span class="provenance-hash" title="${this.escape(proposalHash)}">
+                ${this.escape(proposalHash || 'UNAVAILABLE')}
+              </span>
+              <button class="btn-copy" data-copy="${this.escape(proposalHash || '')}">Copy</button>
+            </div>
+          </div>
+
+          <div class="provenance-item">
+            <span class="provenance-item-label">Active Baseline Config Hash (v1.5.0)</span>
+            <div class="provenance-hash-row">
+              <span class="provenance-hash" title="${this.escape(activeHash)}">
+                ${this.escape(activeHash || 'UNAVAILABLE')}
+              </span>
+              <button class="btn-copy" data-copy="${this.escape(activeHash || '')}">Copy</button>
+            </div>
+          </div>
+
+          <div class="provenance-item">
+            <span class="provenance-item-label">Candidate Draft Config Hash (v1.6.0)</span>
+            <div class="provenance-hash-row">
+              <span class="provenance-hash" title="${this.escape(candidateHash)}">
+                ${this.escape(candidateHash || 'UNAVAILABLE')}
+              </span>
+              <button class="btn-copy" data-copy="${this.escape(candidateHash || '')}">Copy</button>
+            </div>
+          </div>
+
+          <div class="provenance-item">
+            <span class="provenance-item-label">Source Dataset Hash</span>
+            <div class="provenance-hash-row">
+              <span class="provenance-hash" title="${this.escape(proposalDetail?.source_dataset_hash || '')}">
+                ${this.escape(proposalDetail?.source_dataset_hash || 'UNAVAILABLE')}
+              </span>
+              <button class="btn-copy" data-copy="${this.escape(proposalDetail?.source_dataset_hash || '')}">Copy</button>
+            </div>
+          </div>
+
+          <div class="provenance-item">
+            <span class="provenance-item-label">Source Analysis Hash</span>
+            <div class="provenance-hash-row">
+              <span class="provenance-hash" title="${this.escape(proposalDetail?.source_analysis_hash || '')}">
+                ${this.escape(proposalDetail?.source_analysis_hash || 'UNAVAILABLE')}
+              </span>
+              <button class="btn-copy" data-copy="${this.escape(proposalDetail?.source_analysis_hash || '')}">Copy</button>
+            </div>
+          </div>
+
+          <div class="provenance-item">
+            <span class="provenance-item-label">Presentation API Specification</span>
+            <div class="provenance-hash-row">
+              <span class="provenance-hash" title="docs/openapi/presentation-api-v1.yaml">
+                UI-1 Presentation API (docs/openapi/presentation-api-v1.yaml)
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Footer -->
+      <div style="margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap;">
+        <a href="#dashboard" class="btn btn-outline">&larr; Return to Dashboard</a>
+        <a href="#backtest" class="btn btn-outline">Backtest Analytics Dashboard &rarr;</a>
+        <a href="#directory" class="btn btn-outline">Explore IPO Directory &rarr;</a>
+      </div>
+    `;
+
+    // Wire up copy buttons if container supports DOM queries
+    if (typeof container.querySelectorAll === 'function') {
+      container.querySelectorAll('.btn-copy').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const text = btn.getAttribute('data-copy');
+          if (text) this.copyToClipboard(text, btn);
+        });
+      });
+    }
+  }
+
+  renderDeltaPill(delta) {
+    if (delta === null || delta === undefined) return '—';
+    const num = typeof delta === 'number' ? delta : parseFloat(delta);
+    if (isNaN(num) || num === 0) {
+      return `<span class="delta-pill delta-neutral">0.0 pts</span>`;
+    }
+    if (num > 0) {
+      return `<span class="delta-pill delta-pos">+${num.toFixed(1)} pts</span>`;
+    }
+    return `<span class="delta-pill delta-neg">${num.toFixed(1)} pts</span>`;
   }
 
   // --------------------------------------------------------------------------

@@ -687,6 +687,13 @@ class PresentationService:
             module_weight_adjustments=mod_adj if mod_adj else None,
             overfitting_safeguards=data.get("development_results"),
             knockout_firewall_status=(data.get("knockout_proposals") or {}).get("status", "FIREWALL_EMPTY"),
+            objective=data.get("objective"),
+            sample_summary=data.get("sample_summary"),
+            evidence_summary=data.get("evidence_summary"),
+            module_proposals=data.get("module_proposals"),
+            threshold_proposals=data.get("threshold_proposals"),
+            non_regression_results=data.get("non_regression_results"),
+            recommendation=data.get("recommendation"),
         )
 
     # -------------------------------------------------------------------------

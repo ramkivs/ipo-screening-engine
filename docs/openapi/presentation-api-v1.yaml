@@ -1082,6 +1082,33 @@ components:
         knockout_firewall_status:
           type: string
           nullable: true
+        objective:
+          type: string
+          nullable: true
+        sample_summary:
+          type: object
+          nullable: true
+        evidence_summary:
+          type: object
+          nullable: true
+        module_proposals:
+          type: array
+          items:
+            type: object
+          nullable: true
+        threshold_proposals:
+          type: array
+          items:
+            type: object
+          nullable: true
+        non_regression_results:
+          type: array
+          items:
+            type: object
+          nullable: true
+        recommendation:
+          type: string
+          nullable: true
 
     CalibrationProposalListResponse:
       type: object

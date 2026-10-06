@@ -172,4 +172,9 @@ export class ApiClient {
   async getCalibrationProposals() {
     return this._get('/calibration/proposals');
   }
+
+  async getCalibrationProposal(proposalId) {
+    if (!proposalId) throw new ApiError(400, 'INVALID_IDENTIFIER', 'Proposal ID must be provided');
+    return this._get(`/calibration/proposals/${encodeURIComponent(proposalId)}`);
+  }
 }
