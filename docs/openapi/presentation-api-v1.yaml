@@ -1,0 +1,1147 @@
+openapi: 3.1.0
+info:
+  title: IPO Screening Engine — Presentation Read-Model API
+  version: 1.0.0
+  description: |
+    Deterministic, read-only presentation API projecting immutable evaluation,
+    post-listing observation, backtesting, and calibration records produced by
+    the Indian Mainboard IPO Screening Engine.
+
+    PRINCIPLES:
+    - Pure presentation read model (GET / HEAD / OPTIONS only; zero mutation endpoints).
+    - Authoritative source of truth remains the immutable EvaluationStore on disk.
+    - Zero client-side or API-side duplicate scoring or metric calculation.
+    - Explicit preservation of UNKNOWN, NOT_APPLICABLE, and INSUFFICIENT_DATA semantics.
+    - Zero exposure of model provider or external data credentials.
+servers:
+  - url: /api/v1
+    description: Presentation API v1 prefix
+
+paths:
+  /health:
+    get:
+      summary: Service health check
+      operationId: getHealth
+      tags: [System]
+      responses:
+        '200':
+          description: Service is healthy and operating in read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /meta:
+    get:
+      summary: API and engine metadata
+      operationId: getMeta
+      tags: [System]
+      responses:
+        '200':
+          description: System versions, configuration hashes, and frozen-core status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMeta'
+
+  /ipos:
+    get:
+      summary: Discover and list evaluated IPO issuers
+      operationId: listIpos
+      tags: [IPOs]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: search
+          in: query
+          description: Substring match against company_name or ipo_id
+          schema:
+            type: string
+        - name: sector_profile
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of IPO issuers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IpoListResponse'
+
+  /ipos/{ipo_id}:
+    get:
+      summary: Retrieve an IPO issuer and its evaluation summary
+      operationId: getIpo
+      tags: [IPOs]
+      parameters:
+        - name: ipo_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authoritative IPO details and evaluation timeline
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IpoDetail'
+        '404':
+          description: IPO identifier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /ipos/{ipo_id}/history:
+    get:
+      summary: Retrieve chronological evaluation history and lifecycle deltas
+      operationId: getIpoHistory
+      tags: [IPOs]
+      parameters:
+        - name: ipo_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chronological list of evaluations with preliminary-to-final delta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IpoHistoryResponse'
+        '404':
+          description: IPO identifier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /evaluations:
+    get:
+      summary: Discover evaluations across issuers with deterministic filtering
+      operationId: listEvaluations
+      tags: [Evaluations]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: ipo_id
+          in: query
+          schema:
+            type: string
+        - name: mode
+          in: query
+          schema:
+            type: string
+            enum: [PRELIMINARY, FINAL]
+        - name: verdict
+          in: query
+          schema:
+            type: string
+            enum: [APPLY, CONSIDER, AVOID, INSUFFICIENT_DATA]
+        - name: confidence
+          in: query
+          schema:
+            type: string
+            enum: [High, Medium, Low]
+        - name: engine_version
+          in: query
+          schema:
+            type: string
+        - name: config_version
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated evaluations list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationListResponse'
+
+  /evaluations/{evaluation_id}:
+    get:
+      summary: Retrieve complete evaluation scorecard detail
+      operationId: getEvaluation
+      tags: [Evaluations]
+      parameters:
+        - name: evaluation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Complete immutable evaluation scorecard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationDetail'
+        '404':
+          description: Evaluation identifier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /evaluations/{evaluation_id}/evidence:
+    get:
+      summary: Retrieve evidence registry and citations for an evaluation
+      operationId: getEvaluationEvidence
+      tags: [Evidence]
+      parameters:
+        - name: evaluation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Evidence citations and verbatim prospectus quotes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceResponse'
+        '404':
+          description: Evaluation identifier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /evidence/{evidence_id}:
+    get:
+      summary: Retrieve specific evidence citation by evidence identifier
+      operationId: getEvidenceItem
+      tags: [Evidence]
+      parameters:
+        - name: evidence_id
+          in: path
+          required: true
+          description: Evidence identifier or compound identifier {eval_id}:{evidence_id}
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Evidence item details with provenance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceDetail'
+        '404':
+          description: Evidence item not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /evaluations/{evaluation_id}/post-listing:
+    get:
+      summary: Retrieve post-listing price observations and corporate actions
+      operationId: getPostListingObservations
+      tags: [Post-Listing]
+      parameters:
+        - name: evaluation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Multi-horizon post-listing price and return observations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostListingObservationsResponse'
+        '404':
+          description: Evaluation identifier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /evaluations/{evaluation_id}/performance:
+    get:
+      summary: Retrieve realized returns and benchmark alpha summary
+      operationId: getPerformanceSummary
+      tags: [Post-Listing]
+      parameters:
+        - name: evaluation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Structured horizon returns and Nifty 50 alpha
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceSummaryResponse'
+        '404':
+          description: Evaluation identifier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /backtest/datasets:
+    get:
+      summary: List available backtest datasets
+      operationId: listBacktestDatasets
+      tags: [Backtest]
+      responses:
+        '200':
+          description: Available assembled historical backtest datasets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestDatasetListResponse'
+
+  /backtest/analytics:
+    get:
+      summary: Retrieve latest backtest analytics and statistical diagnostics
+      operationId: getBacktestAnalytics
+      tags: [Backtest]
+      responses:
+        '200':
+          description: Backtest statistical diagnostics (Rank IC, hit rates, deciles)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestAnalyticsResponse'
+        '404':
+          description: Backtest analysis report not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /calibration/proposals:
+    get:
+      summary: List governed calibration proposals
+      operationId: listCalibrationProposals
+      tags: [Calibration]
+      responses:
+        '200':
+          description: Governed calibration proposals with provenance hashes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalibrationProposalListResponse'
+
+  /calibration/proposals/{proposal_id}:
+    get:
+      summary: Retrieve detailed calibration proposal artifact
+      operationId: getCalibrationProposal
+      tags: [Calibration]
+      parameters:
+        - name: proposal_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Full calibration proposal artifact with shadow evaluation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalibrationProposal'
+        '404':
+          description: Calibration proposal not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /configuration/current:
+    get:
+      summary: Retrieve configuration lifecycle status (active v1.5 vs inactive candidate v1.6)
+      operationId: getConfigurationStatus
+      tags: [Configuration]
+      responses:
+        '200':
+          description: Current active and candidate configuration lifecycle status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationStatusResponse'
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status, timestamp, read_only]
+      properties:
+        status:
+          type: string
+          example: healthy
+        timestamp:
+          type: string
+          format: date-time
+        read_only:
+          type: boolean
+          example: true
+
+    ApiMeta:
+      type: object
+      required: [api_version, engine_version, spec_version, active_config_version, candidate_config_version, candidate_config_status, golden_result_hash, read_only]
+      properties:
+        api_version:
+          type: string
+          example: v1
+        engine_version:
+          type: string
+          example: 1.5.0
+        spec_version:
+          type: string
+          example: "1.5"
+        active_config_version:
+          type: string
+          example: 1.5.0
+        candidate_config_version:
+          type: string
+          example: 1.6.0
+        candidate_config_status:
+          type: string
+          example: IMPLEMENTED_INACTIVE
+        golden_result_hash:
+          type: string
+          example: e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1
+        read_only:
+          type: boolean
+          example: true
+
+    IpoSummary:
+      type: object
+      required: [ipo_id, company_name, evaluation_count]
+      properties:
+        ipo_id:
+          type: string
+          example: VISHAL-NIRMITI-LIMITED
+        company_name:
+          type: string
+          example: Vishal Nirmiti Limited
+        sector_profile:
+          type: string
+          nullable: true
+          example: standard
+        evaluation_count:
+          type: integer
+          example: 2
+        latest_evaluation_id:
+          type: string
+          nullable: true
+        latest_evaluation_mode:
+          type: string
+          nullable: true
+          enum: [PRELIMINARY, FINAL]
+        latest_score:
+          type: number
+          nullable: true
+          example: 35.0
+        latest_verdict:
+          type: string
+          nullable: true
+          example: INSUFFICIENT_DATA
+        latest_confidence:
+          type: string
+          nullable: true
+          example: Low
+
+    IpoDetail:
+      type: object
+      required: [ipo_id, company_name, evaluations]
+      properties:
+        ipo_id:
+          type: string
+        company_name:
+          type: string
+        sector_profile:
+          type: string
+          nullable: true
+        icdr_route:
+          type: string
+          nullable: true
+        evaluations:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvaluationSummary'
+
+    IpoListResponse:
+      type: object
+      required: [items, total, page, page_size, pages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/IpoSummary'
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        pages:
+          type: integer
+
+    EvaluationSummary:
+      type: object
+      required: [evaluation_id, ipo_id, company_name, evaluation_mode, evaluation_timestamp, final_score, verdict, confidence, engine_version, config_version, result_hash]
+      properties:
+        evaluation_id:
+          type: string
+        ipo_id:
+          type: string
+        company_name:
+          type: string
+        evaluation_mode:
+          type: string
+          enum: [PRELIMINARY, FINAL]
+        evaluation_timestamp:
+          type: string
+          format: date-time
+        final_score:
+          type: number
+        base_score:
+          type: number
+          nullable: true
+        penalties_total:
+          type: number
+          nullable: true
+        lower_bound:
+          type: number
+          nullable: true
+        upper_bound:
+          type: number
+          nullable: true
+        verdict:
+          type: string
+        confidence:
+          type: string
+        completeness_pct:
+          type: number
+          nullable: true
+        engine_version:
+          type: string
+        config_version:
+          type: string
+        result_hash:
+          type: string
+
+    EvaluationListResponse:
+      type: object
+      required: [items, total, page, page_size, pages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvaluationSummary'
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        pages:
+          type: integer
+
+    CriterionScore:
+      type: object
+      required: [id, label, max, score, state]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        max:
+          type: number
+        score:
+          type: number
+        metric:
+          type: string
+          nullable: true
+        value:
+          type: object
+          nullable: true
+        state:
+          type: string
+          enum: [SCORED, UNKNOWN, NOT_APPLICABLE]
+        reason:
+          type: string
+          nullable: true
+        capped_by:
+          type: string
+          nullable: true
+
+    ModuleScore:
+      type: object
+      required: [id, name, max, score, criteria]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        max:
+          type: number
+        score:
+          type: number
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/CriterionScore'
+
+    KnockoutRule:
+      type: object
+      required: [id, label, state]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        state:
+          type: string
+          enum: [CLEAR, TRIGGERED, UNVERIFIED]
+        missing_inputs:
+          type: array
+          items:
+            type: string
+
+    KnockoutSummary:
+      type: object
+      required: [status, rules]
+      properties:
+        status:
+          type: string
+          enum: [CLEAR, TRIGGERED, UNVERIFIED]
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnockoutRule'
+
+    PenaltyItem:
+      type: object
+      required: [id, label, points, state]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        points:
+          type: number
+        state:
+          type: string
+          enum: [SCORED, UNKNOWN]
+        trigger:
+          type: boolean
+          nullable: true
+
+    MissingUnverifiedItem:
+      type: object
+      required: [category, item]
+      properties:
+        category:
+          type: string
+          enum: [CRITERION, KNOCKOUT, PENALTY, SNAPSHOT]
+        item:
+          type: string
+        rule_id:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+
+    EvaluationScoreDetail:
+      type: object
+      required: [final_score, base_score, penalties_total, lower_bound, upper_bound, confidence, completeness_pct, modules]
+      properties:
+        final_score:
+          type: number
+        base_score:
+          type: number
+        penalties_total:
+          type: number
+        lower_bound:
+          type: number
+        upper_bound:
+          type: number
+        available_points:
+          type: number
+          nullable: true
+        unknown_points:
+          type: number
+          nullable: true
+        total_evaluable_points:
+          type: number
+          nullable: true
+        confidence:
+          type: string
+          enum: [High, Medium, Low]
+        completeness_pct:
+          type: number
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleScore'
+
+    EvaluationDetail:
+      type: object
+      required: [evaluation_id, ipo_id, company_name, evaluation_mode, evaluation_timestamp, engine_version, spec_version, config_version, config_hash, input_snapshot_hash, source_manifest_hash, result_hash, score, knockouts, verdict, penalties, missing_unverified, provenance]
+      properties:
+        evaluation_id:
+          type: string
+        ipo_id:
+          type: string
+        company_name:
+          type: string
+        evaluation_mode:
+          type: string
+          enum: [PRELIMINARY, FINAL]
+        evaluation_timestamp:
+          type: string
+          format: date-time
+        engine_version:
+          type: string
+        spec_version:
+          type: string
+        config_version:
+          type: string
+        config_hash:
+          type: string
+        input_snapshot_hash:
+          type: string
+        source_manifest_hash:
+          type: string
+        market_snapshot_hash:
+          type: string
+          nullable: true
+        peer_snapshot_hash:
+          type: string
+          nullable: true
+        result_hash:
+          type: string
+        score:
+          $ref: '#/components/schemas/EvaluationScoreDetail'
+        knockouts:
+          $ref: '#/components/schemas/KnockoutSummary'
+        penalties:
+          type: array
+          items:
+            $ref: '#/components/schemas/PenaltyItem'
+        verdict:
+          type: object
+          properties:
+            verdict:
+              type: string
+            band_score:
+              type: string
+            uncertain:
+              type: boolean
+            insufficient_data:
+              type: boolean
+            mode_label:
+              type: string
+              nullable: true
+        missing_unverified:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissingUnverifiedItem'
+        preliminary_delta:
+          type: object
+          nullable: true
+        provenance:
+          type: object
+          properties:
+            sources:
+              type: array
+              items:
+                type: string
+            evidence_count:
+              type: integer
+            engine_version:
+              type: string
+            spec_version:
+              type: string
+
+    EvidenceDetail:
+      type: object
+      required: [evidence_id, field]
+      properties:
+        evidence_id:
+          type: string
+        field:
+          type: string
+        source:
+          type: string
+          nullable: true
+        document:
+          type: string
+          nullable: true
+        page:
+          type: integer
+          nullable: true
+        locator:
+          type: string
+          nullable: true
+        quote:
+          type: string
+          nullable: true
+        extracted_value:
+          type: object
+          nullable: true
+        unit:
+          type: string
+          nullable: true
+
+    EvidenceResponse:
+      type: object
+      required: [evaluation_id, source_manifest_hash, evidence_count, items]
+      properties:
+        evaluation_id:
+          type: string
+        source_manifest_hash:
+          type: string
+        sources:
+          type: array
+          items:
+            type: string
+        evidence_count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceDetail'
+
+    IpoHistoryResponse:
+      type: object
+      required: [ipo_id, company_name, history]
+      properties:
+        ipo_id:
+          type: string
+        company_name:
+          type: string
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvaluationSummary'
+        delta:
+          type: object
+          nullable: true
+
+    PostListingObservationItem:
+      type: object
+      required: [observation_id, horizon, version, target_date, actual_trading_date, status, issue_price]
+      properties:
+        observation_id:
+          type: string
+        horizon:
+          type: string
+          enum: [LISTING_DAY, ONE_WEEK, ONE_MONTH, SIX_MONTH]
+        version:
+          type: integer
+        target_date:
+          type: string
+        actual_trading_date:
+          type: string
+        status:
+          type: string
+          enum: [VERIFIED, UNVERIFIED, INCOMPLETE, INVALID]
+        issue_price:
+          type: string
+        price_observation:
+          type: object
+          properties:
+            close:
+              type: string
+              nullable: true
+            source:
+              type: string
+              nullable: true
+        benchmark_observation:
+          type: object
+          properties:
+            index_symbol:
+              type: string
+            base_close:
+              type: string
+              nullable: true
+            observation_close:
+              type: string
+              nullable: true
+            return_pct:
+              type: string
+              nullable: true
+        return_set:
+          type: object
+          properties:
+            listing_gain_pct:
+              type: string
+              nullable: true
+            horizon_return_pct:
+              type: string
+              nullable: true
+            benchmark_return_pct:
+              type: string
+              nullable: true
+            excess_return_pct:
+              type: string
+              nullable: true
+            status:
+              type: string
+
+    PostListingObservationsResponse:
+      type: object
+      required: [final_evaluation_id, ipo_id, observation_count, observations]
+      properties:
+        final_evaluation_id:
+          type: string
+        ipo_id:
+          type: string
+        observation_count:
+          type: integer
+        observations:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostListingObservationItem'
+
+    HorizonPerformance:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+        ipo_return_pct:
+          type: string
+          nullable: true
+        benchmark_return_pct:
+          type: string
+          nullable: true
+        excess_return_pct:
+          type: string
+          nullable: true
+
+    PerformanceSummaryResponse:
+      type: object
+      required: [final_evaluation_id, ipo_id, company_name, horizons]
+      properties:
+        final_evaluation_id:
+          type: string
+        ipo_id:
+          type: string
+        company_name:
+          type: string
+        issue_price:
+          type: string
+          nullable: true
+        listing_date:
+          type: string
+          nullable: true
+        horizons:
+          type: object
+          properties:
+            listing_day:
+              $ref: '#/components/schemas/HorizonPerformance'
+            one_week:
+              $ref: '#/components/schemas/HorizonPerformance'
+            one_month:
+              $ref: '#/components/schemas/HorizonPerformance'
+            six_month:
+              $ref: '#/components/schemas/HorizonPerformance'
+
+    BacktestDatasetSummary:
+      type: object
+      required: [dataset_id, dataset_hash, row_count, status_counts]
+      properties:
+        dataset_id:
+          type: string
+        dataset_hash:
+          type: string
+        row_count:
+          type: integer
+        included_observation_count:
+          type: integer
+        generated_at:
+          type: string
+          nullable: true
+        status_counts:
+          type: object
+
+    BacktestDatasetListResponse:
+      type: object
+      required: [datasets, total]
+      properties:
+        datasets:
+          type: array
+          items:
+            $ref: '#/components/schemas/BacktestDatasetSummary'
+        total:
+          type: integer
+
+    BacktestAnalyticsResponse:
+      type: object
+      required: [analysis_hash, dataset_hash, sample_maturity, leakage_audit_passed]
+      properties:
+        analysis_hash:
+          type: string
+        dataset_hash:
+          type: string
+        sample_maturity:
+          type: object
+          properties:
+            one_week:
+              type: string
+            one_month:
+              type: string
+            six_month:
+              type: string
+        leakage_audit_passed:
+          type: boolean
+        rank_ic:
+          type: object
+          nullable: true
+          properties:
+            horizon:
+              type: string
+            spearman_ic:
+              type: number
+            p_value:
+              type: number
+            sample_size:
+              type: integer
+        hit_rates:
+          type: object
+          nullable: true
+        avoided_loss_rates:
+          type: object
+          nullable: true
+        decile_buckets:
+          type: array
+          items:
+            type: object
+          nullable: true
+
+    CalibrationProposal:
+      type: object
+      required: [proposal_id, proposal_hash, baseline_config_version, candidate_config_version, maturity_gate, status, approval_status]
+      properties:
+        proposal_id:
+          type: string
+        proposal_hash:
+          type: string
+        baseline_config_version:
+          type: string
+        candidate_config_version:
+          type: string
+        baseline_config_hash:
+          type: string
+        candidate_config_hash:
+          type: string
+        source_dataset_hash:
+          type: string
+        source_analysis_hash:
+          type: string
+        maturity_gate:
+          type: string
+        status:
+          type: string
+        approval_status:
+          type: string
+        module_weight_adjustments:
+          type: object
+          nullable: true
+        overfitting_safeguards:
+          type: object
+          nullable: true
+        knockout_firewall_status:
+          type: string
+          nullable: true
+
+    CalibrationProposalListResponse:
+      type: object
+      required: [proposals, total]
+      properties:
+        proposals:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalibrationProposal'
+        total:
+          type: integer
+
+    ConfigLifecycleItem:
+      type: object
+      required: [version, status, is_active, config_hash]
+      properties:
+        version:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, IMPLEMENTED_INACTIVE, DEPRECATED]
+        is_active:
+          type: boolean
+        config_hash:
+          type: string
+        description:
+          type: string
+          nullable: true
+        source_proposal_hash:
+          type: string
+          nullable: true
+
+    ConfigurationStatusResponse:
+      type: object
+      required: [active_configuration, candidate_configuration, frozen_core_status, golden_result_status]
+      properties:
+        active_configuration:
+          $ref: '#/components/schemas/ConfigLifecycleItem'
+        candidate_configuration:
+          $ref: '#/components/schemas/ConfigLifecycleItem'
+        frozen_core_status:
+          type: string
+          example: VERIFIED
+        golden_result_status:
+          type: string
+          example: VERIFIED
+
+    ApiError:
+      type: object
+      required: [error, message, code]
+      properties:
+        error:
+          type: string
+          example: Not Found
+        message:
+          type: string
+          example: Evaluation 01ba66c... not found in store
+        code:
+          type: string
+          example: EVALUATION_NOT_FOUND
+        details:
+          type: object
+          nullable: true
