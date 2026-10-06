@@ -7,16 +7,22 @@
 
 ---
 
-## 1. Executive Summary & Reconciliation Impact
+## 1. Executive Summary & Authoritative Reconciliation Impact
 
-| Metric / Attribute | Baseline Evaluation (Before Repair) | Repaired Evaluation (After Pipeline Repair) | Net Reconciled Delta |
+**Authoritative Commit SHA:** `2e271649530338e427140a219976f009d302fef9`  
+**Authoritative Deterministic Result Hash:** `6066aab6d0aff19d74726109512fd5b8b5d9c8fe3c33e05bf0d563a117bed7aa`  
+**Deterministic Evaluation ID:** `R-K-FASHION-ACCESSORIES-LIMITED-20261005-120000Z-final-6066aab6`  
+
+| Metric / Attribute | Baseline Evaluation (`e959e12`) | Authoritative Repaired Evaluation (`2e27164`) | Net Reconciled Delta |
 | :--- | :--- | :--- | :--- |
-| **Final Score** | **20.0 / 100** | **59.0 / 100** (61.0 with segment CAGR) | **+39.0 to +41.0 pts** |
-| **Available Points** | 30.0 points | 82.0 points | **+52.0 points** |
-| **Unknown Points** | **70.0 points** | **18.0 points** (all genuinely external) | **-52.0 points** |
-| **Completeness %** | 30.0% completeness | 82.0% completeness | **+52.0%** |
-| **Confidence Level** | Low | **Medium** | Upgraded |
-| **Verdict** | INSUFFICIENT_DATA | INSUFFICIENT_DATA (gated by unavail Module F) | Preserved |
+| **Final Score** | **20.0 / 100** | **61.0 / 100** | **+41.0 pts** |
+| **Base Score** | 20.0 / 100 | **64.0 / 100** | **+44.0 pts** |
+| **Penalties Applied** | 0.0 pts | **-3.0 pts** (`margin_spike` triggered) | **-3.0 pts** |
+| **Available Points** | 30.0 points | **82.0 points** | **+52.0 points** |
+| **Unknown Points** | **70.0 points** | **18.0 points** | **-52.0 points** |
+| **Completeness %** | 30.0% completeness | **82.0% completeness** | **+52.0%** |
+| **Confidence Level** | Low | **Medium** | **Upgraded** |
+| **Verdict** | INSUFFICIENT_DATA | **INSUFFICIENT_DATA** (Module F unobserved) | Preserved fail-closed |
 | **Module A (Financial Quality)** | 0.0 / 0.0 (25 unknown pts) | **21.0 / 25.0 (0 unknown pts)** | **+21.0 pts (100% scored)** |
 | **Module B (Valuation)** | 0.0 / 0.0 (16 unknown pts) | **10.0 / 16.0 (4 unknown pts)** | **+10.0 pts (real peer scored)** |
 | **Module C (Offer Structure)** | 11.0 / 11.0 (4 unknown pts) | **11.0 / 11.0 (4 unknown pts)** | **100% available scored** |
@@ -26,7 +32,112 @@
 
 ---
 
-## 2. Root Cause Analysis of Information Loss
+### Reconciliation of Score Discrepancy (59.0 vs 61.0)
+During initial testing prior to segment-specific CAGR prioritization, the extractor picked the broad gems and jewellery industry figure of 5.28% (PDF p. 194). Under `config/ipo-config.v1.5.0.json`, the scoring rule for `industry_growth` has bands:
+- `> 12` -> 5 points
+- `>= 8` -> 3 points
+- `>= 0` -> 1 point
+
+At 5.28% CAGR, `industry_growth` fell into the `>= 0` band, scoring **1.0 point**, yielding Module E = 9.0, Base Score = 62.0, and Final Score = **59.0/100** (62.0 - 3.0 penalty).
+
+At the authoritative commit `2e27164`, the extractor correctly extracts the primary operating segment's growth: Global Artificial Jewellery Market CAGR of **8.0%** (2026–2035, PDF p. 192). At 8.0%, `industry_growth` satisfies `>= 8`, scoring **3.0 points** (an exact +2.0 point delta). Module E increases from 9.0 to 11.0, Base Score becomes 64.0, and the deterministic Final Score is **61.0/100** (64.0 - 3.0 penalty).
+
+#### Complete Authoritative Score Arithmetic at Commit `2e27164`:
+- **Module A (Financial Quality): 21.0 / 25.0 (Available: 25.0, Unknown: 0)**
+  - `revenue_cagr`: 6.0 / 6.0 (band `> 25`, derived 2-yr CAGR = 51.17%)
+  - `margin_trend`: 5.0 / 5.0 (band `expanding`, EBITDA margin 0.86% -> 16.74% -> 24.16%)
+  - `roce`: 5.0 / 5.0 (band `> 20`, disclosed FY26 ROCE = 57.74%)
+  - `cfo_quality`: 1.0 / 5.0 (band `>= 0`, cumulative CFO/PAT ratio = 0.2006)
+  - `leverage`: 4.0 / 4.0 (band `strong`, D/E 0.11, ICR > 100)
+- **Module B (Valuation): 10.0 / 20.0 (Available: 16.0, Unknown: 4.0)**
+  - `pe_vs_peers`: 8.0 / 8.0 (band `<= -20%`, Banaras Beads P/E 44.31 vs Issuer P/B band low/high P/E 14.67–20.25)
+  - `second_multiple`: 0.0 / 4.0 (band `else`, Banaras Beads P/B 1.36 vs Issuer P/B ~2.4)
+  - `peg`: 2.0 / 4.0 (band `< 1`, PEG = 0.093, capped at 2.0 due to `low_base_year`)
+  - `sector_ipo_relative`: UNKNOWN (4.0 unknown points; secondary market sector IPO database unsupplied)
+- **Module C (Offer Structure, Proceeds & Pre-IPO): 11.0 / 15.0 (Available: 11.0, Unknown: 4.0)**
+  - `fresh_share`: 3.0 / 3.0 (band `> 70`, 100% fresh issue of ₹3,499.10L)
+  - `ofs_seller_type`: 2.0 / 2.0 (band `none_or_small`, OFS is NIL)
+  - `promoter_ofs_pct`: 2.0 / 2.0 (band `== 0`, OFS is NIL)
+  - `dilution`: 1.0 / 1.0 (band `true`, dilution 27.5% <= 30%)
+  - `use_of_proceeds`: UNKNOWN (4.0 unknown points; fail-closed due to explicitly undisclosed GCP `[●]`)
+  - `pre_ipo_placement`: 2.0 / 2.0 (band `none_or_near_ipo`, no discounted placement within 12m)
+  - `lockin`: 1.0 / 1.0 (band `intact`, 18-month promoter lock-in confirmed)
+- **Module D (Promoter & Governance): 11.0 / 15.0 (Available: 15.0, Unknown: 0)**
+  - `promoter_post_holding`: 4.0 / 4.0 (band `> 60`, post-issue holding 72.25%)
+  - `litigation`: 4.0 / 4.0 (band `clean`, no criminal litigation against promoters/directors)
+  - `rpt`: 1.0 / 3.0 (band `<= 15`, RPT = 6.67% of revenue)
+  - `auditor`: 1.0 / 2.0 (band `eom_only`, Murarka & Associates unchanged 3 FYs, peer-reviewed, not Big-4)
+  - `board_kmp`: 1.0 / 2.0 (band `other`, 3 of 7 independent directors = 42.8% <= 50%)
+- **Module E (Business & Moat): 11.0 / 15.0 (Available: 15.0, Unknown: 0)**
+  - `industry_growth`: 3.0 / 5.0 (band `>= 8`, Global Artificial Jewellery Market CAGR = 8.0%)
+  - `moat`: 3.0 / 5.0 (band `strong_niche`, artificial jewellery and hair accessories leader)
+  - `concentration`: 3.0 / 3.0 (band `< 30`, top-5 customer concentration = 11.11%)
+  - `visibility`: 2.0 / 2.0 (band `strong`, operational order and capacity visibility)
+- **Module F (Market & Demand Signals): 0.0 / 10.0 (Available: 0, Unknown: 10.0)**
+  - `gmp_trend`: UNKNOWN (3.0 pts, unsupplied external secondary feed)
+  - `market_regime`: UNKNOWN (2.0 pts, unsupplied external index feed)
+  - `overall_subscription`: UNKNOWN (2.0 pts, unsupplied live exchange feed)
+  - `nii_subscription`: UNKNOWN (2.0 pts, unsupplied live exchange feed)
+  - `retail_nii_penalty`: UNKNOWN (1.0 pt, unsupplied live exchange feed)
+- **Base Score Total:** 21.0 + 10.0 + 11.0 + 11.0 + 11.0 + 0.0 = **64.0 / 82.0 available points**
+- **Penalties Total:** -3.0 points (`margin_spike` triggered due to EBITDA margin jumping from 0.86% in FY24 to 16.74% in FY25, > 500 bps YoY)
+- **Final Deterministic Score:** 64.0 - 3.0 = **61.0 / 100**
+
+---
+
+## 2. Industry CAGR Semantics & Contractual Grounding
+
+### Schema & Evaluator Contract (v1.5.0)
+Under `schema/ipo-input.v1.5.schema.json` (lines 746–775):
+- `industry_cagr_pct`: Number (percentage).
+- `industry_scope`: Enum `["india", "global", "regional", null]`. Global scope is an explicitly valid statutory input.
+- `industry_forecast_period`: String (e.g. "2026-2035").
+- `industry_source`: String citing the independent report.
+- `industry_is_primary`: Boolean indicating primary product segment.
+
+Under `config/ipo-config.v1.5.0.json` (lines 585–605), `industry_growth` requires all three companion fields (`industry_scope`, `industry_forecast_period`, `industry_source`). If any are omitted, the criterion fails closed to `UNKNOWN`.
+
+### Why Global Artificial Jewellery Market CAGR (8.0%) is Authoritative
+Section V (Industry Overview) of the RHP presents two distinct market discussions:
+1. **Subsection A (PDF p. 192): `GLOBAL IMITATION JEWELLERY MARKET`**
+   - *"The global Artificial Jewellery Market is estimated to be valued at approximately USD 29.16 Billion in 2026. The market is projected to reach USD 58.32 Billion by 2035, expanding at a CAGR of 8% from 2026 to 2035."*
+   - Independent Source: Maximize Market Research Report (`https://www.maximizemarketresearch.com/market-report/jewelry-market/147820/`).
+   - Forecast Period: `2026-2035`.
+   - Point Estimate: Exactly `8.0%`.
+2. **Subsection B (PDF p. 194): `INDIAN JEWELLERY MARKET`**
+   - Discusses the broad Indian domestic jewellery market (valued at USD 90–91B, projected to USD 150B at a CAGR range of 5.2–6.3%).
+   - Critical Disclosure on p. 194: *"The Gold jewellery market in India dominates the landscape with a commanding 80–85% share, while studded jewellery accounts for 15–20%. Fine jewellery represents nearly 90% of the overall market."*
+
+**Authoritative Justification:**
+- **Product Segment Alignment:** R.K. Fashion Accessories Limited does not manufacture gold bullion, diamond solitaires, or precious metal jewellery. It manufactures 100% imitation/artificial fashion jewellery and accessories. Applying the precious metals bullion market CAGR (80-85% gold) to an imitation fashion jewellery producer violates financial and semantic grounding.
+- **Definitive Metric vs Range:** The global artificial jewellery report provides a definitive point estimate (`8.0%`) and single forecast horizon (`2026-2035`), whereas the general Indian overview cites a loose range (`5.2 - 6.3%`).
+- **Contract Compliance:** Global artificial jewellery outlook complies completely with the v1.5.0 specification and schema enums without altering engine scoring rules.
+
+---
+
+## 3. Explicit Tripartite Unknown Points Classification (18.0 Unknown Points)
+
+The 18 unobserved points across the 100 evaluable points are strictly partitioned into three mutually exclusive categories:
+
+### Category 1: External-Data Unavailable (14.0 Points)
+These criteria evaluate market-wide conditions or live market transactions occurring outside the statutory RHP document boundary:
+1. **`B.sector_ipo_relative` (4.0 pts):** Requires secondary trading performance and listing-day multiples of the last 4 IPOs in the same sector over the preceding 12 months. This historical trading dataset is not part of the issuer's pre-issue RHP.
+2. **`F.gmp_trend` (3.0 pts):** Requires live unofficial grey market premium tracking feeds.
+3. **`F.market_regime` (2.0 pts):** Requires secondary market index moving averages (Nifty 50 50-DMA and 200-DMA).
+4. **`F.overall_subscription` (2.0 pts):** Requires real-time exchange bidding book data across QIB, NII, and Retail books.
+5. **`F.nii_subscription` (2.0 pts):** Requires real-time non-institutional investor bidding book data.
+6. **`F.retail_nii_penalty` (1.0 pt):** Requires final bidding-close undersubscription tallies.
+
+### Category 2: Source Explicitly Undisclosed / Unavailable in RHP (4.0 Points)
+These criteria could not be scored because the statutory prospectus deliberately left the required value blank or unpriced:
+1. **`C.use_of_proceeds` (4.0 pts):** In RHP Section III ("Objects of the Issue", p. 133), the General Corporate Purposes (GCP) amount is stated with the legal placeholder `[●]` pending discovery of the final offer price. Under v1.5.0 specification Section 13, the engine is strictly prohibited from substituting the statutory 25% ceiling or treating the undisclosed amount as zero, as doing so would allow blind-heavy issues to bypass governance checks. The criterion fail-closes to `UNKNOWN`.
+
+### Category 3: Other Genuine Contract Limitations (0.0 Points)
+- **None.** All other 22 criteria across Modules A, B, C, D, and E (82.0 evaluable points) are resolved deterministically from extracted RHP facts.
+
+---
+
+## 4. Root Cause Analysis of Information Loss
 
 Through systematic execution profiling of `DocumentExtractor.extract_from_pdf` on the 496-page R.K. Fashion Accessories RHP, four distinct failure points were isolated across the pipeline:
 
@@ -63,7 +174,7 @@ Through systematic execution profiling of `DocumentExtractor.extract_from_pdf` o
 
 ---
 
-## 3. Criterion-by-Criterion Forensic Trace & Classification Matrix
+## 5. Criterion-by-Criterion Forensic Trace & Classification Matrix
 
 | Module & Criterion ID | PDF Source Evidence (Page & Quote) | Extractor Output | Canonical Field | Evaluator Input | Repaired Result | Defect Classification |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -88,7 +199,7 @@ Through systematic execution profiling of `DocumentExtractor.extract_from_pdf` o
 | **D. rpt** | PDF Section V/Financial Notes: RPT within limit | `governance.rpt_pct_revenue` | `governance.rpt_pct_revenue` | `rpt_pct_revenue = 6.67%` | **SCORED 1.0/3.0** (band `<= 15`) | `PRESENT_AND_REPAIRED` |
 | **D. auditor** | PDF p. 170/292: Murarka & Associates, unchanged 3 FYs, not Big 4 | `governance.auditor_changed_3y: false, auditor_reputed: false` | `governance` | `auditor_bucket = "eom_only"` | **SCORED 1.0/2.0** (band `eom_only`) | `PRESENT_AND_REPAIRED` |
 | **D. board_kmp** | PDF p. 248: 7 directors, 3 independent (42.8% <= 50%) | `governance.board_independent_majority` | `governance` | `board_kmp_bucket = "other"` | **SCORED 1.0/2.0** (band `other`) | `PRESENT_AND_REPAIRED` |
-| **E. industry_growth** | PDF p. 192: Global Artificial Jewellery Market CAGR 8.0%, 2026–2035 | `business.industry_cagr_pct: 8.0`, scope: global, period: 2026-2035 | `business` | `industry_cagr_pct = 8.0%` | **SCORED 3.0/5.0** (band `>= 7`) | `PRESENT_AND_REPAIRED` |
+| **E. industry_growth** | PDF p. 192: Global Artificial Jewellery Market CAGR 8.0%, 2026–2035 | `business.industry_cagr_pct: 8.0`, scope: global, period: 2026-2035 | `business` | `industry_cagr_pct = 8.0%` | **SCORED 3.0/5.0** (band `>= 8`) | `PRESENT_AND_REPAIRED` |
 | **E. moat** | PDF Section V: Strong niche artificial jewellery positioning | `business.moat_rating` | `business.moat_rating` | `moat_rating = "strong_niche"` | **SCORED 3.0/5.0** (band `strong_niche`) | `PRESENT_AND_REPAIRED` |
 | **E. concentration** | PDF p. 45: Top 5 customers accounted for 11.11% in FY26 | `business.top5_customer_pct` | `business.top5_customer_pct` | `top5_concentration_pct = 11.11%` | **SCORED 3.0/3.0** (band `< 30`) | `PRESENT_AND_REPAIRED` |
 | **E. visibility** | Operational capacity and order visibility | `business.visibility_rating` | `business.visibility_rating` | `visibility_rating = "strong"` | **SCORED 2.0/2.0** (band `strong`) | `PRESENT_AND_REPAIRED` |
@@ -100,7 +211,7 @@ Through systematic execution profiling of `DocumentExtractor.extract_from_pdf` o
 
 ---
 
-## 4. Verification and Invariant Compliance
+## 6. Verification and Invariant Compliance
 
 1. **Zero Frozen Core Modifications:**
    `git diff --stat` confirms zero modifications to `engine/ipo_screening/derived.py`, `scoring.py`, `knockouts.py`, `snapshots.py`, `evaluation.py`, and `extraction/price_band_notice.py`.
