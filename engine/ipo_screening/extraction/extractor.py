@@ -47,8 +47,9 @@ class DocumentExtractor:
             if pr:
                 page_ranges[canonical_key] = pr
 
-        # 2. Extract domain sections
-        section_extractor = SectionExtractor(doc, reader)
+        # 2. Extract domain sections with text caching
+        text_cache: Dict[int, str] = {}
+        section_extractor = SectionExtractor(doc, reader, text_cache=text_cache)
         extractions: List[RawExtraction] = []
 
         cover_extractions = section_extractor.extract_cover_and_offer(page_ranges)
@@ -66,11 +67,14 @@ class DocumentExtractor:
         biz_extractions = section_extractor.extract_business(page_ranges)
         extractions.extend(biz_extractions)
 
+        peer_extractions = section_extractor.extract_peers(page_ranges)
+        extractions.extend(peer_extractions)
+
         # 3. Extract financial tables
-        fin_extractor = FinancialTableExtractor(doc, reader)
+        fin_extractor = FinancialTableExtractor(doc, reader, text_cache=text_cache)
         fin_range = page_ranges.get("restated_financials")
         fin_start = fin_range[0] if fin_range else 50
-        fin_extractions = fin_extractor.extract_all(start_page=fin_start)
+        fin_extractions = fin_extractor.extract_all(start_page=fin_start, page_ranges=page_ranges)
         extractions.extend(fin_extractions)
 
         # 4. Build canonical JSON

@@ -26,13 +26,14 @@ class TOCEntry:
 _SECTION_PATTERNS = (
     ("the_offer", re.compile(r"\bTHE\s+OFFER\b", re.IGNORECASE)),
     ("capital_structure", re.compile(r"\bCAPITAL\s+STRUCTURE\b", re.IGNORECASE)),
-    ("objects_of_the_offer", re.compile(r"\bOBJECTS\s+OF\s+THE\s+OFFER\b", re.IGNORECASE)),
-    ("basis_for_offer_price", re.compile(r"\bBASIS\s+FOR\s+(?:THE\s+)?OFFER\s+PRICE\b", re.IGNORECASE)),
+    ("objects_of_the_offer", re.compile(r"\bOBJECTS\s+OF\s+(?:THE\s+)?OFFER\b", re.IGNORECASE)),
+    ("basis_for_offer_price", re.compile(r"\bBASIS\s+(?:FOR|OF)\s+(?:THE\s+)?OFFER\s+PRICE\b", re.IGNORECASE)),
     ("industry_overview", re.compile(r"\bINDUSTRY\s+OVERVIEW\b", re.IGNORECASE)),
     ("our_business", re.compile(r"\bOUR\s+BUSINESS\b", re.IGNORECASE)),
     ("our_management", re.compile(r"\bOUR\s+MANAGEMENT\b", re.IGNORECASE)),
-    ("promoters", re.compile(r"\bOUR\s+PROMOTERS\b", re.IGNORECASE)),
-    ("restated_financials", re.compile(r"\bRESTATED\s+FINANCIAL\s+STATEMENTS\b", re.IGNORECASE)),
+    ("promoters", re.compile(r"\bOUR\s+PROMOTER(?:S|\s+AND\s+PROMOTER\s+GROUP)?\b", re.IGNORECASE)),
+    ("restated_financials", re.compile(r"\b(?:RESTATED\s+)?FINANCIAL\s+STATEMENTS\b", re.IGNORECASE)),
+    ("financial_indebtedness", re.compile(r"\b(?:FINANCIAL\s+INDEBTEDNESS|CAPITALISATION\s+STATEMENT)\b", re.IGNORECASE)),
     ("litigation", re.compile(r"\bOUTSTANDING\s+LITIGATION\b", re.IGNORECASE)),
     ("contingent_liabilities", re.compile(r"\bSUMMARY\s+OF\s+CONTINGENT\s+LIABILITIES\b", re.IGNORECASE)),
     ("related_party", re.compile(r"\bSUMMARY\s+OF\s+RELATED\s+PARTY\b", re.IGNORECASE)),
@@ -63,9 +64,14 @@ class TOCRouter:
             except Exception:
                 continue
 
-            if re.search(r"\bTABLE\s+OF\s+CONTENTS\b", text, re.IGNORECASE) or re.search(r"\bINDEX\b", text, re.IGNORECASE):
+            if (
+                re.search(r"\bTABLE\s+OF\s+CONTENTS\b", text, re.IGNORECASE)
+                or re.search(r"\bINDEX\b", text, re.IGNORECASE)
+                or re.search(r"^\s*CONTENTS\s*$", text, re.IGNORECASE | re.MULTILINE)
+            ):
                 toc_text += "\n" + text
-                toc_pdf_page = i + 1
+                if toc_pdf_page < 0:
+                    toc_pdf_page = i + 1
 
         entries: Dict[str, TOCEntry] = {}
         pdf_offset = 0
@@ -97,6 +103,8 @@ class TOCRouter:
             for title, p_num in parsed_items:
                 for key, pattern in _SECTION_PATTERNS:
                     if key not in entries and pattern.search(title):
+                        if key == "the_offer" and re.search(r"\bSUMMARY\s+OF\b", title, re.IGNORECASE):
+                            continue
                         # Approximate PDF page = printed page + offset
                         actual_pdf_page = min(p_num + pdf_offset, page_count)
                         entries[key] = TOCEntry(

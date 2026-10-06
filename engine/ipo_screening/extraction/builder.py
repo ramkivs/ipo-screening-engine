@@ -47,6 +47,14 @@ class CanonicalInputBuilder:
         sector_profile = self.base.get("sector_profile") or self._detect_sector_profile()
         sector = self.base.get("sector") or self._detect_sector()
 
+        peers_list = self.base.get("peers")
+        if not peers_list:
+            peers_list = self._get_field("peers")
+        if not peers_list:
+            peers_list = [
+                {"name": "Generic Listed Peer Ltd", "listed_years": 5, "business_match": "partial"}
+            ]
+
         output: Dict[str, Any] = {
             "ipo_id": self.base.get("ipo_id") or self._slugify(company_name or "UNKNOWN-IPO"),
             "company_name": company_name,
@@ -62,9 +70,7 @@ class CanonicalInputBuilder:
             "use_of_proceeds": self._build_use_of_proceeds(),
             "governance": self._build_governance(),
             "business": self._build_business(),
-            "peers": self.base.get("peers", [
-                {"name": "Generic Listed Peer Ltd", "listed_years": 5, "business_match": "partial"}
-            ]),
+            "peers": peers_list,
         }
 
         if "market" in self.base:
@@ -160,30 +166,41 @@ class CanonicalInputBuilder:
         default_open = "2026-09-30" if self.allow_fixture_fallbacks else None
         default_close = "2026-10-05" if self.allow_fixture_fallbacks else None
 
+        def _pick_issue(key: str, default: Any = None) -> Any:
+            if key in issue_base:
+                return issue_base[key]
+            return self._get_field(f"issue.{key}", default)
+
         res: Dict[str, Any] = {
-            "price_band_low": self._get_field("issue.price_band_low", issue_base.get("price_band_low", default_low)),
-            "price_band_high": self._get_field("issue.price_band_high", issue_base.get("price_band_high", default_high)),
-            "lot_size": self._get_field("issue.lot_size", issue_base.get("lot_size", default_lot)),
-            "fresh_issue": self._get_field("issue.fresh_issue", issue_base.get("fresh_issue", default_fresh)),
-            "ofs": issue_base.get("ofs", default_ofs),
-            "fresh_shares": issue_base.get("fresh_shares", default_fshares),
-            "post_issue_shares": issue_base.get("post_issue_shares", default_pshares),
-            "pre_issue_shares": issue_base.get("pre_issue_shares", default_presh),
-            "post_issue_eps": self._get_field("issue.post_issue_eps", issue_base.get("post_issue_eps", default_eps)),
-            "open_date": issue_base.get("open_date", default_open),
-            "close_date": issue_base.get("close_date", default_close),
+            "price_band_low": _pick_issue("price_band_low", default_low),
+            "price_band_high": _pick_issue("price_band_high", default_high),
+            "lot_size": _pick_issue("lot_size", default_lot),
+            "fresh_issue": _pick_issue("fresh_issue", default_fresh),
+            "ofs": _pick_issue("ofs", default_ofs),
+            "fresh_shares": _pick_issue("fresh_shares", default_fshares),
+            "post_issue_shares": _pick_issue("post_issue_shares", default_pshares),
+            "pre_issue_shares": _pick_issue("pre_issue_shares", default_presh),
+            "post_issue_eps": _pick_issue("post_issue_eps", default_eps),
+            "open_date": _pick_issue("open_date", default_open),
+            "close_date": _pick_issue("close_date", default_close),
         }
-        if "quota_pct" in issue_base or self._get_field("issue.quota_pct"):
-            res["quota_pct"] = self._get_field("issue.quota_pct", issue_base.get("quota_pct"))
-        if "ofs_sellers" in issue_base or self._get_field("issue.ofs_sellers"):
-            res["ofs_sellers"] = self._get_field("issue.ofs_sellers", issue_base.get("ofs_sellers"))
+        if "quota_pct" in issue_base:
+            res["quota_pct"] = issue_base["quota_pct"]
+        elif self._get_field("issue.quota_pct"):
+            res["quota_pct"] = self._get_field("issue.quota_pct")
+
+        if "ofs_sellers" in issue_base:
+            res["ofs_sellers"] = issue_base["ofs_sellers"]
+        elif self._get_field("issue.ofs_sellers") is not None:
+            res["ofs_sellers"] = self._get_field("issue.ofs_sellers")
+
         return res
 
     def _build_financials(self) -> Dict[str, Any]:
         fin_base = self.base.get("financials", {})
-        unit = self._get_field("financials.reporting_unit", fin_base.get("reporting_unit", "INR_LAKHS"))
-        periods = self._get_field("financials.periods", fin_base.get("periods", []))
-        cl = self._get_field("financials.contingent_liabilities", fin_base.get("contingent_liabilities", None))
+        unit = fin_base["reporting_unit"] if "reporting_unit" in fin_base else self._get_field("financials.reporting_unit", "INR_LAKHS")
+        periods = fin_base["periods"] if "periods" in fin_base else self._get_field("financials.periods", [])
+        cl = fin_base["contingent_liabilities"] if "contingent_liabilities" in fin_base else self._get_field("financials.contingent_liabilities", None)
         return {
             "reporting_unit": unit,
             "periods": periods,
@@ -193,10 +210,11 @@ class CanonicalInputBuilder:
 
     def _build_capital_structure(self) -> Dict[str, Any]:
         cap_base = self.base.get("capital_structure", {})
-        pre_pct = self._get_field("capital_structure.promoter_pre_pct", cap_base.get("promoter_pre_pct", 73.42))
-        post_pct = self._get_field("capital_structure.promoter_post_pct", cap_base.get("promoter_post_pct", None))
-        pledge_pct = self._get_field("capital_structure.promoter_pledge_pct", cap_base.get("promoter_pledge_pct", 0.0))
-        lockin = self._get_field("capital_structure.promoter_lockin_in_place", cap_base.get("promoter_lockin_in_place", True))
+        pre_pct = cap_base["promoter_pre_pct"] if "promoter_pre_pct" in cap_base else self._get_field("capital_structure.promoter_pre_pct", 73.42 if self.allow_fixture_fallbacks else None)
+        post_pct = cap_base["promoter_post_pct"] if "promoter_post_pct" in cap_base else self._get_field("capital_structure.promoter_post_pct", None)
+        pledge_pct = cap_base["promoter_pledge_pct"] if "promoter_pledge_pct" in cap_base else self._get_field("capital_structure.promoter_pledge_pct", 0.0)
+        lockin = cap_base["promoter_lockin_in_place"] if "promoter_lockin_in_place" in cap_base else self._get_field("capital_structure.promoter_lockin_in_place", True)
+
         return {
             "promoter_pre_pct": pre_pct,
             "promoter_post_pct": post_pct,
@@ -208,14 +226,16 @@ class CanonicalInputBuilder:
         }
 
     def _build_use_of_proceeds(self) -> List[Dict[str, Any]]:
+        if "use_of_proceeds" in self.base:
+            return self.base["use_of_proceeds"]
         extracted_uop = self._get_field("use_of_proceeds", None)
         if extracted_uop:
             return extracted_uop
-        return self.base.get("use_of_proceeds", [])
+        return []
 
     def _build_governance(self) -> Dict[str, Any]:
         gov_base = self.base.get("governance", {})
-        lit = self._get_field("governance.litigation_bucket", gov_base.get("litigation_bucket", "clean"))
+        lit = gov_base["litigation_bucket"] if "litigation_bucket" in gov_base else self._get_field("governance.litigation_bucket", "clean")
         if lit in ("none", None, "clean"):
             lit = "clean"
         elif lit in ("material_civil", "civil"):
@@ -223,34 +243,45 @@ class CanonicalInputBuilder:
         elif lit != "criminal_or_regulatory":
             lit = "clean"
 
+        def _pick_gov(key: str, default: Any = None) -> Any:
+            if key in gov_base:
+                return gov_base[key]
+            return self._get_field(f"governance.{key}", default)
+
         return {
-            "auditor_opinion": self._get_field("governance.auditor_opinion", gov_base.get("auditor_opinion", "unqualified")),
-            "auditor_changed_3y": gov_base.get("auditor_changed_3y", None),
-            "auditor_reputed": gov_base.get("auditor_reputed", None),
-            "repeated_eom": gov_base.get("repeated_eom", None),
-            "eom_materiality": gov_base.get("eom_materiality", None),
-            "going_concern_uncertainty": gov_base.get("going_concern_uncertainty", None),
+            "auditor_opinion": _pick_gov("auditor_opinion", "unqualified"),
+            "auditor_changed_3y": _pick_gov("auditor_changed_3y", None),
+            "auditor_reputed": _pick_gov("auditor_reputed", None),
+            "repeated_eom": _pick_gov("repeated_eom", None),
+            "eom_materiality": _pick_gov("eom_materiality", None),
+            "going_concern_uncertainty": _pick_gov("going_concern_uncertainty", None),
             "litigation_bucket": lit,
-            "sebi_ed_action_active": self._get_field("governance.sebi_ed_action_active", gov_base.get("sebi_ed_action_active", False)),
-            "rpt_pct_revenue": gov_base.get("rpt_pct_revenue", 6.67),
-            "rpt_pct_of_revenue_growth": gov_base.get("rpt_pct_of_revenue_growth", None),
-            "board_independent_majority": self._get_field("governance.board_independent_majority", gov_base.get("board_independent_majority", False)),
-            "kmp_exits_2y": gov_base.get("kmp_exits_2y", 0),
+            "sebi_ed_action_active": _pick_gov("sebi_ed_action_active", False),
+            "rpt_pct_revenue": _pick_gov("rpt_pct_revenue", 6.67 if self.allow_fixture_fallbacks else None),
+            "rpt_pct_of_revenue_growth": _pick_gov("rpt_pct_of_revenue_growth", None),
+            "board_independent_majority": _pick_gov("board_independent_majority", False),
+            "kmp_exits_2y": _pick_gov("kmp_exits_2y", 0),
         }
 
     def _build_business(self) -> Dict[str, Any]:
         biz_base = self.base.get("business", {})
+
+        def _pick_biz(key: str, default: Any = None) -> Any:
+            if key in biz_base:
+                return biz_base[key]
+            return self._get_field(f"business.{key}", default)
+
         ob = self._get_field("business.order_book", biz_base.get("order_book", None))
-        default_top5 = 85.33 if self.allow_fixture_fallbacks else None
+
         res = {
-            "industry_cagr_pct": biz_base.get("industry_cagr_pct", 3.8 if self.allow_fixture_fallbacks else None),
-            "industry_scope": biz_base.get("industry_scope", None),
-            "industry_forecast_period": biz_base.get("industry_forecast_period", None),
-            "industry_source": biz_base.get("industry_source", None),
-            "top5_customer_pct": self._get_field("business.top5_customer_pct", biz_base.get("top5_customer_pct", default_top5)),
-            "moat_rating": biz_base.get("moat_rating", "strong_niche" if self.allow_fixture_fallbacks else None),
-            "visibility_rating": biz_base.get("visibility_rating", "strong" if self.allow_fixture_fallbacks else None),
-            "regulatory_dependence": biz_base.get("regulatory_dependence", None),
+            "industry_cagr_pct": _pick_biz("industry_cagr_pct", 3.8 if self.allow_fixture_fallbacks else None),
+            "industry_scope": _pick_biz("industry_scope", None),
+            "industry_forecast_period": _pick_biz("industry_forecast_period", None),
+            "industry_source": _pick_biz("industry_source", None),
+            "top5_customer_pct": _pick_biz("top5_customer_pct", 85.33 if self.allow_fixture_fallbacks else None),
+            "moat_rating": _pick_biz("moat_rating", "strong_niche" if self.allow_fixture_fallbacks else None),
+            "visibility_rating": _pick_biz("visibility_rating", "strong" if self.allow_fixture_fallbacks else None),
+            "regulatory_dependence": _pick_biz("regulatory_dependence", None),
         }
         if ob is not None:
             res["order_book"] = ob
