@@ -286,6 +286,18 @@ def create_app(service: Optional[PresentationService] = None) -> FastAPI:
     router = create_router(service)
     app.include_router(router)
 
+    # Mount UI-2 frontend presentation layer if present
+    frontend_dir = Path(__file__).resolve().parent.parent.parent.parent / "frontend"
+    if frontend_dir.exists() and (frontend_dir / "index.html").exists():
+        from fastapi.responses import RedirectResponse
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/ui", StaticFiles(directory=str(frontend_dir), html=True), name="ui")
+
+        @app.get("/", include_in_schema=False)
+        def root_redirect():
+            return RedirectResponse(url="/ui/")
+
     # App-level reference to the service
     app.state.service = service
 

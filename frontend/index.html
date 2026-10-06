@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IPO Screening Engine — Executive Dashboard &amp; Scorecard</title>
+  <meta name="description" content="Institutional Indian Mainboard IPO Screening Engine presentation dashboard and scorecard" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- Header & Governance Navigation -->
+  <header class="app-header" role="banner">
+    <div class="header-container">
+      <div class="brand">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="14"></line>
+        </svg>
+        <h1>IPO Screening Engine</h1>
+        <span class="engine-badge" title="Authoritative Engine Version">v1.5.0</span>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs" role="navigation" aria-label="Main Navigation">
+        <a href="#dashboard" class="nav-tab active" data-view="dashboard" id="nav-dashboard">
+          Executive Dashboard
+        </a>
+        <a href="#directory" class="nav-tab" data-view="directory" id="nav-directory">
+          IPO Directory
+        </a>
+      </nav>
+
+      <!-- Governance Status Banner -->
+      <div id="governance-banner" class="governance-status-bar" aria-label="Policy Lifecycle Status">
+        <span class="gov-pill active">Loading Policy...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main id="app" class="app-container" role="main">
+    <!-- View 1: Executive Dashboard -->
+    <section id="dashboard-view" class="view-section active" role="region" aria-label="Executive Dashboard">
+      <div class="state-box">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Initializing dashboard...</p>
+      </div>
+    </section>
+
+    <!-- View 2: IPO Directory / Discovery -->
+    <section id="directory-view" class="view-section" role="region" aria-label="IPO Directory">
+      <div class="state-box">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Initializing directory...</p>
+      </div>
+    </section>
+
+    <!-- View 3: Evaluation Scorecard & Detail -->
+    <section id="scorecard-view" class="view-section" role="region" aria-label="Evaluation Scorecard">
+      <div class="state-box">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Initializing scorecard...</p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
