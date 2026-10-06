@@ -146,6 +146,11 @@ export class ApiClient {
     return this._get(`/evaluations/${encodeURIComponent(evaluationId)}/evidence`);
   }
 
+  async getEvidence(evidenceId) {
+    if (!evidenceId) throw new ApiError(400, 'INVALID_IDENTIFIER', 'Evidence ID must be provided');
+    return this._get(`/evidence/${encodeURIComponent(evidenceId)}`);
+  }
+
   async getPostListing(evaluationId) {
     if (!evaluationId) throw new ApiError(400, 'INVALID_IDENTIFIER', 'Evaluation ID must be provided');
     return this._get(`/evaluations/${encodeURIComponent(evaluationId)}/post-listing`);
