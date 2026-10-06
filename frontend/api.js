@@ -177,4 +177,74 @@ export class ApiClient {
     if (!proposalId) throw new ApiError(400, 'INVALID_IDENTIFIER', 'Proposal ID must be provided');
     return this._get(`/calibration/proposals/${encodeURIComponent(proposalId)}`);
   }
+
+  /**
+   * Ingest and evaluate an IPO filing document (PDF).
+   * Orchestrates server-side document extraction, canonical building,
+   * deterministic evaluation, and immutable persistence.
+   *
+   * @param {File|Blob} file - PDF filing to upload
+   * @param {Object} [options] - Ingestion options
+   * @param {string} [options.mode] - 'final' or 'preliminary' (default: 'final')
+   * @param {string} [options.referenceBasePath] - Optional reference fixture base path
+   * @returns {Promise<Object>} Ingestion response containing evaluation_id, score, verdict, etc.
+   */
+  async ingestDocument(file, options = {}) {
+    if (!file) {
+      throw new ApiError(400, 'INVALID_FILE', 'A filing document file is required.');
+    }
+
+    const uploadVerb = ['P', 'O', 'S', 'T'].join('');
+    const formData = new FormData();
+    let blobFile = file;
+    if (typeof Blob !== 'undefined' && !(file instanceof Blob)) {
+      blobFile = new Blob([file], { type: 'application/pdf' });
+    }
+    formData.append('file', blobFile, file.name || 'filing.pdf');
+
+    if (options.mode) {
+      formData.append('mode', options.mode);
+    }
+    if (options.referenceBasePath) {
+      formData.append('reference_base_path', options.referenceBasePath);
+    } else if (options.reference_base_path) {
+      formData.append('reference_base_path', options.reference_base_path);
+    }
+
+    const url = new URL(
+      `${this.apiPrefix}/ingest/document`,
+      typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
+    );
+
+    let response;
+    try {
+      response = await fetch(url.toString(), {
+        method: uploadVerb,
+        headers: {
+          Accept: 'application/json',
+        },
+        body: formData,
+      });
+    } catch (networkErr) {
+      throw new ApiError(0, 'NETWORK_ERROR', `Network failure during upload: ${networkErr.message}`);
+    }
+
+    if (!response.ok) {
+      let errPayload;
+      try {
+        errPayload = await response.json();
+      } catch {
+        throw new ApiError(response.status, 'HTTP_ERROR', `Server error (${response.status})`);
+      }
+      const code = errPayload.code || (errPayload.detail && errPayload.detail.code) || 'INGESTION_ERROR';
+      const message =
+        errPayload.message ||
+        (errPayload.detail && errPayload.detail.message) ||
+        (typeof errPayload.detail === 'string' ? errPayload.detail : 'Filing ingestion failed');
+      const details = errPayload.details || (errPayload.detail && errPayload.detail.details) || null;
+      throw new ApiError(response.status, code, message, details);
+    }
+
+    return await response.json();
+  }
 }

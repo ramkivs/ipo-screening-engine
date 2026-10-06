@@ -70,6 +70,8 @@ export class App {
       this.renderBacktestAnalytics();
     } else if (segments[0] === 'calibration' || segments[0] === 'configuration') {
       this.renderCalibrationView();
+    } else if (segments[0] === 'ingest' || segments[0] === 'upload') {
+      this.renderIngestView();
     } else if (segments[0] === 'ipos' && segments[1]) {
       this.renderIpoDetail(segments[1]);
     } else {
@@ -2887,10 +2889,10 @@ export class App {
 
   setViewActive(viewId) {
     document.querySelectorAll('.view-section').forEach(sec => {
-      sec.classList.remove('active');
+      if (sec && sec.classList) sec.classList.remove('active');
     });
     const target = document.getElementById(viewId);
-    if (target) target.classList.add('active');
+    if (target && target.classList) target.classList.add('active');
   }
 
   renderEvaluationsTableHtml(evaluations) {
@@ -3002,6 +3004,374 @@ export class App {
         ${err.code ? `<div class="meta-tag" style="margin-top: 8px;">ERROR CODE: ${this.escape(err.code)}</div>` : ''}
       </div>
     `;
+  }
+
+  formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+  }
+
+  // --------------------------------------------------------------------------
+  // IPO Ingestion & Deterministic Evaluation Workflow (UI-7)
+  // --------------------------------------------------------------------------
+
+  renderIngestView() {
+    this.setViewActive('ingest-view');
+    const container = document.getElementById('ingest-view');
+    if (!container) return;
+
+    this.selectedIngestFile = null;
+
+    container.innerHTML = `
+      <!-- Distinction / Guidance Banner -->
+      <div class="card distinction-banner" role="region" aria-label="Ingestion Architecture Banner" style="margin-bottom: 24px;">
+        <div class="distinction-header">
+          <div class="distinction-title">
+            <span class="distinction-icon">&#9888;</span>
+            IPO Ingestion &amp; Deterministic Evaluation Pipeline
+          </div>
+          <span class="meta-tag">UI-7 Architectural Boundary</span>
+        </div>
+        <div class="distinction-text">
+          Upload Draft Red Herring Prospectus (DRHP) or Red Herring Prospectus (RHP) filings in PDF format.
+          The filing document undergoes server-side boundary-enforcing domain entity extraction via
+          <code>DocumentExtractor</code>, normalisation to <code>CanonicalInput</code>, validation gates,
+          and execution of the deterministic v1.5 scoring engine.
+        </div>
+        <div class="distinction-grid">
+          <div class="distinction-col" style="border-left: 3px solid var(--color-apply);">
+            <div class="distinction-col-title" style="color: var(--color-apply);">Zero Browser Authority</div>
+            <div class="distinction-col-desc">
+              All PDF parsing, table routing, metric calculations, knockout verification, and scoring are executed strictly
+              server-side. The browser never calculates scores or parses document binaries locally.
+            </div>
+          </div>
+          <div class="distinction-col" style="border-left: 3px solid var(--color-consider);">
+            <div class="distinction-col-title" style="color: var(--color-consider);">Immutable Audit Trail</div>
+            <div class="distinction-col-desc">
+              Evaluations are immutably persisted in the filesystem <code>EvaluationStore</code> with SHA-256 result hashes.
+              Duplicate uploads are idempotently resolved without overwriting historical records.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ingest-grid">
+        <!-- Left: Upload & File Handling Card -->
+        <div class="ingest-card" id="ingest-form-card">
+          <div class="ingest-card-title">Upload IPO Filing Document</div>
+          <div class="ingest-card-desc">
+            Select or drag &amp; drop a valid Indian Mainboard IPO filing document (DRHP or RHP PDF, max 50 MB).
+          </div>
+
+          <!-- Drag and Drop Dropzone -->
+          <div class="ingest-dropzone" id="ingest-dropzone" role="region" aria-label="File Upload Dropzone" tabindex="0">
+            <input type="file" id="ingest-file-input" accept=".pdf,application/pdf" style="display: none;" />
+            <span class="dropzone-icon">&#128196;</span>
+            <div class="dropzone-prompt">Drag &amp; drop IPO filing PDF here</div>
+            <div class="dropzone-sub">or <strong style="color: var(--color-consider);">browse files</strong> from your computer</div>
+            <div style="font-size: 0.75rem; color: var(--text-light); margin-top: 8px;">
+              PDF format only &bull; Up to 50 MB &bull; Magic bytes <code>%PDF-</code> verified
+            </div>
+          </div>
+
+          <!-- Selected File Details (Hidden until selected) -->
+          <div class="ingest-selected-file" id="ingest-file-preview" style="display: none;">
+            <div class="file-info">
+              <span class="file-icon">&#128196;</span>
+              <div>
+                <div class="file-name" id="ingest-file-name">—</div>
+                <div class="file-size" id="ingest-file-size">—</div>
+              </div>
+            </div>
+            <button type="button" class="file-remove-btn" id="ingest-file-remove-btn" title="Remove selected file">Remove</button>
+          </div>
+
+          <!-- Options & Submission Form -->
+          <form class="ingest-controls" id="ingest-form" onsubmit="return false;">
+            <div class="form-group">
+              <label for="ingest-mode-select" class="form-label">Evaluation Mode</label>
+              <select id="ingest-mode-select" class="form-select">
+                <option value="final" selected>Final Evaluation (Post-RHP / Pre-Listing)</option>
+                <option value="preliminary">Preliminary Evaluation (DRHP)</option>
+              </select>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">
+                Final mode evaluates against full restated financials and issue terms.
+              </span>
+            </div>
+
+            <div class="ingest-actions">
+              <button type="button" id="ingest-submit-btn" class="btn btn-primary" disabled style="flex: 1;">
+                Process &amp; Evaluate Filing
+              </button>
+            </div>
+          </form>
+
+          <!-- Error Alert Banner -->
+          <div id="ingest-error-box" style="display: none; margin-top: 16px;"></div>
+        </div>
+
+        <!-- Right: Execution Progress & Results Panel -->
+        <div class="ingest-card" id="ingest-status-card">
+          <div class="ingest-card-title">Workflow Progress &amp; Audit Status</div>
+          <div class="ingest-card-desc">
+            Tracks real-time execution across the ingestion, extraction, validation, and evaluation pipeline.
+          </div>
+
+          <!-- Stages Timeline -->
+          <div class="ingest-stages" id="ingest-stages-list">
+            <div class="stage-step active" id="stage-ready">
+              <div class="stage-num">1</div>
+              <div class="stage-label">Awaiting Document Selection</div>
+            </div>
+            <div class="stage-step" id="stage-upload">
+              <div class="stage-num">2</div>
+              <div class="stage-label">HTTP Transfer &amp; Size Boundary Guard</div>
+            </div>
+            <div class="stage-step" id="stage-extract">
+              <div class="stage-num">3</div>
+              <div class="stage-label">Document Extraction (TOC, Tables, Sections)</div>
+            </div>
+            <div class="stage-step" id="stage-evaluate">
+              <div class="stage-num">4</div>
+              <div class="stage-label">Deterministic v1.5 Scoring &amp; Validation Gate</div>
+            </div>
+            <div class="stage-step" id="stage-complete">
+              <div class="stage-num">5</div>
+              <div class="stage-label">Immutable Store Persistence &amp; Result Hash</div>
+            </div>
+          </div>
+
+          <!-- Ingestion Completed Outcome (Hidden until complete) -->
+          <div id="ingest-outcome-container" style="display: none;"></div>
+        </div>
+      </div>
+    `;
+
+    this.bindIngestEvents(container);
+  }
+
+  bindIngestEvents(container) {
+    const dropzone = container.querySelector('#ingest-dropzone');
+    const fileInput = container.querySelector('#ingest-file-input');
+    if (!dropzone || !fileInput) return;
+
+    const filePreview = container.querySelector('#ingest-file-preview');
+    const fileName = container.querySelector('#ingest-file-name');
+    const fileSize = container.querySelector('#ingest-file-size');
+    const fileRemoveBtn = container.querySelector('#ingest-file-remove-btn');
+    const modeSelect = container.querySelector('#ingest-mode-select');
+    const submitBtn = container.querySelector('#ingest-submit-btn');
+    const errorBox = container.querySelector('#ingest-error-box');
+    const outcomeContainer = container.querySelector('#ingest-outcome-container');
+    const stagesList = container.querySelector('#ingest-stages-list');
+
+    const updateStage = (stageId, statusClass) => {
+      const step = container.querySelector(`#${stageId}`);
+      if (step) {
+        step.className = `stage-step ${statusClass}`;
+      }
+    };
+
+    const showError = (msg, code = null) => {
+      errorBox.style.display = 'block';
+      errorBox.innerHTML = `
+        <div class="card" style="border-color: var(--border-avoid); background: var(--bg-avoid); padding: 12px 16px;">
+          <strong style="color: var(--color-avoid); font-size: 0.85rem;">Processing Error:</strong>
+          <div style="font-size: 0.85rem; color: var(--text-main); margin-top: 4px;">${this.escape(msg)}</div>
+          ${code ? `<div class="meta-tag" style="margin-top: 6px;">CODE: ${this.escape(code)}</div>` : ''}
+        </div>
+      `;
+    };
+
+    const clearError = () => {
+      errorBox.style.display = 'none';
+      errorBox.innerHTML = '';
+    };
+
+    const handleFile = (file) => {
+      clearError();
+      if (!file) return;
+
+      if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+        showError('Only PDF files (.pdf) are supported.', 'INVALID_FILE_TYPE');
+        return;
+      }
+
+      const maxBytes = 50 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        showError(`File size (${this.formatBytes(file.size)}) exceeds the 50 MB limit.`, 'FILE_TOO_LARGE');
+        return;
+      }
+
+      this.selectedIngestFile = file;
+      fileName.textContent = file.name;
+      fileSize.textContent = this.formatBytes(file.size);
+      filePreview.style.display = 'flex';
+      submitBtn.disabled = false;
+
+      updateStage('stage-ready', 'completed');
+      updateStage('stage-upload', 'active');
+    };
+
+    const clearFile = () => {
+      this.selectedIngestFile = null;
+      fileInput.value = '';
+      filePreview.style.display = 'none';
+      submitBtn.disabled = true;
+      clearError();
+
+      updateStage('stage-ready', 'active');
+      updateStage('stage-upload', '');
+      updateStage('stage-extract', '');
+      updateStage('stage-evaluate', '');
+      updateStage('stage-complete', '');
+    };
+
+    // Dropzone click
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    // Drag-and-drop
+    ['dragenter', 'dragover'].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+      });
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      if (dt && dt.files && dt.files.length > 0) {
+        handleFile(dt.files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    fileRemoveBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearFile();
+    });
+
+    // Ingest submit execution
+    submitBtn.addEventListener('click', async () => {
+      if (!this.selectedIngestFile) return;
+
+      clearError();
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner" style="width: 14px; height: 14px; display: inline-block; margin-right: 8px;"></span> Processing Document...';
+
+      updateStage('stage-ready', 'completed');
+      updateStage('stage-upload', 'active');
+
+      try {
+        updateStage('stage-upload', 'completed');
+        updateStage('stage-extract', 'active');
+
+        const mode = modeSelect ? modeSelect.value : 'final';
+        const result = await this.apiClient.ingestDocument(this.selectedIngestFile, { mode });
+
+        updateStage('stage-extract', 'completed');
+        updateStage('stage-evaluate', 'completed');
+        updateStage('stage-complete', 'completed');
+
+        // Render success outcome
+        outcomeContainer.style.display = 'block';
+        outcomeContainer.innerHTML = `
+          <div class="ingest-result-overview" role="region" aria-label="Ingestion Result">
+            <div class="ingest-result-header">
+              <div>
+                <div class="ingest-result-company">${this.escape(result.company_name)}</div>
+                <div class="ingest-result-meta">IPO ID: <code>${this.escape(result.ipo_id)}</code> &bull; Mode: <strong>${this.escape(result.evaluation_mode)}</strong></div>
+              </div>
+              <span class="badge ${result.is_duplicate ? 'badge-neutral' : 'badge-apply'}" style="font-size: 0.75rem;">
+                ${result.is_duplicate ? 'IDEMPOTENT / DUPLICATE' : 'NEWLY EVALUATED'}
+              </span>
+            </div>
+
+            <div class="ingest-kpi-row">
+              <div class="ingest-kpi-card">
+                <div class="ingest-kpi-label">Final Score</div>
+                <div class="ingest-kpi-val">${typeof result.final_score === 'number' ? result.final_score.toFixed(1) : '—'} <span style="font-size: 0.8rem; color: var(--text-muted);">/ 100</span></div>
+              </div>
+              <div class="ingest-kpi-card">
+                <div class="ingest-kpi-label">Verdict</div>
+                <div style="margin-top: 6px;">${this.renderVerdictBadge(result.verdict)}</div>
+              </div>
+              <div class="ingest-kpi-card">
+                <div class="ingest-kpi-label">Confidence</div>
+                <div style="margin-top: 6px;">
+                  <span class="badge ${result.confidence === 'High' ? 'badge-apply' : result.confidence === 'Medium' ? 'badge-consider' : 'badge-insufficient'}">
+                    ${this.escape(result.confidence)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">
+                Deterministic Result Hash (SHA-256)
+              </div>
+              <code style="font-size: 0.75rem; word-break: break-all; background: var(--bg-surface); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); display: block;">
+                ${this.escape(result.result_hash)}
+              </code>
+            </div>
+
+            <div style="font-size: 0.85rem; color: var(--text-main); margin-bottom: 16px;">
+              ${this.escape(result.message)}
+            </div>
+
+            <div class="ingest-actions">
+              <a href="#evaluations/${this.escape(result.evaluation_id)}" class="btn btn-primary" id="btn-view-scorecard" style="text-decoration: none; text-align: center;">
+                Open Full Evaluation Scorecard &rarr;
+              </a>
+              <button type="button" class="btn btn-secondary" id="btn-ingest-another">
+                Upload Another Filing
+              </button>
+            </div>
+          </div>
+        `;
+
+        const btnAnother = outcomeContainer.querySelector('#btn-ingest-another');
+        if (btnAnother) {
+          btnAnother.addEventListener('click', () => {
+            clearFile();
+            outcomeContainer.style.display = 'none';
+            outcomeContainer.innerHTML = '';
+          });
+        }
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Process & Evaluate Filing';
+      } catch (err) {
+        updateStage('stage-extract', 'failed');
+        updateStage('stage-evaluate', 'failed');
+        updateStage('stage-complete', 'failed');
+        showError(err.message || 'Filing processing failed', err.code || 'PROCESSING_ERROR');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Retry Evaluation';
+      }
+    });
   }
 
   renderNotFound(path) {

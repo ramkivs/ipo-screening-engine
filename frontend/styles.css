@@ -1729,3 +1729,307 @@ table.data-table tbody tr:last-child td {
   border: 1px solid #e2e8f0;
 }
 
+/* ==========================================================================
+   UI-7 IPO Ingestion & Evaluation Workflow Styles
+   ========================================================================== */
+
+.ingest-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.ingest-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 900px) {
+  .ingest-grid {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+
+.ingest-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+}
+
+.ingest-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-main);
+}
+
+.ingest-card-desc {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+/* Dropzone */
+.ingest-dropzone {
+  border: 2px dashed var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg-app);
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.ingest-dropzone:hover,
+.ingest-dropzone.dragover {
+  border-color: var(--color-consider);
+  background: var(--bg-consider);
+}
+
+.ingest-dropzone:focus-within {
+  outline: 2px solid var(--color-consider);
+  outline-offset: 2px;
+}
+
+.dropzone-icon {
+  font-size: 2.5rem;
+  color: var(--text-light);
+  margin-bottom: 12px;
+  display: block;
+}
+
+.dropzone-prompt {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+
+.dropzone-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* File Selected Card */
+.ingest-selected-file {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.file-icon {
+  font-size: 1.5rem;
+}
+
+.file-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-size {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.file-remove-btn {
+  background: none;
+  border: none;
+  color: var(--color-avoid);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+}
+
+.file-remove-btn:hover {
+  text-decoration: underline;
+}
+
+/* Ingestion Controls Form */
+.ingest-controls {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.form-select, .form-input {
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+
+.form-select:focus, .form-input:focus {
+  outline: none;
+  border-color: var(--color-consider);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+/* Stage Progress Bar */
+.ingest-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.stage-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-app);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.stage-step.active {
+  border-color: var(--color-consider);
+  background: var(--bg-consider);
+  color: var(--color-consider);
+  font-weight: 700;
+}
+
+.stage-step.completed {
+  border-color: var(--border-apply);
+  background: var(--bg-apply);
+  color: var(--color-apply);
+}
+
+.stage-step.failed {
+  border-color: var(--border-avoid);
+  background: var(--bg-avoid);
+  color: var(--color-avoid);
+}
+
+.stage-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+.stage-step.active .stage-num {
+  background: var(--color-consider);
+  color: #fff;
+}
+
+.stage-step.completed .stage-num {
+  background: var(--color-apply);
+  color: #fff;
+}
+
+.stage-step.failed .stage-num {
+  background: var(--color-avoid);
+  color: #fff;
+}
+
+/* Result Overview Card */
+.ingest-result-overview {
+  margin-top: 20px;
+  border: 1px solid var(--border-apply);
+  background: var(--bg-apply);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.ingest-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.ingest-result-company {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.ingest-result-meta {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.ingest-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ingest-kpi-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+
+.ingest-kpi-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ingest-kpi-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+/* Submission action buttons */
+.ingest-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+

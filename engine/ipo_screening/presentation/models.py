@@ -335,3 +335,20 @@ class ApiError(BaseModel):
     message: str
     code: str
     details: Optional[Dict[str, Any]] = None
+
+
+class IngestionResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    evaluation_id: str
+    ipo_id: str
+    company_name: str
+    evaluation_mode: str
+    result_hash: str
+    final_score: float
+    verdict: str
+    confidence: str
+    is_duplicate: bool = False
+    message: str = "Document processed and evaluated successfully."
+    evaluation_url: str
+    evaluation: Optional[EvaluationDetail] = None
+

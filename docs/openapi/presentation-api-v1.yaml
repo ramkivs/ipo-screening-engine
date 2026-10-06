@@ -393,6 +393,68 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConfigurationStatusResponse'
 
+  /ingest/document:
+    post:
+      summary: Ingest and evaluate an IPO filing document (DRHP/RHP PDF)
+      description: |
+        Uploads a PDF filing document, extracts domain entities using DocumentExtractor,
+        converts into CanonicalInput, validates, runs deterministic evaluation,
+        and persists the record to the immutable EvaluationStore.
+        Duplicate uploads return the existing evaluation idempotently.
+      operationId: ingestDocument
+      tags: [Ingestion]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF filing document (DRHP/RHP)
+                mode:
+                  type: string
+                  enum: [final, preliminary]
+                  default: final
+                  description: Evaluation mode
+                reference_base_path:
+                  type: string
+                  description: Optional reference base fixture path for fallbacks
+      responses:
+        '200':
+          description: Evaluation already exists (duplicate idempotent return)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionResponse'
+        '201':
+          description: Document successfully ingested and new evaluation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionResponse'
+        '400':
+          description: Bad request (invalid PDF magic bytes, empty file, or invalid mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '413':
+          description: Payload too large (file exceeds 50 MB limit)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Document extraction or evaluation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
 components:
   schemas:
     HealthStatus:
@@ -1172,3 +1234,47 @@ components:
         details:
           type: object
           nullable: true
+
+    IngestionResponse:
+      type: object
+      required: [evaluation_id, ipo_id, company_name, evaluation_mode, result_hash, final_score, verdict, confidence, is_duplicate, message, evaluation_url]
+      properties:
+        evaluation_id:
+          type: string
+          example: APEX-HOUSING-FINANCE-LIMITED-20261006-120000Z-final-79385bca
+        ipo_id:
+          type: string
+          example: APEX-HOUSING-FINANCE-LIMITED
+        company_name:
+          type: string
+          example: APEX HOUSING FINANCE LIMITED
+        evaluation_mode:
+          type: string
+          enum: [FINAL, PRELIMINARY]
+          example: FINAL
+        result_hash:
+          type: string
+          example: 79385bca35358a030d61d5e12d16f6fb78b9183f2e99971aa8d82aec7dd88cfa
+        final_score:
+          type: number
+          format: float
+          example: 40.0
+        verdict:
+          type: string
+          example: INSUFFICIENT_DATA
+        confidence:
+          type: string
+          example: Low
+        is_duplicate:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Filing successfully ingested, extracted, and evaluated.
+        evaluation_url:
+          type: string
+          example: /#evaluations/APEX-HOUSING-FINANCE-LIMITED-20261006-120000Z-final-79385bca
+        evaluation:
+          $ref: '#/components/schemas/EvaluationDetail'
+          nullable: true
+

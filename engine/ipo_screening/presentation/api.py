@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -28,13 +28,22 @@ from .models import (
     EvidenceDetail,
     EvidenceResponse,
     HealthStatus,
+    IngestionResponse,
     IpoDetail,
     IpoHistoryResponse,
     IpoListResponse,
     PerformanceSummaryResponse,
     PostListingObservationsResponse,
 )
-from .service import PresentationConfig, PresentationService
+from .service import (
+    IngestionError,
+    IngestionEvaluationError,
+    IngestionExtractionError,
+    IngestionPayloadTooLargeError,
+    IngestionValidationError,
+    PresentationConfig,
+    PresentationService,
+)
 
 
 def create_router(service: PresentationService) -> APIRouter:
@@ -222,6 +231,74 @@ def create_router(service: PresentationService) -> APIRouter:
     def get_configuration_status() -> ConfigurationStatusResponse:
         return service.get_configuration_status()
 
+    # -------------------------------------------------------------------------
+    # 6.13 Ingestion & Evaluation Workflow (UI-7)
+    # -------------------------------------------------------------------------
+
+    @router.post("/ingest/document", response_model=IngestionResponse, tags=["Ingestion"])
+    async def ingest_document(
+        file: UploadFile = File(...),
+        mode: str = Form("final"),
+        reference_base_path: Optional[str] = Form(None),
+    ) -> Response:
+        """Upload and evaluate an IPO filing document (DRHP/RHP PDF)."""
+        if not file or not file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Bad Request", "message": "Filing PDF file is required.", "code": "VALIDATION_ERROR"},
+            )
+
+        max_size = 50 * 1024 * 1024
+        if file.size and file.size > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail={"error": "Payload Too Large", "message": "File size exceeds 50 MB limit.", "code": "PAYLOAD_TOO_LARGE"},
+            )
+
+        try:
+            contents = await file.read()
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Bad Request", "message": f"Failed to read uploaded file: {exc}", "code": "FILE_READ_ERROR"},
+            )
+
+        if len(contents) > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail={"error": "Payload Too Large", "message": f"File size ({len(contents)} bytes) exceeds 50 MB limit.", "code": "PAYLOAD_TOO_LARGE"},
+            )
+
+        try:
+            ingest_res = service.ingest_document(
+                file_bytes=contents,
+                filename=file.filename,
+                mode=mode,
+                reference_base_path=reference_base_path,
+            )
+            res_code = status.HTTP_200_OK if ingest_res.is_duplicate else status.HTTP_201_CREATED
+            return JSONResponse(status_code=res_code, content=ingest_res.model_dump())
+        except IngestionPayloadTooLargeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail={"error": "Payload Too Large", "message": str(exc), "code": "PAYLOAD_TOO_LARGE"},
+            )
+        except IngestionValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Bad Request", "message": str(exc), "code": "VALIDATION_ERROR"},
+            )
+        except (IngestionExtractionError, IngestionEvaluationError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"error": "Unprocessable Entity", "message": str(exc), "code": "PROCESSING_FAILED"},
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": "Internal Error", "message": f"Unexpected ingestion error: {exc}", "code": "INGESTION_INTERNAL_ERROR"},
+            )
+
     return router
 
 
@@ -250,14 +327,21 @@ def create_app(service: Optional[PresentationService] = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=["*"],
         allow_credentials=True,
-        allow_methods=["GET", "HEAD", "OPTIONS"],
+        allow_methods=["GET", "HEAD", "OPTIONS", "POST"],
         allow_headers=["*"],
     )
 
-    # Strict Read-Only Middleware: blocks POST, PUT, PATCH, DELETE
+    # Strict Read-Only Middleware: blocks POST, PUT, PATCH, DELETE (except POST /api/v1/ingest/document)
     @app.middleware("http")
     async def read_only_guard(request: Request, call_next):
         if request.method not in ("GET", "HEAD", "OPTIONS"):
+            # UI-7 exception: allow POST strictly to /api/v1/ingest/document
+            if request.method == "POST" and request.url.path in (
+                "/api/v1/ingest/document",
+                "/api/v1/ingest/document/",
+            ):
+                return await call_next(request)
+
             return JSONResponse(
                 status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
                 content={

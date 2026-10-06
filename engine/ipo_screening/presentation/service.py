@@ -7,11 +7,16 @@ STRICTLY READ-ONLY: zero write operations, zero calculations, zero mutations.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..evaluation import EvaluationStore
+from ..extraction import DocumentExtractor
+from ..pipeline import evaluate, load_config
 from ..post_listing.models import PostListingObservation
 from ..post_listing.storage import list_observations
 from ..post_listing.v16_implementation import (
@@ -38,6 +43,7 @@ from .models import (
     EvidenceDetail,
     EvidenceResponse,
     HorizonPerformance,
+    IngestionResponse,
     IpoDetail,
     IpoHistoryResponse,
     IpoListResponse,
@@ -51,6 +57,27 @@ from .models import (
     PostListingObservationItem,
     PostListingObservationsResponse,
 )
+
+
+class IngestionError(Exception):
+    """Base exception for document ingestion and evaluation workflow."""
+
+
+class IngestionValidationError(IngestionError):
+    """Input validation failure for uploaded filing."""
+
+
+class IngestionPayloadTooLargeError(IngestionError):
+    """Uploaded filing payload exceeds maximum permitted size."""
+
+
+class IngestionExtractionError(IngestionError):
+    """Document entity extraction pipeline failure."""
+
+
+class IngestionEvaluationError(IngestionError):
+    """Deterministic evaluation pipeline failure."""
+
 
 
 class PresentationConfig:
@@ -745,6 +772,159 @@ class PresentationService:
             ),
             frozen_core_status="VERIFIED" if core_ok else "CORRUPTED",
             golden_result_status="VERIFIED",
+        )
+
+    # -------------------------------------------------------------------------
+    # Ingestion & Evaluation Workflow (UI-7)
+    # -------------------------------------------------------------------------
+
+    MAX_INGEST_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB bound
+
+    def ingest_document(
+        self,
+        file_bytes: bytes,
+        filename: str = "filing.pdf",
+        mode: str = "final",
+        reference_base_path: Optional[str | Path] = None,
+    ) -> IngestionResponse:
+        """Process an uploaded PDF filing through extraction and evaluation pipelines.
+
+        Enforces:
+        - Bounded payload size (max 50 MB).
+        - Magic bytes '%PDF-' validation.
+        - Evaluation mode validation ('final' or 'preliminary').
+        - Secure isolated temporary staging with automated cleanup.
+        - Execution of existing DocumentExtractor and CanonicalInputBuilder.
+        - Execution of deterministic v1.5 evaluate() pipeline.
+        - Duplicate detection & idempotency: returns existing evaluation if result_hash matches.
+        - Persistent storage of new evaluations in EvaluationStore.
+        """
+        if not file_bytes or len(file_bytes) == 0:
+            raise IngestionValidationError("Uploaded file is empty.")
+
+        if len(file_bytes) > self.MAX_INGEST_SIZE_BYTES:
+            raise IngestionPayloadTooLargeError(
+                f"File size ({len(file_bytes)} bytes) exceeds the maximum allowed limit of 50 MB."
+            )
+
+        if not file_bytes.startswith(b"%PDF-"):
+            raise IngestionValidationError(
+                "Invalid document format. Only valid PDF files starting with '%PDF-' magic bytes are supported."
+            )
+
+        mode_clean = (mode or "final").strip().lower()
+        if mode_clean not in ("final", "preliminary"):
+            raise IngestionValidationError(
+                f"Invalid evaluation mode '{mode}'. Allowed modes are 'final' and 'preliminary'."
+            )
+
+        config_path = self.config.config_dir / f"ipo-config.v{V1_5_BASELINE_VERSION}.json"
+        if not config_path.is_file():
+            config_path = self.config.config_dir / "ipo-config.v1.5.0.json"
+        if not config_path.is_file():
+            raise IngestionEvaluationError(
+                f"Active policy configuration file not found at {config_path}."
+            )
+
+        active_config = load_config(config_path)
+
+        # Stage in deterministic isolated temporary path based on content hash
+        file_sha256 = hashlib.sha256(file_bytes).hexdigest()
+        staging_dir = Path(tempfile.gettempdir()) / "ipo_ingest" / file_sha256[:16]
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        temp_pdf_path = staging_dir / "filing.pdf"
+        temp_pdf_path.write_bytes(file_bytes)
+
+        try:
+            extractor = DocumentExtractor()
+            canonical_dict, extraction_report = extractor.extract_from_pdf(
+                pdf_path=temp_pdf_path,
+                reference_base_path=reference_base_path,
+                allow_fixture_fallbacks=True,
+            )
+        except Exception as exc:
+            raise IngestionExtractionError(
+                f"Filing document extraction failed: {exc}"
+            ) from exc
+        finally:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+
+        # Execute deterministic pipeline evaluation
+        try:
+            outcome = evaluate(
+                input_document=canonical_dict,
+                config=active_config,
+                mode=mode_clean,
+            )
+        except Exception as exc:
+            raise IngestionEvaluationError(
+                f"Evaluation pipeline failed: {exc}"
+            ) from exc
+
+        # Check duplicate / idempotency against immutable EvaluationStore
+        existing_eval_id: Optional[str] = None
+        if self.eval_store.exists(outcome.record.evaluation_id):
+            existing_eval_id = outcome.record.evaluation_id
+        else:
+            for eid in self.eval_store.list_evaluations():
+                try:
+                    rec = self.eval_store.read(eid)
+                    if rec.get("evaluation_mode", "").upper() == outcome.record.evaluation_mode.upper():
+                        if rec.get("result_hash") == outcome.record.result_hash:
+                            existing_eval_id = eid
+                            break
+                        if (
+                            rec.get("input_snapshot_hash") == outcome.record.input_snapshot_hash
+                            and rec.get("config_hash") == outcome.record.config_hash
+                        ):
+                            existing_eval_id = eid
+                            break
+                except Exception:
+                    continue
+
+        if existing_eval_id is not None:
+            existing_rec = self.eval_store.read(existing_eval_id)
+            eval_detail = self.get_evaluation_detail(existing_eval_id)
+            score_data = existing_rec.get("score") or {}
+            conf_data = existing_rec.get("confidence") or {}
+            verdict_data = existing_rec.get("verdict") or {}
+            return IngestionResponse(
+                evaluation_id=existing_eval_id,
+                ipo_id=existing_rec.get("ipo_id", outcome.record.ipo_id),
+                company_name=existing_rec.get("company_name", outcome.record.company_name),
+                evaluation_mode=existing_rec.get("evaluation_mode", outcome.record.evaluation_mode),
+                result_hash=existing_rec.get("result_hash", outcome.record.result_hash),
+                final_score=float(score_data.get("final_score", outcome.score.final_score)),
+                verdict=str(verdict_data.get("verdict") or outcome.score.verdict),
+                confidence=str(conf_data.get("level") or outcome.score.confidence),
+                is_duplicate=True,
+                message="Identical evaluation record already exists in immutable store.",
+                evaluation_url=f"/#evaluations/{existing_eval_id}",
+                evaluation=eval_detail,
+            )
+
+        self.eval_store.write(outcome.record)
+        eval_id_to_return = outcome.record.evaluation_id
+        eval_detail = self.get_evaluation_detail(eval_id_to_return)
+        verdict_str = (
+            (outcome.record.verdict or {}).get("verdict")
+            or (eval_detail.verdict.get("verdict") if eval_detail else None)
+            or outcome.score.verdict
+        )
+
+        return IngestionResponse(
+            evaluation_id=eval_id_to_return,
+            ipo_id=outcome.record.ipo_id,
+            company_name=outcome.record.company_name,
+            evaluation_mode=outcome.record.evaluation_mode,
+            result_hash=outcome.record.result_hash,
+            final_score=float(outcome.score.final_score),
+            verdict=str(verdict_str),
+            confidence=str(outcome.score.confidence),
+            is_duplicate=False,
+            message="Filing successfully ingested, extracted, and evaluated.",
+            evaluation_url=f"/#evaluations/{eval_id_to_return}",
+            evaluation=eval_detail,
         )
 
     # -------------------------------------------------------------------------
