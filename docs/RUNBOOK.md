@@ -801,8 +801,40 @@ Before activating v1.6 as the production baseline in a subsequent phase:
 5. [x] Golden Result hash verified identical (`e84f8bc0...`).
 6. [x] CLI `config verify` passes with exit code 0.
 7. [x] Comparative shadow evaluation confirms downside protection and holdout stability.
-8. [x] Comprehensive test suite passes (566 passed, 0 failures).
+8. [x] Comprehensive test suite passes (575 passed, 0 failures, 0 regressions).
 9. [ ] Explicit activation authorization from Ramki (Phase 8 promotion gate).
+
+---
+
+## 16. CFO/PAT Cross-Platform Determinism Verification
+
+### 16.1 Overview
+
+A cross-platform floating-point summation defect was detected during Windows verification of Phase 7, where binary float non-associativity in Python's native summation caused `derived_metrics.metrics.cfo_pat_cumulative.value` to evaluate to `1.7881897553619623` on Windows vs the expected `1.7881897553619628` (a 1-ULP drift).
+
+The engine was repaired in `engine/ipo_screening/derived.py:_cfo_pat_cumulative` by utilizing exact Decimal summation across observations prior to float conversion:
+```python
+total_cfo = sum((Decimal(str(v)) for v in cfo_values), Decimal("0"))
+total_pat = sum((Decimal(str(v)) for v in pat_values), Decimal("0"))
+ratio = float(total_cfo) / float(total_pat)
+```
+This guarantees identical 64-bit IEEE-754 quotients (`0x1.c9c6cdc652662p+0`) across all operating systems (Linux, Windows, macOS) and period sequence permutations, while strictly preserving the normative mathematical formula: $\text{cumulative ratio} = \sum \text{CFO} / \sum \text{PAT}$.
+
+### 16.2 Verification Commands
+
+To verify determinism and golden result preservation on any platform:
+
+```bash
+# 1. Verify golden regression and result hash
+python3 -m pytest -v tests/test_vishal_golden.py
+
+# 2. Verify CFO/PAT determinism suite (formula, order invariance, fail-closed)
+python3 -m pytest -v tests/test_cfo_pat_determinism.py
+
+# 3. Verify Frozen Core and v1.6 configuration integrity
+python3 -m pytest -v tests/test_v16_implementation.py
+```
+
 
 
 

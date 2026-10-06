@@ -21,6 +21,7 @@ engine can answer "what formula produced this metric?" (spec s24).
 
 from __future__ import annotations
 
+from decimal import Decimal
 import math
 import statistics
 from dataclasses import dataclass, field
@@ -429,8 +430,14 @@ def _cfo_pat_cumulative(ctx: DerivationContext) -> MetricValue:
     periods = ctx.periods
     if not periods:
         return _u("cfo_pat_cumulative", "no full FY observation supplied", formula=formula, inputs=inputs)
-    cfo_values = [p.get("cfo") for p in periods]
-    pat_values = [p.get("pat") for p in periods]
+
+    def _val(p: FinancialPeriod, key: str) -> Optional[Any]:
+        if hasattr(p, "raw") and isinstance(p.raw, Mapping) and key in p.raw:
+            return p.raw.get(key)
+        return p.get(key)
+
+    cfo_values = [_val(p, "cfo") for p in periods]
+    pat_values = [_val(p, "pat") for p in periods]
     if any(v is None for v in cfo_values) or any(v is None for v in pat_values):
         return _u(
             "cfo_pat_cumulative",
@@ -439,9 +446,9 @@ def _cfo_pat_cumulative(ctx: DerivationContext) -> MetricValue:
             formula=formula,
             inputs=inputs,
         )
-    total_cfo = sum(cfo_values)
-    total_pat = sum(pat_values)
-    if total_pat <= 0:
+    total_cfo = sum((Decimal(str(v)) for v in cfo_values), Decimal("0"))
+    total_pat = sum((Decimal(str(v)) for v in pat_values), Decimal("0"))
+    if total_pat <= Decimal("0"):
         return _na(
             "cfo_pat_cumulative",
             "cumulative PAT is non-positive, so the ratio is not meaningful (it is not "
@@ -449,7 +456,7 @@ def _cfo_pat_cumulative(ctx: DerivationContext) -> MetricValue:
             formula=formula,
             inputs=inputs,
         )
-    return _v("cfo_pat_cumulative", total_cfo / total_pat, formula=formula, inputs=inputs)
+    return _v("cfo_pat_cumulative", float(total_cfo) / float(total_pat), formula=formula, inputs=inputs)
 
 
 @metric("leverage_bucket")

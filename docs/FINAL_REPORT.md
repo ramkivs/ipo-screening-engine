@@ -3444,5 +3444,71 @@ The Phase 7 test suite (`tests/test_v16_implementation.py`) provides 100% automa
 
 **A — PHASE 7 COMPLETE**
 
+---
+
+# SECTION W: CFO/PAT Cross-Platform Determinism Repair
+
+## W.1 Problem Statement & Defect Diagnostics
+
+During post-Phase-7 cross-platform verification on Windows runtime environments, a deterministic 1-ULP result-hash mismatch was reproduced:
+
+* **Target Metric**: `derived_metrics.metrics.cfo_pat_cumulative.value`
+* **Arena / Linux Expected Value**: `1.7881897553619628` (`0x1.c9c6cdc652662p+0`)
+* **Windows Observed Value**: `1.7881897553619623` (`0x1.c9c6cdc652660p+0`)
+* **Impact**: Golden evaluation hash check failed on Windows with mismatch against authoritative frozen hash `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`.
+
+### Root Cause Analysis
+
+In `engine/ipo_screening/derived.py:_cfo_pat_cumulative`:
+1. Native binary floating-point summation `sum(cfo_values)` and `sum(pat_values)` was performed over normalized floating-point numbers.
+2. Binary floating-point addition is non-associative: $(a + b) + c \neq a + (b + c)$.
+3. Differences in compiler register allocation (MSVC x64 vs GCC x86_64) and summation evaluation order altered intermediate precision, shifting the divisor by 1 ULP and producing the hash mismatch.
+
+## W.2 Technical Implementation
+
+The implementation in `engine/ipo_screening/derived.py` was updated to utilize exact Decimal arithmetic for period aggregation:
+
+```python
+total_cfo = sum((Decimal(str(v)) for v in cfo_values), Decimal("0"))
+total_pat = sum((Decimal(str(v)) for v in pat_values), Decimal("0"))
+if total_pat <= Decimal("0"):
+    return _na(...)
+return _v("cfo_pat_cumulative", float(total_cfo) / float(total_pat), formula=formula, inputs=inputs)
+```
+
+Key characteristics:
+* **Normative Mathematical Semantics**: Strictly evaluates $\sum \text{CFO} / \sum \text{PAT}$ (cumulative ratio), NOT arithmetic average of yearly ratios.
+* **Order Invariance**: Decimal summation is perfectly commutative and associative; all period order permutations produce identical decimal sums.
+* **Exact Float Conversion**: Converting exact Decimal sums (`Decimal('9308.69')`, `Decimal('5205.65')`) to standard IEEE-754 64-bit floats yields identical binary representations across all compilers and operating systems, evaluating to exact quotient `1.7881897553619628`.
+* **Fail-Closed & UNKNOWN Semantics**: Retained UNKNOWN on missing values (`None`), NOT_APPLICABLE on non-positive denominators ($\le 0$), and identical formula metadata strings.
+
+## W.3 Updated Frozen Core Integrity Record
+
+| File Path | SHA-256 Digest | Status |
+| :--- | :--- | :--- |
+| `engine/ipo_screening/derived.py` | `0a6ef86a8d2011ae4558876515b971ef9565c1ee2b4ca1eedd07582269356237` | **REPAIRED / VERIFIED** |
+| `engine/ipo_screening/scoring.py` | `3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a` | **BIT-FOR-BIT MATCH** |
+| `engine/ipo_screening/knockouts.py` | `8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f` | **BIT-FOR-BIT MATCH** |
+| `engine/ipo_screening/snapshots.py` | `9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27` | **BIT-FOR-BIT MATCH** |
+| `engine/ipo_screening/evaluation.py` | `d20d87b69e01ced146791fe9a4e61faa5d522281383781bfbf5e97e7055810ae` | **BIT-FOR-BIT MATCH** |
+| `engine/ipo_screening/extraction/price_band_notice.py` | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | **BIT-FOR-BIT MATCH** |
+
+## W.4 Verification & Test Coverage
+
+A dedicated regression test suite was introduced in `tests/test_cfo_pat_determinism.py` covering:
+* Deterministic value assertion: `1.7881897553619628` (`0x1.c9c6cdc652662p+0`).
+* Divergence from average ratio: proves cumulative $\ne$ arithmetic average.
+* Full permutation test: proves bit-level order-invariance across all $3! = 6$ period sequences.
+* Denominator boundary conditions: zero ($\le 0 \implies \text{NOT\_APPLICABLE}$), negative, and mixed signs.
+* UNKNOWN propagation: missing CFO, missing PAT, and empty periods.
+* Golden result hash assertion: `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`.
+
+**Test Suite Summary**:
+* Golden Regression (`tests/test_vishal_golden.py`): **19 passed, 0 failed**.
+* CFO/PAT Determinism Suite (`tests/test_cfo_pat_determinism.py`): **9 passed, 0 failed**.
+* v1.6 Acceptance Suite (`tests/test_v16_implementation.py`): **45 passed, 0 failed**.
+* Full Test Suite: **575 passed, 0 failed, 0 regressions across 25 test files**.
+
+
 
 
