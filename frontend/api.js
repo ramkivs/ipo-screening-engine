@@ -165,6 +165,10 @@ export class ApiClient {
     return this._get('/backtest/analytics');
   }
 
+  async getBacktestDatasets() {
+    return this._get('/backtest/datasets');
+  }
+
   async getCalibrationProposals() {
     return this._get('/calibration/proposals');
   }
