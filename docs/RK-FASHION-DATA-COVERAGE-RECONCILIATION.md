@@ -190,19 +190,20 @@ Through systematic execution profiling of `DocumentExtractor.extract_from_pdf` o
 | **C. fresh_share** | PDF p. 1, p. 82: Fresh 42,67,200 shares (₹3,499.10L), OFS NIL | `issue.fresh_issue, issue.ofs` | `issue.fresh_issue, issue.ofs` | `fresh_share_pct = 100.0%` | **SCORED 3.0/3.0** (band `> 70`) | `PRESENT_AND_REPAIRED` |
 | **C. ofs_seller_type** | PDF p. 1: "OFFER FOR SALE SIZE: NIL" | `issue.ofs = 0.0, ofs_sellers = []` | `issue.ofs_sellers` | `ofs_seller_bucket = "none_or_small"` | **SCORED 2.0/2.0** (band `none_or_small`) | `PRESENT_AND_REPAIRED` |
 | **C. promoter_ofs_pct** | PDF p. 1: "OFFER FOR SALE SIZE: NIL" | `issue.ofs = 0.0, ofs_sellers = []` | `issue.ofs_sellers` | `promoter_ofs_pct_of_holding = 0.0%` | **SCORED 2.0/2.0** (band `== 0`) | `PRESENT_AND_REPAIRED` |
-| **C. dilution** | Pre-issue 11,249,563, Fresh 4,267,200 -> Dilution 27.5% | `issue.pre_issue_shares, fresh_shares` | `issue` | `dilution_ok = True` | **SCORED 1.0/1.0** (band `true`) | `PRESENT_AND_REPAIRED` |
+| **C. dilution** | Pre-issue 11,249,563, Fresh 4,267,200, Post 15,516,763 -> Dilution 27.50% | `issue.pre_issue_shares, fresh_shares, post_issue_shares` | `issue` | `dilution_ok = False` (dilution 27.50% > 25.0% threshold) | **SCORED 0.0/1.0** (band `false`) | `PRESENT_AND_REPAIRED` |
 | **C. use_of_proceeds** | PDF p. 133: Working capital ₹1,500L, Capex ₹1,000L, GCP `[●]` | `use_of_proceeds` (`[●]` GCP) | `use_of_proceeds` | Undisclosed marker triggers fail-closed UNKNOWN | **UNKNOWN** (4.0 unavail pts) | `GENUINELY_UNAVAILABLE` (fail-closed spec requirement) |
 | **C. pre_ipo_placement** | PDF p. 106–133: No discounted placement in 12m | `capital_structure.pre_ipo_placements` | `capital_structure` | `pre_ipo_placement_bucket = "none_or_near_ipo"` | **SCORED 2.0/2.0** (band `none_or_near_ipo`) | `PRESENT_AND_REPAIRED` |
 | **C. lockin** | PDF p. 106: Locked in for 18 months | `capital_structure.promoter_lockin_in_place` | `capital_structure` | `lockin_bucket = "intact"` | **SCORED 1.0/1.0** (band `intact`) | `PRESENT_AND_REPAIRED` |
+| **D. promoter_pre_holding** | PDF p. 126: Promoters 99.61% + Group 0.06% = 99.67% | `capital_structure.promoter_pre_pct` | `capital_structure.promoter_pre_pct` | `promoter_pre_pct = 99.67%` | Telemetry captured | `PRESENT_AND_REPAIRED` |
 | **D. promoter_post_holding** | PDF p. 126: Promoters 72.22% + Group 0.03% = 72.25% | `capital_structure.promoter_post_pct` | `capital_structure.promoter_post_pct` | `promoter_post_pct = 72.25%` | **SCORED 4.0/4.0** (band `> 60`) | `PRESENT_AND_REPAIRED` |
 | **D. litigation** | PDF Section IX: No promoter/director criminal litigation | `governance.litigation_bucket` | `governance.litigation_bucket` | `litigation_bucket = "clean"` | **SCORED 4.0/4.0** (band `clean`) | `PRESENT_AND_REPAIRED` |
-| **D. rpt** | PDF Section V/Financial Notes: RPT within limit | `governance.rpt_pct_revenue` | `governance.rpt_pct_revenue` | `rpt_pct_revenue = 6.67%` | **SCORED 1.0/3.0** (band `<= 15`) | `PRESENT_AND_REPAIRED` |
+| **D. rpt** | PDF Section V / RPT Table p. 62: RPT % of revenue is 10.79% | `governance.rpt_pct_revenue` | `governance.rpt_pct_revenue` | `rpt_pct_revenue = 10.79%` | **SCORED 1.0/3.0** (band `<= 15`) | `PRESENT_AND_REPAIRED` |
 | **D. auditor** | PDF p. 170/292: Murarka & Associates, unchanged 3 FYs, not Big 4 | `governance.auditor_changed_3y: false, auditor_reputed: false` | `governance` | `auditor_bucket = "eom_only"` | **SCORED 1.0/2.0** (band `eom_only`) | `PRESENT_AND_REPAIRED` |
 | **D. board_kmp** | PDF p. 248: 7 directors, 3 independent (42.8% <= 50%) | `governance.board_independent_majority` | `governance` | `board_kmp_bucket = "other"` | **SCORED 1.0/2.0** (band `other`) | `PRESENT_AND_REPAIRED` |
 | **E. industry_growth** | PDF p. 192: Global Artificial Jewellery Market CAGR 8.0%, 2026–2035 | `business.industry_cagr_pct: 8.0`, scope: global, period: 2026-2035 | `business` | `industry_cagr_pct = 8.0%` | **SCORED 3.0/5.0** (band `>= 8`) | `PRESENT_AND_REPAIRED` |
-| **E. moat** | PDF Section V: Strong niche artificial jewellery positioning | `business.moat_rating` | `business.moat_rating` | `moat_rating = "strong_niche"` | **SCORED 3.0/5.0** (band `strong_niche`) | `PRESENT_AND_REPAIRED` |
+| **E. moat** | Qualitative rating not deterministically extracted from RHP | `business.moat_rating = None` | `business.moat_rating` | `moat_rating = None` | **UNKNOWN** (5.0 unavail pts) | `GENUINELY_UNAVAILABLE` (qualitative) |
 | **E. concentration** | PDF p. 45: Top 5 customers accounted for 11.11% in FY26 | `business.top5_customer_pct` | `business.top5_customer_pct` | `top5_concentration_pct = 11.11%` | **SCORED 3.0/3.0** (band `< 30`) | `PRESENT_AND_REPAIRED` |
-| **E. visibility** | Operational capacity and order visibility | `business.visibility_rating` | `business.visibility_rating` | `visibility_rating = "strong"` | **SCORED 2.0/2.0** (band `strong`) | `PRESENT_AND_REPAIRED` |
+| **E. visibility** | Qualitative rating not deterministically extracted from RHP | `business.visibility_rating = None` | `business.visibility_rating` | `visibility_rating = None` | **UNKNOWN** (2.0 unavail pts) | `GENUINELY_UNAVAILABLE` (qualitative) |
 | **F. anchor_quality** | External bidding signal (not in pre-issue RHP) | None | `market.anchor` | `None` | **UNKNOWN** | `GENUINELY_UNAVAILABLE` |
 | **F. qib_subscription** | Live market subscription (not in pre-issue RHP) | None | `market.subscription.qib_x` | `None` | **UNKNOWN** | `GENUINELY_UNAVAILABLE` |
 | **F. gmp_trend** | Grey market premium feed (not in pre-issue RHP) | None | `market.gmp.trend` | `None` | **UNKNOWN** | `GENUINELY_UNAVAILABLE` |
@@ -223,5 +224,6 @@ Through systematic execution profiling of `DocumentExtractor.extract_from_pdf` o
 4. **UI-7 Ingestion Security Boundary:**
    Zero server file paths in public ingestion API. Multipart document ingestion tested and verified with 13 passing unit and integration tests.
 5. **Full Test Suite Status:**
-   - 650 pytest test cases pass across all test modules (100% pass rate).
-   - 8 native Node.js frontend tests pass (100% pass rate).
+   - 658 pytest test cases pass across all test modules (100% pass rate).
+   - Includes dedicated isolation suite `tests/test_fixture_fallback_isolation.py` (Tests A through H) asserting zero cross-IPO contamination.
+   - Includes reconciliation test suite `tests/test_rk_fashion_reconciliation.py`.

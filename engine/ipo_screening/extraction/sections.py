@@ -187,22 +187,21 @@ class SectionExtractor:
             )
 
         # 1d. Lot Size (e.g. "multiples of 1600 Equity Shares" or "minimum bid lot ... 1600")
-        m_lot = re.search(
-            r'(?:multiples\s+of|bid\s+lot\s+(?:is\s+)?|lot\s+size\s+(?:is\s+)?)\s*([0-9,]+)\s*(?:equity\s+shares)?',
-            cover_text,
-            re.IGNORECASE,
-        )
-        if not m_lot and page_ranges and "the_offer" in page_ranges:
+        lot_scan_text = cover_text
+        for p in range(5, min(25, self.page_count + 1)):
+            lot_scan_text += "\n" + self.extract_page_text(p)
+        if page_ranges and "the_offer" in page_ranges:
             o_start, o_end = page_ranges["the_offer"]
             for op in range(o_start, min(o_start + 6, o_end + 1)):
-                otxt = self.extract_page_text(op)
-                m_lot = re.search(
-                    r'(?:multiples\s+of|bid\s+lot\s+(?:is\s+)?|lot\s+size\s+(?:is\s+)?)\s*([0-9,]+)\s*(?:equity\s+shares)?',
-                    otxt,
-                    re.IGNORECASE,
-                )
-                if m_lot:
-                    break
+                lot_scan_text += "\n" + self.extract_page_text(op)
+
+        m_lot = re.search(
+            r'(?:multiples\s+of|lot\s+size\s+(?:is\s+)?|minimum\s+trading\s+lot(?:\s+size)?\s*(?:is\s+)?)\s*([0-9,]+)',
+            lot_scan_text,
+            re.IGNORECASE,
+        )
+        if not m_lot:
+            m_lot = re.search(r'bid\s+lot\s+(?:is\s+)?([0-9,]+)', lot_scan_text, re.IGNORECASE)
         if m_lot:
             lot_val = int(parse_indian_number(m_lot.group(1)) or 0)
             if lot_val > 0:
@@ -219,6 +218,23 @@ class SectionExtractor:
                         extraction_confidence=0.95,
                     )
                 )
+
+        # 1e. Board Detection (SME vs Mainboard)
+        is_sme = bool(re.search(r'\b(sme\s+platform|nse\s+emerge|bse\s+sme)\b', lot_scan_text, re.IGNORECASE))
+        if is_sme:
+            extractions.append(
+                RawExtraction(
+                    field_path="board",
+                    candidate_value="sme",
+                    raw_text="sme",
+                    page=1,
+                    section="The Offer",
+                    locator="Exchange Platform",
+                    quote="SME Platform disclosure",
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.98,
+                )
+            )
 
         # 2. Fresh Issue Shares & Amount
         m_fshares = re.search(
@@ -446,6 +462,25 @@ class SectionExtractor:
                 if pre_pct is not None:
                     break
 
+        # Check if Total (A) and Total (B) exist for promoter pre-holding:
+        if pre_pct is None:
+            tot_a_pre = None
+            tot_b_pre = None
+            for idx, l in enumerate(cap_lines):
+                if re.search(r'Total\s*\(\s*A\s*\)', l, re.IGNORECASE):
+                    c_text = l
+                    for j in range(idx + 1, min(idx + 3, len(cap_lines))):
+                        c_text += " " + cap_lines[j]
+                    floats = [float(x) for x in re.findall(r'[0-9]+\.[0-9]+', c_text)]
+                    if len(floats) >= 2:
+                        tot_a_pre = floats[0]
+                if re.search(r'Total\s*\(\s*B\s*\)', l, re.IGNORECASE):
+                    floats = [float(x) for x in re.findall(r'[0-9]+\.[0-9]+', l)]
+                    if len(floats) >= 2:
+                        tot_b_pre = floats[0]
+            if tot_a_pre is not None:
+                pre_pct = round(tot_a_pre + (tot_b_pre or 0.0), 2)
+
         if pre_pct is not None:
             extractions.append(
                 RawExtraction(
@@ -503,13 +538,15 @@ class SectionExtractor:
 
         # Pre-issue and Post-issue shares
         pre_shares = None
-        for l in cap_lines:
-            if "issued, subscribed and paid-up" in l.lower() or "before the offer" in l.lower():
-                m_psh = re.search(r'([0-9,]+)\s*Equity Shares', l, re.IGNORECASE)
-                if m_psh and pre_shares is None:
-                    parsed_psh = int(parse_indian_number(m_psh.group(1)) or 0)
-                    if parsed_psh > 100000:
-                        pre_shares = parsed_psh
+        post_shares = None
+        for idx, l in enumerate(cap_lines):
+            if pre_shares is None and ("before the offer" in l.lower() or "before the issue" in l.lower()):
+                forward_text = " ".join(cap_lines[idx:min(idx + 4, len(cap_lines))])
+                m_pre = re.search(r'([0-9,]{6,})\s*Equity Shares', forward_text, re.IGNORECASE)
+                if m_pre:
+                    parsed_pre = int(parse_indian_number(m_pre.group(1)) or 0)
+                    if parsed_pre > 10000:
+                        pre_shares = parsed_pre
                         extractions.append(
                             RawExtraction(
                                 field_path="issue.pre_issue_shares",
@@ -523,7 +560,26 @@ class SectionExtractor:
                                 extraction_confidence=0.95,
                             )
                         )
-                        break
+            if post_shares is None and ("after the offer" in l.lower() or "after the issue" in l.lower()):
+                forward_text = " ".join(cap_lines[idx:min(idx + 4, len(cap_lines))])
+                m_post = re.search(r'([0-9,]{6,})\s*Equity Shares', forward_text, re.IGNORECASE)
+                if m_post:
+                    parsed_post = int(parse_indian_number(m_post.group(1)) or 0)
+                    if parsed_post > 10000:
+                        post_shares = parsed_post
+                        extractions.append(
+                            RawExtraction(
+                                field_path="issue.post_issue_shares",
+                                candidate_value=post_shares,
+                                raw_text=str(post_shares),
+                                page=p_start,
+                                section="Capital Structure",
+                                locator="Post-issue Share Capital",
+                                quote=f"Post-issue Equity Shares: {post_shares}",
+                                extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                                extraction_confidence=0.95,
+                            )
+                        )
 
         if pledge_pct is not None:
             extractions.append(
@@ -849,6 +905,39 @@ class SectionExtractor:
                 extraction_confidence=0.90,
             )
         )
+
+        # 4. Related Party Transactions (% of revenue)
+        rpt_pct = None
+        rpt_page = p_start
+        for p in range(min(p_start, 35), min(p_end, 70) + 1):
+            txt = self.extract_page_text(p)
+            if "sum of all related party" in txt.lower() and "% of revenue" in txt.lower():
+                m_rpt = re.search(r'as a % of revenue from operations[^\n]*?\n\s*([0-9\.\s]+)', txt, re.IGNORECASE)
+                if m_rpt:
+                    nums = [float(x) for x in m_rpt.group(1).split() if re.match(r'^[0-9]+(?:\.[0-9]+)?$', x)]
+                    if len(nums) == 4:
+                        rpt_pct = nums[1]
+                        rpt_page = p
+                        break
+                    elif len(nums) >= 1:
+                        rpt_pct = nums[0]
+                        rpt_page = p
+                        break
+
+        if rpt_pct is not None:
+            extractions.append(
+                RawExtraction(
+                    field_path="governance.rpt_pct_revenue",
+                    candidate_value=rpt_pct,
+                    raw_text=f"{rpt_pct}%",
+                    page=rpt_page,
+                    section="Related Party Transactions",
+                    locator="Summary of Related Party Transactions",
+                    quote=f"Related party transactions as % of revenue: {rpt_pct}%",
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.95,
+                )
+            )
 
         return extractions
 

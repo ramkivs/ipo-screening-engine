@@ -58,7 +58,7 @@ class CanonicalInputBuilder:
         output: Dict[str, Any] = {
             "ipo_id": self.base.get("ipo_id") or self._slugify(company_name or "UNKNOWN-IPO"),
             "company_name": company_name,
-            "board": self.base.get("board", "mainboard"),
+            "board": self.base.get("board") or self._get_field("board", "mainboard"),
             "icdr_route": icdr_route,
             "sector_profile": sector_profile,
             "sector": sector,
@@ -171,16 +171,36 @@ class CanonicalInputBuilder:
                 return issue_base[key]
             return self._get_field(f"issue.{key}", default)
 
+        fresh_shares = _pick_issue("fresh_shares", default_fshares)
+        pre_shares = _pick_issue("pre_issue_shares", default_presh)
+        post_shares = _pick_issue("post_issue_shares", default_pshares)
+        if post_shares is None and pre_shares is not None and fresh_shares is not None:
+            post_shares = pre_shares + fresh_shares
+
+        # Deterministically derive post_issue_eps from restated PAT and post_issue_shares if not explicitly provided
+        post_eps = _pick_issue("post_issue_eps", None)
+        if post_eps is None:
+            fin_base = self.base.get("financials", {})
+            periods = fin_base.get("periods") or self._get_field("financials.periods", [])
+            if post_shares and periods and post_shares > 0:
+                latest_p = periods[-1]
+                latest_pat = latest_p.get("pat")
+                if latest_pat is not None:
+                    # latest_pat in INR_LAKHS -> multiply by 100,000 for total INR
+                    post_eps = round((latest_pat * 100000.0) / post_shares, 2)
+        if post_eps is None and self.allow_fixture_fallbacks:
+            post_eps = default_eps
+
         res: Dict[str, Any] = {
             "price_band_low": _pick_issue("price_band_low", default_low),
             "price_band_high": _pick_issue("price_band_high", default_high),
             "lot_size": _pick_issue("lot_size", default_lot),
             "fresh_issue": _pick_issue("fresh_issue", default_fresh),
             "ofs": _pick_issue("ofs", default_ofs),
-            "fresh_shares": _pick_issue("fresh_shares", default_fshares),
-            "post_issue_shares": _pick_issue("post_issue_shares", default_pshares),
-            "pre_issue_shares": _pick_issue("pre_issue_shares", default_presh),
-            "post_issue_eps": _pick_issue("post_issue_eps", default_eps),
+            "fresh_shares": fresh_shares,
+            "post_issue_shares": post_shares,
+            "pre_issue_shares": pre_shares,
+            "post_issue_eps": post_eps,
             "open_date": _pick_issue("open_date", default_open),
             "close_date": _pick_issue("close_date", default_close),
         }
