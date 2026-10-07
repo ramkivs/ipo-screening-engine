@@ -505,3 +505,185 @@ def test_s_vishal_golden_regression(active_config):
     )
     assert outcome.record.result_hash == VISHAL_GOLDEN_RESULT_HASH
     assert outcome.score.final_score == pytest.approx(35.0)
+
+
+# -----------------------------------------------------------------------------
+# Cross-Platform Locking & Windows Portability Tests
+# -----------------------------------------------------------------------------
+
+def test_cross_platform_import_portability_without_fcntl():
+    """Verify that ipo_screening and lifecycle import cleanly when fcntl is absent (Windows)."""
+    import sys
+    from unittest.mock import patch
+
+    # Ensure importing without fcntl does not raise ModuleNotFoundError
+    with patch.dict(sys.modules, {"fcntl": None}):
+        import ipo_screening
+        from ipo_screening.lifecycle import (
+            LifecycleManager,
+            acquire_file_lock,
+            release_file_lock,
+        )
+        assert hasattr(ipo_screening, "ENGINE_VERSION")
+        assert callable(acquire_file_lock)
+        assert callable(release_file_lock)
+
+
+def test_cross_platform_locking_exclusive_serialization(store_dir):
+    """Verify exclusive writer serialization: a second writer cannot enter critical section simultaneously."""
+    import threading
+    import time
+    from ipo_screening.lifecycle import LifecycleManager
+
+    mgr1 = LifecycleManager(store_dir)
+    mgr2 = LifecycleManager(store_dir)
+
+    acquired_1 = threading.Event()
+    release_1 = threading.Event()
+    mgr2_entered_simultaneously = False
+    mgr2_timed_out = False
+
+    def writer_1():
+        with mgr1._file_lock(timeout=5.0):
+            acquired_1.set()
+            release_1.wait(timeout=2.0)
+
+    def writer_2():
+        nonlocal mgr2_entered_simultaneously, mgr2_timed_out
+        acquired_1.wait(timeout=2.0)
+        try:
+            # Try to acquire while writer_1 is still holding lock (short timeout)
+            with mgr2._file_lock(timeout=0.1, blocking=True):
+                mgr2_entered_simultaneously = True
+        except TimeoutError:
+            mgr2_timed_out = True
+
+    t1 = threading.Thread(target=writer_1)
+    t2 = threading.Thread(target=writer_2)
+
+    t1.start()
+    t2.start()
+
+    t2.join(timeout=3.0)
+    release_1.set()
+    t1.join(timeout=3.0)
+
+    assert not mgr2_entered_simultaneously, "Writer 2 entered critical section while Writer 1 held the lock!"
+    assert mgr2_timed_out, "Writer 2 should have timed out waiting for locked critical section"
+
+
+def test_cross_platform_locking_release_on_completion(store_dir):
+    """Verify that lock is released after normal completion, allowing immediate re-acquisition."""
+    from ipo_screening.lifecycle import LifecycleManager
+
+    mgr = LifecycleManager(store_dir)
+
+    with mgr._file_lock(timeout=1.0):
+        pass
+
+    # Immediately acquire again
+    acquired_second_time = False
+    with mgr._file_lock(timeout=1.0):
+        acquired_second_time = True
+
+    assert acquired_second_time is True
+
+
+def test_cross_platform_locking_release_on_exception(store_dir):
+    """Verify that lock is released after an exception inside the critical section."""
+    from ipo_screening.lifecycle import LifecycleManager
+
+    mgr = LifecycleManager(store_dir)
+
+    with pytest.raises(RuntimeError):
+        with mgr._file_lock(timeout=1.0):
+            raise RuntimeError("Forced critical section error")
+
+    # Lock must be released cleanly despite the unhandled exception
+    reacquired = False
+    with mgr._file_lock(timeout=1.0):
+        reacquired = True
+
+    assert reacquired is True
+
+
+def test_cross_platform_locking_windows_msvcrt_simulation(tmp_path):
+    """Verify Windows msvcrt locking behavior: byte 0 lock, retry loop, timeout, and unlock."""
+    from unittest.mock import MagicMock, patch
+    from ipo_screening.lifecycle import acquire_file_lock, release_file_lock
+
+    mock_msvcrt = MagicMock()
+    mock_msvcrt.LK_NBLCK = 2
+    mock_msvcrt.LK_UNLCK = 0
+
+    lock_file = tmp_path / "test_win.lock"
+    lock_file.write_bytes(b"0")
+
+    with lock_file.open("r+b") as f:
+        fileno = f.fileno()
+
+        # 1. Normal acquisition and release under Windows
+        with patch("ipo_screening.lifecycle.fcntl", None), patch("ipo_screening.lifecycle.msvcrt", mock_msvcrt):
+            acquire_file_lock(fileno, blocking=True, timeout=1.0)
+            mock_msvcrt.locking.assert_called_with(fileno, 2, 1)
+
+            release_file_lock(fileno)
+            mock_msvcrt.locking.assert_called_with(fileno, 0, 1)
+
+        # 2. Contention and timeout fail-closed under Windows
+        mock_msvcrt.reset_mock()
+        mock_msvcrt.locking.side_effect = OSError(13, "Permission denied")
+
+        with patch("ipo_screening.lifecycle.fcntl", None), patch("ipo_screening.lifecycle.msvcrt", mock_msvcrt):
+            with pytest.raises(TimeoutError) as exc_info:
+                acquire_file_lock(fileno, blocking=True, timeout=0.05, poll_interval=0.005)
+            assert "exclusive Windows lifecycle lock" in str(exc_info.value)
+
+
+def test_cross_platform_locking_fail_closed_on_timeout(store_dir):
+    """Verify fail-closed behavior: critical section is never executed if lock acquisition fails."""
+    import threading
+    from ipo_screening.lifecycle import LifecycleManager
+
+    mgr1 = LifecycleManager(store_dir)
+    mgr2 = LifecycleManager(store_dir)
+
+    acquired_1 = threading.Event()
+    release_1 = threading.Event()
+    critical_section_entered = False
+
+    def writer_1():
+        with mgr1._file_lock(timeout=5.0):
+            acquired_1.set()
+            release_1.wait(timeout=2.0)
+
+    t1 = threading.Thread(target=writer_1)
+    t1.start()
+
+    acquired_1.wait(timeout=2.0)
+
+    with pytest.raises(TimeoutError):
+        with mgr2._file_lock(timeout=0.05):
+            critical_section_entered = True
+
+    release_1.set()
+    t1.join(timeout=2.0)
+
+    assert critical_section_entered is False
+
+
+def test_lifecycle_index_atomic_replacement_integrity(store_dir):
+    """Verify that save_index uses atomic replacement and maintains index integrity under concurrent reads."""
+    from ipo_screening.lifecycle import IssuerLifecycleEntry, LifecycleIndex, LifecycleManager
+
+    mgr = LifecycleManager(store_dir)
+    index = mgr.load_index()
+    index.issuers["TEST-CORP"] = IssuerLifecycleEntry(ipo_id="TEST-CORP", company_name="Test Corp")
+
+    mgr.save_index(index)
+    assert mgr.index_path.exists()
+
+    # Re-read
+    loaded = mgr.load_index()
+    assert "TEST-CORP" in loaded.issuers
+

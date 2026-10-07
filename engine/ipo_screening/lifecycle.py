@@ -28,14 +28,25 @@ Rules enforced:
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
 import os
 import tempfile
+import threading
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+
+try:
+    import fcntl
+except (ImportError, ModuleNotFoundError):
+    fcntl = None  # type: ignore[assignment]
+
+try:
+    import msvcrt
+except (ImportError, ModuleNotFoundError):
+    msvcrt = None  # type: ignore[assignment]
 
 from .errors import EngineError
 from .evaluation import EvaluationStore
@@ -300,6 +311,96 @@ def get_protection_tier(
 
 
 # -----------------------------------------------------------------------------
+# Cross-Platform Locking Primitives
+# -----------------------------------------------------------------------------
+
+def acquire_file_lock(
+    fileno: int,
+    *,
+    blocking: bool = True,
+    timeout: float = 30.0,
+    poll_interval: float = 0.01,
+) -> None:
+    """Acquire an exclusive OS-level file lock in a cross-platform manner.
+
+    - On POSIX: Uses `fcntl.flock(fileno, fcntl.LOCK_EX)`. When a timeout is specified,
+      polls with `fcntl.LOCK_NB` until acquired or timeout expires.
+    - On Windows: Uses native `msvcrt.locking(fileno, msvcrt.LK_NBLCK, 1)` on byte 0.
+      When blocking, polls with `poll_interval` until acquired or timeout expires.
+    - Fails closed: raises `TimeoutError` on timeout, or propagates platform exceptions.
+    """
+    if fcntl is not None:
+        if not blocking:
+            try:
+                fcntl.flock(fileno, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return
+            except (BlockingIOError, OSError) as exc:
+                raise TimeoutError(f"Could not immediately acquire POSIX lifecycle lock: {exc}") from exc
+
+        if timeout is None:
+            fcntl.flock(fileno, fcntl.LOCK_EX)
+            return
+
+        start = time.monotonic()
+        while True:
+            try:
+                fcntl.flock(fileno, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return
+            except (BlockingIOError, OSError) as exc:
+                if (time.monotonic() - start) >= timeout:
+                    raise TimeoutError(
+                        f"Timed out after {timeout:.2f}s waiting for exclusive POSIX lifecycle lock: {exc}"
+                    ) from exc
+                time.sleep(poll_interval)
+
+    elif msvcrt is not None:
+        os.lseek(fileno, 0, os.SEEK_SET)
+        if not blocking:
+            try:
+                msvcrt.locking(fileno, msvcrt.LK_NBLCK, 1)
+                return
+            except (OSError, IOError) as exc:
+                raise TimeoutError(f"Could not immediately acquire Windows lifecycle lock: {exc}") from exc
+
+        start = time.monotonic()
+        while True:
+            try:
+                os.lseek(fileno, 0, os.SEEK_SET)
+                msvcrt.locking(fileno, msvcrt.LK_NBLCK, 1)
+                return
+            except (OSError, IOError) as exc:
+                if timeout is not None and (time.monotonic() - start) >= timeout:
+                    raise TimeoutError(
+                        f"Timed out after {timeout:.2f}s waiting for exclusive Windows lifecycle lock: {exc}"
+                    ) from exc
+                time.sleep(poll_interval)
+
+    else:
+        raise NotImplementedError(
+            "Neither 'fcntl' (POSIX) nor 'msvcrt' (Windows) is available in this Python runtime."
+        )
+
+
+def release_file_lock(fileno: int) -> None:
+    """Release an exclusive OS-level file lock in a cross-platform manner.
+
+    - On POSIX: Uses `fcntl.flock(fileno, fcntl.LOCK_UN)`.
+    - On Windows: Uses `msvcrt.locking(fileno, msvcrt.LK_UNLCK, 1)` on byte 0.
+    """
+    if fcntl is not None:
+        try:
+            fcntl.flock(fileno, fcntl.LOCK_UN)
+        except OSError:
+            pass
+    elif msvcrt is not None:
+        try:
+            os.lseek(fileno, 0, os.SEEK_SET)
+            msvcrt.locking(fileno, msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+
+
+# -----------------------------------------------------------------------------
 # Lifecycle Manager
 # -----------------------------------------------------------------------------
 
@@ -316,17 +417,28 @@ class LifecycleManager:
         self.lock_path = self.root / "lifecycle_index.lock"
         self.store = EvaluationStore(self.root)
         self.active_config_hash = active_config_hash or ACTIVE_RATIFIED_CONFIG_HASH
+        self._thread_lock = threading.RLock()
 
     @contextlib.contextmanager
-    def _file_lock(self):
-        """Acquire POSIX file lock to ensure atomic multi-process transitions."""
+    def _file_lock(self, timeout: float = 30.0, blocking: bool = True):
+        """Acquire cross-platform exclusive file lock to ensure atomic multi-process transitions.
+
+        Opens <store_root>/lifecycle_index.lock in append/update mode (never truncated)
+        and acquires an exclusive OS-level lock (fcntl on POSIX, msvcrt on Windows).
+        Always releases in a finally block to ensure no stale lock state.
+        """
         self.root.mkdir(parents=True, exist_ok=True)
-        with open(self.lock_path, "w") as lock_file:
-            try:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-                yield
-            finally:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        with self._thread_lock:
+            with open(self.lock_path, "a+b") as lock_file:
+                fileno = lock_file.fileno()
+                if os.fstat(fileno).st_size == 0:
+                    lock_file.write(b"0")
+                    lock_file.flush()
+                acquire_file_lock(fileno, blocking=blocking, timeout=timeout)
+                try:
+                    yield
+                finally:
+                    release_file_lock(fileno)
 
     def load_index(self) -> LifecycleIndex:
         """Load lifecycle_index.json, or bootstrap store if absent or corrupted."""
@@ -863,4 +975,6 @@ __all__ = [
     "LifecycleManager",
     "get_protection_tier",
     "utc_now_iso",
+    "acquire_file_lock",
+    "release_file_lock",
 ]
