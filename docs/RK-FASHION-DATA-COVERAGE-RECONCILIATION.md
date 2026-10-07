@@ -9,79 +9,105 @@
 
 ## 1. Executive Summary & Authoritative Reconciliation Impact
 
-**Authoritative Commit SHA:** `2e271649530338e427140a219976f009d302fef9`  
-**Authoritative Deterministic Result Hash:** `6066aab6d0aff19d74726109512fd5b8b5d9c8fe3c33e05bf0d563a117bed7aa`  
-**Deterministic Evaluation ID:** `R-K-FASHION-ACCESSORIES-LIMITED-20261005-120000Z-final-6066aab6`  
+**Authoritative Deterministic Result Hash:** `58fc5db51e74d9d3c33e5ad9ef2b00c6b733d4fae2efe6a7e77fb0471976b37e`  
+**Deterministic Evaluation ID:** `R-K-FASHION-ACCESSORIES-LIMITED-20261005-120000Z-final-58fc5db5`  
+**Input Snapshot Hash:** `e1923f830b94ae7ba0dfcac72ac717e9c3593dd80e6380849e0228a0edcfc2b6`  
+**Source Manifest Hash:** `dbb8f47274b0bcf7eb6363e707c860436a95237d660cf0a565ffc5770f859ef5`  
+**Engine Version:** `1.5.0` | **Configuration Version:** `1.5.0`
 
-| Metric / Attribute | Baseline Evaluation (`e959e12`) | Authoritative Repaired Evaluation (`2e27164`) | Net Reconciled Delta |
-| :--- | :--- | :--- | :--- |
-| **Final Score** | **20.0 / 100** | **61.0 / 100** | **+41.0 pts** |
-| **Base Score** | 20.0 / 100 | **64.0 / 100** | **+44.0 pts** |
-| **Penalties Applied** | 0.0 pts | **-3.0 pts** (`margin_spike` triggered) | **-3.0 pts** |
-| **Available Points** | 30.0 points | **82.0 points** | **+52.0 points** |
-| **Unknown Points** | **70.0 points** | **18.0 points** | **-52.0 points** |
-| **Completeness %** | 30.0% completeness | **82.0% completeness** | **+52.0%** |
-| **Confidence Level** | Low | **Medium** | **Upgraded** |
-| **Verdict** | INSUFFICIENT_DATA | **INSUFFICIENT_DATA** (Module F unobserved) | Preserved fail-closed |
-| **Module A (Financial Quality)** | 0.0 / 0.0 (25 unknown pts) | **21.0 / 25.0 (0 unknown pts)** | **+21.0 pts (100% scored)** |
-| **Module B (Valuation)** | 0.0 / 0.0 (16 unknown pts) | **10.0 / 16.0 (4 unknown pts)** | **+10.0 pts (real peer scored)** |
-| **Module C (Offer Structure)** | 11.0 / 11.0 (4 unknown pts) | **11.0 / 11.0 (4 unknown pts)** | **100% available scored** |
-| **Module D (Governance)** | 5.0 / 9.0 (6 unknown pts) | **11.0 / 15.0 (0 unknown pts)** | **+6.0 pts (100% scored)** |
-| **Module E (Business/Moat)** | 4.0 / 10.0 (5 unknown pts) | **11.0 / 15.0 (0 unknown pts)** | **+7.0 pts (100% scored)** |
-| **Module F (Market/Demand)** | 0.0 / 0.0 (10 unknown pts) | 0.0 / 0.0 (10 unknown pts) | Genuine external unknowns |
+| Metric / Attribute | Baseline Evaluation (`e959e12`) | Obsolete Contaminated (`2e27164`) | Authoritative Clean Repaired Evaluation | Net Reconciled Delta (vs Baseline) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Final Score** | **20.0 / 100** | *61.0 / 100 (OBSOLETE)* | **55.0 / 100** | **+35.0 pts** |
+| **Base Score** | 20.0 / 100 | *64.0 / 100 (OBSOLETE)* | **58.0 / 100** | **+38.0 pts** |
+| **Penalties Applied** | 0.0 pts | -3.0 pts (`margin_spike`) | **-3.0 pts** (`margin_spike` triggered) | **-3.0 pts** |
+| **Available Points** | 30.0 points | 82.0 points | **75.0 points** | **+45.0 points** |
+| **Unknown Points** | **70.0 points** | 18.0 points | **25.0 points** | **-45.0 points** |
+| **Completeness %** | 30.0% completeness | 82.0% (OBSOLETE) | **75.0% completeness** | **+45.0%** |
+| **Confidence Level** | Low | Medium (OBSOLETE) | **Low** ($75.0\% < 80.0\%$) | **Preserved Fail-Closed** |
+| **Verdict** | INSUFFICIENT_DATA | INSUFFICIENT_DATA | **INSUFFICIENT_DATA** | Preserved Fail-Closed |
+| **Floor (Lower Bound)** | 17.0 | 48.0 (OBSOLETE) | **42.0** | **+25.0 pts** |
+| **Ceiling (Upper Bound)** | 90.0 | 79.0 (OBSOLETE) | **80.0** | **-10.0 pts** |
+| **Module A (Financial Quality)** | 0.0 / 0.0 (25 unknown pts) | 21.0 / 25.0 | **21.0 / 25.0 (0 unknown pts)** | **+21.0 pts (100% scored)** |
+| **Module B (Valuation)** | 0.0 / 0.0 (16 unknown pts) | 10.0 / 16.0 | **10.0 / 16.0 (4 unknown pts)** | **+10.0 pts (real peer scored)** |
+| **Module C (Offer Structure)** | 11.0 / 11.0 (4 unknown pts) | 11.0 / 11.0 (OBSOLETE) | **10.0 / 11.0 (4 unknown pts)** | **+10.0 pts (dilution 0/1)** |
+| **Module D (Governance)** | 5.0 / 9.0 (6 unknown pts) | 11.0 / 15.0 | **11.0 / 15.0 (0 unknown pts)** | **+6.0 pts (100% scored)** |
+| **Module E (Business/Moat)** | 4.0 / 10.0 (5 unknown pts) | 11.0 / 15.0 (OBSOLETE) | **6.0 / 8.0 (7 unknown pts)** | **+2.0 pts (moat/vis UNKNOWN)** |
+| **Module F (Market/Demand)** | 0.0 / 0.0 (10 unknown pts) | 0.0 / 0.0 | **0.0 / 0.0 (10 unknown pts)** | Genuine external unknowns |
 
 ---
 
-### Reconciliation of Score Discrepancy (59.0 vs 61.0)
-During initial testing prior to segment-specific CAGR prioritization, the extractor picked the broad gems and jewellery industry figure of 5.28% (PDF p. 194). Under `config/ipo-config.v1.5.0.json`, the scoring rule for `industry_growth` has bands:
-- `> 12` -> 5 points
-- `>= 8` -> 3 points
-- `>= 0` -> 1 point
+### Reconciliation of Score Discrepancies (Historical Contaminated 61.0 vs Verified Clean Repaired 55.0)
 
-At 5.28% CAGR, `industry_growth` fell into the `>= 0` band, scoring **1.0 point**, yielding Module E = 9.0, Base Score = 62.0, and Final Score = **59.0/100** (62.0 - 3.0 penalty).
+In the initial reconciliation pass at commit `2e27164`, an evaluation score of **61.0 / 100** (Base: 64.0, Penalty: -3.0) was reported. Comprehensive forensic investigation revealed that this 61.0 score was **OBSOLETE AND CONTAMINATED** due to test fixture constants silently leaking into the evaluation from `CanonicalInputBuilder` (`builder.py`), which defaulted to fallback values from Vishal Nirmiti (`fixtures/vishal_nirmiti/input.json`).
 
-At the authoritative commit `2e27164`, the extractor correctly extracts the primary operating segment's growth: Global Artificial Jewellery Market CAGR of **8.0%** (2026–2035, PDF p. 192). At 8.0%, `industry_growth` satisfies `>= 8`, scoring **3.0 points** (an exact +2.0 point delta). Module E increases from 9.0 to 11.0, Base Score becomes 64.0, and the deterministic Final Score is **61.0/100** (64.0 - 3.0 penalty).
+When all cross-IPO fixture fallbacks were completely eliminated (`allow_fixture_fallbacks=False`) and the pipeline was audited against clean, proven R.K. Fashion Accessories RHP facts, three distinct criteria diverged from the obsolete 61-point claim:
 
-#### Complete Authoritative Score Arithmetic at Commit `2e27164`:
+1. **Module C — `dilution` ($-1.0$ point divergence):**
+   - *Contaminated State (`2e27164`)*: Scored $1.0 / 1.0$ point based on Vishal Nirmiti's post-issue shares fallback of $26,390,909$, which falsely computed dilution as $4,267,200 / 26,390,909 = 16.17\% < 25.0\%$.
+   - *Repaired Clean State*: R.K.'s actual post-issue share count from RHP page 107 is $15,516,763$. The true dilution is $4,267,200 / 15,516,763 = \mathbf{27.500581...\%} \ge 25.0\%$. Because General Corporate Purposes (GCP) is undisclosed (`[●]`), the growth exemption cannot be conferred under fail-closed rules. Consequently, `dilution_ok` evaluates strictly to `False`, scoring **0.0 / 1.0 points**.
+2. **Module E — `moat` ($-3.0$ points divergence, $+5.0$ unknown points):**
+   - *Contaminated State (`2e27164`)*: Scored $3.0 / 5.0$ points based on Vishal Nirmiti's `"strong_niche"` fixture fallback.
+   - *Repaired Clean State*: Qualitative assessments are not deterministically extractable from the statutory RHP text. Under strict fail-closed extraction, `moat_rating` is `None`, evaluating criterion `moat` to **UNKNOWN** ($0.0$ scored / $5.0$ unavailable points).
+3. **Module E — `visibility` ($-2.0$ points divergence, $+2.0$ unknown points):**
+   - *Contaminated State (`2e27164`)*: Scored $2.0 / 2.0$ points based on Vishal Nirmiti's `"strong"` fixture fallback.
+   - *Repaired Clean State*: Qualitative assessments are not deterministically extractable from the statutory RHP text. Under strict fail-closed extraction, `visibility_rating` is `None`, evaluating criterion `visibility` to **UNKNOWN** ($0.0$ scored / $2.0$ unavailable points).
+
+#### Mathematical Reconciliation from Obsolete 64.0 Base to Verified 58.0 Base:
+$$\text{Obsolete Contaminated Base Score} = 64.0$$
+$$- 1.0 \text{ (true dilution 27.50\% } \ge 25.0\%) = 63.0$$
+$$- 3.0 \text{ (moat unextracted qualitative rating } \to \text{UNKNOWN}) = 60.0$$
+$$- 2.0 \text{ (visibility unextracted qualitative rating } \to \text{UNKNOWN}) = \mathbf{58.0}$$
+
+$$\text{Final Verified Clean Score} = \text{Base } (58.0) - \text{Active Penalties } (3.0) = \mathbf{55.0 \text{ / } 100}$$
+
+---
+
+### Complete Authoritative Score Arithmetic (Verified Clean Result)
+
 - **Module A (Financial Quality): 21.0 / 25.0 (Available: 25.0, Unknown: 0)**
-  - `revenue_cagr`: 6.0 / 6.0 (band `> 25`, derived 2-yr CAGR = 51.17%)
+  - `revenue_cagr`: 6.0 / 6.0 (band `> 25`, derived 2-yr CAGR = 51.16%)
   - `margin_trend`: 5.0 / 5.0 (band `expanding`, EBITDA margin 0.86% -> 16.74% -> 24.16%)
   - `roce`: 5.0 / 5.0 (band `> 20`, disclosed FY26 ROCE = 57.74%)
   - `cfo_quality`: 1.0 / 5.0 (band `>= 0`, cumulative CFO/PAT ratio = 0.2006)
   - `leverage`: 4.0 / 4.0 (band `strong`, D/E 0.11, ICR > 100)
-- **Module B (Valuation): 10.0 / 20.0 (Available: 16.0, Unknown: 4.0)**
-  - `pe_vs_peers`: 8.0 / 8.0 (band `<= -20%`, Banaras Beads P/E 44.31 vs Issuer P/B band low/high P/E 14.67–20.25)
-  - `second_multiple`: 0.0 / 4.0 (band `else`, Banaras Beads P/B 1.36 vs Issuer P/B ~2.4)
-  - `peg`: 2.0 / 4.0 (band `< 1`, PEG = 0.093, capped at 2.0 due to `low_base_year`)
+- **Module B (Valuation): 10.0 / 16.0 (Available: 16.0, Unknown: 4.0)**
+  - `pe_vs_peers`: 8.0 / 8.0 (band `<= -20%`, Banaras Beads P/E 44.31 vs Issuer P/E 20.25, premium = -54.31%)
+  - `second_multiple`: 0.0 / 4.0 (band `else`, Banaras Beads P/B 1.36 vs Issuer P/B ~2.49)
+  - `peg`: 2.0 / 4.0 (band `< 1`, PEG = 0.1285, capped at 2.0 due to `low_base_year`)
   - `sector_ipo_relative`: UNKNOWN (4.0 unknown points; secondary market sector IPO database unsupplied)
-- **Module C (Offer Structure, Proceeds & Pre-IPO): 11.0 / 15.0 (Available: 11.0, Unknown: 4.0)**
+- **Module C (Offer Structure, Proceeds & Pre-IPO): 10.0 / 11.0 (Available: 11.0, Unknown: 4.0)**
   - `fresh_share`: 3.0 / 3.0 (band `> 70`, 100% fresh issue of ₹3,499.10L)
   - `ofs_seller_type`: 2.0 / 2.0 (band `none_or_small`, OFS is NIL)
   - `promoter_ofs_pct`: 2.0 / 2.0 (band `== 0`, OFS is NIL)
-  - `dilution`: 1.0 / 1.0 (band `true`, dilution 27.5% <= 30%)
+  - `dilution`: 0.0 / 1.0 (band `false`, dilution = 27.50% $\ge$ 25.0%, GCP undisclosed so growth exemption not conferred)
   - `use_of_proceeds`: UNKNOWN (4.0 unknown points; fail-closed due to explicitly undisclosed GCP `[●]`)
   - `pre_ipo_placement`: 2.0 / 2.0 (band `none_or_near_ipo`, no discounted placement within 12m)
   - `lockin`: 1.0 / 1.0 (band `intact`, 18-month promoter lock-in confirmed)
 - **Module D (Promoter & Governance): 11.0 / 15.0 (Available: 15.0, Unknown: 0)**
   - `promoter_post_holding`: 4.0 / 4.0 (band `> 60`, post-issue holding 72.25%)
   - `litigation`: 4.0 / 4.0 (band `clean`, no criminal litigation against promoters/directors)
-  - `rpt`: 1.0 / 3.0 (band `<= 15`, RPT = 6.67% of revenue)
+  - `rpt`: 1.0 / 3.0 (band `<= 15`, FY26 RPT % of revenue = 10.79%)
   - `auditor`: 1.0 / 2.0 (band `eom_only`, Murarka & Associates unchanged 3 FYs, peer-reviewed, not Big-4)
   - `board_kmp`: 1.0 / 2.0 (band `other`, 3 of 7 independent directors = 42.8% <= 50%)
-- **Module E (Business & Moat): 11.0 / 15.0 (Available: 15.0, Unknown: 0)**
+- **Module E (Business & Moat): 6.0 / 8.0 (Available: 8.0, Unknown: 7.0)**
   - `industry_growth`: 3.0 / 5.0 (band `>= 8`, Global Artificial Jewellery Market CAGR = 8.0%)
-  - `moat`: 3.0 / 5.0 (band `strong_niche`, artificial jewellery and hair accessories leader)
+  - `moat`: UNKNOWN (5.0 unknown points; qualitative rating not in RHP, fail-closed `None`)
   - `concentration`: 3.0 / 3.0 (band `< 30`, top-5 customer concentration = 11.11%)
-  - `visibility`: 2.0 / 2.0 (band `strong`, operational order and capacity visibility)
-- **Module F (Market & Demand Signals): 0.0 / 10.0 (Available: 0, Unknown: 10.0)**
+  - `visibility`: UNKNOWN (2.0 unknown points; qualitative rating not in RHP, fail-closed `None`)
+- **Module F (Market & Demand Signals): 0.0 / 0.0 (Available: 0, Unknown: 10.0)**
   - `gmp_trend`: UNKNOWN (3.0 pts, unsupplied external secondary feed)
   - `market_regime`: UNKNOWN (2.0 pts, unsupplied external index feed)
   - `overall_subscription`: UNKNOWN (2.0 pts, unsupplied live exchange feed)
   - `nii_subscription`: UNKNOWN (2.0 pts, unsupplied live exchange feed)
   - `retail_nii_penalty`: UNKNOWN (1.0 pt, unsupplied live exchange feed)
-- **Base Score Total:** 21.0 + 10.0 + 11.0 + 11.0 + 11.0 + 0.0 = **64.0 / 82.0 available points**
-- **Penalties Total:** -3.0 points (`margin_spike` triggered due to EBITDA margin jumping from 0.86% in FY24 to 16.74% in FY25, > 500 bps YoY)
-- **Final Deterministic Score:** 64.0 - 3.0 = **61.0 / 100**
+- **Base Score Total:** $21.0 + 10.0 + 10.0 + 11.0 + 6.0 + 0.0 = \mathbf{58.0 \text{ / } 75.0 \text{ available points}}$
+- **Penalties Total:** $\mathbf{-3.0 \text{ points}}$ (`margin_spike` triggered due to EBITDA margin jumping from 0.86% in FY24 to 24.16% in FY26, > 500 bps YoY)
+- **Final Deterministic Score:** $58.0 - 3.0 = \mathbf{55.0 \text{ / } 100}$
+- **Completeness %:** $\frac{75.0 \text{ available}}{100.0 \text{ max}} \times 100\% = \mathbf{75.0\%}$
+- **Confidence Level:** **Low** ($75.0\% < 80.0\%$ threshold)
+- **Verdict:** `INSUFFICIENT_DATA` (fail-closed due to completeness $< 80.0\%$)
+- **Floor (Lower Bound):** $58.0 - 3.0 \text{ (active)} - 13.0 \text{ (unresolved penalties)} = \mathbf{42.0}$
+- **Ceiling (Upper Bound):** $58.0 + 25.0 \text{ (unknown)} - 3.0 \text{ (active)} = \mathbf{80.0}$
 
 ---
 
@@ -115,9 +141,9 @@ Section V (Industry Overview) of the RHP presents two distinct market discussion
 
 ---
 
-## 3. Explicit Tripartite Unknown Points Classification (18.0 Unknown Points)
+## 3. Explicit Tripartite Unknown Points Classification (25.0 Unknown Points)
 
-The 18 unobserved points across the 100 evaluable points are strictly partitioned into three mutually exclusive categories:
+The 25 unobserved points across the 100 evaluable points are strictly partitioned into three mutually exclusive categories:
 
 ### Category 1: External-Data Unavailable (14.0 Points)
 These criteria evaluate market-wide conditions or live market transactions occurring outside the statutory RHP document boundary:
@@ -132,8 +158,10 @@ These criteria evaluate market-wide conditions or live market transactions occur
 These criteria could not be scored because the statutory prospectus deliberately left the required value blank or unpriced:
 1. **`C.use_of_proceeds` (4.0 pts):** In RHP Section III ("Objects of the Issue", p. 133), the General Corporate Purposes (GCP) amount is stated with the legal placeholder `[●]` pending discovery of the final offer price. Under v1.5.0 specification Section 13, the engine is strictly prohibited from substituting the statutory 25% ceiling or treating the undisclosed amount as zero, as doing so would allow blind-heavy issues to bypass governance checks. The criterion fail-closes to `UNKNOWN`.
 
-### Category 3: Other Genuine Contract Limitations (0.0 Points)
-- **None.** All other 22 criteria across Modules A, B, C, D, and E (82.0 evaluable points) are resolved deterministically from extracted RHP facts.
+### Category 3: Unextracted Qualitative Dimensions (7.0 Points)
+These criteria evaluate qualitative company characteristics that are not deterministically extractable from statutory disclosures:
+1. **`E.moat` (5.0 pts):** Market-position and moat durability rating (`moat_rating`). Absent an analyst override, it strictly evaluates to `None` / `UNKNOWN`.
+2. **`E.visibility` (2.0 pts):** Capacity and order-book revenue visibility assessment (`visibility_rating`). Absent an analyst override, it strictly evaluates to `None` / `UNKNOWN`.
 
 ---
 
@@ -164,13 +192,21 @@ Through systematic execution profiling of `DocumentExtractor.extract_from_pdf` o
 - **Mechanism:**
   1. On the cover page, a two-column layout caused `OFFER FOR SALE SIZE` and `NIL` to be separated by table line breaks. Single-line regexes failed to match `NIL`, and `builder.py` defaulted `ofs` to 3,300 lakhs when `allow_fixture_fallbacks` was active.
   2. `promoter_post_pct` was not extracted due to line breaks across table cells (`Total (A)` on PDF p. 126).
-  3. Statutory auditor tenure and network standing fields (`auditor_changed_3y`, `auditor_reputed`) were unmapped, causing `auditor_bucket` to return UNKNOWN.
-  4. Industry CAGR metadata (`industry_scope`, `industry_forecast_period`, `industry_source`) was missing, triggering the strict spec s12 all-or-nothing fail-closed gate.
+  3. Pre-issue and post-issue shares were missing extractors, causing fallbacks to Vishal constants ($19,800,000$ and $26,390,909$), which contaminated dilution calculations.
+  4. Lot size lacked an extractor, falling back to 68 instead of the SME trading lot of 1,600.
+  5. Post-issue EPS fell back to 9.46 instead of deriving from restated PAT and post-issue shares (4.05).
+  6. RPT percentage fell back to 6.67% instead of extracting FY26 disclosed 10.79%.
+  7. Statutory auditor tenure and network standing fields (`auditor_changed_3y`, `auditor_reputed`) were unmapped, causing `auditor_bucket` to return UNKNOWN.
+  8. Industry CAGR metadata (`industry_scope`, `industry_forecast_period`, `industry_source`) was missing, triggering the strict spec s12 all-or-nothing fail-closed gate.
 - **Repair:**
   1. Multi-line NIL OFS detector in `SectionExtractor.extract_cover_and_offer` emits `issue.ofs: 0.0` and `issue.ofs_sellers: []`.
-  2. Multi-line post-issue shareholding parser captures promoter holding of `72.25%`.
-  3. Governance extractor parses statutory auditor **Murarka & Associates** (audited all 3 FYs, not Big 4 -> `auditor_changed_3y = False`, `auditor_reputed = False` -> `eom_only` score 1.0).
-  4. Business extractor parses top-5 customer concentration (`11.11%`) and forward industry CAGR (`8.0%`, scope `global`, period `2026-2035`, source `Global Artificial Jewellery Market Report`).
+  2. Multi-line post-issue shareholding parser captures promoter holding of `72.25%` and pre-issue holding of `99.67%`.
+  3. Forward table row parser extracts pre-issue shares of `11,249,563` and post-issue shares of `15,516,763`.
+  4. Lot size extractor discovers SME market trading lot of `1,600` shares on definitions and trading disclosures pages.
+  5. Derived post-issue EPS computes deterministically as $₹62,869,000 / 15,516,763 = \mathbf{4.05}$.
+  6. RPT extractor captures FY26 RPT percentage of revenue as `10.79%` (repairing the old contaminated `6.67%` fallback).
+  7. Governance extractor parses statutory auditor **Murarka & Associates** (audited all 3 FYs, not Big 4 -> `auditor_changed_3y = False`, `auditor_reputed = False` -> `eom_only` score 1.0).
+  8. Business extractor parses top-5 customer concentration (`11.11%`) and forward industry CAGR (`8.0%`, scope `global`, period `2026-2035`, source `Global Artificial Jewellery Market Report`).
 
 ---
 
@@ -178,26 +214,26 @@ Through systematic execution profiling of `DocumentExtractor.extract_from_pdf` o
 
 | Module & Criterion ID | PDF Source Evidence (Page & Quote) | Extractor Output | Canonical Field | Evaluator Input | Repaired Result | Defect Classification |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **A. revenue_cagr** | PDF pp. 169–170: Rev FY24 ₹1,328.49L, FY25 ₹1,777.19L, FY26 ₹3,035.71L | `financials.periods[].revenue` | `financials.periods` | `revenue_cagr_2y_from_3fy = 51.17%` | **SCORED 6.0/6.0** (band `> 25`) | `PRESENT_AND_REPAIRED` |
+| **A. revenue_cagr** | PDF pp. 169–170: Rev FY24 ₹1,328.49L, FY25 ₹1,777.19L, FY26 ₹3,035.71L | `financials.periods[].revenue` | `financials.periods` | `revenue_cagr_2y_from_3fy = 51.16%` | **SCORED 6.0/6.0** (band `> 25`) | `PRESENT_AND_REPAIRED` |
 | **A. margin_trend** | PDF pp. 169–170: EBITDA FY24 0.86%, FY25 16.74%, FY26 24.16%; PAT FY24 7.13%, FY25 11.24%, FY26 20.71% | `financials.periods[].ebitda, pat` | `financials.periods` | `margin_trend = "expanding"` | **SCORED 5.0/5.0** (band `expanding`) | `PRESENT_AND_REPAIRED` |
 | **A. roce** | PDF pp. 169–170: Disclosed ROCE FY26: 57.74% | `financials.periods[].disclosed_roce_pct` | `financials.periods` | `roce_latest = 57.74%` | **SCORED 5.0/5.0** (band `> 20`) | `PRESENT_AND_REPAIRED` |
 | **A. cfo_quality** | PDF p. 379: OCF FY24 -₹7.13L, FY25 ₹77.61L, FY26 ₹114.72L; PAT sum ₹923.19L | `financials.periods[].cfo, pat` | `financials.periods` | `cfo_pat_cumulative = 0.2006` | **SCORED 1.0/5.0** (band `>= 0`) | `PRESENT_AND_REPAIRED` |
 | **A. leverage** | PDF p. 36/356: FY26 Debt ₹170.32L, Net Worth ₹1,616.22L, Interest ₹0.97L | `financials.periods[].total_debt, net_worth` | `financials.periods` | `leverage_bucket = "strong"` (D/E 0.11, ICR > 100) | **SCORED 4.0/4.0** (band `strong`) | `PRESENT_AND_REPAIRED` |
-| **B. pe_vs_peers** | PDF p. 168: Banaras Beads Limited CMP ₹119.20, EPS ₹2.69, P/E 44.31 (2026-09-28) | `peers` (1 peer object) | `peers` | Issuer P/E 14.67–20.25 vs Peer 44.31 (`pe_premium_pct <= -20%`) | **SCORED 8.0/8.0** (band `<= -20`) | `PRESENT_AND_REPAIRED` |
-| **B. second_multiple** | PDF p. 168: Banaras Beads NAV ₹87.38 -> P/B 1.36 vs Issuer P/B ~2.4 | `peers` (P/B 1.36) | `peers` | `second_multiple_premium_pct` | **SCORED 0.0/4.0** (band `else`) | `PRESENT_AND_REPAIRED` |
-| **B. peg** | P/E ~14.67 / PAT CAGR 157.4% = 0.093 | Derived from Issue & Periods | `derived.peg` | `peg = 0.093` | **SCORED 2.0/4.0** (band `< 1`, cap low_base) | `PRESENT_AND_REPAIRED` |
+| **B. pe_vs_peers** | PDF p. 168: Banaras Beads Limited CMP ₹119.20, EPS ₹2.69, P/E 44.31 (2026-09-28) | `peers` (1 peer object) | `peers` | Issuer P/E 20.25 vs Peer 44.31 (`pe_premium_pct = -54.31%`) | **SCORED 8.0/8.0** (band `<= -20`) | `PRESENT_AND_REPAIRED` |
+| **B. second_multiple** | PDF p. 168: Banaras Beads NAV ₹87.38 -> P/B 1.36 vs Issuer P/B ~2.49 | `peers` (P/B 1.36) | `peers` | `second_multiple_premium_pct = +82.90%` | **SCORED 0.0/4.0** (band `else`) | `PRESENT_AND_REPAIRED` |
+| **B. peg** | P/E 20.25 / PAT CAGR 157.44% = 0.1285 | Derived from Issue & Periods | `derived.peg` | `peg = 0.1285` | **SCORED 2.0/4.0** (band `< 1`, cap low_base) | `PRESENT_AND_REPAIRED` |
 | **B. sector_ipo_relative** | Not present in pre-issue RHP (requires external database of recent 4 sector IPOs) | None | `recent_sector_ipos` | `None` | **UNKNOWN** (4.0 unavail pts) | `GENUINELY_UNAVAILABLE` |
 | **C. fresh_share** | PDF p. 1, p. 82: Fresh 42,67,200 shares (₹3,499.10L), OFS NIL | `issue.fresh_issue, issue.ofs` | `issue.fresh_issue, issue.ofs` | `fresh_share_pct = 100.0%` | **SCORED 3.0/3.0** (band `> 70`) | `PRESENT_AND_REPAIRED` |
 | **C. ofs_seller_type** | PDF p. 1: "OFFER FOR SALE SIZE: NIL" | `issue.ofs = 0.0, ofs_sellers = []` | `issue.ofs_sellers` | `ofs_seller_bucket = "none_or_small"` | **SCORED 2.0/2.0** (band `none_or_small`) | `PRESENT_AND_REPAIRED` |
 | **C. promoter_ofs_pct** | PDF p. 1: "OFFER FOR SALE SIZE: NIL" | `issue.ofs = 0.0, ofs_sellers = []` | `issue.ofs_sellers` | `promoter_ofs_pct_of_holding = 0.0%` | **SCORED 2.0/2.0** (band `== 0`) | `PRESENT_AND_REPAIRED` |
-| **C. dilution** | Pre-issue 11,249,563, Fresh 4,267,200, Post 15,516,763 -> Dilution 27.50% | `issue.pre_issue_shares, fresh_shares, post_issue_shares` | `issue` | `dilution_ok = False` (dilution 27.50% > 25.0% threshold) | **SCORED 0.0/1.0** (band `false`) | `PRESENT_AND_REPAIRED` |
+| **C. dilution** | Pre 11,249,563, Fresh 4,267,200, Post 15,516,763 -> Dilution 27.50% | `issue.pre_issue_shares, fresh_shares, post_issue_shares` | `issue` | `dilution_ok = False` (dilution 27.50% $\ge$ 25.0% threshold) | **SCORED 0.0/1.0** (band `false`) | `PRESENT_AND_REPAIRED` |
 | **C. use_of_proceeds** | PDF p. 133: Working capital ₹1,500L, Capex ₹1,000L, GCP `[●]` | `use_of_proceeds` (`[●]` GCP) | `use_of_proceeds` | Undisclosed marker triggers fail-closed UNKNOWN | **UNKNOWN** (4.0 unavail pts) | `GENUINELY_UNAVAILABLE` (fail-closed spec requirement) |
 | **C. pre_ipo_placement** | PDF p. 106–133: No discounted placement in 12m | `capital_structure.pre_ipo_placements` | `capital_structure` | `pre_ipo_placement_bucket = "none_or_near_ipo"` | **SCORED 2.0/2.0** (band `none_or_near_ipo`) | `PRESENT_AND_REPAIRED` |
 | **C. lockin** | PDF p. 106: Locked in for 18 months | `capital_structure.promoter_lockin_in_place` | `capital_structure` | `lockin_bucket = "intact"` | **SCORED 1.0/1.0** (band `intact`) | `PRESENT_AND_REPAIRED` |
 | **D. promoter_pre_holding** | PDF p. 126: Promoters 99.61% + Group 0.06% = 99.67% | `capital_structure.promoter_pre_pct` | `capital_structure.promoter_pre_pct` | `promoter_pre_pct = 99.67%` | Telemetry captured | `PRESENT_AND_REPAIRED` |
 | **D. promoter_post_holding** | PDF p. 126: Promoters 72.22% + Group 0.03% = 72.25% | `capital_structure.promoter_post_pct` | `capital_structure.promoter_post_pct` | `promoter_post_pct = 72.25%` | **SCORED 4.0/4.0** (band `> 60`) | `PRESENT_AND_REPAIRED` |
 | **D. litigation** | PDF Section IX: No promoter/director criminal litigation | `governance.litigation_bucket` | `governance.litigation_bucket` | `litigation_bucket = "clean"` | **SCORED 4.0/4.0** (band `clean`) | `PRESENT_AND_REPAIRED` |
-| **D. rpt** | PDF Section V / RPT Table p. 62: RPT % of revenue is 10.79% | `governance.rpt_pct_revenue` | `governance.rpt_pct_revenue` | `rpt_pct_revenue = 10.79%` | **SCORED 1.0/3.0** (band `<= 15`) | `PRESENT_AND_REPAIRED` |
+| **D. rpt** | PDF Section I / p. 62: FY26 RPT % of revenue is 10.79% | `governance.rpt_pct_revenue` | `governance.rpt_pct_revenue` | `rpt_pct_revenue = 10.79%` (replaces obsolete 6.67% fallback) | **SCORED 1.0/3.0** (band `<= 15`) | `PRESENT_AND_REPAIRED` |
 | **D. auditor** | PDF p. 170/292: Murarka & Associates, unchanged 3 FYs, not Big 4 | `governance.auditor_changed_3y: false, auditor_reputed: false` | `governance` | `auditor_bucket = "eom_only"` | **SCORED 1.0/2.0** (band `eom_only`) | `PRESENT_AND_REPAIRED` |
 | **D. board_kmp** | PDF p. 248: 7 directors, 3 independent (42.8% <= 50%) | `governance.board_independent_majority` | `governance` | `board_kmp_bucket = "other"` | **SCORED 1.0/2.0** (band `other`) | `PRESENT_AND_REPAIRED` |
 | **E. industry_growth** | PDF p. 192: Global Artificial Jewellery Market CAGR 8.0%, 2026–2035 | `business.industry_cagr_pct: 8.0`, scope: global, period: 2026-2035 | `business` | `industry_cagr_pct = 8.0%` | **SCORED 3.0/5.0** (band `>= 8`) | `PRESENT_AND_REPAIRED` |
