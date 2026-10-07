@@ -70,7 +70,7 @@ def active_config():
 
 @pytest.fixture
 def sample_input():
-    d = json.loads(Path("fixtures/vishal_nirmiti/input.json").read_text())
+    d = json.loads(Path("fixtures/vishal_nirmiti/input.json").read_text(encoding="utf-8"))
     d["ipo_id"] = "AURORA-TECH-LIMITED"
     d["company_name"] = "Aurora Tech Limited"
     return d
@@ -370,7 +370,7 @@ def test_n_referenced_backtest_record(store_dir):
     eval_id = "REF-EVAL-20261005-120000Z-final-12345678"
     obs_dir = store_dir / eval_id / "observations"
     obs_dir.mkdir(parents=True, exist_ok=True)
-    (obs_dir / "observation_1w.json").write_text("{}")
+    (obs_dir / "observation_1w.json").write_text("{}", encoding="utf-8")
 
     tier = get_protection_tier(eval_id, "SOME-IPO", store_root=store_dir)
     assert tier == TIER_2_GOVERNED
@@ -469,7 +469,7 @@ def test_r_rk_lifecycle_mapping(store_dir, active_config):
             "config_hash": ACTIVE_RATIFIED_CONFIG_HASH,
             "result_hash": eid.split("-")[-1],
         }
-        (edir / "evaluation.json").write_text(json.dumps(rec_data))
+        (edir / "evaluation.json").write_text(json.dumps(rec_data), encoding="utf-8")
 
     # Run bootstrap
     mgr.bootstrap_store(force=True)
@@ -496,7 +496,7 @@ def test_r_rk_lifecycle_mapping(store_dir, active_config):
 def test_s_vishal_golden_regression(active_config):
     """S. Vishal golden regression: Bit-for-bit hash e84f8bc0... unchanged."""
     from datetime import datetime, timezone
-    sample_input = json.loads(Path("fixtures/vishal_nirmiti/input.json").read_text())
+    sample_input = json.loads(Path("fixtures/vishal_nirmiti/input.json").read_text(encoding="utf-8"))
     outcome = evaluate(
         input_document=sample_input,
         config=active_config,
@@ -686,4 +686,13 @@ def test_lifecycle_index_atomic_replacement_integrity(store_dir):
     # Re-read
     loaded = mgr.load_index()
     assert "TEST-CORP" in loaded.issuers
+
+
+def test_lifecycle_fixture_loading_encoding_portable():
+    """Verify that fixture loading is explicitly UTF-8 encoded and independent of Windows CP1252 charmap."""
+    p = Path("fixtures/vishal_nirmiti/input.json")
+    content = p.read_text(encoding="utf-8")
+    data = json.loads(content)
+    assert data["ipo_id"] == "VISHAL-NIRMITI-LIMITED"
+    assert "₹" in content
 
