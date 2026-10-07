@@ -32,8 +32,16 @@ from .models import (
     IpoDetail,
     IpoHistoryResponse,
     IpoListResponse,
+    LifecycleActionRequest,
+    LifecycleActionResponse,
     PerformanceSummaryResponse,
     PostListingObservationsResponse,
+)
+from ..lifecycle import (
+    CyclicLineageError,
+    EvaluationNotFoundError,
+    InvalidStateTransitionError,
+    ProtectedRecordError,
 )
 from .service import (
     IngestionError,
@@ -94,8 +102,11 @@ def create_router(service: PresentationService) -> APIRouter:
         return res
 
     @router.get("/ipos/{ipo_id}/history", response_model=IpoHistoryResponse, tags=["IPOs"])
-    def get_ipo_history(ipo_id: str) -> IpoHistoryResponse:
-        res = service.get_ipo_history(ipo_id)
+    def get_ipo_history(
+        ipo_id: str,
+        include_archived: bool = Query(False, description="Include archived historical evaluations"),
+    ) -> IpoHistoryResponse:
+        res = service.get_ipo_history(ipo_id, include_archived=include_archived)
         if not res:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -312,6 +323,80 @@ def create_router(service: PresentationService) -> APIRouter:
                 detail={"error": "Internal Error", "message": f"Unexpected ingestion error: {exc}", "code": "INGESTION_INTERNAL_ERROR"},
             )
 
+    # -------------------------------------------------------------------------
+    # 6.14 Lifecycle Governance Operations
+    # -------------------------------------------------------------------------
+
+    @router.post("/evaluations/{evaluation_id}/archive", response_model=LifecycleActionResponse, tags=["Lifecycle"])
+    def archive_evaluation(
+        evaluation_id: str,
+        payload: Optional[LifecycleActionRequest] = None,
+    ) -> LifecycleActionResponse:
+        reason = payload.reason if payload else None
+        actor = payload.actor if payload else None
+        try:
+            return service.archive_evaluation(evaluation_id, reason=reason, actor=actor)
+        except EvaluationNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": str(exc), "code": "EVALUATION_NOT_FOUND"},
+            ) from exc
+        except ProtectedRecordError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": "Forbidden", "message": str(exc), "code": "PROTECTED_RECORD"},
+            ) from exc
+        except InvalidStateTransitionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": "Conflict", "message": str(exc), "code": "INVALID_STATE_TRANSITION"},
+            ) from exc
+
+    @router.post("/evaluations/{evaluation_id}/unarchive", response_model=LifecycleActionResponse, tags=["Lifecycle"])
+    def unarchive_evaluation(
+        evaluation_id: str,
+        payload: Optional[LifecycleActionRequest] = None,
+    ) -> LifecycleActionResponse:
+        reason = payload.reason if payload else None
+        actor = payload.actor if payload else None
+        try:
+            return service.unarchive_evaluation(evaluation_id, reason=reason, actor=actor)
+        except EvaluationNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": str(exc), "code": "EVALUATION_NOT_FOUND"},
+            ) from exc
+        except InvalidStateTransitionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": "Conflict", "message": str(exc), "code": "INVALID_STATE_TRANSITION"},
+            ) from exc
+
+    @router.post("/evaluations/{evaluation_id}/make-active", response_model=LifecycleActionResponse, tags=["Lifecycle"])
+    def make_evaluation_active(
+        evaluation_id: str,
+        payload: Optional[LifecycleActionRequest] = None,
+    ) -> LifecycleActionResponse:
+        reason = payload.reason if payload else None
+        actor = payload.actor if payload else None
+        try:
+            return service.make_evaluation_active(evaluation_id, reason=reason, actor=actor)
+        except EvaluationNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": str(exc), "code": "EVALUATION_NOT_FOUND"},
+            ) from exc
+        except CyclicLineageError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Bad Request", "message": str(exc), "code": "CYCLIC_LINEAGE"},
+            ) from exc
+        except InvalidStateTransitionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": "Conflict", "message": str(exc), "code": "INVALID_STATE_TRANSITION"},
+            ) from exc
+
     return router
 
 
@@ -344,14 +429,17 @@ def create_app(service: Optional[PresentationService] = None) -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Strict Read-Only Middleware: blocks POST, PUT, PATCH, DELETE (except POST /api/v1/ingest/document)
+    # Strict Read-Only Middleware: blocks POST, PUT, PATCH, DELETE (except POST /api/v1/ingest/document and lifecycle operations)
     @app.middleware("http")
     async def read_only_guard(request: Request, call_next):
         if request.method not in ("GET", "HEAD", "OPTIONS"):
-            # UI-7 exception: allow POST strictly to /api/v1/ingest/document
-            if request.method == "POST" and request.url.path in (
-                "/api/v1/ingest/document",
-                "/api/v1/ingest/document/",
+            path = request.url.path
+            # UI-7 ingestion exception and governed lifecycle operations
+            if request.method == "POST" and (
+                path in ("/api/v1/ingest/document", "/api/v1/ingest/document/")
+                or path.endswith("/archive")
+                or path.endswith("/unarchive")
+                or path.endswith("/make-active")
             ):
                 return await call_next(request)
 

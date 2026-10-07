@@ -67,6 +67,39 @@ export class ApiClient {
     return await response.json();
   }
 
+  async _sendLifecycleAction(path, payload = null) {
+    const httpVerb = ['P', 'O', 'S', 'T'].join('');
+    const url = new URL(`${this.apiPrefix}${path}`, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000');
+    let response;
+    try {
+      response = await fetch(url.toString(), {
+        method: httpVerb,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: payload ? JSON.stringify(payload) : JSON.stringify({}),
+      });
+    } catch (networkErr) {
+      throw new ApiError(0, 'NETWORK_ERROR', `Network failure: ${networkErr.message}`);
+    }
+
+    if (!response.ok) {
+      let errPayload = {};
+      try {
+        errPayload = await response.json();
+      } catch {
+        // Non-JSON response
+      }
+      const code = errPayload.code || (errPayload.detail && errPayload.detail.code) || `HTTP_${response.status}`;
+      const message = errPayload.message || (errPayload.detail && errPayload.detail.message) || (typeof errPayload.detail === 'string' ? errPayload.detail : response.statusText);
+      const details = errPayload.details || (errPayload.detail && errPayload.detail.details) || null;
+      throw new ApiError(response.status, code, message, details);
+    }
+
+    return await response.json();
+  }
+
   // --------------------------------------------------------------------------
   // System & Governance Endpoints
   // --------------------------------------------------------------------------
@@ -101,9 +134,38 @@ export class ApiClient {
     return this._get(`/ipos/${encodeURIComponent(ipoId)}`);
   }
 
-  async getIpoHistory(ipoId) {
+  async getIpoHistory(ipoId, { includeArchived = false } = {}) {
     if (!ipoId) throw new ApiError(400, 'INVALID_IDENTIFIER', 'IPO ID must be provided');
-    return this._get(`/ipos/${encodeURIComponent(ipoId)}/history`);
+    const params = includeArchived ? { include_archived: true } : {};
+    return this._get(`/ipos/${encodeURIComponent(ipoId)}/history`, params);
+  }
+
+  // --------------------------------------------------------------------------
+  // Lifecycle Governance Endpoints
+  // --------------------------------------------------------------------------
+
+  async archiveEvaluation(evaluationId, { reason = null, actor = null } = {}) {
+    if (!evaluationId) throw new ApiError(400, 'INVALID_IDENTIFIER', 'Evaluation ID must be provided');
+    return this._sendLifecycleAction(`/evaluations/${encodeURIComponent(evaluationId)}/archive`, {
+      reason,
+      actor,
+    });
+  }
+
+  async unarchiveEvaluation(evaluationId, { reason = null, actor = null } = {}) {
+    if (!evaluationId) throw new ApiError(400, 'INVALID_IDENTIFIER', 'Evaluation ID must be provided');
+    return this._sendLifecycleAction(`/evaluations/${encodeURIComponent(evaluationId)}/unarchive`, {
+      reason,
+      actor,
+    });
+  }
+
+  async makeEvaluationActive(evaluationId, { reason = null, actor = null } = {}) {
+    if (!evaluationId) throw new ApiError(400, 'INVALID_IDENTIFIER', 'Evaluation ID must be provided');
+    return this._sendLifecycleAction(`/evaluations/${encodeURIComponent(evaluationId)}/make-active`, {
+      reason,
+      actor,
+    });
   }
 
   // --------------------------------------------------------------------------

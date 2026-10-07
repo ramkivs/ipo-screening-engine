@@ -430,9 +430,11 @@ export class App {
                   </td>
                   <td>
                     <strong>${ipo.evaluation_count}</strong>
+                    ${ipo.historical_count > 0 ? `<div style="font-size: 0.72rem; color: var(--text-muted);">${ipo.historical_count} historical</div>` : ''}
+                    ${ipo.archived_count > 0 ? `<div style="font-size: 0.72rem; color: var(--text-muted);">${ipo.archived_count} archived</div>` : ''}
                   </td>
                   <td>
-                    ${ipo.latest_score !== null ? `<strong>${ipo.latest_score.toFixed(1)}</strong> / 100` : '<span class="badge badge-unknown">UNKNOWN</span>'}
+                    ${ipo.latest_score !== null ? `<strong>${ipo.latest_score.toFixed(1)}</strong> / 100 <span class="badge badge-active" style="font-size: 0.65rem; padding: 2px 4px; vertical-align: middle;">ACTIVE</span>` : '<span class="badge badge-unknown">UNKNOWN</span>'}
                   </td>
                   <td>
                     ${this.renderVerdictBadge(ipo.latest_verdict)}
@@ -539,6 +541,33 @@ export class App {
             <a href="#ipos/${this.escape(evaluation.ipo_id)}" class="btn btn-outline btn-sm">Lifecycle History</a>
           </div>
         </div>
+
+        ${evaluation.operational_status === 'SUPERSEDED' ? `
+          <div class="lifecycle-banner-superseded">
+            <div>
+              <strong>⚠️ NOTICE: This evaluation is SUPERSEDED.</strong>
+              <span>An authoritative replacement evaluation has superseded this historical record.</span>
+              ${evaluation.superseded_by ? `
+                <div style="font-size: 0.8rem; margin-top: 4px;">
+                  Active Replacement: <code>${this.escape(evaluation.superseded_by)}</code>
+                </div>
+              ` : ''}
+            </div>
+            ${evaluation.superseded_by ? `
+              <a href="#evaluations/${this.escape(evaluation.superseded_by)}" class="btn btn-primary btn-sm">
+                Switch to Active Scorecard &rarr;
+              </a>
+            ` : ''}
+          </div>
+        ` : evaluation.operational_status === 'ARCHIVED' ? `
+          <div class="lifecycle-banner-archived">
+            <div>
+              <strong>📦 NOTICE: This evaluation is ARCHIVED.</strong>
+              <span>This record is suppressed from operational dashboards and retained for auditability.</span>
+            </div>
+            <button class="btn btn-outline btn-sm" id="btn-unarchive-current" data-eval-id="${this.escape(evaluationId)}">Unarchive Evaluation</button>
+          </div>
+        ` : ''}
 
         <!-- 1. Scorecard Banner Header -->
         <div class="scorecard-banner">
@@ -730,6 +759,22 @@ export class App {
           </div>
         </div>
       `;
+
+      const unarchiveBtn = container.querySelector('#btn-unarchive-current');
+      if (unarchiveBtn) {
+        unarchiveBtn.addEventListener('click', async () => {
+          unarchiveBtn.disabled = true;
+          unarchiveBtn.textContent = 'Unarchiving...';
+          try {
+            await this.api.unarchiveEvaluation(evaluationId);
+            await this.renderScorecard(evaluationId);
+          } catch (err) {
+            alert(`Failed to unarchive: ${err.message}`);
+            unarchiveBtn.disabled = false;
+            unarchiveBtn.textContent = 'Unarchive Evaluation';
+          }
+        });
+      }
     } catch (err) {
       this.renderError(container, 'Failed to load evaluation scorecard', err);
     }
@@ -2803,6 +2848,10 @@ export class App {
     const container = document.getElementById('directory-view');
     if (!container) return;
 
+    if (this.ipoHistoryShowArchived === undefined) {
+      this.ipoHistoryShowArchived = false;
+    }
+
     container.innerHTML = `
       <div class="state-box">
         <div class="spinner"></div>
@@ -2811,18 +2860,66 @@ export class App {
     `;
 
     try {
-      const history = await this.api.getIpoHistory(ipoId);
+      const history = await this.api.getIpoHistory(ipoId, { includeArchived: this.ipoHistoryShowArchived });
+
+      const activeEval = history.history.find(e => e.operational_status === 'ACTIVE');
 
       container.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
           <a href="#directory" class="btn btn-outline btn-sm">&larr; Back to Directory</a>
-          <span class="meta-tag">Issuer Progression</span>
+          <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="checkbox" id="toggle-show-archived" ${this.ipoHistoryShowArchived ? 'checked' : ''} />
+            <span>Show Archived Executions</span>
+          </label>
         </div>
+
+        ${activeEval ? `
+          <div class="card" style="border-left: 4px solid var(--color-apply); margin-bottom: 20px;">
+            <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 12px;">
+              <div>
+                <span class="badge badge-active" style="margin-right: 8px;">AUTHORITATIVE ACTIVE EVALUATION</span>
+                <strong style="font-size: 1.1rem;">${this.escape(history.company_name)}</strong>
+              </div>
+              <span class="meta-tag">MODE: ${this.escape(activeEval.evaluation_mode)}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: center;">
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">ACTIVE SCORE</div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: var(--text-main);">
+                  ${activeEval.final_score.toFixed(1)} <span style="font-size: 0.9rem; font-weight: 500; color: var(--text-muted);">/ 100</span>
+                </div>
+              </div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">VERDICT</div>
+                <div>${this.renderVerdictBadge(activeEval.verdict)}</div>
+              </div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">CONFIDENCE</div>
+                <div style="font-weight: 600;">${this.escape(activeEval.confidence)} (${activeEval.completeness_pct !== null ? activeEval.completeness_pct.toFixed(0) : '—'}%)</div>
+              </div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">EVALUATION ID</div>
+                <code style="font-size: 0.75rem;">${this.escape(activeEval.evaluation_id)}</code>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 14px;">
+              <a href="#evaluations/${this.escape(activeEval.evaluation_id)}" class="btn btn-primary btn-sm">
+                View Active Scorecard &rarr;
+              </a>
+              <a href="#evidence/${this.escape(activeEval.evaluation_id)}" class="btn btn-outline btn-sm">
+                Inspect Evidence &rarr;
+              </a>
+              <a href="#performance/${this.escape(activeEval.evaluation_id)}" class="btn btn-outline btn-sm">
+                Performance &rarr;
+              </a>
+            </div>
+          </div>
+        ` : ''}
 
         <div class="card">
           <div class="card-header">
-            <div class="card-title">${this.escape(history.company_name)} (<code>${this.escape(history.ipo_id)}</code>)</div>
-            <span class="meta-tag">${history.history.length} Lifecycle Evaluations</span>
+            <div class="card-title">Evaluation Timeline &amp; History (<code>${this.escape(history.ipo_id)}</code>)</div>
+            <span class="meta-tag">${history.history.length} Lifecycle Runs Displayed</span>
           </div>
 
           ${history.delta ? `
@@ -2830,7 +2927,7 @@ export class App {
               <div class="card-title" style="font-size: 0.85rem; margin-bottom: 8px;">
                 Preliminary &rarr; Final Progression Delta
               </div>
-              <div style="display: flex; gap: 24px; font-size: 0.85rem;">
+              <div style="display: flex; gap: 24px; font-size: 0.85rem; flex-wrap: wrap;">
                 <div>Preliminary Score: <strong>${history.delta.preliminary_score !== null ? history.delta.preliminary_score.toFixed(1) : '—'}</strong></div>
                 <div>Final Score: <strong>${history.delta.final_score !== null ? history.delta.final_score.toFixed(1) : '—'}</strong></div>
                 <div>Score Delta: <strong>${history.delta.score_delta !== null ? (history.delta.score_delta >= 0 ? `+${history.delta.score_delta.toFixed(1)}` : history.delta.score_delta.toFixed(1)) : '0.0'}</strong></div>
@@ -2840,35 +2937,80 @@ export class App {
           ` : ''}
 
           <div class="table-wrapper">
-            <table class="data-table">
+            <table class="data-table" id="lifecycle-history-table">
               <thead>
                 <tr>
-                  <th>Evaluation ID</th>
+                  <th style="width: 36px; text-align: center;">
+                    <input type="checkbox" id="select-all-evals" title="Select all eligible historical evaluations" />
+                  </th>
+                  <th>Evaluation ID &amp; Lineage</th>
+                  <th>Status</th>
                   <th>Mode / Stage</th>
                   <th>Timestamp</th>
-                  <th>Final Score</th>
+                  <th>Score</th>
                   <th>Verdict</th>
                   <th>Confidence</th>
-                  <th>Action</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 ${history.history.map(e => `
-                  <tr>
-                    <td><code>${this.escape(e.evaluation_id)}</code></td>
+                  <tr data-eval-id="${this.escape(e.evaluation_id)}">
+                    <td style="text-align: center;">
+                      ${e.operational_status !== 'ACTIVE' ? `
+                        <input type="checkbox" class="eval-select-checkbox" data-eval-id="${this.escape(e.evaluation_id)}" data-status="${this.escape(e.operational_status)}" />
+                      ` : `
+                        <span title="Active evaluation cannot be archived" style="color: var(--text-light); font-size: 0.8rem;">—</span>
+                      `}
+                    </td>
+                    <td>
+                      <div><code>${this.escape(e.evaluation_id)}</code></div>
+                      ${e.superseded_by ? `
+                        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">
+                          Superseded by: <code>${this.escape(e.superseded_by)}</code>
+                        </div>
+                      ` : ''}
+                      ${e.supersedes ? `
+                        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">
+                          Supersedes: <code>${this.escape(e.supersedes)}</code>
+                        </div>
+                      ` : ''}
+                    </td>
+                    <td>
+                      ${e.operational_status === 'ACTIVE' ? `
+                        <span class="badge badge-active">ACTIVE</span>
+                      ` : e.operational_status === 'SUPERSEDED' ? `
+                        <span class="badge badge-superseded">SUPERSEDED</span>
+                      ` : `
+                        <span class="badge badge-archived">ARCHIVED</span>
+                      `}
+                    </td>
                     <td><span class="meta-tag">${this.escape(e.evaluation_mode)}</span></td>
-                    <td>${this.formatDate(e.evaluation_timestamp)}</td>
+                    <td style="font-size: 0.8rem;">${this.formatDate(e.evaluation_timestamp)}</td>
                     <td><strong>${e.final_score.toFixed(1)}</strong></td>
                     <td>${this.renderVerdictBadge(e.verdict)}</td>
-                    <td>${this.escape(e.confidence)} (${e.completeness_pct !== null ? e.completeness_pct.toFixed(0) : '—'}%)</td>
+                    <td style="font-size: 0.8rem;">${this.escape(e.confidence)}</td>
                     <td>
-                      <div style="display: flex; gap: 6px;">
+                      <div style="display: flex; gap: 4px; flex-wrap: wrap;">
                         <a href="#evaluations/${this.escape(e.evaluation_id)}" class="btn btn-outline btn-sm">
                           Scorecard
                         </a>
                         <a href="#evidence/${this.escape(e.evaluation_id)}" class="btn btn-outline btn-sm">
                           Evidence
                         </a>
+                        ${e.operational_status === 'SUPERSEDED' ? `
+                          <button class="btn btn-outline btn-sm btn-row-archive" data-eval-id="${this.escape(e.evaluation_id)}" title="Archive this superseded run">
+                            Archive
+                          </button>
+                          <button class="btn btn-outline btn-sm btn-row-make-active" data-eval-id="${this.escape(e.evaluation_id)}" title="Make this evaluation authoritative ACTIVE">
+                            Make Active
+                          </button>
+                        ` : ''}
+                        ${e.operational_status === 'ARCHIVED' ? `
+                          <button class="btn btn-outline btn-sm btn-row-unarchive" data-eval-id="${this.escape(e.evaluation_id)}" title="Unarchive this run to visible history">
+                            Unarchive
+                          </button>
+                        ` : ''}
                       </div>
                     </td>
                   </tr>
@@ -2876,10 +3018,148 @@ export class App {
               </tbody>
             </table>
           </div>
+
+          <!-- Bulk Selection Toolbar -->
+          <div style="display: flex; gap: 10px; align-items: center; margin-top: 14px; padding: 10px 14px; background: var(--bg-subtle); border-radius: var(--radius-sm); flex-wrap: wrap;">
+            <button class="btn btn-outline btn-sm" id="btn-bulk-archive" disabled>Archive Selected</button>
+            <button class="btn btn-outline btn-sm" id="btn-bulk-unarchive" disabled>Unarchive Selected</button>
+            <span id="bulk-selection-count" style="font-size: 0.8rem; color: var(--text-muted);">0 selected</span>
+          </div>
         </div>
       `;
+
+      this.setupLifecycleHistoryEvents(container, ipoId);
     } catch (err) {
       this.renderError(container, 'Failed to load issuer detail', err);
+    }
+  }
+
+  setupLifecycleHistoryEvents(container, ipoId) {
+    const toggleArchived = container.querySelector('#toggle-show-archived');
+    if (toggleArchived) {
+      toggleArchived.addEventListener('change', () => {
+        this.ipoHistoryShowArchived = toggleArchived.checked;
+        this.renderIpoDetail(ipoId);
+      });
+    }
+
+    const selectAllCheckbox = container.querySelector('#select-all-evals');
+    const rowCheckboxes = container.querySelectorAll('.eval-select-checkbox');
+    const bulkArchiveBtn = container.querySelector('#btn-bulk-archive');
+    const bulkUnarchiveBtn = container.querySelector('#btn-bulk-unarchive');
+    const countSpan = container.querySelector('#bulk-selection-count');
+
+    const updateBulkState = () => {
+      const selected = Array.from(rowCheckboxes).filter(cb => cb.checked);
+      const count = selected.length;
+      if (countSpan) countSpan.textContent = `${count} selected`;
+
+      const hasSuperseded = selected.some(cb => cb.getAttribute('data-status') === 'SUPERSEDED');
+      const hasArchived = selected.some(cb => cb.getAttribute('data-status') === 'ARCHIVED');
+
+      if (bulkArchiveBtn) bulkArchiveBtn.disabled = !hasSuperseded;
+      if (bulkUnarchiveBtn) bulkUnarchiveBtn.disabled = !hasArchived;
+    };
+
+    if (selectAllCheckbox) {
+      selectAllCheckbox.addEventListener('change', () => {
+        rowCheckboxes.forEach(cb => { cb.checked = selectAllCheckbox.checked; });
+        updateBulkState();
+      });
+    }
+
+    rowCheckboxes.forEach(cb => {
+      cb.addEventListener('change', updateBulkState);
+    });
+
+    // Single Row Archive
+    container.querySelectorAll('.btn-row-archive').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const eid = btn.getAttribute('data-eval-id');
+        btn.disabled = true;
+        try {
+          await this.api.archiveEvaluation(eid, { reason: 'USER_TABLE_ARCHIVE' });
+          await this.renderIpoDetail(ipoId);
+        } catch (err) {
+          alert(`Archive failed: ${err.message}`);
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // Single Row Unarchive
+    container.querySelectorAll('.btn-row-unarchive').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const eid = btn.getAttribute('data-eval-id');
+        btn.disabled = true;
+        try {
+          await this.api.unarchiveEvaluation(eid, { reason: 'USER_TABLE_UNARCHIVE' });
+          await this.renderIpoDetail(ipoId);
+        } catch (err) {
+          alert(`Unarchive failed: ${err.message}`);
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // Single Row Make Active (Governed Rollback)
+    container.querySelectorAll('.btn-row-make-active').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const eid = btn.getAttribute('data-eval-id');
+        if (!confirm(`Are you sure you want to designate evaluation ${eid} as the authoritative ACTIVE evaluation?`)) {
+          return;
+        }
+        btn.disabled = true;
+        try {
+          await this.api.makeEvaluationActive(eid, { reason: 'GOVERNED_ROLLBACK' });
+          await this.renderIpoDetail(ipoId);
+        } catch (err) {
+          alert(`Make Active failed: ${err.message}`);
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // Bulk Archive
+    if (bulkArchiveBtn) {
+      bulkArchiveBtn.addEventListener('click', async () => {
+        const selectedEids = Array.from(rowCheckboxes)
+          .filter(cb => cb.checked && cb.getAttribute('data-status') === 'SUPERSEDED')
+          .map(cb => cb.getAttribute('data-eval-id'));
+
+        if (!selectedEids.length) return;
+        bulkArchiveBtn.disabled = true;
+        try {
+          for (const eid of selectedEids) {
+            await this.api.archiveEvaluation(eid, { reason: 'BULK_ARCHIVE' });
+          }
+          await this.renderIpoDetail(ipoId);
+        } catch (err) {
+          alert(`Bulk archive failed: ${err.message}`);
+          bulkArchiveBtn.disabled = false;
+        }
+      });
+    }
+
+    // Bulk Unarchive
+    if (bulkUnarchiveBtn) {
+      bulkUnarchiveBtn.addEventListener('click', async () => {
+        const selectedEids = Array.from(rowCheckboxes)
+          .filter(cb => cb.checked && cb.getAttribute('data-status') === 'ARCHIVED')
+          .map(cb => cb.getAttribute('data-eval-id'));
+
+        if (!selectedEids.length) return;
+        bulkUnarchiveBtn.disabled = true;
+        try {
+          for (const eid of selectedEids) {
+            await this.api.unarchiveEvaluation(eid, { reason: 'BULK_UNARCHIVE' });
+          }
+          await this.renderIpoDetail(ipoId);
+        } catch (err) {
+          alert(`Bulk unarchive failed: ${err.message}`);
+          bulkUnarchiveBtn.disabled = false;
+        }
+      });
     }
   }
 

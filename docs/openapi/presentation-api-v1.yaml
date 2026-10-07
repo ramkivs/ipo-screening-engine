@@ -116,6 +116,13 @@ paths:
           required: true
           schema:
             type: string
+        - name: include_archived
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Whether to include archived historical evaluations
       responses:
         '200':
           description: Chronological list of evaluations with preliminary-to-final delta
@@ -452,6 +459,142 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+  /evaluations/{evaluation_id}/archive:
+    post:
+      summary: Archive a historical evaluation execution
+      description: |
+        Reversibly transitions an evaluation to ARCHIVED visibility state.
+        Removes the evaluation from default operational and directory views while
+        preserving 100% of underlying immutable files, hashes, and audit evidence.
+        Active evaluations cannot be archived unless the offering is withdrawn.
+        Tier 1 Golden evaluations cannot be archived.
+      operationId: archiveEvaluation
+      tags: [Lifecycle]
+      parameters:
+        - name: evaluation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleActionRequest'
+      responses:
+        '200':
+          description: Evaluation successfully archived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleActionResponse'
+        '403':
+          description: Forbidden (Tier 1 golden evaluation cannot be archived)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Evaluation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflict (invalid state transition, e.g. archiving active evaluation)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /evaluations/{evaluation_id}/unarchive:
+    post:
+      summary: Unarchive an archived evaluation execution
+      description: |
+        Restores an archived evaluation to VISIBLE state within the historical timeline.
+        Does not automatically promote the evaluation to ACTIVE.
+      operationId: unarchiveEvaluation
+      tags: [Lifecycle]
+      parameters:
+        - name: evaluation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleActionRequest'
+      responses:
+        '200':
+          description: Evaluation successfully unarchived to VISIBLE state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleActionResponse'
+        '404':
+          description: Evaluation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflict (evaluation is not archived)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /evaluations/{evaluation_id}/make-active:
+    post:
+      summary: Designate a historical evaluation as authoritative ACTIVE (Governed Rollback)
+      description: |
+        Designates the target evaluation as the authoritative ACTIVE evaluation for its mode.
+        Automatically demotes any incumbent active evaluation to SUPERSEDED with lineage pointer.
+        Requires evaluation to have been scored under the ratified active policy.
+      operationId: makeEvaluationActive
+      tags: [Lifecycle]
+      parameters:
+        - name: evaluation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleActionRequest'
+      responses:
+        '200':
+          description: Evaluation successfully designated as ACTIVE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleActionResponse'
+        '400':
+          description: Bad request (cyclic lineage detected)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Evaluation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Conflict (unratified policy or invalid state transition)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
 components:
   schemas:
     HealthStatus:
@@ -613,6 +756,24 @@ components:
           type: string
         result_hash:
           type: string
+        lifecycle_state:
+          type: string
+          enum: [ACTIVE, SUPERSEDED]
+          default: ACTIVE
+        visibility_state:
+          type: string
+          enum: [VISIBLE, ARCHIVED]
+          default: VISIBLE
+        operational_status:
+          type: string
+          enum: [ACTIVE, SUPERSEDED, ARCHIVED]
+          default: ACTIVE
+        superseded_by:
+          type: string
+          nullable: true
+        supersedes:
+          type: string
+          nullable: true
 
     EvaluationListResponse:
       type: object
@@ -848,6 +1009,63 @@ components:
               type: string
             spec_version:
               type: string
+        lifecycle_state:
+          type: string
+          enum: [ACTIVE, SUPERSEDED]
+          default: ACTIVE
+        visibility_state:
+          type: string
+          enum: [VISIBLE, ARCHIVED]
+          default: VISIBLE
+        operational_status:
+          type: string
+          enum: [ACTIVE, SUPERSEDED, ARCHIVED]
+          default: ACTIVE
+        superseded_by:
+          type: string
+          nullable: true
+        supersedes:
+          type: string
+          nullable: true
+        lifecycle:
+          type: object
+          nullable: true
+
+    LifecycleActionRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          nullable: true
+        actor:
+          type: string
+          nullable: true
+
+    LifecycleActionResponse:
+      type: object
+      required: [evaluation_id, ipo_id, lifecycle_state, visibility_state, operational_status, message]
+      properties:
+        evaluation_id:
+          type: string
+        ipo_id:
+          type: string
+        lifecycle_state:
+          type: string
+          enum: [ACTIVE, SUPERSEDED]
+        visibility_state:
+          type: string
+          enum: [VISIBLE, ARCHIVED]
+        operational_status:
+          type: string
+          enum: [ACTIVE, SUPERSEDED, ARCHIVED]
+        superseded_by:
+          type: string
+          nullable: true
+        supersedes:
+          type: string
+          nullable: true
+        message:
+          type: string
 
     EvidenceDetail:
       type: object

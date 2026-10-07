@@ -68,6 +68,15 @@ from .errors import (
 )
 from .evaluation import EvaluationRecord, EvaluationStore, compute_result_hash
 from .knockouts import KnockoutResult, KnockoutSummary, evaluate_knockouts
+from .lifecycle import (
+    CyclicLineageError,
+    InvalidStateTransitionError,
+    LifecycleError,
+    LifecycleIndex,
+    LifecycleManager,
+    LifecycleRecord,
+    ProtectedRecordError,
+)
 from .overlays import EffectiveScoringPlan, resolve_overlays
 from .pipeline import EvaluationOutcome, evaluate, evaluate_file, load_config, replay
 from .scoring import CriterionResult, ModuleResult, ScoreResult, score
@@ -99,6 +108,13 @@ __all__ = [
     "EvaluationRecord",
     "EvaluationStore",
     "compute_result_hash",
+    "LifecycleRecord",
+    "LifecycleIndex",
+    "LifecycleManager",
+    "LifecycleError",
+    "InvalidStateTransitionError",
+    "CyclicLineageError",
+    "ProtectedRecordError",
     "EvaluationOutcome",
     "evaluate",
     "evaluate_file",

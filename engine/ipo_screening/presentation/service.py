@@ -16,6 +16,21 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ..evaluation import EvaluationStore
 from ..extraction import DocumentExtractor
+from ..lifecycle import (
+    ACTIVE_RATIFIED_CONFIG_HASH,
+    CyclicLineageError,
+    EvaluationNotFoundError,
+    InvalidStateTransitionError,
+    LIFECYCLE_STATE_ACTIVE,
+    LIFECYCLE_STATE_SUPERSEDED,
+    LifecycleManager,
+    OPERATIONAL_STATUS_ACTIVE,
+    OPERATIONAL_STATUS_ARCHIVED,
+    OPERATIONAL_STATUS_SUPERSEDED,
+    ProtectedRecordError,
+    VISIBILITY_STATE_ARCHIVED,
+    VISIBILITY_STATE_VISIBLE,
+)
 from ..pipeline import evaluate, load_config
 from ..post_listing.models import PostListingObservation
 from ..post_listing.storage import list_observations
@@ -50,6 +65,8 @@ from .models import (
     IpoSummary,
     KnockoutRule,
     KnockoutSummary,
+    LifecycleActionRequest,
+    LifecycleActionResponse,
     MissingUnverifiedItem,
     ModuleScore,
     PenaltyItem,
@@ -104,6 +121,7 @@ class PresentationService:
     def __init__(self, config: Optional[PresentationConfig] = None) -> None:
         self.config = config or PresentationConfig()
         self.eval_store = EvaluationStore(self.config.store_root)
+        self.lifecycle_mgr = LifecycleManager(self.config.store_root, active_config_hash=ACTIVE_RATIFIED_CONFIG_HASH)
 
     # -------------------------------------------------------------------------
     # System Metadata
@@ -169,12 +187,39 @@ class PresentationService:
             if sector_profile and sec_prof != sector_profile:
                 continue
 
-            # Sort evaluations by timestamp descending
             evals = data["evaluations"]
-            evals.sort(key=lambda x: str(x.get("evaluation_timestamp", "")), reverse=True)
-            latest = evals[0] if evals else {}
-            score_data = latest.get("score") or {}
-            verdict_data = latest.get("verdict") or {}
+            # Mode-scoped explicit active evaluation selection
+            active_id = self.lifecycle_mgr.get_active_evaluation_id(ipo_id, mode="final")
+            if not active_id:
+                active_id = self.lifecycle_mgr.get_active_evaluation_id(ipo_id, mode="preliminary")
+
+            active_rec = next((r for r in evals if r.get("evaluation_id") == active_id), None) if active_id else None
+            if not active_rec:
+                # Fallback to latest valid evaluation with active ratified config_hash
+                ratified = [
+                    r for r in evals
+                    if r.get("config_hash") == ACTIVE_RATIFIED_CONFIG_HASH
+                ]
+                candidates = ratified if ratified else evals
+                candidates.sort(key=lambda x: str(x.get("evaluation_timestamp", "")), reverse=True)
+                active_rec = candidates[0] if candidates else {}
+
+            score_data = active_rec.get("score") or {}
+            verdict_data = active_rec.get("verdict") or {}
+
+            # Count historical and archived runs
+            hist_cnt = 0
+            arch_cnt = 0
+            active_eid = active_rec.get("evaluation_id")
+            for r in evals:
+                eid = r.get("evaluation_id")
+                if eid == active_eid:
+                    continue
+                lc = self.lifecycle_mgr.get_lifecycle(eid)
+                if lc and lc.visibility_state == VISIBILITY_STATE_ARCHIVED:
+                    arch_cnt += 1
+                else:
+                    hist_cnt += 1
 
             summaries.append(
                 IpoSummary(
@@ -182,8 +227,10 @@ class PresentationService:
                     company_name=c_name,
                     sector_profile=sec_prof,
                     evaluation_count=len(evals),
-                    latest_evaluation_id=latest.get("evaluation_id"),
-                    latest_evaluation_mode=latest.get("evaluation_mode"),
+                    historical_count=hist_cnt,
+                    archived_count=arch_cnt,
+                    latest_evaluation_id=active_rec.get("evaluation_id"),
+                    latest_evaluation_mode=active_rec.get("evaluation_mode"),
                     latest_score=score_data.get("final_score"),
                     latest_verdict=verdict_data.get("verdict"),
                     latest_confidence=score_data.get("confidence"),
@@ -206,7 +253,7 @@ class PresentationService:
             pages=pages,
         )
 
-    def get_ipo_detail(self, ipo_id: str) -> Optional[IpoDetail]:
+    def get_ipo_detail(self, ipo_id: str, include_archived: bool = True) -> Optional[IpoDetail]:
         """Retrieve detailed IPO record and its evaluation timeline."""
         eval_ids = self.eval_store.list_evaluations()
         matched_evals: List[Dict[str, Any]] = []
@@ -221,6 +268,10 @@ class PresentationService:
                 continue
 
             if rec.get("ipo_id") == ipo_id:
+                if not include_archived:
+                    lc = self.lifecycle_mgr.get_lifecycle(eid)
+                    if lc and lc.visibility_state == VISIBILITY_STATE_ARCHIVED:
+                        continue
                 matched_evals.append(rec)
                 company_name = rec.get("company_name", company_name)
                 inp = rec.get("input_snapshot") or {}
@@ -245,9 +296,9 @@ class PresentationService:
             evaluations=eval_summaries,
         )
 
-    def get_ipo_history(self, ipo_id: str) -> Optional[IpoHistoryResponse]:
+    def get_ipo_history(self, ipo_id: str, include_archived: bool = False) -> Optional[IpoHistoryResponse]:
         """Retrieve chronological evaluation history and preliminary-to-final delta."""
-        detail = self.get_ipo_detail(ipo_id)
+        detail = self.get_ipo_detail(ipo_id, include_archived=include_archived)
         if not detail:
             return None
 
@@ -425,8 +476,17 @@ class PresentationService:
             modules=modules_list,
         )
 
+        eval_id = rec.get("evaluation_id", evaluation_id)
+        lc = self.lifecycle_mgr.get_lifecycle(eval_id)
+        lifecycle_state = lc.lifecycle_state if lc else LIFECYCLE_STATE_ACTIVE
+        visibility_state = lc.visibility_state if lc else VISIBILITY_STATE_VISIBLE
+        operational_status = lc.operational_status if lc else OPERATIONAL_STATUS_ACTIVE
+        superseded_by = lc.superseded_by if lc else None
+        supersedes = lc.supersedes if lc else None
+        lc_dict = lc.to_dict() if lc else None
+
         return EvaluationDetail(
-            evaluation_id=rec.get("evaluation_id", evaluation_id),
+            evaluation_id=eval_id,
             ipo_id=rec.get("ipo_id", ""),
             company_name=rec.get("company_name", ""),
             evaluation_mode=rec.get("evaluation_mode", "FINAL"),
@@ -447,6 +507,12 @@ class PresentationService:
             missing_unverified=missing_list,
             preliminary_delta=rec.get("preliminary_delta"),
             provenance=rec.get("provenance") or {},
+            lifecycle_state=lifecycle_state,
+            visibility_state=visibility_state,
+            operational_status=operational_status,
+            superseded_by=superseded_by,
+            supersedes=supersedes,
+            lifecycle=lc_dict,
         )
 
     # -------------------------------------------------------------------------
@@ -903,6 +969,12 @@ class PresentationService:
             )
 
         self.eval_store.write(outcome.record)
+        # Register in lifecycle governance
+        self.lifecycle_mgr.register_evaluation(
+            outcome.record,
+            actor="system_ingest",
+            reason="statutory_filing_ingest",
+        )
         eval_id_to_return = outcome.record.evaluation_id
         eval_detail = self.get_evaluation_detail(eval_id_to_return)
         verdict_str = (
@@ -935,9 +1007,17 @@ class PresentationService:
         score_range = rec.get("score_range") or {}
         verdict_data = rec.get("verdict") or {}
         conf_data = rec.get("confidence") or {}
+        eval_id = rec.get("evaluation_id", "")
+
+        lc = self.lifecycle_mgr.get_lifecycle(eval_id)
+        lifecycle_state = lc.lifecycle_state if lc else LIFECYCLE_STATE_ACTIVE
+        visibility_state = lc.visibility_state if lc else VISIBILITY_STATE_VISIBLE
+        operational_status = lc.operational_status if lc else OPERATIONAL_STATUS_ACTIVE
+        superseded_by = lc.superseded_by if lc else None
+        supersedes = lc.supersedes if lc else None
 
         return EvaluationSummary(
-            evaluation_id=rec.get("evaluation_id", ""),
+            evaluation_id=eval_id,
             ipo_id=rec.get("ipo_id", ""),
             company_name=rec.get("company_name", ""),
             evaluation_mode=rec.get("evaluation_mode", "FINAL"),
@@ -953,4 +1033,67 @@ class PresentationService:
             engine_version=rec.get("engine_version", "1.5.0"),
             config_version=rec.get("config_version", "1.5.0"),
             result_hash=rec.get("result_hash", ""),
+            lifecycle_state=lifecycle_state,
+            visibility_state=visibility_state,
+            operational_status=operational_status,
+            superseded_by=superseded_by,
+            supersedes=supersedes,
+        )
+
+    # -------------------------------------------------------------------------
+    # Lifecycle Operations
+    # -------------------------------------------------------------------------
+
+    def archive_evaluation(
+        self,
+        evaluation_id: str,
+        reason: Optional[str] = None,
+        actor: Optional[str] = None,
+    ) -> LifecycleActionResponse:
+        record = self.lifecycle_mgr.archive_evaluation(evaluation_id, actor=actor, reason=reason)
+        return LifecycleActionResponse(
+            evaluation_id=record.evaluation_id,
+            ipo_id=record.ipo_id,
+            lifecycle_state=record.lifecycle_state,
+            visibility_state=record.visibility_state,
+            operational_status=record.operational_status,
+            superseded_by=record.superseded_by,
+            supersedes=record.supersedes,
+            message=f"Evaluation '{evaluation_id}' successfully transitioned to ARCHIVED visibility.",
+        )
+
+    def unarchive_evaluation(
+        self,
+        evaluation_id: str,
+        reason: Optional[str] = None,
+        actor: Optional[str] = None,
+    ) -> LifecycleActionResponse:
+        record = self.lifecycle_mgr.unarchive_evaluation(evaluation_id, actor=actor, reason=reason)
+        return LifecycleActionResponse(
+            evaluation_id=record.evaluation_id,
+            ipo_id=record.ipo_id,
+            lifecycle_state=record.lifecycle_state,
+            visibility_state=record.visibility_state,
+            operational_status=record.operational_status,
+            superseded_by=record.superseded_by,
+            supersedes=record.supersedes,
+            message=f"Evaluation '{evaluation_id}' successfully unarchived to VISIBLE status.",
+        )
+
+    def make_evaluation_active(
+        self,
+        evaluation_id: str,
+        reason: Optional[str] = None,
+        actor: Optional[str] = None,
+    ) -> LifecycleActionResponse:
+        record = self.lifecycle_mgr.make_active(evaluation_id, actor=actor, reason=reason)
+        return LifecycleActionResponse(
+            evaluation_id=record.evaluation_id,
+            ipo_id=record.ipo_id,
+            lifecycle_state=record.lifecycle_state,
+            visibility_state=record.visibility_state,
+            operational_status=record.operational_status,
+            superseded_by=record.superseded_by,
+            supersedes=record.supersedes,
+            message=f"Evaluation '{evaluation_id}' successfully designated as authoritative ACTIVE.",
         )

@@ -35,6 +35,8 @@ class IpoSummary(BaseModel):
     company_name: str
     sector_profile: Optional[str] = None
     evaluation_count: int = 0
+    historical_count: int = 0
+    archived_count: int = 0
     latest_evaluation_id: Optional[str] = None
     latest_evaluation_mode: Optional[str] = None
     latest_score: Optional[float] = None
@@ -69,6 +71,11 @@ class EvaluationSummary(BaseModel):
     engine_version: str = "1.5.0"
     config_version: str = "1.5.0"
     result_hash: str
+    lifecycle_state: str = "ACTIVE"
+    visibility_state: str = "VISIBLE"
+    operational_status: str = "ACTIVE"
+    superseded_by: Optional[str] = None
+    supersedes: Optional[str] = None
 
 
 class EvaluationListResponse(BaseModel):
@@ -178,6 +185,30 @@ class EvaluationDetail(BaseModel):
     penalties: List[PenaltyItem] = Field(default_factory=list)
     verdict: Dict[str, Any]
     missing_unverified: List[MissingUnverifiedItem] = Field(default_factory=list)
+    lifecycle_state: str = "ACTIVE"
+    visibility_state: str = "VISIBLE"
+    operational_status: str = "ACTIVE"
+    superseded_by: Optional[str] = None
+    supersedes: Optional[str] = None
+    lifecycle: Optional[Dict[str, Any]] = None
+
+
+class LifecycleActionRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    reason: Optional[str] = None
+    actor: Optional[str] = None
+
+
+class LifecycleActionResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    evaluation_id: str
+    ipo_id: str
+    lifecycle_state: str
+    visibility_state: str
+    operational_status: str
+    superseded_by: Optional[str] = None
+    supersedes: Optional[str] = None
+    message: str
     preliminary_delta: Optional[Dict[str, Any]] = None
     provenance: Dict[str, Any] = Field(default_factory=dict)
 
