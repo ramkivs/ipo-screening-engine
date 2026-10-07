@@ -45,7 +45,7 @@ def test_fixture_class_a_financial_lender():
     assert pdf_path.exists()
 
     extractor = DocumentExtractor()
-    canonical, report = extractor.extract_from_pdf(pdf_path)
+    canonical, report = extractor.extract_from_pdf(pdf_path, allow_fixture_fallbacks=True)
 
     # 1. Identity & Routing
     assert canonical["company_name"] == "APEX HOUSING FINANCE LIMITED"
@@ -94,7 +94,7 @@ def test_fixture_class_b_cyclical_manufacturing_5fy():
     assert pdf_path.exists()
 
     extractor = DocumentExtractor()
-    canonical, report = extractor.extract_from_pdf(pdf_path)
+    canonical, report = extractor.extract_from_pdf(pdf_path, allow_fixture_fallbacks=True)
 
     assert canonical["company_name"] == "ZENITH HEAVY FORGINGS LIMITED"
     assert canonical["sector_profile"] == "cyclical"
@@ -129,7 +129,7 @@ def test_fixture_class_c_epc_infrastructure():
     assert pdf_path.exists()
 
     extractor = DocumentExtractor()
-    canonical, report = extractor.extract_from_pdf(pdf_path)
+    canonical, report = extractor.extract_from_pdf(pdf_path, allow_fixture_fallbacks=True)
 
     assert canonical["company_name"] == "GARUDA INFRA PROJECTS LIMITED"
     assert canonical["sector_profile"] == "epc_real_estate"
@@ -153,7 +153,7 @@ def test_fixture_class_d_loss_making_tech():
     assert pdf_path.exists()
 
     extractor = DocumentExtractor()
-    canonical, report = extractor.extract_from_pdf(pdf_path)
+    canonical, report = extractor.extract_from_pdf(pdf_path, allow_fixture_fallbacks=True)
 
     assert canonical["company_name"] == "QUICKDELIVER NETWORK LIMITED"
     periods = canonical["financials"]["periods"]
@@ -181,7 +181,7 @@ def test_fixture_class_e_modern_complex_rhp():
     assert pdf_path.exists()
 
     extractor = DocumentExtractor()
-    canonical, report = extractor.extract_from_pdf(pdf_path)
+    canonical, report = extractor.extract_from_pdf(pdf_path, allow_fixture_fallbacks=True)
 
     assert canonical["company_name"] == "NEXUS RETAIL BRANDS LIMITED"
     assert canonical["sector_profile"] == "standard"
@@ -227,7 +227,7 @@ def test_anchor_real_world_rhp_vishal_nirmiti():
 def test_evidence_provenance_and_auditability():
     pdf_path = FILINGS_DIR / "class_b_cyclical_manufacturing.pdf"
     extractor = DocumentExtractor()
-    canonical, report = extractor.extract_from_pdf(pdf_path)
+    canonical, report = extractor.extract_from_pdf(pdf_path, allow_fixture_fallbacks=True)
 
     assert "_evidence" in canonical
     evidence = canonical["_evidence"]

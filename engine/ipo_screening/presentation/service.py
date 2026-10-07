@@ -839,7 +839,7 @@ class PresentationService:
             extractor = DocumentExtractor()
             canonical_dict, extraction_report = extractor.extract_from_pdf(
                 pdf_path=temp_pdf_path,
-                allow_fixture_fallbacks=True,
+                allow_fixture_fallbacks=False,
             )
         except Exception as exc:
             raise IngestionExtractionError(

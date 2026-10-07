@@ -242,14 +242,16 @@ def create_router(service: PresentationService) -> APIRouter:
         mode: str = Form("final"),
     ) -> Response:
         """Upload and evaluate an IPO filing document (DRHP/RHP PDF)."""
-        # Strict Security Boundary: reject any attempt to supply caller-controlled server paths
+        # Strict Security Boundary: reject any attempt to supply caller-controlled server paths or fallback controls
         form_data = await request.form()
-        if "reference_base_path" in form_data:
+        forbidden_params = {"reference_base_path", "base_path", "path", "file_path", "allow_fixture_fallbacks", "fallback", "allow_fallbacks"}
+        present_forbidden = forbidden_params.intersection(form_data.keys())
+        if present_forbidden:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "error": "Bad Request",
-                    "message": "Arbitrary server filesystem path parameter 'reference_base_path' is strictly prohibited on the public ingestion boundary.",
+                    "message": f"Unauthorized security parameter(s) detected: {sorted(list(present_forbidden))}. Server filesystem paths and fixture fallback controls are strictly prohibited on the public ingestion boundary.",
                     "code": "SECURITY_VIOLATION_UNAUTHORIZED_PARAMETER",
                 },
             )

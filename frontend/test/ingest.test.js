@@ -97,7 +97,7 @@ test('UI-7 ApiClient - ingestDocument handles validation errors and payload limi
   }
 });
 
-test('UI-7 ApiClient - ingestDocument does not expose or send reference_base_path parameter', async () => {
+test('UI-7 ApiClient - ingestDocument does not expose or send reference_base_path or fallback parameters', async () => {
   const originalFetch = globalThis.fetch;
   let capturedBody = null;
 
@@ -113,16 +113,20 @@ test('UI-7 ApiClient - ingestDocument does not expose or send reference_base_pat
 
     const client = new ApiClient();
     const fakeFile = new Blob(['%PDF-1.4 mock content']);
-    // Even if caller erroneously attempts to pass reference_base_path in options
+    // Even if caller erroneously attempts to pass reference_base_path or fallback parameters in options
     await client.ingestDocument(fakeFile, {
       mode: 'final',
       referenceBasePath: '/tmp/malicious/path.json',
-      reference_base_path: '/tmp/malicious/path.json'
+      reference_base_path: '/tmp/malicious/path.json',
+      allow_fixture_fallbacks: true,
+      fallback: true
     });
 
     assert.ok(capturedBody instanceof FormData);
     assert.equal(capturedBody.get('reference_base_path'), null, 'FormData must not contain reference_base_path');
     assert.equal(capturedBody.get('referenceBasePath'), null, 'FormData must not contain referenceBasePath');
+    assert.equal(capturedBody.get('allow_fixture_fallbacks'), null, 'FormData must not contain allow_fixture_fallbacks');
+    assert.equal(capturedBody.get('fallback'), null, 'FormData must not contain fallback');
     assert.equal(capturedBody.get('mode'), 'final');
   } finally {
     globalThis.fetch = originalFetch;

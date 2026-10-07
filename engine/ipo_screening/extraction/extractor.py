@@ -31,7 +31,7 @@ class DocumentExtractor:
         self,
         pdf_path: str | Path,
         reference_base_path: Optional[str | Path] = None,
-        allow_fixture_fallbacks: bool = True,
+        allow_fixture_fallbacks: bool = False,
     ) -> Tuple[Dict[str, Any], ExtractionReport]:
         """Process PDF and produce validated canonical JSON plus ExtractionReport."""
         t0 = time.perf_counter()

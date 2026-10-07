@@ -52,17 +52,18 @@ VISHAL_CONSTANTS = {
 
 def test_a_default_allow_fixture_fallbacks_is_supported():
     """Test A: Verify allow_fixture_fallbacks parameter in DocumentExtractor & builder."""
-    # 1. DocumentExtractor.extract_from_pdf has allow_fixture_fallbacks parameter
+    # 1. DocumentExtractor.extract_from_pdf has allow_fixture_fallbacks parameter defaulting to False
     sig_ext = inspect.signature(DocumentExtractor.extract_from_pdf)
     assert "allow_fixture_fallbacks" in sig_ext.parameters
+    assert sig_ext.parameters["allow_fixture_fallbacks"].default is False
 
     # 2. CanonicalInputBuilder.__init__ has allow_fixture_fallbacks defaulting to False
     sig_builder = inspect.signature(CanonicalInputBuilder.__init__)
     assert sig_builder.parameters["allow_fixture_fallbacks"].default is False
 
-    # 3. PresentationService.ingest_document implementation inspection
+    # 3. PresentationService.ingest_document implementation explicitly uses False
     service_src = inspect.getsource(PresentationService.ingest_document)
-    assert "allow_fixture_fallbacks" in service_src
+    assert "allow_fixture_fallbacks=False" in service_src
 
 
 def test_b_builder_isolation_no_vishal_leakage():
