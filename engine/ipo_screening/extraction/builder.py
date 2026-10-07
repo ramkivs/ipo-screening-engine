@@ -299,6 +299,7 @@ class CanonicalInputBuilder:
             "industry_forecast_period": _pick_biz("industry_forecast_period", None),
             "industry_source": _pick_biz("industry_source", None),
             "top5_customer_pct": _pick_biz("top5_customer_pct", 85.33 if self.allow_fixture_fallbacks else None),
+            "top5_supplier_pct": _pick_biz("top5_supplier_pct", None),
             "moat_rating": _pick_biz("moat_rating", "strong_niche" if self.allow_fixture_fallbacks else None),
             "visibility_rating": _pick_biz("visibility_rating", "strong" if self.allow_fixture_fallbacks else None),
             "regulatory_dependence": _pick_biz("regulatory_dependence", None),

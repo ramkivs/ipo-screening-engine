@@ -471,13 +471,13 @@ def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):
     assert body["ipo_id"] == "R-K-FASHION-ACCESSORIES-LIMITED"
     assert body["evaluation_mode"] == "FINAL"
     assert body["is_duplicate"] is False
-    assert body["final_score"] == pytest.approx(55.0)
+    assert body["final_score"] == pytest.approx(50.0)
     assert body["confidence"] == "Low"
     assert body["verdict"] == "INSUFFICIENT_DATA"
 
     eval_data = body["evaluation"]
-    assert eval_data["score"]["final_score"] == pytest.approx(55.0)
-    assert eval_data["score"]["base_score"] == pytest.approx(58.0)
+    assert eval_data["score"]["final_score"] == pytest.approx(50.0)
+    assert eval_data["score"]["base_score"] == pytest.approx(53.0)
     assert eval_data["score"]["penalties_total"] == pytest.approx(-3.0)
     assert eval_data["score"]["completeness_pct"] == pytest.approx(75.0)
 

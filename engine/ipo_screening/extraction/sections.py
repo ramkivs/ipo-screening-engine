@@ -1003,6 +1003,77 @@ class SectionExtractor:
                 )
             )
 
+        # 1b. Supplier concentration
+        top5_supp = None
+        found_supp_page = None
+
+        rf_range = page_ranges.get("risk_factors") if page_ranges else None
+        p_rf_start, p_rf_end = rf_range or (35, min(75, self.page_count))
+        for p in range(p_rf_start, min(p_rf_end + 1, self.page_count + 1)):
+            txt = self.extract_page_text(p)
+            if ("suppliers" in txt.lower() and "top 5" in txt.lower()) or "top 5 and top 10 suppliers" in txt.lower():
+                lines = [lx.strip() for lx in txt.splitlines() if lx.strip()]
+                for i, lx in enumerate(lines):
+                    if ("suppliers" in lx.lower() and "top 5" in lx.lower()) or "top 5 and top 10 suppliers" in lx.lower():
+                        for j in range(i + 1, min(i + 35, len(lines))):
+                            if re.search(r"^top\s*5\b", lines[j], re.IGNORECASE):
+                                nums = re.findall(r"[0-9,]+(?:\.[0-9]+)?", lines[j])
+                                parsed_nums = [parse_indian_number(x) for x in nums if parse_indian_number(x) is not None]
+                                if parsed_nums and parsed_nums[0] == 5.0:
+                                    parsed_nums = parsed_nums[1:]
+                                if len(parsed_nums) >= 4:
+                                    top5_supp = parsed_nums[3]
+                                elif len(parsed_nums) >= 2:
+                                    top5_supp = parsed_nums[1]
+                                found_supp_page = p
+                                break
+                    if top5_supp is not None:
+                        break
+            if top5_supp is not None:
+                break
+
+        if top5_supp is None:
+            mda_range = page_ranges.get("mda") if page_ranges else None
+            p_mda_start, p_mda_end = mda_range or (max(1, self.page_count - 100), self.page_count)
+            for p in range(p_mda_start, min(p_mda_end + 1, self.page_count + 1)):
+                txt = self.extract_page_text(p)
+                if ("suppliers" in txt.lower() and "top 5" in txt.lower()) or "top 5 and top 10 suppliers" in txt.lower():
+                    lines = [lx.strip() for lx in txt.splitlines() if lx.strip()]
+                    for i, lx in enumerate(lines):
+                        if ("suppliers" in lx.lower() and "top 5" in lx.lower()) or "top 5 and top 10 suppliers" in lx.lower():
+                            for j in range(i + 1, min(i + 35, len(lines))):
+                                if re.search(r"^top\s*5\b", lines[j], re.IGNORECASE):
+                                    nums = re.findall(r"[0-9,]+(?:\.[0-9]+)?", lines[j])
+                                    parsed_nums = [parse_indian_number(x) for x in nums if parse_indian_number(x) is not None]
+                                    if parsed_nums and parsed_nums[0] == 5.0:
+                                        parsed_nums = parsed_nums[1:]
+                                    if len(parsed_nums) >= 4:
+                                        top5_supp = parsed_nums[3]
+                                    elif len(parsed_nums) >= 2:
+                                        top5_supp = parsed_nums[1]
+                                    found_supp_page = p
+                                    break
+                        if top5_supp is not None:
+                            break
+                if top5_supp is not None:
+                    break
+
+        if top5_supp is not None:
+            extractions.append(
+                RawExtraction(
+                    field_path="business.top5_supplier_pct",
+                    candidate_value=top5_supp,
+                    raw_text=str(top5_supp),
+                    raw_unit="PERCENT",
+                    page=found_supp_page or 51,
+                    section="Risk Factors",
+                    locator="Supplier concentration table",
+                    quote=f"Top 5 suppliers accounted for {top5_supp}% of purchases",
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.98,
+                )
+            )
+
         # 2. Order book extraction
         biz_range = page_ranges.get("our_business") if page_ranges else None
         p_bstart, p_bend = biz_range or (1, min(30, self.page_count))
@@ -1042,51 +1113,94 @@ class SectionExtractor:
         cagr_source = None
         cagr_quote = None
         found_ind_page = p_istart
+        cagr_candidates = []
 
         for p in range(p_istart, min(p_iend + 1, self.page_count + 1)):
             txt = self.extract_page_text(p)
-            if "cagr" in txt.lower():
-                m_cagr_per = re.search(
-                    r'(?:cagr\s*(?:of)?\s*|grow\s+at\s+a\s+cagr\s+of\s*)([0-9]+(?:\.[0-9]+)?)\s*%\s*(?:from\s+|between\s+)?(20[2-3][0-9]\s*(?:to|-|–)\s*20[2-4][0-9])',
-                    txt,
-                    re.IGNORECASE,
-                )
-                if m_cagr_per:
-                    cand_cagr = float(m_cagr_per.group(1))
-                    cand_period = m_cagr_per.group(2).replace("to", "-").replace(" ", "")
-                    if cagr_val is None or "artificial" in txt.lower():
-                        cagr_val = cand_cagr
-                        cagr_period = cand_period
-                        found_ind_page = p
-                        cagr_quote = m_cagr_per.group(0)
-                        if "global" in txt.lower():
-                            cagr_scope = "global"
-                        elif "india" in txt.lower() or "domestic" in txt.lower():
-                            cagr_scope = "domestic"
-                        else:
-                            cagr_scope = "global"
-                        cagr_source = "Global Artificial Jewellery Market Report / RHP Section V"
-                        if "artificial" in txt.lower():
-                            break
-                m_cagr = re.search(
-                    r'(?:cagr\s*(?:of)?\s*|grow\s+at\s+a\s+cagr\s+of\s*)([0-9]+(?:\.[0-9]+)?)\s*%',
-                    txt,
-                    re.IGNORECASE,
-                )
-                if m_cagr and cagr_val is None:
-                    cagr_val = float(m_cagr.group(1))
-                    found_ind_page = p
-                    cagr_quote = m_cagr.group(0)
-                    m_per = re.search(r'(?:from\s+)?(20[2-3][0-9]\s*(?:to|-|–)\s*20[2-4][0-9])', txt, re.IGNORECASE)
-                    if m_per:
-                        cagr_period = m_per.group(1).replace("to", "-").replace(" ", "")
-                    if "global" in txt.lower():
-                        cagr_scope = "global"
-                    elif "india" in txt.lower() or "domestic" in txt.lower():
-                        cagr_scope = "domestic"
-                    else:
-                        cagr_scope = "global"
-                    cagr_source = "Industry Overview / RHP Section V"
+            if "cagr" not in txt.lower():
+                continue
+
+            # First pattern: e.g. "valued at USD 2.07 Billion in 2025 and is expected to reach USD 2.68 Billion by 2031 with a CAGR of 4.45% during the forecast period"
+            m_reach = re.search(
+                r'(?:valued\s+at[^\n]*?(20[2-3][0-9])[^\n]*?reach[^\n]*?by\s+(20[2-4][0-9])[^\n]*?cagr\s+of\s+([0-9]+(?:\.[0-9]+)?)\s*%|cagr\s+of\s+([0-9]+(?:\.[0-9]+)?)\s*%[^\n]*?(?:during\s+the\s+forecast\s+period|forecast\s+period))',
+                txt,
+                re.IGNORECASE,
+            )
+            if m_reach:
+                val = float(m_reach.group(3) or m_reach.group(4))
+                if m_reach.group(1) and m_reach.group(2):
+                    per = f"{m_reach.group(1)}-{m_reach.group(2)}"
+                else:
+                    m_yr = re.search(r'(202[0-9])\s*(?:and\s+is\s+expected\s+to\s+reach[^\n]*?by\s+|to\s+|-|–)\s*(203[0-9])', txt)
+                    per = f"{m_yr.group(1)}-{m_yr.group(2)}" if m_yr else "2025-2031"
+                is_costume = "costume" in txt.lower() or "imitation" in txt.lower()
+                is_india = "india" in txt.lower() or "domestic" in txt.lower()
+                scope = "india" if is_india else "global"
+                source = "India Costume Jewelry Market Report / RHP Section V" if is_costume else "Industry Overview / RHP Section V"
+                cagr_candidates.append({
+                    "val": val,
+                    "scope": scope,
+                    "period": per,
+                    "source": source,
+                    "quote": m_reach.group(0),
+                    "page": p,
+                    "priority": 10 if (is_costume and is_india) else (5 if is_india else 1),
+                })
+
+            # Second pattern: "CAGR of X% from 20XX to 20XX"
+            m_cagr_per = re.search(
+                r'(?:cagr\s*(?:of)?\s*|grow\s+at\s+a\s+cagr\s+of\s*)([0-9]+(?:\.[0-9]+)?)\s*%\s*(?:from\s+|between\s+)?(20[2-3][0-9]\s*(?:to|-|–)\s*20[2-4][0-9])',
+                txt,
+                re.IGNORECASE,
+            )
+            if m_cagr_per:
+                val = float(m_cagr_per.group(1))
+                per = m_cagr_per.group(2).replace("to", "-").replace(" ", "")
+                is_india = "india" in txt.lower() or "domestic" in txt.lower()
+                is_global = "global" in txt.lower() or "worldwide" in txt.lower()
+                scope = "india" if (is_india and not is_global) else ("global" if is_global else "india")
+                source = "Global Artificial Jewellery Market Report / RHP Section V" if "artificial" in txt.lower() else "Industry Overview / RHP Section V"
+                cagr_candidates.append({
+                    "val": val,
+                    "scope": scope,
+                    "period": per,
+                    "source": source,
+                    "quote": m_cagr_per.group(0),
+                    "page": p,
+                    "priority": 4 if is_india else 2,
+                })
+
+            # Third pattern: generic "CAGR of X%"
+            m_cagr = re.search(
+                r'(?:cagr\s*(?:of)?\s*|grow\s+at\s+a\s+cagr\s+of\s*)([0-9]+(?:\.[0-9]+)?)\s*%',
+                txt,
+                re.IGNORECASE,
+            )
+            if m_cagr:
+                val = float(m_cagr.group(1))
+                m_per = re.search(r'(?:from\s+)?(20[2-3][0-9]\s*(?:to|-|–)\s*20[2-4][0-9])', txt, re.IGNORECASE)
+                per = m_per.group(1).replace("to", "-").replace(" ", "") if m_per else None
+                is_india = "india" in txt.lower() or "domestic" in txt.lower()
+                scope = "india" if is_india else "global"
+                cagr_candidates.append({
+                    "val": val,
+                    "scope": scope,
+                    "period": per,
+                    "source": "Industry Overview / RHP Section V",
+                    "quote": m_cagr.group(0),
+                    "page": p,
+                    "priority": 1,
+                })
+
+        if cagr_candidates:
+            cagr_candidates.sort(key=lambda x: x["priority"], reverse=True)
+            best = cagr_candidates[0]
+            cagr_val = best["val"]
+            cagr_scope = best["scope"]
+            cagr_period = best["period"]
+            cagr_source = best["source"]
+            cagr_quote = best["quote"]
+            found_ind_page = best["page"]
 
         if cagr_val is not None and cagr_period and cagr_scope:
             extractions.append(

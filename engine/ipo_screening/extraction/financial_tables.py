@@ -507,20 +507,27 @@ class FinancialTableExtractor:
         # 2. Extract Cash Flow (CFO and Capex)
         cfo_vals = None
         capex_vals = None
-        cf_scan_pages = list(range(r_range[0], min(r_range[1] + 1, self.page_count + 1)))
-        cf_scan_pages.extend(range(35, min(55, self.page_count + 1)))
+        cf_scan_pages = list(range(35, min(55, self.page_count + 1)))
+        cf_scan_pages.extend(range(r_range[0], min(r_range[1] + 1, self.page_count + 1)))
         cf_scan_pages.extend(range(370, min(385, self.page_count + 1)))
 
         for p in cf_scan_pages:
             txt = self.extract_page_text(p)
-            if "cash generating from operating activity" in txt.lower() and cfo_vals is None:
-                for l in txt.splitlines():
-                    if "cash generating from operating activity" in l.lower():
-                        raw_cfo = re.findall(r"\(?[0-9,]+(?:\.[0-9]+)?\)?", l)
-                        parsed_cfo = [parse_indian_number(x) for x in raw_cfo if parse_indian_number(x) is not None]
-                        if len(parsed_cfo) >= 3:
-                            cfo_vals = parsed_cfo[-3:]
-                            break
+            # Statutory Cash Flow Statement - Net Cash Flow from Operating Activities
+            if ("operating" in txt.lower() and cfo_vals is None):
+                lines = [lx.strip() for lx in txt.splitlines() if lx.strip()]
+                for idx, lx in enumerate(lines):
+                    if re.search(r"net cash flows? (?:from|used in)", lx, re.IGNORECASE) or re.search(r"operating activities\s*\(a\)", lx, re.IGNORECASE):
+                        combined = " ".join(lines[idx:min(idx + 5, len(lines))])
+                        if "operating" in combined.lower() and "investing" not in combined.lower() and "financing" not in combined.lower():
+                            raw = re.findall(r"\(?[0-9,]+(?:\.[0-9]+)?\)?", combined)
+                            parsed = [parse_indian_number(x) for x in raw if parse_indian_number(x) is not None]
+                            if len(parsed) >= 4:
+                                cfo_vals = parsed[:4]
+                                break
+                            elif len(parsed) >= 3:
+                                cfo_vals = parsed[:3]
+                                break
             if "purchase of property" in txt.lower() and capex_vals is None:
                 lines = [lx.strip() for lx in txt.splitlines() if lx.strip()]
                 for idx, lx in enumerate(lines):

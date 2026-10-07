@@ -3,8 +3,11 @@
 Forensic reconciliation asserting:
 1. End-to-end extraction from RHP PDF without hard-coding or reference template.
 2. Reconciliation of Module A, B, C, D, E data points from RHP source pages.
-3. Module score verification and unknown points reduction.
-4. Bit-for-bit preservation of Vishal Nirmiti golden evaluation.
+3. Repair of DEFECT-1: top-5 supplier concentration (34.10% -> criterion score 1/3).
+4. Repair of DEFECT-2: domestic Indian costume jewellery CAGR (4.45% -> criterion score 1/5).
+5. Repair of DEFECT-3: statutory operating cash flow after tax (-26.10, 3.09, -67.79 -> criterion score 0/5).
+6. Total repaired score: 50.0 / 100 (Base 53.0, Penalties -3.0).
+7. Bit-for-bit preservation of Vishal Nirmiti golden evaluation.
 """
 
 from __future__ import annotations
@@ -76,7 +79,7 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     assert fy24["pat"] == 94.78
     assert fy24["net_worth"] == 781.77
     assert fy24["total_debt"] == 60.90
-    assert fy24["cfo"] == -7.13
+    assert fy24["cfo"] == -26.10  # Repaired statutory operating cash flow (was -7.13 pre-tax)
     assert fy24["capex"] == 118.79
     assert fy24["interest_expense"] == 0.33
     assert fy24["disclosed_roce_pct"] == 13.32
@@ -87,7 +90,7 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     assert fy25["pat"] == 199.72
     assert fy25["net_worth"] == 981.49
     assert fy25["total_debt"] == 60.88
-    assert fy25["cfo"] == 77.61
+    assert fy25["cfo"] == 3.09  # Repaired statutory operating cash flow (was 77.61 pre-tax)
     assert fy25["capex"] == 0.32
     assert fy25["interest_expense"] == 0.24
     assert fy25["disclosed_roce_pct"] == 29.13
@@ -98,7 +101,7 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     assert fy26["pat"] == 628.69
     assert fy26["net_worth"] == 1616.22
     assert fy26["total_debt"] == 170.32
-    assert fy26["cfo"] == 114.72
+    assert fy26["cfo"] == -67.79  # Repaired statutory operating cash flow (was 114.72 pre-tax)
     assert fy26["capex"] == 36.35
     assert fy26["interest_expense"] == 0.97
     assert fy26["disclosed_roce_pct"] == 57.74
@@ -128,9 +131,11 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
 
     # 5. Module E: Business & Industry
     assert canonical["business"]["top5_customer_pct"] == 11.11
-    assert canonical["business"]["industry_cagr_pct"] == 8.0
-    assert canonical["business"]["industry_scope"] == "global"
-    assert canonical["business"]["industry_forecast_period"] == "2026-2035"
+    assert canonical["business"]["top5_supplier_pct"] == 34.10  # Repaired DEFECT-1
+    assert canonical["business"]["industry_cagr_pct"] == 4.45  # Repaired DEFECT-2 (was 8.0)
+    assert canonical["business"]["industry_scope"] == "india"
+    assert canonical["business"]["industry_forecast_period"] == "2025-2031"
+    assert canonical["business"]["industry_source"] == "India Costume Jewelry Market Report / RHP Section V"
     assert canonical["business"]["moat_rating"] is None
     assert canonical["business"]["visibility_rating"] is None
 
@@ -140,20 +145,24 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     outcome = evaluate(canonical, config, mode="final", evaluation_datetime=eval_at)
 
     assert outcome.record.validation["ok"] is True
-    assert outcome.record.score["final_score"] == 55.0
-    assert outcome.record.score["base_score"] == 58.0
+    assert outcome.record.score["final_score"] == 50.0  # 55.0 - 2 (supplier) - 2 (cagr) - 1 (cfo)
+    assert outcome.record.score["base_score"] == 53.0
     assert outcome.record.score["penalties_total"] == -3.0
     assert outcome.record.confidence["level"] == "Low"
     assert outcome.record.confidence["completeness_pct"] == 75.0
-    assert outcome.record.score["lower_bound"] == 42.0
-    assert outcome.record.score["upper_bound"] == 80.0
+    assert outcome.record.score["lower_bound"] == 37.0
+    assert outcome.record.score["upper_bound"] == 75.0
+    assert outcome.record.verdict["verdict"] == "INSUFFICIENT_DATA"
 
     # Module assertions
     modules = {m["module_id"]: m for m in outcome.record.score["modules"]}
 
-    # Module A: 21 / 25, 0 unknown
-    assert modules["A"]["score"] == 21.0
+    # Module A: 20 / 25 (cfo_quality drops from 1 to 0 due to negative cumulative CFO)
+    assert modules["A"]["score"] == 20.0
     assert modules["A"]["unknown_points"] == 0
+    cfo_crit = next(c for c in modules["A"]["criteria"] if c["criterion_id"] == "cfo_quality")
+    assert cfo_crit["state"] == "SCORED"
+    assert cfo_crit["score"] == 0.0
 
     # Module B: 10 / 16, pe_vs_peers scored 8.0 vs Banaras Beads
     assert modules["B"]["score"] == 10.0
@@ -167,7 +176,6 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     assert fresh_crit["state"] == "SCORED"
     assert fresh_crit["score"] == 3.0
     ofs_seller_crit = next(c for c in modules["C"]["criteria"] if c["criterion_id"] == "ofs_seller_type")
-    assert fresh_crit["state"] == "SCORED"
     assert ofs_seller_crit["score"] == 2.0
     prom_ofs_crit = next(c for c in modules["C"]["criteria"] if c["criterion_id"] == "promoter_ofs_pct")
     assert prom_ofs_crit["state"] == "SCORED"
@@ -183,12 +191,97 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     assert aud_crit["state"] == "SCORED"
     assert aud_crit["score"] == 1.0
 
-    # Module E: 6 / 8, 7 unknown points (moat 5 pts, visibility 2 pts unextracted)
-    assert modules["E"]["score"] == 6.0
+    # Module E: 2 / 8, 7 unknown points (moat 5 pts, visibility 2 pts unextracted)
+    assert modules["E"]["score"] == 2.0
     assert modules["E"]["unknown_points"] == 7.0
     ind_crit = next(c for c in modules["E"]["criteria"] if c["criterion_id"] == "industry_growth")
     assert ind_crit["state"] == "SCORED"
-    assert ind_crit["score"] == 3.0
+    assert ind_crit["score"] == 1.0  # Repaired: 4.45% in band >= 0% scores 1/5 (was 8.0% -> 3/5)
     conc_crit = next(c for c in modules["E"]["criteria"] if c["criterion_id"] == "concentration")
     assert conc_crit["state"] == "SCORED"
-    assert conc_crit["score"] == 3.0
+    assert conc_crit["score"] == 1.0  # Repaired: effective conc 34.10% in <=50% scores 1/3 (was 11.11% -> 3/3)
+
+
+def test_defect1_supplier_concentration_reconciliation():
+    """DEFECT-1: Top-5 supplier concentration extracted from RHP p.51/p.354 and correctly scores 1/3."""
+    extractor = DocumentExtractor()
+    canonical, _ = extractor.extract_from_pdf(RK_PDF, allow_fixture_fallbacks=False)
+
+    top5_cust = canonical["business"].get("top5_customer_pct")
+    top5_supp = canonical["business"].get("top5_supplier_pct")
+
+    assert top5_cust == pytest.approx(11.11)
+    assert top5_supp == pytest.approx(34.10)
+
+    # Effective concentration must be max(customer, supplier) = 34.10%
+    effective_concentration = max(top5_cust, top5_supp)
+    assert effective_concentration == pytest.approx(34.10)
+
+    # Under v1.5.0 config, 34.10% falls in <= 50% band -> 1.0 / 3.0 pts
+    config = load_config(CONFIG_FILE)
+    outcome = evaluate(canonical, config, mode="final", evaluation_datetime=datetime(2026, 10, 5, 12, 0, 0, tzinfo=timezone.utc))
+    mod_e = next(m for m in outcome.record.score["modules"] if m["module_id"] == "E")
+    conc_crit = next(c for c in mod_e["criteria"] if c["criterion_id"] == "concentration")
+    assert conc_crit["state"] == "SCORED"
+    assert conc_crit["score"] == 1.0
+
+
+def test_defect2_industry_cagr_selection_reconciliation():
+    """DEFECT-2: Selected CAGR is domestic Indian costume jewellery (4.45%), not global 8.00%."""
+    extractor = DocumentExtractor()
+    canonical, _ = extractor.extract_from_pdf(RK_PDF, allow_fixture_fallbacks=False)
+
+    biz = canonical["business"]
+    assert biz["industry_cagr_pct"] == pytest.approx(4.45)
+    assert biz["industry_scope"] == "india"
+    assert biz["industry_forecast_period"] == "2025-2031"
+    assert biz["industry_source"] == "India Costume Jewelry Market Report / RHP Section V"
+
+    # Prove global CAGR occurrences (8.00% on p.192, 5.28% on p.190) did NOT become the selected value
+    assert biz["industry_cagr_pct"] != pytest.approx(8.00)
+    assert biz["industry_cagr_pct"] != pytest.approx(5.28)
+
+    # Under v1.5.0 config, 4.45% falls into band >= 0% -> 1.0 / 5.0 pts
+    config = load_config(CONFIG_FILE)
+    outcome = evaluate(canonical, config, mode="final", evaluation_datetime=datetime(2026, 10, 5, 12, 0, 0, tzinfo=timezone.utc))
+    mod_e = next(m for m in outcome.record.score["modules"] if m["module_id"] == "E")
+    ind_crit = next(c for c in mod_e["criteria"] if c["criterion_id"] == "industry_growth")
+    assert ind_crit["state"] == "SCORED"
+    assert ind_crit["score"] == 1.0
+
+
+def test_defect3_operating_cash_flow_field_selection():
+    """DEFECT-3: Extractor selects statutory operating cash flow after tax, yielding 0/5 for negative CFO/PAT."""
+    extractor = DocumentExtractor()
+    canonical, _ = extractor.extract_from_pdf(RK_PDF, allow_fixture_fallbacks=False)
+
+    periods = canonical["financials"]["periods"]
+    fy24_cfo = next(p["cfo"] for p in periods if p["fy"] == "FY2024")
+    fy25_cfo = next(p["cfo"] for p in periods if p["fy"] == "FY2025")
+    fy26_cfo = next(p["cfo"] for p in periods if p["fy"] == "FY2026")
+
+    # Statutory post-tax operating cash flow values
+    assert fy24_cfo == pytest.approx(-26.10)
+    assert fy25_cfo == pytest.approx(3.09)
+    assert fy26_cfo == pytest.approx(-67.79)
+
+    # Pre-tax values must NOT silently re-enter canonical CFO fields
+    for p in periods:
+        assert p["cfo"] not in [-7.13, 77.60, 77.61, 114.72]
+
+    # Cumulative calculations
+    cum_cfo = sum(p["cfo"] for p in periods)
+    cum_pat = sum(p["pat"] for p in periods)
+    cfo_pat_ratio = cum_cfo / cum_pat
+
+    assert cum_cfo == pytest.approx(-90.80)
+    assert cum_pat == pytest.approx(923.19)
+    assert cfo_pat_ratio == pytest.approx(-0.09835, rel=1e-3)
+
+    # Negative ratio scores 0.0 under v1.5.0 config
+    config = load_config(CONFIG_FILE)
+    outcome = evaluate(canonical, config, mode="final", evaluation_datetime=datetime(2026, 10, 5, 12, 0, 0, tzinfo=timezone.utc))
+    mod_a = next(m for m in outcome.record.score["modules"] if m["module_id"] == "A")
+    cfo_crit = next(c for c in mod_a["criteria"] if c["criterion_id"] == "cfo_quality")
+    assert cfo_crit["state"] == "SCORED"
+    assert cfo_crit["score"] == 0.0
