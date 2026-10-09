@@ -29,7 +29,7 @@ Ramki expressly authorized this directory and Markdown format in TASK 16. The re
 ## Consequences and constraints
 
 - A1 and A7 are recorded separately from the still-open A8 investigation.
-- A8 alternatives remain proposals until Ramki selects source-specific events and cutoffs.
+- Task 16 A8 event/cutoff alternatives were proposals; Task 18 later approved policy directions are recorded in A8, while source/provider/event/cutoff contracts and missing-GMP Final handling remain open.
 - A5 remains `CALIBRATION_EVIDENCE_INSUFFICIENT`; peer scoring remains blocked.
 - No application, schema, configuration, scoring, eligibility or provider behavior is changed by this convention.
 
