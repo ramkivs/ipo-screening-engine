@@ -2,7 +2,8 @@
 
 - **Decision ID:** A9
 - **Title:** Missing GMP Final Fail Closed
-- **Status:** RAMKI-APPROVED DECISION; PUBLICATION PENDING INDEPENDENT REMOTE VERIFICATION
+- **Decision status:** RAMKI-APPROVED DECISION — OPTION A, FAIL CLOSED.
+- **Publication status:** PUBLISHED AND INDEPENDENTLY VERIFIED at `refs/heads/arena/4e1080b7-ipo-screening-engine` in commit `0c6defe3aaab4b01a711cd8d50f03c25f2d2a180`.
 - **Decision authority:** RAMKI
 - **Decision date:** 2026-10-10
 - **Authorization basis:** Ramki's explicit approval of Option A, explicit assignment of A9, and supplied approval date in TASK 33. No decision time or timezone is supplied or asserted.

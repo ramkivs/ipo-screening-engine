@@ -2,7 +2,7 @@
 
 - **Decision ID:** A8
 - **Title:** Approved policy directions and source-specific event/cutoff requirements for Final snapshots
-- **Status:** RAMKI-APPROVED POLICY DIRECTIONS RECORDED; SOURCE/PROVIDER/EVENT/CUTOFF CONTRACTS OPEN; MISSING-GMP FINAL POLICY UNRESOLVED; PHASE 0 OPEN; PHASE 1 UNAUTHORIZED
+- **Status:** RAMKI-APPROVED POLICY DIRECTIONS RECORDED; SOURCE/PROVIDER/EVENT/CUTOFF CONTRACTS OPEN; MISSING-GMP FINAL RULE RESOLVED BY A9; PHASE 0 OPEN; PHASE 1 UNAUTHORIZED
 - **Decision authority:** RAMKI for approved A8 policy directions and remaining selections (A1 designates RAMKI as conflict-adjudication authority; this record does not adjudicate source conflicts).
 - **Approval provenance and date:** Ramki's explicit approval of A8-S, A8-M, A8-G and A8-P, and the common timestamp/evidence safeguards, in the TASK 18 instruction received 2026-10-10 (Asia/Calcutta). Earlier general A8 principles and investigation recorded 2026-10-09 (Asia/Calcutta).
 - **Repository:** `ramkivs/ipo-screening-engine`
@@ -40,7 +40,9 @@ The following are **RAMKI-APPROVED DECISIONS** recorded from Ramki's explicit Ta
 
 **UNAVAILABLE:** Repository artifacts identify no approved GMP source or qualifying observation/publication semantics.
 
-**UNRESOLVED — MISSING-GMP FINAL POLICY:** If no qualifying GMP observation is available, does that block Final, or is GMP recorded as missing and handled under an explicitly approved completeness/range rule? Ramki has not selected either behavior. Also unresolved are the approved source, qualifying observation definition, source-native timestamp semantics and cutoff. Do not infer a missing-GMP outcome.
+**RESOLVED BY A9 — MISSING-GMP FINAL POLICY:** If a required qualifying GMP snapshot or its required hash is absent or invalid, withhold `FINAL`. A blocked-input marker is not a qualifying snapshot or hash. No exception is authorized by A9.
+
+**UNRESOLVED:** Approved source; qualifying actual observation; source-native event/as-of and timestamp semantics; source-specific cutoff; snapshot/hash representation; and stale or unverifiable handling beyond the A9 condition. Do not infer any other provider-specific behavior.
 
 ### A8-P — Peers
 
@@ -62,7 +64,7 @@ The following are **RAMKI-APPROVED DECISIONS** recorded from Ramki's explicit Ta
 - **EXECUTION-PROMPT REQUIREMENT —** `handoff/authoritative/ARENA_IPO_Screening_Engine_v1.5_Execution_Prompt.md` §§10, 12, 13 and 15 addresses configured peer freshness, timestamp validation, provenance, immutable evaluation records and a relevant Day-3/closing snapshot. It does not name the source or define provider-specific event/cutoff semantics.
 - **AUTHORITY —** `handoff/authoritative/ARENA_IPO_Screening_Artifact_Manifest_v1.5.md` establishes the v1.5 specification as authoritative, the technical design as target architecture and legacy assets as references.
 
-**UNAVAILABLE in v1.5 and the inspected repository evidence:** None of these artifacts selects the actual subscription, market, GMP or peer provider, defines a source-specific event/observation identity and cutoff for each snapshot, or establishes a missing-GMP Final policy. The Task 18 directions above are project decisions layered onto these requirements; they do not purport to be requirements already stated in v1.5.
+**UNAVAILABLE in authoritative v1.5 artifacts:** These artifacts do not select actual subscription, market, GMP or peer providers, or define the source-specific event/observation identities and cutoffs. The v1.5 specification itself does not prescribe missing-GMP `FINAL` handling; the project-level resolution for the absent/invalid required qualifying GMP snapshot/hash condition is recorded in A9. The Task 18 directions remain project decisions layered onto v1.5, not requirements already stated in v1.5.
 
 ## Task 17 source findings and ARENA recommendations (historical)
 
@@ -97,7 +99,7 @@ The historic alternatives in the Task 17 table are grounded in v1.5's generic di
 
 1. **Subscription — UNRESOLVED:** approved source; exact final-record event identity and source-native as-of semantics; publication behavior; source-specific cutoff and its relation to evaluation time; and absent/unavailable-record handling.
 2. **Market — UNRESOLVED:** approved source and, metric by metric, whether an actual session close or a separately approved point-in-time rule applies; the session/observation identity and cutoff; and non-trading/unavailable handling.
-3. **GMP — UNRESOLVED:** approved source, qualifying actual observation and timestamp semantics, cutoff, and the explicitly unresolved choice whether absent qualifying GMP blocks Final or is missing under an approved completeness/range rule.
+3. **GMP — PARTIALLY RESOLVED BY A9:** An absent or invalid required qualifying GMP snapshot or required hash blocks `FINAL`; a blocked-input marker does not qualify. **UNRESOLVED:** Approved source, qualifying observation, event/as-of and timestamp semantics, source-specific cutoff, snapshot/hash representation, and stale/unverifiable handling beyond A9.
 4. **Peers — UNRESOLVED:** approved source, named actual session, observation cutoff, and reproducible peer-universe snapshot rule. Do not finalize peer eligibility or production scoring before A5 is resolved.
 5. **Common evidence — UNRESOLVED:** the source-specific evidence contract must establish original-timezone/offset capture, UTC normalization, event occurrence, publication/retrieval separation and required hashes. Do not presume a shared cutoff or fallback.
 
@@ -107,13 +109,13 @@ The historic alternatives in the Task 17 table are grounded in v1.5's generic di
 
 The v1.5 contract requires immutable, reproducible snapshots, while its artifacts and the inspected repository do not establish provider-specific events or cutoffs. Ramki's approved directions constrain policy without converting scheduled milestones into completed events, substituting publication/retrieval time for event time, or inventing freshness intervals.
 
-**Restriction:** The policy directions do not complete the four source-specific contracts. They must not be used to claim that a provider-backed Final snapshot is verified or to finalize peer eligibility. The missing-GMP Final rule remains open. A5 continues to block peer freshness/listing-history parameters and production peer scoring. This governance record does not change the v1.5 specification, configuration, source integrations or evaluation behavior.
+**Restriction:** The policy directions do not complete the four source-specific contracts. They must not be used to claim that a provider-backed Final snapshot is verified or to finalize peer eligibility. A9 resolves only the missing/invalid required qualifying GMP snapshot/hash Final consequence; GMP source-specific contracts remain open. A5 continues to block peer freshness/listing-history parameters and production peer scoring. This governance record does not change the v1.5 specification, configuration, source integrations or evaluation behavior.
 
 ## Unresolved dependencies
 
 - Subscription source, actual final-record event/as-of semantics, publication behavior, cutoff and missing-record handling.
 - Market source and metric-specific session/point-in-time rule, cutoff and non-trading/unavailable handling.
-- GMP source, qualifying-observation/timestamp/cutoff contract and the explicit missing-GMP Final decision.
+- GMP source, qualifying-observation/event/as-of/timestamp/cutoff contract, snapshot/hash representation and stale/unverifiable handling beyond A9. A9 has resolved the missing/invalid required qualifying snapshot/hash Final consequence.
 - Peer source, named session, observation cutoff and peer-universe snapshot rule; A5 evidence and parameter approval before eligibility/scoring.
 - A source-specific canonical evidence contract for event occurrence, original timezone/offset and UTC timestamps, publication/retrieval times, cutoffs/evaluation time and required hashes.
 
