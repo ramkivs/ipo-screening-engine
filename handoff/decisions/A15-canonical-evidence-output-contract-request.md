@@ -1,14 +1,22 @@
-# A15 — Canonical Evidence and Output Contract Decision Request
+# A15 — Canonical Evidence and Output Contract (Original Request and Current Status)
 
-- **Record ID:** A15
-- **Title:** Decision request for the canonical evidence/result representation
-- **Status:** OPEN DECISION REQUEST — NO NEW POLICY OR IMPLEMENTATION APPROVED
-- **Decision authority requested:** RAMKI
+- **Record ID:** A15 (original request; decision in linked A15 record)
+- **Title:** Canonical evidence/result representation — semantic approval and property/schema follow-up
+- **Status:** APPROVED AT SEMANTIC/CONTRACT-DESIGN LEVEL — PROPERTY/SCHEMA PROPOSAL PENDING; IMPLEMENTATION NOT AUTHORIZED
+- **Decision authority:** RAMKI
+- **Decision date:** 2026-10-13 (Asia/Calcutta)
+- **Current decision:** [`A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md`](A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md)
+- **Next design proposal:** [`A15-CANONICAL-EVIDENCE-OUTPUT-SCHEMA-DESIGN-PROPOSAL-2026-10-13.md`](../investigation/A15-CANONICAL-EVIDENCE-OUTPUT-SCHEMA-DESIGN-PROPOSAL-2026-10-13.md)
 - **Request date:** 2026-10-13 (Asia/Calcutta)
 - **Repository:** `ramkivs/ipo-screening-engine`
 - **Baseline:** Assembled review candidate `9bad659927616ad7fd3aad2864b6637f095872c5` (tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`); A11–A13 and current A8-M/A9/A10 records are in that candidate.
-- **Scope:** Resolve the remaining shared semantic and serialization contract needed before any canonical schema/result implementation. This request is not itself an approval.
+- **Original request scope:** Resolve the shared semantic/serialization prerequisites before any canonical schema/result implementation; the request itself was not an approval.
+- **Current status:** Semantic/contract-design direction approved by the linked 2026-10-13 A15 decision; property/schema proposal awaits later Ramki review.
 - **Implementation authority:** NOT GRANTED. Phase 0 remains OPEN; Phase 1 and `P1-CANON-01` remain NOT AUTHORIZED.
+
+## Current status update — 2026-10-13
+
+Ramki approved A15 at the semantic/contract-design level on 2026-10-13; see the linked A15 decision record. This supersedes the original OPEN-request status below. The field-level table remains useful as an inventory of current shape and design questions, but its Arena recommendation column is **not** automatically adopted as property names, enum values, exact requiredness, source qualification, hash scope or schema/version policy. The A7 unverified-only condition remains unresolved/nonterminal with no terminal label; its exact serialization remains a proposal. Those concrete choices are now the subject of the linked documentation-only design proposal and require later Ramki review. A15 approval does not close Phase 0 or authorize implementation.
 
 ## Decisions already approved and preserved
 
@@ -21,7 +29,9 @@
 
 These records remain controlling at their cited baselines. A15 does not reopen or extend those decisions.
 
-## Specific decision requested
+## Original decision request (historical; superseded by the A15 decision)
+
+The following records the open request as it stood before Ramki's 2026-10-13 semantic/contract-design approval. It is retained for provenance, not as a current request to re-approve the semantic baseline. The property/schema choices remain open for the later proposal and Ramki's review.
 
 Please approve or amend one coherent canonical evidence/result contract that answers the following, without overriding explicit v1.5 requirements or inferring source-specific policy:
 
@@ -33,7 +43,7 @@ A decision may leave individual provider/source contracts open. In particular, i
 
 ## Field-level decision matrix (request; recommendations are not approvals)
 
-The first two columns record existing requirements/current candidate shape; they do not imply that existing code or schema satisfies the approved contract. Every item in **Recommended disposition** is an Arena recommendation for Ramki to accept, amend or reject. Property names and new status values are deliberately not selected here.
+The first two columns record the original approved requirements and candidate shape; they do not imply that existing code or schema satisfies the contract. Following the semantic/contract-design approval, this matrix remains a historical field-level inventory. Every item in **Recommended disposition** remains an Arena proposal unless explicitly restated as approved in the linked decision. Property names, enum spellings and per-property requiredness are for the separate design review.
 
 | Field / contract area | Existing approved rule and current shape | Exact unresolved point | Recommended disposition — NOT APPROVED | Compatibility / failure consequence | Acceptance evidence required |
 |---|---|---|---|---|---|
@@ -47,19 +57,19 @@ The first two columns record existing requirements/current candidate shape; they
 | **Final outcome, knockout state, score and diagnostics** | A7-D1 already requires distinct `final_outcome`, per-rule knockout state/evidence, critical-safety completeness, score interval/score-derived verdict and diagnostics. A7-D2 already defines verified-knockout and critical-safety cases. The candidate `EvaluationRecord` serializes a `verdict` mapping and separate knockouts/score ranges; the inspected candidate code/schema contains no `final_outcome` property. A7 says v1.5 does not prescribe the exact result shape. | The exact A7-D2 terminal case remains open: no verified knockout, no critical-safety gap, but unresolved `UNVERIFIED` prevents the uncertainty rules from establishing safety. Choose a terminal outcome/status or explicitly approve a no-terminal serialization. | Preserve all approved distinctions. Ramki must decide that one terminal case or approve an explicit nonterminal representation; do not infer `AVOID`, `CLEAR`, `INSUFFICIENT_DATA` or any other label. | Until decided, no definitive favorable result may be manufactured for that case. Diagnostics cannot overwrite a final outcome, and a final outcome cannot erase evidence gaps or score range. | Scenario tests for verified knockout with score uncertainty, missing critical safety without verified knockout, unverified-only unresolved case, and distinct round-trip of outcome, evidence state, score interval and diagnostics. |
 | **Required/optional semantics by metric and mode** | v1.5 distinguishes Preliminary from Final and requires Final snapshots/source hashes; A8 supplies metric-specific event/cutoff constraints; A8-M's required-NIFTY UNKNOWN blocks Final; A9's missing/invalid required GMP snapshot/hash blocks Final; A10 expressly leaves subscription Final handling undecided. Current schema does not define the requested contract's full mode-by-metric conditional matrix. | For every property, whether it is MUST, MAY, or MUST-WITH-EXPLICIT-STATE in Preliminary versus Final, and how omission differs from `UNKNOWN`, `NOT_APPLICABLE`, unavailable or invalid for each metric. | Recommend a per-property/per-mode/per-metric requiredness matrix; do not globally mark fields optional or invent a global missing-input Final rule. Preserve A8-M/A9 exactly and leave A10 consequences open unless separately decided. | Required missing/malformed values fail the §20 validation gate. Apply NIFTY and GMP consequences only in their approved scopes; subscription/other metrics remain unresolved rather than borrowing them. | Mode/state matrix tests: required versus optional, explicit missing states, Preliminary pending information, Final freeze, and separate A8-M/A9/A10 cases. |
 | **Schema location, version, serialization and compatibility** | Candidate tree has `schema/ipo-input.v1.5.schema.json` and `schema/supplemental-enrichment.v1.schema.json`; no dedicated versioned immutable evaluation-result schema is present. Spec §23 suggests artifact filenames but no JSON Schema for the result. Candidate `EvaluationRecord` includes engine/spec/config versions and input/source/market/peer/result hashes; code's canonical hash grammar is `1.5.0`. | Exact output schema path/version, property definitions, strict validation scope, serializer grammar version, additive/breaking change treatment and replay/migration of existing immutable records/hashes. | Recommend an explicitly versioned evaluation/result contract, separate from silently changing the v1.5 input schema; define compatibility and migration before implementation. Preserve historical serialized bytes and hashes. No path/version is selected here. | Invalid input/result schema fails the applicable §20 validation gate. Recommend that an unsupported required schema/serializer version fail closed pending an approved migration; never reinterpret historic snapshots or recalculate their hashes in place. Version/hash-scope changes require explicit version treatment. | Version matrix for existing v1.5 inputs and saved records; strict schema failure tests; deterministic serialize/parse/serialize; replay and unchanged historical-hash tests; migration tests only after an approved migration rule. |
-| **Focused tests and independent acceptance** | A13 records 85 passing tests on candidate `9bad659` in three existing files; they are baseline technical evidence, not implementation acceptance. A14 is OPEN and no independent reviewer is appointed. | New contract-specific tests do not exist because no schema/serializer implementation is authorized. Reviewer name, independence basis and exact acceptance outcome are still required. | After Ramki approves the contract and issues a separate exact-scope implementation grant, require focused tests for every row above and independent review of the exact changed commit/tree. Treat the existing 85 passes only as the candidate baseline. | No test pass, branch history or this recommendation grants implementation, Phase 0 closure, reviewer acceptance, release or production authority. | A Ramki-attributed contract decision; authorized implementation diff/schema version; focused test outputs and hash/replay evidence; and an independent named review report that accepts/rejects the exact commit/tree against A14 criteria. |
+| **Focused tests and independent acceptance** | A13 records 85 passing tests on candidate `9bad659` in three existing files; they are baseline technical evidence, not implementation acceptance. A14 records Ramki's appointment of Sai; independence confirmation and acceptance remain pending. | New contract-specific tests do not exist because no schema/serializer implementation is authorized. Sai's independence declaration and exact candidate accept/reject report remain outstanding. | After Ramki approves the property/schema contract and issues a separate exact-scope implementation grant, require focused tests for every row above and independent review of the exact changed commit/tree. Treat the existing 85 passes only as the candidate baseline. | No test pass, branch history or this recommendation grants implementation, Phase 0 closure, reviewer acceptance, release or production authority. | A Ramki-attributed property/schema decision; authorized implementation diff/schema version; focused test outputs and hash/replay evidence; and an independent named review report that accepts/rejects the exact commit/tree against A14 criteria. |
 
-**Current disposition:** The approved semantics above are settled and must not be reopened by this request. The recommendations remain **NOT APPROVED**. The substantive Ramki decisions still required are the field/property contract and conditional requiredness, A7's exact unverified-only terminal/no-terminal representation, hash-origin/scope contract, and output-schema/version/compatibility choice. A8 source qualification/cutoffs and A10 subscription Final consequences remain separate open decisions.
+**Historical disposition at original request time — SUPERSEDED:** At that point, the request recorded the existing approved rules, marked Arena recommendations NOT APPROVED, and asked Ramki for the shared semantic contract. Ramki's later 2026-10-13 approval is recorded in [`A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md`](A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md). That decision approves the semantic/contract-design direction only; property names, exact enums/requiredness, hash algorithm/subject and output schema/version/compatibility remain for the separate proposal and later Ramki decision. A8 source qualification/cutoffs and A10 subscription Final consequences remain separate open decisions.
 
 ## Cross-record disposition — A14
 
-A14 remains **OPEN / BLOCKED on explicit Ramki appointment**: no independent reviewer is named, and the appointment must state the person's independence basis and acceptance scope. A14's review target is candidate commit `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`. The reviewer criteria in A14 apply to any later contract implementation review. A15 does not appoint a reviewer, constitute independent acceptance, close Phase 0, or grant Phase 1 implementation authority.
+A14 now records Sai's appointment by Ramki as reported in the 2026-10-13 task instruction. No additional independence evidence is supplied by that appointment; independence confirmation and acceptance remain pending. A14's exact review target is candidate commit `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`. A15's semantic approval is not independent candidate acceptance, does not close Phase 0, and does not grant Phase 1 implementation authority.
 
-## Requested acceptance evidence and constraints
+## Property/schema review and implementation constraints
 
-A durable Ramki-attributed decision should identify each approved semantic/property definition, the selected schema/version and compatibility rule, the A7 terminal representation (or explicit no-terminal state), rationale, date, supporting evidence and any explicit deferrals with safe consequences. If a question is intentionally deferred, state the safe behavior while it remains open. Do not convert a proposal or this request into a decision.
+The semantic/contract-design decision is now recorded. Ramki's later review of the linked design proposal should accept, amend or reject the property definitions, enum values, conditional requiredness, hash subject/origin, schema/serialization version, compatibility/migration rule, and the proposed A7 nonterminal representation. Any deferral must retain a documented safe behavior; a proposal is not an approval.
 
-Until that decision is recorded and the separate Phase 1 grant is issued, do not change schemas, serializers, scoring, configuration, fixtures, application behavior or tests. Phase 0 closure remains a separate decision and is not accomplished by this request.
+Until Ramki approves the property/schema design and a separate exact-scope Phase 1 implementation grant is issued, do not change schemas, serializers, scoring, configuration, fixtures, application behavior or tests. Phase 0 closure remains a separate decision and is not accomplished by A15 approval.
 
 ## Rationale
 
@@ -73,6 +83,6 @@ A1, A7, A8-M, A9 and A10 establish important semantic constraints but do not sup
 
 ## Unresolved dependencies and authority boundary
 
-A15 remains open until Ramki records the requested contract decision. Even after that decision, implementation requires a separate exact-scope Phase 1 grant, and independent review/release remain separate. No reviewer, policy outcome, provider, schema version, terminal label, or implementation authority is appointed or approved here.
+A15's semantic/contract-design direction is approved; the property/schema proposal remains pending Ramki's later review. The A7 unverified-only terminal label remains unresolved; A8-M source qualification/cutoffs and A10 subscription Final consequences remain separate open decisions. A14 records Sai's appointment, but independence confirmation and acceptance remain pending. Any implementation still requires a separate exact-scope Phase 1 grant. No provider, terminal label, schema version, compatibility policy or implementation authority is approved by this historical request.
 
 ---
