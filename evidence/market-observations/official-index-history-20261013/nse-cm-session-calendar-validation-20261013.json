@@ -1,0 +1,185 @@
+{
+  "artifactType": "nse-cm-session-calendar-validation",
+  "createdDate": "2026-10-13",
+  "scope": {
+    "from": "2025-10-13",
+    "to": "2026-10-08",
+    "index": "NIFTY 50"
+  },
+  "source": {
+    "holidayMasterEndpoints": [
+      "https://www.nseindia.com/api/holiday-master?type=trading&year=2025",
+      "https://www.nseindia.com/api/holiday-master?type=trading"
+    ],
+    "marketKey": "CM",
+    "retrievedDate": "2026-10-13",
+    "receiptTimeCaptured": false,
+    "rawProviderResponseBytesCaptured": false,
+    "note": "Calendar entries are an extract from functions.fetch_page rendered JSON output; this artifact and its local hash are not provider-byte captures."
+  },
+  "holidayMasterEntries": [
+    {
+      "date": "2025-10-21",
+      "description": "Diwali Laxmi Pujan",
+      "marketKey": "CM",
+      "status": "calendar-listed; official special live-session circular overrides normal holiday handling"
+    },
+    {
+      "date": "2025-10-22",
+      "description": "Balipratipada",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2025-11-05",
+      "description": "Prakash Gurpurb Sri Guru Nanak Dev",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2025-12-25",
+      "description": "Christmas",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-01-15",
+      "description": "Municipal Corporation Election - Maharashtra",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-01-26",
+      "description": "Republic Day",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-02-15",
+      "description": "Mahashivratri",
+      "marketKey": "CM",
+      "status": "Sunday; calendar entry, no weekday-session exclusion required"
+    },
+    {
+      "date": "2026-03-03",
+      "description": "Holi",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-03-21",
+      "description": "Id-Ul-Fitr (Ramadan Eid)",
+      "marketKey": "CM",
+      "status": "Saturday; calendar entry, no weekday-session exclusion required"
+    },
+    {
+      "date": "2026-03-26",
+      "description": "Shri Ram Navami",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-03-31",
+      "description": "Shri Mahavir Jayanti",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-04-03",
+      "description": "Good Friday",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-04-14",
+      "description": "Dr. Baba Saheb Ambedkar Jayanti",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-05-01",
+      "description": "Maharashtra Day",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-05-28",
+      "description": "Bakri Id",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-06-26",
+      "description": "Muharram",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-08-15",
+      "description": "Independence Day",
+      "marketKey": "CM",
+      "status": "Saturday; calendar entry, no weekday-session exclusion required"
+    },
+    {
+      "date": "2026-09-14",
+      "description": "Ganesh Chaturthi",
+      "marketKey": "CM",
+      "status": "closed"
+    },
+    {
+      "date": "2026-10-02",
+      "description": "Mahatma Gandhi Jayanti",
+      "marketKey": "CM",
+      "status": "closed"
+    }
+  ],
+  "weekdayClosuresAppliedToExpectedCalendar": [
+    "2025-10-22",
+    "2025-11-05",
+    "2025-12-25",
+    "2026-01-15",
+    "2026-01-26",
+    "2026-03-03",
+    "2026-03-26",
+    "2026-03-31",
+    "2026-04-03",
+    "2026-04-14",
+    "2026-05-01",
+    "2026-05-28",
+    "2026-06-26",
+    "2026-09-14",
+    "2026-10-02"
+  ],
+  "specialSessions": [
+    {
+      "date": "2025-10-21",
+      "description": "Diwali Muhurat live trading session",
+      "circularRef": "NSE/CMTR/70319 (124/2025)",
+      "circularDate": "2025-09-22",
+      "sourceUrl": "https://nsearchives.nseindia.com/content/circulars/CMTR70319.pdf",
+      "normalMarketLocalTime": "13:45-14:45",
+      "observedInHistory": true
+    },
+    {
+      "date": "2026-02-01",
+      "description": "Union Budget live trading session (Sunday)",
+      "circularRef": "NSE/CMTR/72349 (11/2026)",
+      "circularDate": "2026-01-16",
+      "sourceUrl": "https://nsearchives.nseindia.com/content/circulars/CMTR72349.pdf",
+      "normalMarketLocalTime": "09:15-15:30",
+      "observedInHistory": true
+    }
+  ],
+  "validation": {
+    "weekdayCandidatesBeforeClosures": 259,
+    "weekdayClosuresApplied": 15,
+    "specialSessionsAdded": 2,
+    "expectedSessions": 245,
+    "observedSessions": 245,
+    "uniqueObservedSessions": 245,
+    "missingExpectedSessions": [],
+    "unexpectedObservedDates": [],
+    "calendarMatchesObservedDates": true,
+    "observationCloseValidity": "all 245 source closes are present, finite, numeric, and greater than zero"
+  }
+}
