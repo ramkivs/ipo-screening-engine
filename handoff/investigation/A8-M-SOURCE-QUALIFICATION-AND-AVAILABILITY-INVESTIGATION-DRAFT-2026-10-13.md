@@ -235,3 +235,73 @@ A targeted read of `engine/ipo_screening/connectors/adapters.py` confirmed that 
 - **Implementation authority:** NOT GRANTED. **Release authority:** NOT GRANTED. **Production activation:** NOT AUTHORIZED.
 
 This reviewed investigation record is maintained under `handoff/investigation/`. Its publication is documentation-only: it does not amend the approved decision records or close any gate. No tracker or reconciliation cross-reference is changed in this publication.
+
+## 11. Addendum — NSE v1.19 Index Data qualification and prepared request
+
+This additive note supplements §4.4 without changing the approved A8-M semantics or the report's conclusion. It separates text retrievable from the current specification from older-version and secondary evidence. **No NSE Index Data sample, subscription, provider-delivered bytes, or delivery receipt was obtained.**
+
+### 11.1 Current v1.19 statements verified
+
+The official [NSE Historical Data — Order and Trade Specification v1.19](https://nsearchives.nseindia.com/web/mediaattachment/2026-08/NSE_Hist_Order_Trade_Data_1.19_20260801125146.pdf) identifies its document date as **03-Aug-2026**. Its contents place `3.1.9 Index Data` on page 56 and list separate FAQ sections for SFTP, historical cloud, and EOD cloud (`8.3`, `8.5`, and `8.6`; FAQ pages 69–80). The v1.19 text retrieved for the Full Orders & Trades section states that Full Orders data is made available after **90 calendar days** and Full Trades data after **30 calendar days** from the respective trade date. These are distinct full-order/full-trade cooling-off lags. They are not the SFTP retention period or an EOD delivery-time guarantee, and their applicability to the separate Index Data file is **unconfirmed**.
+
+The page parser exposed only the first 30 PDF pages. Targeted searches of the official v1.19 document still did not expose the page-56 Index Data field table or the detailed SFTP/cloud FAQ timing and retention rows. The section headings establish that those sections exist; they do not establish the underlying terms for the Index Data file.
+
+### 11.2 Index layout and delivery statements that remain version-limited
+
+The following layout details appeared in the official older [Order & Trade specification v1.15](https://nsearchives.nseindia.com/web/sites/default/files/inline-files/Hist_Order_Trade_Data_1.15.pdf), not in retrievable v1.19 §3.1.9 text. They are recorded as comparison/verification targets only and must not be represented as confirmed v1.19 terms until the current page or a current provider sample is obtained:
+
+| Earlier-version field | Earlier-version description |
+|---|---|
+| `IX` record indicator | Alphabetic, 2 bytes |
+| `CASH` segment | Alphabetic, 4 bytes |
+| Index/transaction date | Numeric, 8 bytes, `YYYYMMDD`; described as the date when computed |
+| Transaction time | Alphanumeric, 8 bytes, `HH:MM:SS`; described as the time when it occurred |
+| NIFTY 50 value | Numeric, 8 bytes; paise representation, with the rightmost two digits after the decimal point and left-zero-padding to 8 digits |
+| NIFTY Next 50 value | Numeric, 8 bytes; same paise representation |
+
+Those six field widths sum to **38 bytes**. The older layout labels the frequency **“All ticks”**, the record as fixed length with LF delimiter, and file availability as **“EOD.”** None of those labels, even if confirmed unchanged in v1.19, specifies which record is the official final daily close, proves that every expected session/file is complete, or gives a publication or recipient-availability timestamp. A computation/transaction date or `HH:MM:SS` value is not, by itself, a provider publication time, SFTP/cloud availability time, recipient receipt time, retrieval time, or evaluation cutoff.
+
+A filename of the form `CASH_Index_DDMMYYYY.DAT.gz` is visible in an older [NSE layout document](https://archives.nseindia.com/content/press/Hist_Order_data_layout.pdf). The exact example/name convention has not been verified in the current v1.19 text. A documented filename pattern is not evidence that a file was downloaded or that its contents, date coverage, or close semantics were inspected.
+
+The older v1.15 SFTP FAQ says its listed availability timings are **provisional**, that source-side delay may affect them, and that the **previous three days' files** are available on SFTP. The current v1.19 FAQ has separate SFTP and cloud sections, but their detailed schedule/retention lines were not exposed in the retrieved text. Thus v1.15 does not establish current v1.19 timing or three-day retention for Index Data, and a three-day SFTP window would not establish the historical product's full depth or archive retention. A [secondary August 2026 summary](https://www.multibagg.ai/market-pulse/articles/nse-historical-order-data-access-cmso17q55ebl00zqegeeo68i5) reports tentative 01:00–03:00 IST order/trade and cloud timing; this is not an authoritative v1.19 extraction and does not establish an Index Data schedule. **No numeric delay or delivery guarantee is adopted.**
+
+The v1.15 SFTP checksum FAQ refers to order/trade DAT and trigger-file completion. No current evidence establishes that the `CASH_Index_...DAT.gz` file has an applicable trigger or checksum, which objects it covers, or what a trigger/checksum would prove. The 90-day order and 30-day trade lags above likewise do not establish an Index Data lag.
+
+### 11.3 Exact contract evidence still unresolved
+
+For the Index Data route, the following remain open and require direct current product evidence from NSE Data & Analytics (NDAL):
+
+1. **Official close/final-record semantics:** whether the `All ticks` stream contains a specific final record, how an official NIFTY 50 daily close is identified and rounded, and how post-close updates, special sessions, or no-update sessions are handled.
+2. **File completeness and session calendar:** whether a file is expected for every applicable CM session, how completeness of all ticks/records is established, and the authoritative holiday/special-session calendar and missing/late-file procedure.
+3. **Publication and recipient availability:** product-specific timestamps for computation/event, file creation, provider publication, SFTP/cloud visibility, recipient receipt, and any retained status/log history, with timezone/offset. These times must remain distinct; retrieval today cannot prove availability at a past cutoff.
+4. **Correction, regeneration, and revision precedence:** correction/reissue triggers, stable file or record revision identifiers, replacement/precedence rules, and retention of superseded files.
+5. **Product coverage, history, and access:** exact index/segment coverage, historical start/depth, archive and SFTP retention, delivery routes, prerequisites, subscription/sample access, and commercial terms.
+6. **Index-file checksum/trigger:** whether a checksum and/or `.trg` applies to Index Data; exact file scope, generation timing, checksum algorithm and compressed/uncompressed coverage; and whether it proves transfer integrity, file completion, session completeness, or something else.
+
+### 11.4 Draft NSE evidence request — prepared, not sent
+
+**Status: UNSENT.** This is a factual request only. No contact, subscription, account activation, or purchase has been made or authorized.
+
+**To:** NSE Data & Analytics Ltd. (NDAL), Historical Order & Trade product support
+
+**Subject:** Evidence request — CM Index Data in Historical Order & Trade Specification v1.19
+
+Hello,
+
+We are qualifying whether the CM Index Data described in the NSE Historical Order & Trade Specification v1.19 (dated 03-Aug-2026) can provide a daily NIFTY 50 close. Please provide or clarify the following for the current product and delivery route:
+
+1. The current full text of §3.1.9 and a representative, unaltered Index Data file for a named session, including raw `IX` records for NIFTY 50 and NIFTY Next 50. Please confirm whether a sample is available without a subscription and any conditions for accessing or retaining it.
+2. The field/encoding definition and the official daily-close rule: what “All ticks” and “EOD” mean for this file; how to identify the final official NIFTY 50 close; and how the rule handles special sessions, late updates, corrections, or a session with no final record. Please also define the date and `HH:MM:SS` fields and confirm the index identity represented by the value field.
+3. The complete-session/file calendar, index coverage, file-completeness criteria, expected file naming, handling of missing/partial/late files, available historical date range, and retention of both current and superseded files.
+4. Product-specific timing evidence for computation, file generation, provider publication, and recipient availability on SFTP and/or cloud, with timezone/offset and any status/receipt timestamps retained. Please identify which schedules are provisional versus committed and whether any published SFTP/cloud timing applies to Index Data.
+5. The correction, regeneration, replacement, and revision-precedence rules, including any stable file/record revision identifiers and how recipients can determine which version supersedes another.
+6. Whether the Index Data file has a `.trg` and/or checksum. If so, please identify the covered files, naming, algorithm/scope, generation timing, compressed or uncompressed bytes checked, and exactly what the trigger/checksum establishes (for example, transfer integrity versus full-session completeness).
+7. The available delivery routes and prerequisites (including SFTP/cloud requirements), historical coverage and retention, sample-access process, subscription prerequisites, applicable terms, and charges.
+
+We are requesting documentation and a representative sample for evidence qualification only; this is not a subscription or purchase request.
+
+Regards,
+
+[Requester name / organization]
+
+This addendum preserves the prior gate and authority state: **A8-M OPEN; Phase 0 OPEN; Phase 1 UNAUTHORIZED; implementation/release NOT GRANTED; production activation NOT AUTHORIZED.**
