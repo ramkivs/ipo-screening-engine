@@ -1,0 +1,11 @@
+{
+  "snapshot_id": "ZERO-DEMAND-001",
+  "provider_id": "NSE-OFFICIAL-FEED",
+  "as_of": "2026-10-04T19:26:01Z",
+  "retrieval_timestamp": "2026-10-04T19:30:00Z",
+  "qib_x": 0.0,
+  "nii_x": 0.0,
+  "retail_x": 0.02,
+  "overall_x": 0.01,
+  "special_category_x": null
+}

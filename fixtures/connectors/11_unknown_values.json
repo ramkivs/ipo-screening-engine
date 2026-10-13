@@ -1,0 +1,10 @@
+{
+  "snapshot_id": "UNKNOWN-GMP-001",
+  "provider_id": "CHITTORGARH-TRACKER",
+  "as_of": "2026-10-04T19:26:01Z",
+  "retrieval_timestamp": "2026-10-04T19:30:00Z",
+  "gmp_rupees": null,
+  "gmp_pct": null,
+  "trend": null,
+  "notes": "GMP is unquoted / no trades reported yet"
+}
