@@ -1,19 +1,22 @@
 # IPO Screening Engine — Project Tracker (Review Candidate)
 
-> **Candidate status:** DOCUMENTATION-ONLY COPY-FORWARD — PENDING REVIEW. This tracker candidate is not yet the canonical delivery tracker, a policy decision, implementation authority, acceptance, or release approval. The original tracker on 4e is unchanged.
+> **Candidate status:** BOUNDED NON-CANONICAL REVIEW CANDIDATE ASSEMBLED — PENDING INDEPENDENT REVIEW. This remains a candidate-only tracker, not the canonical delivery tracker, a policy decision, implementation authority, acceptance, or release approval. The original tracker on 4e is unchanged.
 
 - **Updated:** 2026-10-13 (Asia/Calcutta)
 - **Repository:** `ramkivs/ipo-screening-engine`
-- **Tracker candidate branch:** `arena/573e69a4-ipo-screening-engine` (session branch; candidate pending review)
+- **Tracker candidate branch:** `arena/573e69a4-ipo-screening-engine` (fixed session branch; candidate pending independent review)
 - **Governance/evidence reference:** `arena/4e1080b7-ipo-screening-engine` at `adbd93c5b4450fb113561368d7d101eb4686c842`
-- **Product-code continuation:** `arena/01a10b42-ipo-screening-engine` at `4b19faf848a721265597a678926988d484d30e59`
+- **Product-code review base:** `arena/01a10b42-ipo-screening-engine` at `4b19faf848a721265597a678926988d484d30e59`
+- **Assembly authority:** A11–A13, authorization commit `7e25d1e2f97d162d97ff837c7dd40fb3d070aea1`
+- **Assembled review candidate:** merge commit `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`; parents are authorization commit `7e25d1e2f97d162d97ff837c7dd40fb3d070aea1` and product base `4b19faf848a721265597a678926988d484d30e59`. The exact candidate tree remains unchanged by follow-up documentation-only records.
+- **Review/contract requests:** A14 requests independent reviewer appointment; A15 requests the unresolved canonical evidence/output contract decision. Neither is an approval.
 - **Open PR candidate:** PR #3, `arena/ipo-screening-engine-v1.5` at `49c994430148d327e0afff6d67f31072563d64cc`
-- **Canonical delivery candidate:** NOT SELECTED. These refs are not one accepted release.
+- **Canonical delivery candidate:** NOT SELECTED. This review candidate is not an accepted release.
 - **Authority:** Individual project decisions remain governed by their cited records in `handoff/decisions/`. This tracker is a status summary only.
 
 ## Tracker provenance and publication boundary
 
-This is a copy-forward of `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` from `arena/4e1080b7-ipo-screening-engine` (tip `adbd93c5`; source tracker last changed in `40a3f1e8`). Ramki authorized the original tracker candidate copy-forward on the fixed session branch on 2026-10-13. A11 records Phase 0 OPEN, A12 ratifies 01a as product-code review base only, and A13 separately authorizes the bounded non-canonical assembly. The exact merge-commit SHA will be recorded in the post-assembly verification update. This tracker remains pending independent review; it does not mutate the source tracker on 4e, select a canonical delivery candidate, or approve the findings as project decisions. The Library tracker was not available in the checkout, and this is not claimed to be its copy or update.
+This is a copy-forward of `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` from `arena/4e1080b7-ipo-screening-engine` (tip `adbd93c5`; source tracker last changed in `40a3f1e8`). Ramki authorized the original tracker candidate copy-forward on the fixed session branch on 2026-10-13. A11 records Phase 0 OPEN, A12 ratifies 01a as product-code review base only, and A13 separately authorizes the bounded non-canonical assembly. A13's execution addendum records the exact merge commit `9bad659927616ad7fd3aad2864b6637f095872c5` and its verification. This tracker remains pending independent review; it does not mutate the source tracker on 4e, select a canonical delivery candidate, or approve the findings as project decisions. The Library tracker was not available in the checkout, and this is not claimed to be its copy or update.
 
 A repository tracker row does not itself grant implementation, source qualification, scoring, schema, release, or production-activation authority. The cross-workstream audit and dependency-aware implementation sequence are in `handoff/investigation/IPO-SCREENING-ENGINE-RECONCILIATION-AUDIT-DRAFT-2026-10-13.md`; that audit is analysis, not an approval record.
 
@@ -28,7 +31,7 @@ A repository tracker row does not itself grant implementation, source qualificat
 | Deterministic session calendar/publication-availability rule | **OPEN PREREQUISITE** | Support a deterministic, testable rule with NSE session/special-session and source-availability evidence. Cover cutoff, weekends, holidays, special sessions, future/impossible times and unresolved timezone. No numeric publication-delay allowance is authorized. |
 | NIFTY runtime calculation / Final gate | **NOT AUTHORIZED; NOT IMPLEMENTED on inspected app refs** | No application SMA classifier or required-NIFTY Final gate was found. Implementation authority is expressly not granted. Wait for evidence, Phase 0 contract, and separate implementation authority. |
 | A8-M overall | **OPEN** | Policy is approved; source-native qualification and deterministic freshness prerequisite remain open. No current trend category/score or production-ready metric is established. |
-| Phase 0 / Phase 1 | **Phase 0 OPEN / Phase 1 UNAUTHORIZED** | No formal Phase 0 closure/freeze or independent acceptance record was located. |
+| Phase 0 / Phase 1 | **Phase 0 OPEN / Phase 1 UNAUTHORIZED** | A11 formally records Phase 0 OPEN; no closure/freeze or independent acceptance has been granted. |
 | Implementation / release / production activation | **NOT GRANTED / NOT AUTHORIZED** | No runtime, configuration, scoring, schema or release changes are authorized by the A8-M policy publication. |
 
 ## Cross-workstream status update
@@ -49,7 +52,7 @@ A repository tracker row does not itself grant implementation, source qualificat
 | **GCP fixture** | **RECHECK REQUIRED — owner sign-off** | v1.5 runtime keeps undisclosed `[●]` UNKNOWN and the statutory ceiling separate. Legacy VNL fixture discrepancy is described as “resolved, needs sign-off”; no separate R. Kapoor/Ramki confirmation that it is superseded was located. No fixture/scoring change or retrospective approval. |
 | **EPC / real estate** | **CURRENT SHARED OVERLAY VERIFIED; no split authorized** | Current profile is `epc_real_estate`. No authority to split or change scoring was located. |
 | **Sector-relative / bank-NBFC coverage** | **PARTIALLY IMPLEMENTED — evidence/acceptance pending** | Generic code/test coverage exists; reviewed reports do not establish broad point-in-time real-source coverage or independent acceptance. Synthetic fixtures do not establish broad coverage. |
-| **Integration / independent acceptance** | **BLOCKED — technical prerequisite and independent acceptance required** | No ref unifies the later 01a application with current 4e governance/A9; PR #3 is an older separate candidate. PR #3 currently has no reviews or checks. Name a candidate and independent reviewer, then validate that exact tree. |
+| **Bounded candidate assembly / independent acceptance** | **ASSEMBLED — INDEPENDENT REVIEW PENDING** | Candidate `9bad659927616ad7fd3aad2864b6637f095872c5` (tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`) has first parent A11–A13 authorization `7e25d1e2f97d162d97ff837c7dd40fb3d070aea1` and second parent product base 01a `4b19faf848a721265597a678926988d484d30e59`; the selected current 4e governance files are pinned by A13. No independent reviewer is appointed and no acceptance exists. A14 requests appointment; the reviewer must assess this exact tree and its scoped verification. PR #3 remains a separate, older candidate with no reviews or checks. |
 | **Merge / release / production activation** | **NOT AUTHORIZED** | PR #3 remains OPEN. `CLEAN` mergeability is not acceptance. No merge, release, or activation authority was found. Keep Phase 7 inactive. |
 | **Deferred roadmap** | **DEFERRED — not current blockers** | Live exchange quote streams, automated corporate-action calendars, SQL/multi-user persistence, infrastructure, and enterprise auth/RBAC are outside the current single-user personal-use scope absent a specific decision. Keep VIX separate from NIFTY trend. |
 | **NDAL request** | **UNSENT** | Existing factual request is prepared in the 4e A8-M investigation. No contact, subscription, or purchase is authorized here. Obtain explicit authorization before sending; stop if a charge or subscription is required. |
@@ -58,12 +61,12 @@ A repository tracker row does not itself grant implementation, source qualificat
 
 This order is by prerequisite, not business priority. A9 and NIFTY are independent consumer workstreams after the shared evidence/candidate prerequisites; this tracker does not rank one above the other.
 
-1. **Owner gate:** decide Phase 0 closure/remaining contracts, name the canonical candidate, and separately grant exact implementation scope. No grant is present here.
-2. **Canonical evidence/output contract:** approve the field map, serialization, revision and field-level conflict record before any schema change. Phase 1 authority is still required.
-3. **Parallel source-specific gates:** after the canonical contract, (a) integrate/test the A9 GMP gate on the selected product candidate once its source/hash contract and implementation permission exist; and (b) implement NIFTY only after source-native closes and cutoff/session-availability evidence, then test the approved UNKNOWN/final behavior. Neither is currently authorized.
+1. **Phase 0 / owner gate:** Phase 0 remains OPEN under A11. The bounded candidate is assembled for review only; it is not canonical and does not close Phase 0. Resolve remaining contracts, then separately decide any implementation authority.
+2. **Canonical evidence/output contract:** decide the semantic field map, A7 terminal representation, schema/version and compatibility contract requested in A15 before any schema change. `P1-CANON-01` remains NOT AUTHORIZED; a separate exact-scope Phase 1 grant is required.
+3. **Parallel source-specific gates:** only after the canonical contract and separate implementation authority, (a) integrate/test the A9 GMP gate once its source/hash contract is resolved; and (b) implement NIFTY only after source-native closes and cutoff/session-availability evidence, then test the approved UNKNOWN/final behavior. Neither is currently authorized.
 4. **Other A8 integrations:** settle each subscription, GMP-source, peer/A5, VIX, listing-gain, and anchor contract with actual source/evidence before proposing code. Do not invent sources or thresholds.
-5. **Existing work / coverage:** obtain independent acceptance of Phase 5E–5J, UI-1–UI-7, Track B, Phase 7 and the named repairs on one exact tree. Add sector/bank code only for a specific approved gap supported by evidence. Obtain GCP fixture sign-off before any fixture change.
-6. **Integration and release:** authorize branch reconciliation, review/tests, and independent acceptance for the named candidate; merge/release/production remain separate unauthorized decisions.
+5. **Existing work / coverage:** obtain independent acceptance of Phase 5E–5J, UI-1–UI-7, Track B, Phase 7 and the named repairs on the exact candidate. Add sector/bank code only for a specific approved gap supported by evidence. Obtain GCP fixture sign-off before any fixture change.
+6. **Review and release:** Ramki must appoint an independent reviewer for the exact assembled candidate and record the review outcome. Merge/release/production remain separate unauthorized decisions.
 
 The audit draft contains the item-by-item missing/completed/authority/dependency/acceptance/next-action table. This sequence grants no work.
 
