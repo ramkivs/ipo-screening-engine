@@ -27,6 +27,15 @@ The reviewer should independently inspect **the exact commit/tree above**, not a
 
 The later session-branch follow-up commit adds only this request, A13 execution evidence, A15's open contract request and candidate-tracker metadata. It does not change the review-target tree `9bad659` or its product files. Any reviewer acceptance must name `9bad659927616ad7fd3aad2864b6637f095872c5` and tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5` explicitly.
 
+## Focused appointment-authority finding (verified 2026-10-13)
+
+- **Eligibility criterion:** The published Program Authority package requires a reviewer who did not implement the changes under review; A14 further requires independence from both implementation and assembly. The reviewer must inspect the exact candidate and report the named acceptance scope. A same-person Phase 0 review is allowed only if Ramki explicitly tasks that scope.
+- **Appointment authority/mechanism:** A1 appoints Ramki as field-conflict authority, not as reviewer and not as a reviewer-delegation mechanism. GOV-001 only establishes decision-record location/format. The Program Authority package says Ramki must name the reviewer and scope. No reviewer roster or delegated appointment was found. Thus a valid appointment mechanism exists only through a durable, explicit Ramki appointment; no person is identified by the current records.
+- **Current appointment evidence:** No named independent reviewer appears in the reviewed decision, audit, tracker or Program Authority records. GitHub reports PR #3 has no review requests/reviews, and the fixed session branch has no PR. PR #3's head is not this review candidate. At this focused re-verification, the local and remote session tip was `8944af93c28bb3f2fa7f52dda066902b81270de6`; candidate `9bad659927616ad7fd3aad2864b6637f095872c5` remained its ancestor with tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5` unchanged.
+- **Disposition:** **OPEN / BLOCKED on Ramki appointment.** No eligible person can be identified from the present records without inventing an appointment or inferring independence from role similarity. The required decision remains: name the reviewer, state independence basis, and approve the exact acceptance scope in this A14 request.
+
+A15 now supplies the cross-referenced field-level canonical-contract request. Neither A14 nor A15 records an appointment or acceptance.
+
 ## Rationale
 
 A13 resolves the narrowly authorized integration prerequisite and produces one exact, traceable candidate tree. It does not establish independent acceptance. The reviewed records and PR #3 disclose no named independent reviewer, so Ramki's appointment and a review of the exact candidate remain necessary; the absence of an appointment does not retroactively block the authorized assembly.
