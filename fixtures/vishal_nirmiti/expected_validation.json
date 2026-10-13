@@ -1,0 +1,68 @@
+{
+  "expected": {
+    "errors": [],
+    "ok": true,
+    "warnings": [
+      {
+        "code": "GCP_UNDISCLOSED",
+        "location": "use_of_proceeds.gcp",
+        "message": "the general corporate purposes amount is undisclosed in the RHP; the 25% ICDR ceiling is recorded separately as a limit and is not treated as the amount",
+        "scope": "semantic",
+        "severity": "WARNING"
+      },
+      {
+        "code": "PEER_MULTIPLES_STALE",
+        "location": "peers",
+        "message": "peer 'GPT Infraprojects Limited': peer multiple dated 2026-07-23 is beyond the 30-day staleness limit. The dependent valuation criteria are treated as UNKNOWN rather than scored on stale data.",
+        "scope": "semantic",
+        "severity": "WARNING"
+      },
+      {
+        "code": "PEER_MULTIPLES_STALE",
+        "location": "peers",
+        "message": "peer 'Indian Hume Pipe Company Limited': peer multiple dated 2026-07-23 is beyond the 30-day staleness limit. The dependent valuation criteria are treated as UNKNOWN rather than scored on stale data.",
+        "scope": "semantic",
+        "severity": "WARNING"
+      },
+      {
+        "code": "PEER_SET_NO_VALID_ENTRIES",
+        "location": "peers",
+        "message": "no VALID peer remains, so every valuation criterion is UNKNOWN and the score range widens accordingly",
+        "scope": "semantic",
+        "severity": "WARNING"
+      },
+      {
+        "code": "PROVENANCE_MISSING_FOR_FIELDS",
+        "detail": {
+          "count": 110,
+          "examples": [
+            "issue.price_band_low",
+            "issue.price_band_high",
+            "issue.lot_size",
+            "issue.ofs",
+            "issue.fresh_shares",
+            "issue.post_issue_shares",
+            "issue.pre_issue_shares",
+            "issue.post_issue_eps",
+            "issue.open_date",
+            "issue.close_date",
+            "issue.quota_pct.nii",
+            "issue.quota_pct.retail",
+            "issue.ofs_sellers[0].name",
+            "issue.ofs_sellers[0].type",
+            "issue.ofs_sellers[0].holding_pct_pre_issue",
+            "issue.ofs_sellers[0].source_id",
+            "financials.reporting_unit",
+            "financials.periods[0].fy",
+            "financials.periods[0].revenue",
+            "financials.periods[0].pat"
+          ]
+        },
+        "location": "_evidence",
+        "message": "110 material input field(s) carry no evidence reference, for example ['issue.price_band_low', 'issue.price_band_high', 'issue.lot_size', 'issue.ofs', 'issue.fresh_shares', 'issue.post_issue_shares', 'issue.pre_issue_shares', 'issue.post_issue_eps']. Each scored input should identify its source, as-of date, document/page and extraction method (spec s3.4).",
+        "scope": "semantic",
+        "severity": "WARNING"
+      }
+    ]
+  }
+}

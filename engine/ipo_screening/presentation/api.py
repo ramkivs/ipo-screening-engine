@@ -1,0 +1,493 @@
+"""UI-1 FastAPI Presentation Read-Model API Implementation.
+
+Implements read-only REST endpoints matching docs/openapi/presentation-api-v1.yaml.
+Strictly read-only: rejects POST / PUT / PATCH / DELETE with 405 Method Not Allowed.
+"""
+
+from __future__ import annotations
+
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from .models import (
+    ApiError,
+    ApiMeta,
+    BacktestAnalyticsResponse,
+    BacktestDatasetListResponse,
+    CalibrationProposal,
+    CalibrationProposalListResponse,
+    ConfigurationStatusResponse,
+    EvaluationDetail,
+    EvaluationListResponse,
+    EvidenceDetail,
+    EvidenceResponse,
+    HealthStatus,
+    IngestionResponse,
+    IpoDetail,
+    IpoHistoryResponse,
+    IpoListResponse,
+    LifecycleActionRequest,
+    LifecycleActionResponse,
+    PerformanceSummaryResponse,
+    PostListingObservationsResponse,
+)
+from ..lifecycle import (
+    CyclicLineageError,
+    EvaluationNotFoundError,
+    InvalidStateTransitionError,
+    ProtectedRecordError,
+)
+from .service import (
+    IngestionError,
+    IngestionEvaluationError,
+    IngestionExtractionError,
+    IngestionPayloadTooLargeError,
+    IngestionValidationError,
+    PresentationConfig,
+    PresentationService,
+)
+
+
+def create_router(service: PresentationService) -> APIRouter:
+    router = APIRouter(prefix="/api/v1")
+
+    # -------------------------------------------------------------------------
+    # 6.1 Health & Metadata
+    # -------------------------------------------------------------------------
+
+    @router.get("/health", response_model=HealthStatus, tags=["System"])
+    def get_health() -> HealthStatus:
+        return HealthStatus(
+            status="healthy",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            read_only=True,
+        )
+
+    @router.get("/meta", response_model=ApiMeta, tags=["System"])
+    def get_meta() -> ApiMeta:
+        return service.get_meta()
+
+    # -------------------------------------------------------------------------
+    # 6.2 & 6.3 IPO Discovery & Detail
+    # -------------------------------------------------------------------------
+
+    @router.get("/ipos", response_model=IpoListResponse, tags=["IPOs"])
+    def list_ipos(
+        page: int = Query(1, ge=1),
+        page_size: int = Query(20, ge=1, le=100),
+        search: Optional[str] = Query(None),
+        sector_profile: Optional[str] = Query(None),
+    ) -> IpoListResponse:
+        return service.list_ipos(
+            page=page,
+            page_size=page_size,
+            search=search,
+            sector_profile=sector_profile,
+        )
+
+    @router.get("/ipos/{ipo_id}", response_model=IpoDetail, tags=["IPOs"])
+    def get_ipo(ipo_id: str) -> IpoDetail:
+        res = service.get_ipo_detail(ipo_id)
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": f"IPO issuer '{ipo_id}' not found in store", "code": "IPO_NOT_FOUND"},
+            )
+        return res
+
+    @router.get("/ipos/{ipo_id}/history", response_model=IpoHistoryResponse, tags=["IPOs"])
+    def get_ipo_history(
+        ipo_id: str,
+        include_archived: bool = Query(False, description="Include archived historical evaluations"),
+    ) -> IpoHistoryResponse:
+        res = service.get_ipo_history(ipo_id, include_archived=include_archived)
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": f"IPO issuer '{ipo_id}' not found in store", "code": "IPO_NOT_FOUND"},
+            )
+        return res
+
+    # -------------------------------------------------------------------------
+    # 6.4 & 6.5 Evaluation Discovery & Detail
+    # -------------------------------------------------------------------------
+
+    @router.get("/evaluations", response_model=EvaluationListResponse, tags=["Evaluations"])
+    def list_evaluations(
+        page: int = Query(1, ge=1),
+        page_size: int = Query(20, ge=1, le=100),
+        ipo_id: Optional[str] = Query(None),
+        mode: Optional[str] = Query(None),
+        verdict: Optional[str] = Query(None),
+        confidence: Optional[str] = Query(None),
+        engine_version: Optional[str] = Query(None),
+        config_version: Optional[str] = Query(None),
+    ) -> EvaluationListResponse:
+        return service.list_evaluations(
+            page=page,
+            page_size=page_size,
+            ipo_id=ipo_id,
+            mode=mode,
+            verdict=verdict,
+            confidence=confidence,
+            engine_version=engine_version,
+            config_version=config_version,
+        )
+
+    @router.get("/evaluations/{evaluation_id}", response_model=EvaluationDetail, tags=["Evaluations"])
+    def get_evaluation(evaluation_id: str) -> EvaluationDetail:
+        res = service.get_evaluation_detail(evaluation_id)
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": f"Evaluation '{evaluation_id}' not found in store", "code": "EVALUATION_NOT_FOUND"},
+            )
+        return res
+
+    # -------------------------------------------------------------------------
+    # 6.6 Evidence
+    # -------------------------------------------------------------------------
+
+    @router.get("/evaluations/{evaluation_id}/evidence", response_model=EvidenceResponse, tags=["Evidence"])
+    def get_evaluation_evidence(evaluation_id: str) -> EvidenceResponse:
+        res = service.get_evaluation_evidence(evaluation_id)
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": f"Evaluation '{evaluation_id}' not found in store", "code": "EVALUATION_NOT_FOUND"},
+            )
+        return res
+
+    @router.get("/evidence/{evidence_id}", response_model=EvidenceDetail, tags=["Evidence"])
+    def get_evidence_item(evidence_id: str) -> EvidenceDetail:
+        res = service.get_evidence_item(evidence_id)
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": f"Evidence item '{evidence_id}' not found in store", "code": "EVIDENCE_NOT_FOUND"},
+            )
+        return res
+
+    # -------------------------------------------------------------------------
+    # 6.8 & 6.9 Post-Listing & Performance
+    # -------------------------------------------------------------------------
+
+    @router.get("/evaluations/{evaluation_id}/post-listing", response_model=PostListingObservationsResponse, tags=["Post-Listing"])
+    def get_post_listing_observations(evaluation_id: str) -> PostListingObservationsResponse:
+        res = service.get_post_listing_observations(evaluation_id)
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": f"Evaluation '{evaluation_id}' not found in store", "code": "EVALUATION_NOT_FOUND"},
+            )
+        return res
+
+    @router.get("/evaluations/{evaluation_id}/performance", response_model=PerformanceSummaryResponse, tags=["Post-Listing"])
+    def get_performance_summary(evaluation_id: str) -> PerformanceSummaryResponse:
+        res = service.get_performance_summary(evaluation_id)
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": f"Evaluation '{evaluation_id}' not found in store", "code": "EVALUATION_NOT_FOUND"},
+            )
+        return res
+
+    # -------------------------------------------------------------------------
+    # 6.10 Backtest Datasets & Analytics
+    # -------------------------------------------------------------------------
+
+    @router.get("/backtest/datasets", response_model=BacktestDatasetListResponse, tags=["Backtest"])
+    def list_backtest_datasets() -> BacktestDatasetListResponse:
+        return service.list_backtest_datasets()
+
+    @router.get("/backtest/analytics", response_model=BacktestAnalyticsResponse, tags=["Backtest"])
+    def get_backtest_analytics() -> BacktestAnalyticsResponse:
+        res = service.get_backtest_analytics()
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": "Backtest analytics report not found on disk", "code": "ANALYTICS_NOT_FOUND"},
+            )
+        return res
+
+    # -------------------------------------------------------------------------
+    # 6.11 Calibration
+    # -------------------------------------------------------------------------
+
+    @router.get("/calibration/proposals", response_model=CalibrationProposalListResponse, tags=["Calibration"])
+    def list_calibration_proposals() -> CalibrationProposalListResponse:
+        return service.list_calibration_proposals()
+
+    @router.get("/calibration/proposals/{proposal_id}", response_model=CalibrationProposal, tags=["Calibration"])
+    def get_calibration_proposal(proposal_id: str) -> CalibrationProposal:
+        res = service.get_calibration_proposal(proposal_id)
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": f"Calibration proposal '{proposal_id}' not found", "code": "PROPOSAL_NOT_FOUND"},
+            )
+        return res
+
+    # -------------------------------------------------------------------------
+    # 6.12 Configuration Status
+    # -------------------------------------------------------------------------
+
+    @router.get("/configuration/current", response_model=ConfigurationStatusResponse, tags=["Configuration"])
+    def get_configuration_status() -> ConfigurationStatusResponse:
+        return service.get_configuration_status()
+
+    # -------------------------------------------------------------------------
+    # 6.13 Ingestion & Evaluation Workflow (UI-7)
+    # -------------------------------------------------------------------------
+
+    @router.post("/ingest/document", response_model=IngestionResponse, tags=["Ingestion"])
+    async def ingest_document(
+        request: Request,
+        file: UploadFile = File(...),
+        mode: str = Form("final"),
+    ) -> Response:
+        """Upload and evaluate an IPO filing document (DRHP/RHP PDF)."""
+        # Strict Security Boundary: reject any attempt to supply caller-controlled server paths or fallback controls
+        form_data = await request.form()
+        forbidden_params = {"reference_base_path", "base_path", "path", "file_path", "allow_fixture_fallbacks", "fallback", "allow_fallbacks"}
+        present_forbidden = forbidden_params.intersection(form_data.keys())
+        if present_forbidden:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "Bad Request",
+                    "message": f"Unauthorized security parameter(s) detected: {sorted(list(present_forbidden))}. Server filesystem paths and fixture fallback controls are strictly prohibited on the public ingestion boundary.",
+                    "code": "SECURITY_VIOLATION_UNAUTHORIZED_PARAMETER",
+                },
+            )
+
+        if not file or not file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Bad Request", "message": "Filing PDF file is required.", "code": "VALIDATION_ERROR"},
+            )
+
+        max_size = 50 * 1024 * 1024
+        if file.size and file.size > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail={"error": "Payload Too Large", "message": "File size exceeds 50 MB limit.", "code": "PAYLOAD_TOO_LARGE"},
+            )
+
+        try:
+            contents = await file.read()
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Bad Request", "message": f"Failed to read uploaded file: {exc}", "code": "FILE_READ_ERROR"},
+            )
+
+        if len(contents) > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail={"error": "Payload Too Large", "message": f"File size ({len(contents)} bytes) exceeds 50 MB limit.", "code": "PAYLOAD_TOO_LARGE"},
+            )
+
+        try:
+            ingest_res = service.ingest_document(
+                file_bytes=contents,
+                filename=file.filename,
+                mode=mode,
+            )
+            res_code = status.HTTP_200_OK if ingest_res.is_duplicate else status.HTTP_201_CREATED
+            return JSONResponse(status_code=res_code, content=ingest_res.model_dump())
+        except IngestionPayloadTooLargeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail={"error": "Payload Too Large", "message": str(exc), "code": "PAYLOAD_TOO_LARGE"},
+            )
+        except IngestionValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Bad Request", "message": str(exc), "code": "VALIDATION_ERROR"},
+            )
+        except (IngestionExtractionError, IngestionEvaluationError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"error": "Unprocessable Entity", "message": str(exc), "code": "PROCESSING_FAILED"},
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": "Internal Error", "message": f"Unexpected ingestion error: {exc}", "code": "INGESTION_INTERNAL_ERROR"},
+            )
+
+    # -------------------------------------------------------------------------
+    # 6.14 Lifecycle Governance Operations
+    # -------------------------------------------------------------------------
+
+    @router.post("/evaluations/{evaluation_id}/archive", response_model=LifecycleActionResponse, tags=["Lifecycle"])
+    def archive_evaluation(
+        evaluation_id: str,
+        payload: Optional[LifecycleActionRequest] = None,
+    ) -> LifecycleActionResponse:
+        reason = payload.reason if payload else None
+        actor = payload.actor if payload else None
+        try:
+            return service.archive_evaluation(evaluation_id, reason=reason, actor=actor)
+        except EvaluationNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": str(exc), "code": "EVALUATION_NOT_FOUND"},
+            ) from exc
+        except ProtectedRecordError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": "Forbidden", "message": str(exc), "code": "PROTECTED_RECORD"},
+            ) from exc
+        except InvalidStateTransitionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": "Conflict", "message": str(exc), "code": "INVALID_STATE_TRANSITION"},
+            ) from exc
+
+    @router.post("/evaluations/{evaluation_id}/unarchive", response_model=LifecycleActionResponse, tags=["Lifecycle"])
+    def unarchive_evaluation(
+        evaluation_id: str,
+        payload: Optional[LifecycleActionRequest] = None,
+    ) -> LifecycleActionResponse:
+        reason = payload.reason if payload else None
+        actor = payload.actor if payload else None
+        try:
+            return service.unarchive_evaluation(evaluation_id, reason=reason, actor=actor)
+        except EvaluationNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": str(exc), "code": "EVALUATION_NOT_FOUND"},
+            ) from exc
+        except InvalidStateTransitionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": "Conflict", "message": str(exc), "code": "INVALID_STATE_TRANSITION"},
+            ) from exc
+
+    @router.post("/evaluations/{evaluation_id}/make-active", response_model=LifecycleActionResponse, tags=["Lifecycle"])
+    def make_evaluation_active(
+        evaluation_id: str,
+        payload: Optional[LifecycleActionRequest] = None,
+    ) -> LifecycleActionResponse:
+        reason = payload.reason if payload else None
+        actor = payload.actor if payload else None
+        try:
+            return service.make_evaluation_active(evaluation_id, reason=reason, actor=actor)
+        except EvaluationNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": str(exc), "code": "EVALUATION_NOT_FOUND"},
+            ) from exc
+        except CyclicLineageError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Bad Request", "message": str(exc), "code": "CYCLIC_LINEAGE"},
+            ) from exc
+        except InvalidStateTransitionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"error": "Conflict", "message": str(exc), "code": "INVALID_STATE_TRANSITION"},
+            ) from exc
+
+    return router
+
+
+def create_app(service: Optional[PresentationService] = None) -> FastAPI:
+    """FastAPI application factory with strict read-only enforcement."""
+    if service is None:
+        cfg = PresentationConfig(
+            store_root=os.getenv("IPO_STORE_ROOT", "build/evaluations"),
+            config_dir=os.getenv("IPO_CONFIG_DIR", "config"),
+            dataset_path=os.getenv("IPO_DATASET_PATH", "build/dataset/dataset.json"),
+            analytics_path=os.getenv("IPO_ANALYTICS_PATH", "build/analytics/analytics.json"),
+            proposal_path=os.getenv("IPO_PROPOSAL_PATH", "config/calibration-proposal.v1.6.0.json"),
+        )
+        service = PresentationService(cfg)
+
+    app = FastAPI(
+        title="IPO Screening Engine — Presentation Read-Model API",
+        version="1.0.0",
+        description="Deterministic read-only presentation API for Indian Mainboard IPO Screening Engine.",
+        docs_url="/docs",
+        redoc_url="/redoc",
+    )
+
+    # Enable CORS for local preview/development
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["GET", "HEAD", "OPTIONS", "POST"],
+        allow_headers=["*"],
+    )
+
+    # Strict Read-Only Middleware: blocks POST, PUT, PATCH, DELETE (except POST /api/v1/ingest/document and lifecycle operations)
+    @app.middleware("http")
+    async def read_only_guard(request: Request, call_next):
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            path = request.url.path
+            # UI-7 ingestion exception and governed lifecycle operations
+            if request.method == "POST" and (
+                path in ("/api/v1/ingest/document", "/api/v1/ingest/document/")
+                or path.endswith("/archive")
+                or path.endswith("/unarchive")
+                or path.endswith("/make-active")
+            ):
+                return await call_next(request)
+
+            return JSONResponse(
+                status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+                content={
+                    "error": "Method Not Allowed",
+                    "message": f"Method {request.method} is prohibited. The Presentation API is strictly read-only.",
+                    "code": "READ_ONLY_METHOD_NOT_ALLOWED",
+                },
+                headers={"Allow": "GET, HEAD, OPTIONS"},
+            )
+        response: Response = await call_next(request)
+        return response
+
+    # Custom exception handler for HTTPException with consistent JSON envelope
+    @app.exception_handler(HTTPException)
+    async def custom_http_exception_handler(request: Request, exc: HTTPException):
+        if isinstance(exc.detail, dict):
+            content = exc.detail
+        else:
+            content = {
+                "error": "Client Error",
+                "message": str(exc.detail),
+                "code": f"HTTP_{exc.status_code}",
+            }
+        return JSONResponse(status_code=exc.status_code, content=content)
+
+    router = create_router(service)
+    app.include_router(router)
+
+    # Mount UI-2 frontend presentation layer if present
+    frontend_dir = Path(__file__).resolve().parent.parent.parent.parent / "frontend"
+    if frontend_dir.exists() and (frontend_dir / "index.html").exists():
+        from fastapi.responses import RedirectResponse
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/ui", StaticFiles(directory=str(frontend_dir), html=True), name="ui")
+
+        @app.get("/", include_in_schema=False)
+        def root_redirect():
+            return RedirectResponse(url="/ui/")
+
+    # App-level reference to the service
+    app.state.service = service
+
+    return app
+
+
+# Default singleton instance for uvicorn
+app = create_app()

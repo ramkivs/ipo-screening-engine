@@ -1,0 +1,32 @@
+# Generated run output: evaluation stores, workbooks, scratch reports.
+# These are reproducible from the inputs and must never be committed
+# (spec s23: the record is authoritative, Excel is a projection).
+build/
+
+# Cached RHP page text, regenerated with pypdf. ~1.9 MB, not a source of truth.
+.cache/
+
+# Tool caches
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Local environments
+.venv/
+venv/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Staged download copies. Duplicates of the tracked carrier, so not committed;
+# regenerate with ./handoff/delivery/stage-downloads.sh at any time.
+handoff/delivery/download/
+
+# NOTE: handoff/delivery/carrier/ is deliberately NOT ignored.
+# An earlier copy of it was ignored, and a session restore dropped every ignored
+# path (build/, .cache/ and that carrier all disappeared) while the tracked and
+# untracked source files survived. The carrier is the only mechanism that can
+# reconstruct this delivery in another workspace, so it must be tracked.

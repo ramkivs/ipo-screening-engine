@@ -1,0 +1,10 @@
+{
+  "snapshot_id": "FEED-A-SUB-001",
+  "provider_id": "NSE-PRIMARY-FEED",
+  "as_of": "2026-10-04T19:26:01Z",
+  "retrieval_timestamp": "2026-10-04T19:30:00Z",
+  "qib_x": 12.5,
+  "nii_x": 4.2,
+  "retail_x": 2.1,
+  "overall_x": 6.8
+}

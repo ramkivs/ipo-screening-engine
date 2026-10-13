@@ -1,0 +1,16 @@
+{
+  "snapshot_id": "ANCHOR-CIRCULAR-001",
+  "provider_id": "BSE-ANCHOR-CIRCULAR",
+  "as_of": "2026-10-04T18:00:00Z",
+  "retrieval_timestamp": "2026-10-04T18:15:00Z",
+  "anchor_names": [
+    "Government Pension Fund Global",
+    "Goldman Sachs India Equity Fund",
+    "HDFC Mutual Fund",
+    "ICICI Prudential Life Insurance"
+  ],
+  "anchor_total_shares": 3540000,
+  "anchor_total_amount": 7788.0,
+  "anchor_lockin_verified": true,
+  "anchor_quality": "reputed"
+}

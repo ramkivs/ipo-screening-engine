@@ -1,0 +1,12 @@
+{
+  "name": "ipo-screening-engine-ui",
+  "version": "1.0.0",
+  "description": "Read-only presentation frontend for IPO Screening Engine",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": ["ipo", "screening", "finance", "presentation", "read-only"],
+  "author": "Ramki",
+  "license": "UNLICENSED"
+}
