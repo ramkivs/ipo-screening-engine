@@ -1,11 +1,11 @@
 # A15 Canonical Evaluation Record — Decision-Ready Implementation Profile
 
-- **Disposition recommendation to Ramki:** **ACCEPT WITH SPECIFIED AMENDMENTS** to the 2026-10-13 A15 property/schema proposal.
-- **Status:** Proposed exact contract; **not yet design-approved or implementation-authorized**.
+- **Original disposition recommendation:** **ACCEPT WITH SPECIFIED AMENDMENTS** to the 2026-10-13 A15 property/schema proposal.
+- **Current status:** Ramki approved the exact profile with specified amendments on 2026-10-14 and granted its bounded implementation; implementation is complete at `fecdd8220500d7932c93b55b311a5f9830f92572` (tree `657e6b049156ce14a1b77b495700f34a3a20c068`). Independent review and product acceptance remain pending.
 - **Profile prepared:** 2026-10-14 (Asia/Calcutta); based on remotely verified package commit `dbc7544ae800408e162a1787031c15659924ea65` and its matching file blob.
 - **Candidate M:** `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5` — unchanged and out of implementation scope.
 
-This replaces the earlier open-ended package in place. It makes concrete recommendations; no row below should be read as Ramki's approval. It reuses A15's approved semantic direction, A7-D1/D2, A1, A8-M/A9/A10, v1.5 and the inspected current `EvaluationRecord`/`EvaluationStore`/`hashing.py` behavior. No broad audit or product-code/test run was performed for this documentation revision.
+The exact profile in §§1–3 was first published as a recommendation, then approved by Ramki with specified amendments under the 2026-10-14 A15 disposition recorded in `handoff/decisions/A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md`. The five-path scope in §4 was separately authorized as an explicit overlap while Phase 0 remains OPEN. This package's original §5 approval request is retained as historical evidence and is superseded by that disposition. The work reuses A15's semantic direction, A7-D1/D2, A1, A8-M/A9/A10, v1.5 and the inspected `EvaluationRecord`/`EvaluationStore`/`hashing.py` behavior. No broad audit or product-code/test run was performed for the original documentation revision.
 
 ## 1. Decision matrix — exact recommended contract
 
@@ -144,9 +144,9 @@ python -m pytest tests/test_evaluation_record_v1.py tests/test_reproducibility_s
 
 Pass criteria: (1) all required/conditional schema cases pass and invalid combinations fail closed; (2) all state, reason and evidence references resolve; no unknown-to-zero, unverified-to-clear/triggered or automatic A1 winner; (3) A7 mapping table is exact, including no `final_outcome` in the unverified-only case; (4) Python file bytes match pinned golden output and Node independently matches the v1.5 canonical object-hash vector; non-finite values reject; (5) manifest verifies the new artifact and hash profile; (6) existing v1.5 result hash and old artifact payloads remain unchanged; (7) no old directory is rewritten; (8) no source/runtime gate or excluded path changes. This is implementation validation only, not independent acceptance, Phase 0 closure, canonical selection, merge or release. No A13 85-test or UI-7 rerun is included.
 
-## 5. Exact Ramki disposition and authority required
+## 5. Original Ramki disposition and authority request (historical; superseded)
 
-These are three separate matters. A design decision is not a code grant; a code grant is not Phase 0 closure.
+This section records the pre-approval request and is retained for provenance. Ramki's 2026-10-14 ACCEPT WITH SPECIFIED AMENDMENTS disposition and separate exact implementation grant satisfied the requested A/B/C items for this profile; this section is no longer an outstanding request. The distinctions remain controlling: design approval is not a code grant, and a code grant is not Phase 0 closure.
 
 ### A. Design approval — required first
 
@@ -171,6 +171,15 @@ A11 still records Phase 0 OPEN; no existing A15 grant authorizes Phase 1. To rem
 - **WAIT:** this implementation grant takes effect only after a separately recorded Phase 0 closure; or
 - **OVERLAP:** record: “I authorize this bounded A15 increment while Phase 0 remains OPEN as an explicit overlap; this does not close Phase 0.”
 
-Until A, B and the Phase 0 choice are recorded, make no product code/schema/test/config/fixture changes. No implicit approval is used to override A11/A15's explicit restriction. GCP/D1/D3 are not blockers for this isolated work.
+Historical pre-approval hold: do not implement until A, B and the Phase 0 choice are recorded. That hold was satisfied and superseded by the explicit 2026-10-14 disposition above. GCP/D1/D3 were not blockers for this isolated work.
 
 ---
+
+## 6. Execution and acceptance status as of 2026-10-14
+
+- **Implementation:** completed on the fixed session branch at `fecdd8220500d7932c93b55b311a5f9830f92572`, tree `657e6b049156ce14a1b77b495700f34a3a20c068`; its exact changed paths are the five listed in §4. The commit and tree were remotely verified unchanged during the post-A15 convergence check.
+- **Focused verification:** the prior implementation turn reported `python -m pytest tests/test_evaluation_record_v1.py tests/test_reproducibility_store.py` — **43 passed in 16.54s**. No rerun was needed because the committed code/tree remained unchanged. This result is implementation-test evidence, not an independent review or product acceptance. The repository has no GitHub Actions workflows/runs or PR check results to provide remote CI confirmation.
+- **Candidate M:** remains `9bad659927616ad7fd3aad2864b6637f095872c5` / tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`; the A15 implementation is post-M and is not included in that candidate. No rebuild, rebase or reclassification occurred.
+- **Independent review:** pending. A14 records Sai's appointment only for exact Candidate M; the A15 commit/tree is outside that appointment. No A15 review extension, Sai-authored disposition or substantiated independence report is recorded.
+- **Product acceptance:** not recorded. It remains a separate Ramki decision after the relevant exact-target review; no implementation test or review recommendation substitutes for it.
+- **Promotion:** no canonical delivery branch selected; no PR created for the session branch; no merge, release or production activation authorized. Phase 0 remains OPEN and general Phase 1 remains unauthorized.

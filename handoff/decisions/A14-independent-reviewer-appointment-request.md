@@ -10,7 +10,11 @@
 - **Exact review target:** Commit `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`, on `arena/573e69a4-ipo-screening-engine`.
 - **Parents:** Session authorization/disposition commit `7e25d1e2f97d162d97ff837c7dd40fb3d070aea1`; product-code review base `arena/01a10b42-ipo-screening-engine` at `4b19faf848a721265597a678926988d484d30e59`.
 - **Governance source:** `arena/4e1080b7-ipo-screening-engine` at `adbd93c5b4450fb113561368d7d101eb4686c842`; selected decision files were copied/pinned as authorized by A13. The 4e history is not a parent of the candidate.
-- **Implementation authority:** NOT GRANTED. Phase 0 remains OPEN; Phase 1 and `P1-CANON-01` remain UNAUTHORIZED.
+- **A14 authority boundary:** This appointment is for review of Candidate M only; A14 itself grants no product implementation. Phase 0 remains OPEN; general Phase 1 and `P1-CANON-01` remain UNAUTHORIZED.
+
+## Current review-scope boundary — 2026-10-14
+
+Candidate M remains commit `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`. The active session branch subsequently received the separately authorized A15 implementation commit `fecdd8220500d7932c93b55b311a5f9830f92572`, tree `657e6b049156ce14a1b77b495700f34a3a20c068`, with five product/schema/test paths. That A15 increment is post-M and is **outside** Sai's A14 appointment as recorded here. No explicit extension of Sai's appointment to A15, A15 review report, or product acceptance is recorded. Do not treat a review of Candidate M as review or acceptance of the later A15 implementation.
 
 ## Appointment recorded and independence basis — 2026-10-13
 
@@ -28,7 +32,7 @@ The status request to Sai below remains outstanding. The criterion-by-criterion 
 
 **Concise disposition request to Sai (prepared, not sent):** Please reply `ACCEPT` or `REJECT` for candidate commit `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`; identify the review scope/checks and any material limitations; and state your independence basis, including whether you implemented or assembled any part. “No material issues” alone is not an explicit disposition.
 
-Sai is asked to review **only** candidate commit `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`—not the later documentation-only session-branch tip—and to issue an explicit accept/reject with findings against the requested scope below. The report should:
+Sai is asked to review **only** candidate commit `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`—not the later session-branch tip, which now contains a separately authorized post-M A15 implementation—and to issue an explicit accept/reject with findings against the requested scope below. The report should:
 
 1. Confirm ancestry/provenance: first parent `7e25d1e2f97d162d97ff837c7dd40fb3d070aea1`, second parent `4b19faf848a721265597a678926988d484d30e59`, and the 4e source-history boundary.
 2. Confirm candidate/product-tree and authorized governance-record separation, including that no unauthorized 4e application, schema, config, fixture or test changes were imported.
@@ -52,7 +56,7 @@ The reviewer should independently inspect **the exact commit/tree above**, not a
 4. Status boundaries: Phase 0 is OPEN; the candidate is non-canonical and not accepted/release-ready; `P1-CANON-01` remains unauthorized and this assembly does not claim its completion; no source qualification, release or production activation is implied.
 5. Technical evidence: independently assess the scoped test result recorded for this commit (`tests/test_enrichment_contract.py`, `tests/test_validation_gates.py`, and `tests/test_reproducibility_store.py`: 85 passed) and identify any further acceptance checks required. This does not claim a full suite, Windows validation, or independent acceptance.
 
-**Historical provenance note (superseded status; candidate identity retained):** At the earlier session-branch tip `50160ab9832597e359d2f29512bacdf542b08645`, the follow-up contained A14, A13 execution evidence, the then-open A15 request and tracker metadata. Subsequent updates publish only A14/A15/tracker/design documentation; they do not change candidate `9bad659` or its product tree. Any review acceptance must name commit `9bad659927616ad7fd3aad2864b6637f095872c5` and tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5` explicitly.
+**Historical provenance note (superseded status; candidate identity retained):** At the earlier session-branch tip `50160ab9832597e359d2f29512bacdf542b08645`, the follow-up contained A14, A13 execution evidence, the then-open A15 request and tracker metadata. Before the A15 implementation, follow-up updates were documentation-only and did not change Candidate M. The later A15 product/schema/test increment is separately authorized at `fecdd8220500d7932c93b55b311a5f9830f92572` / tree `657e6b049156ce14a1b77b495700f34a3a20c068`; it does not change Candidate M, but it means the current session branch is no longer documentation-only relative to M. Any A14 review acceptance must still name commit `9bad659927616ad7fd3aad2864b6637f095872c5` and tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5` explicitly.
 
 ## Historical appointment-authority finding (verified at the prior 2026-10-13 check; superseded by the appointment above)
 
@@ -63,7 +67,7 @@ At the earlier check, the reviewed records contained no named reviewer. The foll
 - **Current appointment evidence:** No named independent reviewer appears in the reviewed decision, audit, tracker or Program Authority records. GitHub reports PR #3 has no review requests/reviews, and the fixed session branch has no PR. PR #3's head is not this review candidate. At this focused re-verification, the local and remote session tip was `8944af93c28bb3f2fa7f52dda066902b81270de6`; candidate `9bad659927616ad7fd3aad2864b6637f095872c5` remained its ancestor with tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5` unchanged.
 - **Disposition:** **OPEN / BLOCKED on Ramki appointment.** No eligible person can be identified from the present records without inventing an appointment or inferring independence from role similarity. The required decision remains: name the reviewer, state independence basis, and approve the exact acceptance scope in this A14 request.
 
-A15's semantic/contract-design approval and the documentation-only property/schema proposal are recorded in [`A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md`](A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md) and [`../investigation/A15-CANONICAL-EVIDENCE-OUTPUT-SCHEMA-DESIGN-PROPOSAL-2026-10-13.md`](../investigation/A15-CANONICAL-EVIDENCE-OUTPUT-SCHEMA-DESIGN-PROPOSAL-2026-10-13.md). Sai's appointment is now recorded above; no independent acceptance is recorded.
+A15's semantic decision, subsequent property/schema approval, and exact implementation grant/status are recorded in [`A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md`](A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md), the superseded historical proposal [`../investigation/A15-CANONICAL-EVIDENCE-OUTPUT-SCHEMA-DESIGN-PROPOSAL-2026-10-13.md`](../investigation/A15-CANONICAL-EVIDENCE-OUTPUT-SCHEMA-DESIGN-PROPOSAL-2026-10-13.md), and the execution package [`../implementation/A15-CANONICAL-EVALUATION-RECORD-IMPLEMENTATION-PACKAGE-2026-10-14.md`](../implementation/A15-CANONICAL-EVALUATION-RECORD-IMPLEMENTATION-PACKAGE-2026-10-14.md). Sai's appointment remains exactly for Candidate M; no independent acceptance is recorded for M or the A15 implementation.
 
 ## Rationale
 

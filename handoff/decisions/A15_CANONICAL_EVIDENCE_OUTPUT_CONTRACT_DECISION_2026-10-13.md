@@ -2,7 +2,7 @@
 
 - **Decision ID:** A15
 - **Title:** Semantic approval of the canonical evidence/output contract design direction
-- **Status:** RAMKI-APPROVED — SEMANTIC/CONTRACT-DESIGN LEVEL ONLY; PROPERTY/SCHEMA PROPOSAL PENDING; IMPLEMENTATION NOT AUTHORIZED
+- **Status:** SEMANTIC/CONTRACT-DESIGN DIRECTION APPROVED 2026-10-13; PROPERTY/SCHEMA PROFILE ACCEPTED WITH SPECIFIED AMENDMENTS AND BOUNDED FIVE-PATH IMPLEMENTATION AUTHORIZED 2026-10-14; IMPLEMENTATION COMPLETED AT `fecdd8220500d7932c93b55b311a5f9830f92572`. Independent review, product acceptance, canonical selection and promotion remain pending.
 - **Decision authority:** RAMKI
 - **Decision date:** 2026-10-13 (Asia/Calcutta)
 - **Approval provenance:** The instruction initiating this publication explicitly states that Ramki approved A15 at the semantic/contract-design level on 2026-10-13. No decision time is supplied or asserted. The specifically named prepared file was absent from both the verified pre-publication workspace and remote session-branch tree at `50160ab9832597e359d2f29512bacdf542b08645`; this record captures only the approval scope expressly stated in the instruction and does not claim to reproduce unavailable additional wording.
@@ -10,7 +10,21 @@
 - **Baseline:** Session branch `arena/573e69a4-ipo-screening-engine` at pre-publication tip `50160ab9832597e359d2f29512bacdf542b08645`.
 - **Review candidate:** Commit `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`; this decision does not change that candidate.
 - **Scope:** Semantic/contract-design direction for the canonical evidence and evaluation-result representation, and authority to prepare a separate property/schema proposal for later Ramki review.
-- **Implementation authority:** **NOT GRANTED.** Phase 0 remains OPEN; Phase 1 and `P1-CANON-01` remain NOT AUTHORIZED.
+- **Implementation authority:** Ramki separately authorized only the five-path A15 increment on 2026-10-14 as an explicit overlap while Phase 0 remains OPEN. This does not authorize broader Phase 1 work; `P1-CANON-01` and all other implementation remain NOT AUTHORIZED.
+
+## 2026-10-14 superseding property/schema disposition and execution record
+
+**Disposition:** Ramki accepted the decision-ready A15 evaluation-record profile with specified amendments and separately authorized its exact bounded implementation. The disposition was provided in Ramki's explicit Arena task instruction on 2026-10-14; the initial 2026-10-13 semantic decision remains intact. This addendum records that later approval rather than attributing it to the earlier decision date.
+
+**Accepted profile:** the exact decision-ready profile in `handoff/implementation/A15-CANONICAL-EVALUATION-RECORD-IMPLEMENTATION-PACKAGE-2026-10-14.md` §§1–3, based on the package revision at `dbc7544ae800408e162a1787031c15659924ea65`, with its stated amendments: (1) closed Draft 2020-12 schema at `schema/ipo-evaluation-record.v1.schema.json`, version `1.0.0`, with the specified conditional requiredness; (2) existing configured verdict copied to terminal `final_outcome` after A7 precedence, and the A7 unverified-only case represented as `NONTERMINAL_UNRESOLVED` with `UNVERIFIED_KNOCKOUT_NO_SAFE_RESULT` and no `final_outcome`; (3) schema-valid deterministic record-file serialization kept separate from the unchanged v1.5 canonical-object hash grammar; (4) opaque legacy digests preserved as `LEGACY_UNRESOLVED`, without an in-record self-referential manifest hash; and (5) additive compatibility only, preserving old hashes/artifacts and all A1/A7/A8-M/A9/A10 and v1.5 scope boundaries. No source/provider qualification or new metric-specific gate was approved.
+
+**Exact implementation authority:** only these five paths, on the fixed branch `arena/573e69a4-ipo-screening-engine`, based on product-review code base `4b19faf848a721265597a678926988d484d30e59`: `schema/ipo-evaluation-record.v1.schema.json`, `engine/ipo_screening/evaluation_record.py`, `engine/ipo_screening/evaluation.py`, `tests/test_evaluation_record_v1.py`, and `tests/test_reproducibility_store.py`. The authorization was an explicit overlap while Phase 0 remains OPEN. Candidate M `9bad659927616ad7fd3aad2864b6637f095872c5` and its tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5` were not changed. No additional product paths, sources, configuration, fixtures, API/UI, PR, merge, release or production activation were authorized.
+
+**Implementation and verification:** implementation commit `fecdd8220500d7932c93b55b311a5f9830f92572`, tree `657e6b049156ce14a1b77b495700f34a3a20c068`, changes exactly the five paths above. The reported focused command `python -m pytest tests/test_evaluation_record_v1.py tests/test_reproducibility_store.py` passed **43 tests** in the prior implementation turn. The commit/tree is unchanged; no rerun was warranted. This is implementation-test evidence, not independent review or acceptance. GitHub currently has no Actions workflows/runs or check results for this branch.
+
+**Status boundaries:** A15 implementation is complete and remotely present. The independent reviewer appointed under A14 is scoped to Candidate M, not this post-M A15 code commit; no A15 review extension/report is recorded. Product acceptance and canonical delivery selection remain separate and are not recorded. No PR disposition, merge/release, or production activation has been authorized. Phase 0 remains OPEN and general Phase 1 remains unauthorized.
+
+> The 2026-10-13 sections below preserve their original decision baseline. Any statement there that the exact property/schema profile is pending or that the bounded A15 implementation grant has not been made is superseded only by this addendum. All other scope limits remain in force.
 
 ## Approved semantic/contract-design direction
 
@@ -26,34 +40,32 @@ Ramki approves advancing A15 from an open semantic/contract-design request to a 
 8. **Apply requiredness only within its approved scope.** v1.5 Preliminary/Final rules and the A8/A9/A10 contracts remain controlling. A8-M's required-NIFTY `UNKNOWN` blocks Final only for that required NIFTY input; A9's absent/invalid required qualifying GMP snapshot/hash withholds Final only in its approved GMP scope; A10 does not decide subscription Final behavior. No global missing-input Final rule or provider qualification is established.
 9. **Preserve immutability.** Historical evaluations and source/result artifacts are not overwritten or silently reinterpreted. Any later version or migration must identify its source, preserve original bytes and hashes, and be separately specified and approved.
 
-## Decisions explicitly not made by A15
+## Decisions still not made after A15 (as of 2026-10-14)
 
-This semantic approval does **not** select or approve:
+The accepted package profile in the addendum is the only approved concrete A15 property/schema/serialization contract. A15 still does **not**:
 
-- exact property names, data types, enum values or conditional schema definitions;
-- source/provider qualification, a source URL, a source event, a freshness allowance, or any source-specific cutoff not already decided;
-- the terminal `final_outcome` for A7's unverified-only case;
-- hash algorithm, canonicalization version, exact serialized hash subject, or a rule by which a digest qualifies under A9;
-- an output-schema location/version, serializer version, migration or backward-compatibility behavior;
-- A10 missing/unavailable subscription Final behavior;
-- a schema/code/configuration/fixture/test change, Phase 0 closure, Phase 1 authority, release or production activation.
+- qualify a source/provider, select a source URL or source-native event, approve a freshness allowance or settle source-specific cutoff/availability rules beyond existing decisions;
+- decide A10's missing/unavailable subscription Final behavior or extend A8-M/A9 rules to other metrics;
+- establish a provider/source hash algorithm, exact qualifying GMP hash subject or source certification; the A15 digest fields do not qualify an A9 input;
+- authorize any implementation beyond the exact five paths in the 2026-10-14 grant, or any config/fixture/scoring/source/API/UI changes;
+- close Phase 0, authorize general Phase 1 or `P1-CANON-01`, select a canonical delivery branch, or approve release/production activation.
 
-The earlier A15 request's Arena **recommendation** column is not a source-selection decision and does not silently approve any property spelling or unresolved metric policy. The property/schema proposal is documentation-only and must label its choices as recommendations for Ramki to accept, amend or reject.
+The earlier A15 recommendation column remains a proposal except where the accepted 2026-10-14 profile explicitly adopts a choice; no other metric/source policy is inferred from it.
 
 ## Reconciliation with controlling decisions and v1.5
 
 - **A1:** Ramki remains the field-conflict authority; originals are preserved; each actual adjudication needs its own durable field-level decision and validation; unresolved disputes remain non-screenable.
-- **A7:** Preserve A7-D1/D2, including the still-unresolved terminal label/serialization for the specified unverified-only case. No `AVOID`, `CLEAR`, `INSUFFICIENT_DATA` or other terminal label is inferred for that case.
+- **A7:** Preserve A7-D1/D2. The approved A15 output profile serializes the specified unverified-only case as `NONTERMINAL_UNRESOLVED`, with reason `UNVERIFIED_KNOCKOUT_NO_SAFE_RESULT` and no `final_outcome`; it introduces no new terminal outcome.
 - **A8-M:** The approved NIFTY 50 PRICE INDEX classification and its required-input UNKNOWN-to-no-Final consequence remain NIFTY-specific. Source-native evidence qualification and the deterministic session/publication-availability prerequisite remain open. A local capture hash does not identify provider bytes.
-- **A9:** Withhold Final when a required qualifying GMP snapshot or required hash is absent or invalid. A9 still selects no provider, algorithm, hash subject or serialization.
+- **A9:** Withhold Final when a required qualifying GMP snapshot or required hash is absent or invalid. A9 still selects no provider or qualifying GMP hash subject; the A15 output digest profile does not supply source qualification or make a generic/local digest satisfy A9.
 - **A10:** Subscription observations remain distinct and evidence/display-only under interim handling; no scoring or missing-subscription Final rule is added.
 - **v1.5:** §§3.2–3.4, 5, 16, 18–20, 21 and 23 remain authoritative. A15's logical contract does not amend them. The output representation may be designed as a separate versioned record; no in-place v1.5 schema change is authorized by this decision.
 
-No direct conflict between those governing decision semantics and the cited v1.5 requirements was identified in this review. The separate property/schema proposal records candidate implementation gaps and asks Ramki to decide any unresolved design choice before implementation.
+No direct conflict between those governing decision semantics and the cited v1.5 requirements was identified. The accepted A15 profile is an additive versioned output artifact; it does not edit either v1.5 input schema or alter historical hashes/artifacts. Source-native qualification, event/cutoff/availability contracts and A10 Final behavior remain open where noted above.
 
 ## Required next step
 
-Prepare and submit `handoff/investigation/A15-CANONICAL-EVIDENCE-OUTPUT-SCHEMA-DESIGN-PROPOSAL-2026-10-13.md` for Ramki's later review. It may recommend concrete properties and enum values, but must identify them as proposals, preserve all approved semantics above, and enumerate conditional requiredness, exact digest subjects, schema/serialization compatibility and focused acceptance tests. Do not implement that proposal without a separate exact-scope written grant.
+The design proposal and exact-scope implementation are complete. The next gate is exact-target independent review of implementation commit `fecdd8220500d7932c93b55b311a5f9830f92572` / tree `657e6b049156ce14a1b77b495700f34a3a20c068`, followed by separate Ramki product acceptance if warranted. A14 appoints Sai only for Candidate M. Ramki must either explicitly extend Sai's review scope (with Sai's independence/conflict declaration) or appoint another reviewer with a documented independence basis before treating A15 as independently reviewed. No review/acceptance is inferred from the implementation test result.
 
 ## Consequences and authority boundary
 

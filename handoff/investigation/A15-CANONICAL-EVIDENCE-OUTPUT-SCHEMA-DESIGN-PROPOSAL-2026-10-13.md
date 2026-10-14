@@ -1,14 +1,14 @@
 # A15 — Canonical Evidence/Output Property and Schema Design Proposal
 
-- **Status:** DOCUMENTATION-ONLY DESIGN PROPOSAL — NOT APPROVED; NO SCHEMA OR IMPLEMENTATION AUTHORIZED
+- **Status at preparation (2026-10-13):** DOCUMENTATION-ONLY DESIGN PROPOSAL — NOT APPROVED; NO SCHEMA OR IMPLEMENTATION AUTHORIZED. **Current disposition (2026-10-14):** superseded by Ramki's acceptance-with-specified-amendments of the decision-ready profile and bounded implementation grant recorded in `handoff/decisions/A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md` and `handoff/implementation/A15-CANONICAL-EVALUATION-RECORD-IMPLEMENTATION-PACKAGE-2026-10-14.md`.
 - **For:** RAMKI / Program Authority
 - **Prepared:** 2026-10-13 (Asia/Calcutta)
-- **Decision baseline:** `handoff/decisions/A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md` (semantic/contract-design approval only)
+- **Decision baseline:** `handoff/decisions/A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md` (semantic/contract-design approval only as of 2026-10-13; later disposition is recorded there)
 - **Review candidate:** `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`
 - **Pre-proposal session tip:** `50160ab9832597e359d2f29512bacdf542b08645`
-- **Implementation authority:** NOT GRANTED. Phase 0 remains OPEN; `P1-CANON-01` remains NOT AUTHORIZED.
+- **Implementation authority:** This proposal itself granted none. The later exact five-path A15 implementation grant is recorded in the linked 2026-10-14 disposition; Phase 0 remains OPEN and `P1-CANON-01` / general Phase 1 remain NOT AUTHORIZED.
 
-> Every proposed property name, enum, schema path/version, serialization profile and hash scope below is a recommendation for Ramki to accept, amend or reject. None is an approved executable contract. This file does not implement or modify a JSON Schema, serializer, application, configuration, fixture or test.
+> Historical note: the property names, enums, schema path/version, serialization profile and hash scope below were recommendations when prepared on 2026-10-13. Ramki's later approval applies to the decision-ready profile in the 2026-10-14 implementation package, not automatically to every alternative or statement in this earlier proposal. This file itself does not implement or modify a JSON Schema, serializer, application, configuration, fixture or test.
 
 ## 1. Purpose and decision boundary
 
