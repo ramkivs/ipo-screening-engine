@@ -1,0 +1,120 @@
+{
+  "artifactType": "a8m-nifty50-sma-evidence-validation",
+  "createdDate": "2026-10-13",
+  "scope": "evidence-only descriptive moving averages; no trend mapping, score, policy, or implementation change",
+  "sourceCloseObservations": {
+    "count": 245,
+    "uniqueSessionDates": 245,
+    "firstSession": "2025-10-13",
+    "lastSession": "2026-10-08",
+    "allClosesFiniteNumericPositive": true,
+    "observationFile": "nse-nifty50-close-observations-20251013-20261013.csv",
+    "sourceResponseCounts": {
+      "nifty50-20251013-20260122": 70,
+      "nifty50-20260123-20260227": 26,
+      "nifty50-20260302-20260415": 28,
+      "nifty50-20260416-20260529": 30,
+      "nifty50-20260601-20260630": 21,
+      "nifty50-published-20260701-20261013": 70
+    }
+  },
+  "sessionCalendarValidation": {
+    "artifact": "nse-cm-session-calendar-validation-20261013.json",
+    "expectedSessions": 245,
+    "observedSessions": 245,
+    "missingExpectedSessions": [],
+    "unexpectedObservedDates": [],
+    "specialSessionsIncluded": [
+      "2025-10-21",
+      "2026-02-01"
+    ]
+  },
+  "movingAverages": {
+    "50": {
+      "points": 196,
+      "first": {
+        "windowStart": "2025-10-13",
+        "windowEnd": "2025-12-23",
+        "count": 50,
+        "sma": "25874.062"
+      },
+      "last": {
+        "windowStart": "2026-07-29",
+        "windowEnd": "2026-10-08",
+        "count": 50,
+        "sma": "23761.064"
+      },
+      "file": "nse-nifty50-sma50-20261013.csv",
+      "bytes": 7510,
+      "sha256": "15CA50C0C4BA7DF820E11224BDAEDF2C3F9287E034531A3B020131CF2EC17945"
+    },
+    "200": {
+      "points": 46,
+      "first": {
+        "windowStart": "2025-10-13",
+        "windowEnd": "2026-08-04",
+        "count": 200,
+        "sma": "24772.9665"
+      },
+      "last": {
+        "windowStart": "2025-12-17",
+        "windowEnd": "2026-10-08",
+        "count": 200,
+        "sma": "24282.7665"
+      },
+      "file": "nse-nifty50-sma200-20261013.csv",
+      "bytes": 1980,
+      "sha256": "5406E629D4A7223A787EF747044DF8E04D720D9C03967D435A57A41DB2522FCD"
+    }
+  },
+  "priorPublished70SessionSma50Overlap": {
+    "matchedPoints": 21,
+    "firstSession": "2026-09-08",
+    "firstValue": "24196.319",
+    "lastSession": "2026-10-08",
+    "lastValue": "23761.064",
+    "allPointsMatched": true
+  },
+  "existingTransferManifestCheck": {
+    "nse-nifty50-20260701-20261013.json": {
+      "declaredBytes": 19008,
+      "actualBytes": 19008,
+      "declaredSha256": "8796E50DFE19BBDD887BCBCC29F7D609C26182EA9BB40DFF2BDDFDD876E4B17B",
+      "actualSha256": "8796E50DFE19BBDD887BCBCC29F7D609C26182EA9BB40DFF2BDDFDD876E4B17B",
+      "matchedBeforeCorrection": true
+    },
+    "nse-india-vix-20260701-20261013.json": {
+      "declaredBytes": 19897,
+      "actualBytes": 19897,
+      "declaredSha256": "A23ACBA678C0A8B0BD03F8DE53D7B5FBA63AA2CDACC0FDB35812777C7104D32A",
+      "actualSha256": "A23ACBA678C0A8B0BD03F8DE53D7B5FBA63AA2CDACC0FDB35812777C7104D32A",
+      "matchedBeforeCorrection": true
+    },
+    "nse-index-alignment-validation-20261013.json": {
+      "declaredBytes": 16184,
+      "actualBytes": 15659,
+      "declaredSha256": "C7C67B7DD929D27CAD6D37FC025A5088805B49B0D3D0B6B2091028C204AB1A48",
+      "actualSha256": "D5776178EF7198F9E9B73D3B1191F80FEE2BF48945BCF338D25F26AFBC8D1E1A",
+      "matchedBeforeCorrection": false
+    },
+    "alignmentObservationRowsValidatedAgainstInputs": 70,
+    "alignmentManifestCorrection": {
+      "previouslyDeclaredBytes": 16184,
+      "actualBytes": 15659,
+      "previouslyDeclaredSha256": "C7C67B7DD929D27CAD6D37FC025A5088805B49B0D3D0B6B2091028C204AB1A48",
+      "correctedSha256": "D5776178EF7198F9E9B73D3B1191F80FEE2BF48945BCF338D25F26AFBC8D1E1A",
+      "alignmentArtifactContentChanged": false,
+      "independentInputHashAndCloseValidationPassed": true,
+      "scope": "local copied Git artifact file bytes only; not provider response bytes"
+    },
+    "correctedTransferManifest": {
+      "bytes": 573,
+      "sha256": "AD70613565AF148BFFAB6A6A84242D0E207B85D0BE8415A1D0898B271A3F514B"
+    }
+  },
+  "limitations": [
+    "Historical source tool exposed rendered JSON text; raw HTTP provider bytes, response headers, and exact receipt times were unavailable.",
+    "Local SHA-256 values identify checked-in local files only; they are not provider-byte hashes.",
+    "SMA outputs are descriptive arithmetic calculations and do not resolve the NIFTY trend classification rule."
+  ]
+}

@@ -1,0 +1,171 @@
+{
+  "artifactType": "a8m-nifty50-sma-evidence-file-manifest",
+  "createdDate": "2026-10-13",
+  "hashScope": "SHA-256 values identify exact local workspace file bytes only. They do not identify provider response bytes.",
+  "selfReference": "This manifest excludes itself to avoid a self-referential digest.",
+  "fileCount": 27,
+  "files": [
+    {
+      "file": "A8-M-EVIDENCE-FINDINGS.md",
+      "bytes": 2017,
+      "sha256": "922A4F6E0EBA946DC25441424F9888DB358B10CCD8943FC1E9773C421FF2EE35",
+      "role": "pre-existing A8-M findings for reused 70-session inputs"
+    },
+    {
+      "file": "A8-M-SMA-EVIDENCE-20261013.md",
+      "bytes": 7429,
+      "sha256": "48D63D7426AC298F4D05B34CC59EF2FB75353C5D1B3A1508D37BCE410917AA18",
+      "role": "human-readable evidence findings and methodology"
+    },
+    {
+      "file": "nse-cm-session-calendar-validation-20261013.json",
+      "bytes": 5004,
+      "sha256": "2063E4667344DD284B529AA43C58B3639A93CA60605660E7287C00550DD2AAC3",
+      "role": "session calendar extract and date-alignment validation"
+    },
+    {
+      "file": "nse-index-alignment-validation-20261013.json",
+      "bytes": 15659,
+      "sha256": "D5776178EF7198F9E9B73D3B1191F80FEE2BF48945BCF338D25F26AFBC8D1E1A",
+      "role": "pre-existing official-index close alignment artifact"
+    },
+    {
+      "file": "nse-india-vix-20260701-20261013.json",
+      "bytes": 19897,
+      "sha256": "A23ACBA678C0A8B0BD03F8DE53D7B5FBA63AA2CDACC0FDB35812777C7104D32A",
+      "role": "reused published official India VIX history response"
+    },
+    {
+      "file": "nse-nifty50-20260701-20261013.json",
+      "bytes": 19008,
+      "sha256": "8796E50DFE19BBDD887BCBCC29F7D609C26182EA9BB40DFF2BDDFDD876E4B17B",
+      "role": "reused published official NIFTY 50 history response"
+    },
+    {
+      "file": "nse-nifty50-close-observations-20251013-20261013.csv",
+      "bytes": 51377,
+      "sha256": "A3F6CA34732B22447A263A613820EB0B22FBC2E64888E2B59036012FF40A4B3D",
+      "role": "normalized source close observations with provenance columns"
+    },
+    {
+      "file": "nse-nifty50-sma-integrity-validation-20261013.json",
+      "bytes": 4428,
+      "sha256": "6BF087F53625A9A2FF5E7BA6C420BCDFD4F4B68F635D4AFA930AD8B82E7699A6",
+      "role": "targeted source and calculation integrity validation"
+    },
+    {
+      "file": "nse-nifty50-sma200-20261013.csv",
+      "bytes": 1980,
+      "sha256": "5406E629D4A7223A787EF747044DF8E04D720D9C03967D435A57A41DB2522FCD",
+      "role": "derived descriptive SMA series"
+    },
+    {
+      "file": "nse-nifty50-sma50-20261013.csv",
+      "bytes": 7510,
+      "sha256": "15CA50C0C4BA7DF820E11224BDAEDF2C3F9287E034531A3B020131CF2EC17945",
+      "role": "derived descriptive SMA series"
+    },
+    {
+      "file": "source-captures/nse-cmtr-70319-muhurat-2025-rendered-extract.md",
+      "bytes": 1121,
+      "sha256": "A9046D42B0490CAD3EDA665E1F4A0A078307D1623543DF5C38513F39DEA735F0",
+      "role": "rendered official NSE circular extract"
+    },
+    {
+      "file": "source-captures/nse-cmtr-72349-union-budget-2026-rendered-extract.md",
+      "bytes": 973,
+      "sha256": "5AF083FBFD64B7C6A9032597025F1F82B32718CDF363425156AC1A7FAEF9876F",
+      "role": "rendered official NSE circular extract"
+    },
+    {
+      "file": "source-captures/nse-nifty50-20251013-20260122-chunk-0.txt",
+      "bytes": 8000,
+      "sha256": "BF1C384306440629834E34BD34AE4B34FB669C7B68517EE2691592AF0E498E5A",
+      "role": "rendered official source response fragment"
+    },
+    {
+      "file": "source-captures/nse-nifty50-20251013-20260122-chunk-1.txt",
+      "bytes": 8000,
+      "sha256": "62AA1F5881278782ABAC0D752FC1D44328206ED73FF6C756EC258CF7BF451A00",
+      "role": "rendered official source response fragment"
+    },
+    {
+      "file": "source-captures/nse-nifty50-20251013-20260122-chunk-2.txt",
+      "bytes": 3014,
+      "sha256": "BAFA39B8EA6F27C1AE3F42CE0C05E1DBB69A9A8A4BAF920E5D0F2DE4A3ADBEF8",
+      "role": "rendered official source response fragment"
+    },
+    {
+      "file": "source-captures/nse-nifty50-20260123-20260227-chunk-0.txt",
+      "bytes": 7082,
+      "sha256": "75F79B163A014A8B1BFD49F01834929CBC6912F36DAD8CF427593AE72588708D",
+      "role": "rendered official source response fragment"
+    },
+    {
+      "file": "source-captures/nse-nifty50-20260302-20260415-chunk-0.txt",
+      "bytes": 7617,
+      "sha256": "C2EF4188F41FE6E645834D3050DEBF98B68369CEA572FD4664042A309F9C27B5",
+      "role": "rendered official source response fragment"
+    },
+    {
+      "file": "source-captures/nse-nifty50-20260416-20260529-chunk-0.txt",
+      "bytes": 8000,
+      "sha256": "BD3306D56DA08E41CA09E38E69538FE090351F808E3EF78AC3AA8B9FC9089D54",
+      "role": "rendered official source response fragment"
+    },
+    {
+      "file": "source-captures/nse-nifty50-20260416-20260529-chunk-1.txt",
+      "bytes": 161,
+      "sha256": "4BE3937647B69D68BF9DEF26DA34824BA32FF67C97C3DE0FCFA1EF85C370E520",
+      "role": "rendered official source response fragment"
+    },
+    {
+      "file": "source-captures/nse-nifty50-20260601-20260630-chunk-0.txt",
+      "bytes": 5717,
+      "sha256": "A195DFD2B23F9E38E7E63DD0654EF9542AADF62113D95149F81A4E4F32B572B5",
+      "role": "rendered official source response fragment"
+    },
+    {
+      "file": "source-captures/response-capture-manifest.json",
+      "bytes": 10372,
+      "sha256": "12D1CE606BDAE4CBFC744B5F30DFAC519BBCE2AC7AA71F0DDB4B9F2EDFE14F61",
+      "role": "capture provenance and local integrity metadata"
+    },
+    {
+      "file": "source-responses/nifty50-20251013-20260122-rendered-response.json",
+      "bytes": 19002,
+      "sha256": "280C53F05CE7FDC5304FA54B9E41D9938109123364D318EC667BC85F4CF90F74",
+      "role": "reconstructed JSON from rendered source response chunks; not provider bytes"
+    },
+    {
+      "file": "source-responses/nifty50-20260123-20260227-rendered-response.json",
+      "bytes": 7070,
+      "sha256": "B676726E4D3309AFEFCA208E7CBE6C56CB7E8EC9CEA199FB847A7F12BCA29910",
+      "role": "reconstructed JSON from rendered source response chunks; not provider bytes"
+    },
+    {
+      "file": "source-responses/nifty50-20260302-20260415-rendered-response.json",
+      "bytes": 7605,
+      "sha256": "014E57E99B34963FB528167F74E75783A865B0551584FAB695D1EC40E90CC1D5",
+      "role": "reconstructed JSON from rendered source response chunks; not provider bytes"
+    },
+    {
+      "file": "source-responses/nifty50-20260416-20260529-rendered-response.json",
+      "bytes": 8149,
+      "sha256": "EA75B535804A2EE55F531CF85B853732BF6139CD77ACF2C87082B3ADF4CF3647",
+      "role": "reconstructed JSON from rendered source response chunks; not provider bytes"
+    },
+    {
+      "file": "source-responses/nifty50-20260601-20260630-rendered-response.json",
+      "bytes": 5705,
+      "sha256": "3ABEDC165AB9A55601064B92FDB77656B041D90EE06ED7360C965B9FFC3BA856",
+      "role": "reconstructed JSON from rendered source response chunks; not provider bytes"
+    },
+    {
+      "file": "transfer-manifest.json",
+      "bytes": 573,
+      "sha256": "AD70613565AF148BFFAB6A6A84242D0E207B85D0BE8415A1D0898B271A3F514B",
+      "role": "corrected local artifact size/hash manifest"
+    }
+  ]
+}

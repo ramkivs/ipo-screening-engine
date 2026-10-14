@@ -1,0 +1,206 @@
+{
+  "artifactType": "nse-nifty50-rendered-source-capture-manifest",
+  "createdDate": "2026-10-13",
+  "sourceEndpointFamily": "https://www.nseindia.com/api/historicalOR/indicesHistory",
+  "captureMethod": {
+    "tool": "functions.fetch_page",
+    "representation": "rendered JSON text fragments as returned by the page tool",
+    "rawProviderResponseBytesCaptured": false,
+    "responseHeadersCaptured": false,
+    "exactReceiptTimeCaptured": false,
+    "sha256Scope": "local UTF-8 workspace file bytes only, never provider-byte hashes",
+    "reconstruction": "outer Markdown JSON fences removed from first/last chunks; returned chunk text concatenated in index order; JSON parsing and record count checks passed"
+  },
+  "responses": [
+    {
+      "id": "nifty50-20251013-20260122",
+      "requestedFrom": "2025-10-13",
+      "requestedTo": "2026-01-22",
+      "requestUrl": "https://www.nseindia.com/api/historicalOR/indicesHistory?indexType=NIFTY%2050&from=13-10-2025&to=22-01-2026",
+      "retrievedDate": "2026-10-13",
+      "retrievalTime": null,
+      "renderedChunks": [
+        {
+          "chunkIndex": 0,
+          "file": "source-captures/nse-nifty50-20251013-20260122-chunk-0.txt",
+          "bytes": 8000,
+          "sha256": "BF1C384306440629834E34BD34AE4B34FB669C7B68517EE2691592AF0E498E5A",
+          "hashScope": "local UTF-8 bytes of the saved functions.fetch_page rendered-content fragment; not provider response bytes",
+          "localIntegrityVerified": true
+        },
+        {
+          "chunkIndex": 1,
+          "file": "source-captures/nse-nifty50-20251013-20260122-chunk-1.txt",
+          "bytes": 8000,
+          "sha256": "62AA1F5881278782ABAC0D752FC1D44328206ED73FF6C756EC258CF7BF451A00",
+          "hashScope": "local UTF-8 bytes of the saved functions.fetch_page rendered-content fragment; not provider response bytes",
+          "localIntegrityVerified": true
+        },
+        {
+          "chunkIndex": 2,
+          "file": "source-captures/nse-nifty50-20251013-20260122-chunk-2.txt",
+          "bytes": 3014,
+          "sha256": "BAFA39B8EA6F27C1AE3F42CE0C05E1DBB69A9A8A4BAF920E5D0F2DE4A3ADBEF8",
+          "hashScope": "local UTF-8 bytes of the saved functions.fetch_page rendered-content fragment; not provider response bytes",
+          "localIntegrityVerified": true
+        }
+      ],
+      "reassembledRenderedJson": "source-responses/nifty50-20251013-20260122-rendered-response.json",
+      "reassembledUtf8Bytes": 19002,
+      "reassembledSha256": "280C53F05CE7FDC5304FA54B9E41D9938109123364D318EC667BC85F4CF90F74",
+      "reassembledHashScope": "local reconstructed UTF-8 body text after removing page-tool Markdown fences and joining returned chunks; not provider bytes",
+      "recordCount": 70,
+      "firstReturnedSessionDate": "2026-01-22",
+      "lastReturnedSessionDate": "2025-10-13",
+      "recordOrdering": "descending by EOD_TIMESTAMP"
+    },
+    {
+      "id": "nifty50-20260123-20260227",
+      "requestedFrom": "2026-01-23",
+      "requestedTo": "2026-02-27",
+      "requestUrl": "https://www.nseindia.com/api/historicalOR/indicesHistory?indexType=NIFTY%2050&from=23-01-2026&to=27-02-2026",
+      "retrievedDate": "2026-10-13",
+      "retrievalTime": null,
+      "renderedChunks": [
+        {
+          "chunkIndex": 0,
+          "file": "source-captures/nse-nifty50-20260123-20260227-chunk-0.txt",
+          "bytes": 7082,
+          "sha256": "75F79B163A014A8B1BFD49F01834929CBC6912F36DAD8CF427593AE72588708D",
+          "hashScope": "local UTF-8 bytes of the saved functions.fetch_page rendered-content fragment; not provider response bytes",
+          "localIntegrityVerified": true
+        }
+      ],
+      "reassembledRenderedJson": "source-responses/nifty50-20260123-20260227-rendered-response.json",
+      "reassembledUtf8Bytes": 7070,
+      "reassembledSha256": "B676726E4D3309AFEFCA208E7CBE6C56CB7E8EC9CEA199FB847A7F12BCA29910",
+      "reassembledHashScope": "local reconstructed UTF-8 body text after removing page-tool Markdown fences and joining returned chunks; not provider bytes",
+      "recordCount": 26,
+      "firstReturnedSessionDate": "2026-02-27",
+      "lastReturnedSessionDate": "2026-01-23",
+      "recordOrdering": "descending by EOD_TIMESTAMP"
+    },
+    {
+      "id": "nifty50-20260302-20260415",
+      "requestedFrom": "2026-03-02",
+      "requestedTo": "2026-04-15",
+      "requestUrl": "https://www.nseindia.com/api/historicalOR/indicesHistory?indexType=NIFTY%2050&from=02-03-2026&to=15-04-2026",
+      "retrievedDate": "2026-10-13",
+      "retrievalTime": null,
+      "renderedChunks": [
+        {
+          "chunkIndex": 0,
+          "file": "source-captures/nse-nifty50-20260302-20260415-chunk-0.txt",
+          "bytes": 7617,
+          "sha256": "C2EF4188F41FE6E645834D3050DEBF98B68369CEA572FD4664042A309F9C27B5",
+          "hashScope": "local UTF-8 bytes of the saved functions.fetch_page rendered-content fragment; not provider response bytes",
+          "localIntegrityVerified": true
+        }
+      ],
+      "reassembledRenderedJson": "source-responses/nifty50-20260302-20260415-rendered-response.json",
+      "reassembledUtf8Bytes": 7605,
+      "reassembledSha256": "014E57E99B34963FB528167F74E75783A865B0551584FAB695D1EC40E90CC1D5",
+      "reassembledHashScope": "local reconstructed UTF-8 body text after removing page-tool Markdown fences and joining returned chunks; not provider bytes",
+      "recordCount": 28,
+      "firstReturnedSessionDate": "2026-04-15",
+      "lastReturnedSessionDate": "2026-03-02",
+      "recordOrdering": "descending by EOD_TIMESTAMP"
+    },
+    {
+      "id": "nifty50-20260416-20260529",
+      "requestedFrom": "2026-04-16",
+      "requestedTo": "2026-05-29",
+      "requestUrl": "https://www.nseindia.com/api/historicalOR/indicesHistory?indexType=NIFTY%2050&from=16-04-2026&to=29-05-2026",
+      "retrievedDate": "2026-10-13",
+      "retrievalTime": null,
+      "renderedChunks": [
+        {
+          "chunkIndex": 0,
+          "file": "source-captures/nse-nifty50-20260416-20260529-chunk-0.txt",
+          "bytes": 8000,
+          "sha256": "BD3306D56DA08E41CA09E38E69538FE090351F808E3EF78AC3AA8B9FC9089D54",
+          "hashScope": "local UTF-8 bytes of the saved functions.fetch_page rendered-content fragment; not provider response bytes",
+          "localIntegrityVerified": true
+        },
+        {
+          "chunkIndex": 1,
+          "file": "source-captures/nse-nifty50-20260416-20260529-chunk-1.txt",
+          "bytes": 161,
+          "sha256": "4BE3937647B69D68BF9DEF26DA34824BA32FF67C97C3DE0FCFA1EF85C370E520",
+          "hashScope": "local UTF-8 bytes of the saved functions.fetch_page rendered-content fragment; not provider response bytes",
+          "localIntegrityVerified": true
+        }
+      ],
+      "reassembledRenderedJson": "source-responses/nifty50-20260416-20260529-rendered-response.json",
+      "reassembledUtf8Bytes": 8149,
+      "reassembledSha256": "EA75B535804A2EE55F531CF85B853732BF6139CD77ACF2C87082B3ADF4CF3647",
+      "reassembledHashScope": "local reconstructed UTF-8 body text after removing page-tool Markdown fences and joining returned chunks; not provider bytes",
+      "recordCount": 30,
+      "firstReturnedSessionDate": "2026-05-29",
+      "lastReturnedSessionDate": "2026-04-16",
+      "recordOrdering": "descending by EOD_TIMESTAMP"
+    },
+    {
+      "id": "nifty50-20260601-20260630",
+      "requestedFrom": "2026-06-01",
+      "requestedTo": "2026-06-30",
+      "requestUrl": "https://www.nseindia.com/api/historicalOR/indicesHistory?indexType=NIFTY%2050&from=01-06-2026&to=30-06-2026",
+      "retrievedDate": "2026-10-13",
+      "retrievalTime": null,
+      "renderedChunks": [
+        {
+          "chunkIndex": 0,
+          "file": "source-captures/nse-nifty50-20260601-20260630-chunk-0.txt",
+          "bytes": 5717,
+          "sha256": "A195DFD2B23F9E38E7E63DD0654EF9542AADF62113D95149F81A4E4F32B572B5",
+          "hashScope": "local UTF-8 bytes of the saved functions.fetch_page rendered-content fragment; not provider response bytes",
+          "localIntegrityVerified": true
+        }
+      ],
+      "reassembledRenderedJson": "source-responses/nifty50-20260601-20260630-rendered-response.json",
+      "reassembledUtf8Bytes": 5705,
+      "reassembledSha256": "3ABEDC165AB9A55601064B92FDB77656B041D90EE06ED7360C965B9FFC3BA856",
+      "reassembledHashScope": "local reconstructed UTF-8 body text after removing page-tool Markdown fences and joining returned chunks; not provider bytes",
+      "recordCount": 21,
+      "firstReturnedSessionDate": "2026-06-30",
+      "lastReturnedSessionDate": "2026-06-01",
+      "recordOrdering": "descending by EOD_TIMESTAMP"
+    },
+    {
+      "id": "nifty50-published-20260701-20261013",
+      "requestedFrom": "2026-07-01",
+      "requestedTo": "2026-10-13",
+      "requestUrl": "https://www.nseindia.com/api/historicalOR/indicesHistory?indexType=NIFTY%2050&from=01-07-2026&to=13-10-2026",
+      "retrievedDate": null,
+      "retrievalTime": null,
+      "existingPublishedFile": "nse-nifty50-20260701-20261013.json",
+      "bytes": 19008,
+      "sha256": "8796E50DFE19BBDD887BCBCC29F7D609C26182EA9BB40DFF2BDDFDD876E4B17B",
+      "recordCount": 70,
+      "firstReturnedSessionDate": "2026-10-08",
+      "lastReturnedSessionDate": "2026-07-01",
+      "recordOrdering": "descending by EOD_TIMESTAMP",
+      "note": "Reused existing published source; receipt timestamp was not recorded in its evidence package."
+    }
+  ],
+  "sessionCalendarSources": {
+    "holidayMasterEndpoints": [
+      "https://www.nseindia.com/api/holiday-master?type=trading&year=2025",
+      "https://www.nseindia.com/api/holiday-master?type=trading"
+    ],
+    "retrievedDate": "2026-10-13",
+    "details": "Relevant CM calendar dates are captured in nse-cm-session-calendar-validation-20261013.json; the full rendered holiday-master payload was not retained."
+  },
+  "specialSessionCircularExtracts": [
+    {
+      "file": "source-captures/nse-cmtr-70319-muhurat-2025-rendered-extract.md",
+      "sourceUrl": "https://nsearchives.nseindia.com/content/circulars/CMTR70319.pdf",
+      "circularRef": "NSE/CMTR/70319 (124/2025)"
+    },
+    {
+      "file": "source-captures/nse-cmtr-72349-union-budget-2026-rendered-extract.md",
+      "sourceUrl": "https://nsearchives.nseindia.com/content/circulars/CMTR72349.pdf",
+      "circularRef": "NSE/CMTR/72349 (11/2026)"
+    }
+  ]
+}

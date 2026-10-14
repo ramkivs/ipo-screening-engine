@@ -1,0 +1,20 @@
+[
+  {
+    "file": "nse-nifty50-20260701-20261013.json",
+    "bytes": 19008,
+    "sha256": "8796E50DFE19BBDD887BCBCC29F7D609C26182EA9BB40DFF2BDDFDD876E4B17B",
+    "verifiedCopy": true
+  },
+  {
+    "file": "nse-india-vix-20260701-20261013.json",
+    "bytes": 19897,
+    "sha256": "A23ACBA678C0A8B0BD03F8DE53D7B5FBA63AA2CDACC0FDB35812777C7104D32A",
+    "verifiedCopy": true
+  },
+  {
+    "file": "nse-index-alignment-validation-20261013.json",
+    "bytes": 15659,
+    "sha256": "D5776178EF7198F9E9B73D3B1191F80FEE2BF48945BCF338D25F26AFBC8D1E1A",
+    "verifiedCopy": true
+  }
+]
