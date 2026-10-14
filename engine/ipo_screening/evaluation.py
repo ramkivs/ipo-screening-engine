@@ -14,6 +14,7 @@ artifacts:
       market.json       the frozen market snapshot
       peers.json        the frozen peer snapshot
       result.json       score, knockouts, confidence, range, verdict
+      evaluation-record.v1.json  the A15 canonical record projection
       manifest.json     hashes of every artifact above
 
 Rules enforced here:
@@ -54,6 +55,7 @@ ARTIFACT_FILES = (
     "market.json",
     "peers.json",
     "result.json",
+    "evaluation-record.v1.json",
     "manifest.json",
 )
 
@@ -203,6 +205,15 @@ class EvaluationRecord:
             "peers.json": self.peers_artifact(),
             "result.json": self.result_artifact(),
         }
+        # Keep the A15 output artifact independent of canonical_json() file
+        # serialization. The projection validates itself before it can enter a
+        # new manifest; existing v1.5 artifacts and their hashes are untouched.
+        from .evaluation_record import (
+            RECORD_ARTIFACT_NAME,
+            build_evaluation_record_v1,
+        )
+
+        payloads[RECORD_ARTIFACT_NAME] = build_evaluation_record_v1(self)
         manifest = {
             "evaluation_id": self.evaluation_id,
             "engine_version": self.engine_version,
@@ -215,6 +226,9 @@ class EvaluationRecord:
             "market_snapshot_hash": self.market_snapshot_hash,
             "peer_snapshot_hash": self.peer_snapshot_hash,
             "evaluation_timestamp": self.evaluation_timestamp,
+            "artifact_hash_algorithm": "SHA-256",
+            "artifact_hash_profile": "ipo-engine-canonical-json/1.5.0",
+            "artifact_hash_subject": "parsed JSON object",
             "artifacts": {
                 name: sha256_of(payload) for name, payload in sorted(payloads.items())
             },
@@ -430,13 +444,25 @@ class EvaluationStore:
                 "evaluations are immutable and must never be overwritten (spec s21). A corrected "
                 "extraction, a new configuration or a new snapshot must create a new evaluation."
             )
+        # Build and validate all new-profile content before creating the
+        # directory, so a schema error cannot leave a partial history entry.
+        payloads = record.artifacts()
+        from .evaluation_record import (
+            RECORD_ARTIFACT_NAME,
+            serialize_evaluation_record_v1,
+        )
+
+        serialized_record = serialize_evaluation_record_v1(payloads[RECORD_ARTIFACT_NAME])
         directory.mkdir(parents=True, exist_ok=False)
-        for name, payload in sorted(record.artifacts().items()):
+        for name, payload in sorted(payloads.items()):
             target = directory / name
             # Exclusive create: even a race cannot clobber an existing artifact.
             with target.open("w", encoding="utf-8", newline="\n") as handle:
-                json.dump(payload, handle, indent=2, sort_keys=True, ensure_ascii=False)
-                handle.write("\n")
+                if name == RECORD_ARTIFACT_NAME:
+                    handle.write(serialized_record)
+                else:
+                    json.dump(payload, handle, indent=2, sort_keys=True, ensure_ascii=False)
+                    handle.write("\n")
         return directory
 
     def read(self, evaluation_id: str) -> Dict[str, Any]:
@@ -446,7 +472,7 @@ class EvaluationStore:
             return json.load(handle)
 
     def read_artifact(self, evaluation_id: str, name: str) -> Dict[str, Any]:
-        """Read one sibling artifact (``input``/``evidence``/``market``/``peers``/``result``)."""
+        """Read a sibling artifact (for example ``input`` or ``evaluation-record.v1``)."""
         path = self.path_for(evaluation_id) / f"{name}.json"
         with path.open("r", encoding="utf-8") as handle:
             return json.load(handle)

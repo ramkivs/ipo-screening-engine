@@ -144,7 +144,7 @@ def test_recorded_hashes_verify_against_the_stored_artifacts(golden_input, confi
     report = store.verify_hashes(outcome.record.evaluation_id)
     assert report["result_hash_matches"] is True
     assert report["artifact_mismatches"] == []
-    assert report["artifacts_verified"] == 6
+    assert report["artifacts_verified"] == 7
 
 
 def test_tampering_with_a_stored_artifact_is_detected(golden_input, config, tmp_path):
@@ -246,6 +246,7 @@ def test_every_artifact_required_by_spec_21_is_written(golden_input, config, tmp
         "market.json",
         "peers.json",
         "result.json",
+        "evaluation-record.v1.json",
         "manifest.json",
     ):
         assert (directory / name).exists(), name
