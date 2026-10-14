@@ -1,153 +1,176 @@
-# A15 Canonical Evaluation Record — Implementation Package
+# A15 Canonical Evaluation Record — Decision-Ready Implementation Profile
 
-- **Status:** READY-TO-EXECUTE SPECIFICATION — PROPOSAL ONLY; NO PRODUCT CODE OR SCHEMA AUTHORIZED
-- **Prepared:** 2026-10-14 (Asia/Calcutta)
-- **Repository:** `ramkivs/ipo-screening-engine`
-- **Authoritative session ref checked:** `arena/573e69a4-ipo-screening-engine` at `674aa9b0aca57544f412891cc26c4fa30459e017`
-- **Product-code review base:** `arena/01a10b42-ipo-screening-engine` at `4b19faf848a721265597a678926988d484d30e59`
-- **Candidate M:** `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5` (unchanged; not the implementation base selected by this document)
-- **Controlling records:** A1 (`11eebb4…`), A7 (`3e70b56…`), A11 (`688cc05…`), A15 decision (`3247904…`), and A15 property/schema proposal (`62cf3c3…`).
+- **Disposition recommendation to Ramki:** **ACCEPT WITH SPECIFIED AMENDMENTS** to the 2026-10-13 A15 property/schema proposal.
+- **Status:** Proposed exact contract; **not yet design-approved or implementation-authorized**.
+- **Profile prepared:** 2026-10-14 (Asia/Calcutta); based on remotely verified package commit `dbc7544ae800408e162a1787031c15659924ea65` and its matching file blob.
+- **Candidate M:** `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5` — unchanged and out of implementation scope.
 
-> This is an implementation specification for owner review, not an approval, implementation grant, canonical selection, Phase 0 closure, acceptance, merge, release, or production authorization. Do not execute the code changes below until the design decision and exact-scope implementation grant in §8 are recorded.
+This replaces the earlier open-ended package in place. It makes concrete recommendations; no row below should be read as Ramki's approval. It reuses A15's approved semantic direction, A7-D1/D2, A1, A8-M/A9/A10, v1.5 and the inspected current `EvaluationRecord`/`EvaluationStore`/`hashing.py` behavior. No broad audit or product-code/test run was performed for this documentation revision.
 
-## 1. Decision and authority boundary
+## 1. Decision matrix — exact recommended contract
 
-**Already approved:** Ramki's 2026-10-13 A15 decision approves the semantic/contract-design direction: preserve value state, verification, source/metric qualification, validation, processing and outcome as distinct concerns; preserve evidence and temporal meaning; keep source revisions and A1 adjudications attributable; distinguish digest origin and subject; retain A7/A8-M/A9/A10 limits; and preserve immutable history. These semantic decisions are not reopened here.
+All nested objects are closed (`additionalProperties: false`); there is no `extensions` object in v1. Empty arrays are explicit, not omitted. The schema's `$schema`/`$id` are schema metadata, not record payload properties; every data property listed below is required.
 
-**Not approved:** The published A15 proposal explicitly labels all concrete field names, enums, schema path/version, conditional requiredness, serialization/hash profile and migration choices as recommendations. Its presence does not approve those choices. A7's unverified-only terminal/no-terminal case also remains unresolved.
-
-**Implementation authority:** A11 keeps Phase 0 OPEN. A11 and A15 explicitly withhold implementation authority; A15 says `P1-CANON-01` is not authorized and requires a separate written grant. A12/A13 do not provide an exact-scope A15 implementation grant. The tracker is a status summary, not a grant. No applicable implicit authority is used to override those express restrictions. GCP/D1/D3 are unrelated to this isolated output-record increment and are not prerequisites.
-
-## 2. A15 decision matrix
-
-Classification key: **1** already approved by an authoritative decision; **2** directly proposed and consistent with approved decisions, but not itself approved; **3** a genuine owner decision remains; **4** blocked by an external/source-specific dependency. A recommendation in category 2 is not approval.
-
-| Area | Classification | Existing evidence and resolution for this package |
+| JSON path | Type / allowed value | Requiredness and rule |
 |---|---|---|
-| **Semantic axes** | **1 — approved** | A15 and v1.5 require value state (`VALUE`, `UNKNOWN`, `NOT_APPLICABLE`), verification, qualification, validation, processing, result and diagnostics to remain distinct. A1 requires preservation of competing observations and Ramki-attributed field adjudication. A7-D1 requires outcome, per-rule knockout state/evidence, critical-safety completeness, score interval/verdict and diagnostics to remain distinct. Do not collapse these into a single status. |
-| **A15 record envelope and property names** | **2 — proposed, consistent** | The proposal names `record_schema_version`, `serialization_profile`, `record`, `evaluation`, `sources`, `evidence`, `observations`, `field_values`, `adjudications`, `snapshots`, `result` and `integrity`. It also proposes `value_state`, `verification_status`, `qualification_status`, `schema_status`, `semantic_status`, `processing_status`, reason/evidence references and digest metadata. Use these as the implementation target only after the complete profile is approved; do not claim these spellings are already policy. |
-| **Schema and versioning** | **2 — proposed, consistent** | The proposal recommends a separate `schema/ipo-evaluation-record.v1.schema.json`, JSON Schema Draft 2020-12, and record version `1.0.0`, independent of input-schema and canonicalization versions. Keep `ipo-input.v1.5.schema.json` and `supplemental-enrichment.v1.schema.json` unchanged. |
-| **Closed shape and exact requiredness** | **3 — unresolved** | The proposal allows either `additionalProperties: false` or a namespaced extension object; it does not select one. Its per-field, Preliminary/Final and metric-specific requiredness matrix is also explicitly pending. Package recommendation: closed objects (`additionalProperties: false`) for v1.0; explicit `UNKNOWN`/reason/evidence fields instead of silently omitting unknown facts; no generic missing-input-to-Final rule. Ramki must approve this profile. |
-| **Serialization and deterministic representation** | **2 — proposed, conditional** | UTF-8 JSON with a versioned `canonicalization_id` is consistent with v1.5 reproducibility. Reuse `hashing.canonical_json` / grammar `1.5.0` only if the focused cross-process and cross-runtime golden-byte tests below pass. If they do not, stop and propose a new canonicalization ID/version; do not change the existing grammar or old hashes in this increment. |
-| **Digest subjects and origin** | **3 for exact profile; 4 for qualifying provider hashes** | The proposal's `SHA-256` recommendation and `LOCAL_COMPUTED`, `SOURCE_DECLARED` and `INDEPENDENTLY_ATTESTED` origin distinctions are consistent with A15, but their exact enums/subjects are not approved. A9 still does not identify which source-native GMP snapshot/hash qualifies; source/provider evidence is an external dependency. A local or generic payload hash must never be described as a provider digest or as satisfying A9. |
-| **Missing, invalid and unverified values** | **1 for semantics; 2 for proposed encoding** | Approved: unknown is not zero; `UNVERIFIED` is neither `TRIGGERED` nor `CLEAR`; schema/required-field failures stop scoring; missing critical-safety evidence is not a verified knockout; A8-M required UNKNOWN blocks Final only in its NIFTY scope; A9's qualifying missing/invalid snapshot/hash blocks Final only in its GMP scope; A10 interim observations remain distinct and evidence/display-only. The proposal's explicit reason and evidence-reference fields are consistent; their exact names/enums remain proposed. |
-| **A7 unverified-only result** | **3 — unresolved** | A7-D2 settles the semantics but explicitly leaves the exact terminal result/status unresolved when no verified knockout or critical-safety gap exists and an `UNVERIFIED` knockout prevents an established safe result. See §3 for the smallest safe representation recommendation. |
-| **Compatibility and reproducibility** | **1 for immutability; 2/3 for output-version details** | v1.5 and A15 require immutable evaluations, deterministic result hashes and preservation of historical bytes. The proposal's additive output version, no in-place rewrite and no automatic migration are consistent recommendations. Exact unsupported-version behavior, output golden bytes and the mapping between the new record digest and existing `result_hash` remain for approval. No historical record is migrated or rehashed. |
-| **Tests and acceptance** | **2 — proposed, consistent** | The A15 proposal's focused tests (strict schema/reference validation; distinct state axes; Preliminary/Final requiredness; timestamps; conflicts/A1; digest subjects/origins; A7 cases; deterministic golden bytes; history invariance; A10 separation) follow the approved semantics. The exact accepted profile and tests must be named by the implementation grant. |
-| **External data-source contracts** | **4 — blocked where used** | Actual NIFTY source/session/availability, A9 GMP provider/event/hash subject, and A10 subscription Final behavior remain separate dependencies. They do not block a generic output record that faithfully represents missing/unqualified evidence; this increment must not implement those gates or fabricate source metadata. |
+| `$schema` / schema file | Draft 2020-12; `schema/ipo-evaluation-record.v1.schema.json` | New output schema only; do not change either existing v1.5 input schema. Use `$id: "urn:ipo-screening-engine:ipo-evaluation-record:1.0.0"`. |
+| `record_schema_version` | string, const `"1.0.0"` | Required. Independent of input schema and serialization/hash profile versions. |
+| `serialization_profile` | closed object: `profile_id`, `encoding`, `indent`, `sort_keys`, `ensure_ascii`, `line_ending`, `final_newline`, `string_normalization`, `non_finite_numbers` | Required, exact value below. This describes the on-disk JSON bytes, not the hash grammar. |
+| `record` | closed object: `evaluation_id`, `ipo_id`, `company_name`, `engine_version`, `spec_version`, `config_version`, `config_hash` (all non-empty strings) | Required. Values copy the existing immutable `EvaluationRecord`; do not mint a second evaluation ID. |
+| `evaluation` | closed object: `mode`, `evaluated_at`, `evaluation_cutoff`, `processing_status`, `validation` | Required. `mode` is one of the current `LIFECYCLE` values `PRELIMINARY`, `FINAL`, `POST_LISTING_1W`, `POST_LISTING_1M`, or `POST_LISTING_6M`; `evaluated_at` is an RFC 3339 date-time with explicit offset; `evaluation_cutoff` is the timestamp-state object below; `processing_status` is `COMPLETED` or `FAILED`; validation below. |
+| `sources[]` | objects: required `source_id`, `source_type`; optional `uri`, `source_record_id`, `source_revision_id`, `digest_refs`; `timestamps[]` required | Required array; empty only when no source is represented. Do not infer source/provider identity, revision or qualification. `source_id` is unique in-record. |
+| `evidence[]` | objects: required `evidence_id`, `source_id`, `locator`, `extraction_method`; optional `confidence` (number 0–1), `artifact_ref`; `timestamps[]` required | Required array; references must resolve to `sources`. `locator` is a document/page/section locator or structured field/path, never a fabricated page. |
+| `observations[]` | objects: required `observation_id`, `field_path`, `source_id`, `evidence_refs[]`, `value_state`, `timestamps[]`; optional `source_revision_id`, `raw_value`, `raw_lexeme`, `reason` | Required array; preserve each source observation and competing revision. `raw_value` is a JSON scalar and required for `VALUE`; preserve `raw_lexeme` when it exists in the source artifact. `UNKNOWN` requires the same `{code, message?, evidence_refs[]}` reason object as a field value and forbids `raw_value`. Unknown facts carry state/reason, not invented values. |
+| `field_values[]` | objects described in §2 | Required; one canonical entry per material field in the frozen input, including `UNKNOWN` and `NOT_APPLICABLE`. Conflicting raw observations remain in `observations[]`; no auto-winner. |
+| `adjudications[]` | objects described in §2 | Required; empty unless an actual durable A1/Ramki adjudication exists. Never synthesize one. |
+| `snapshots` | closed object with `input_snapshot_hash`, `source_manifest_hash`, `market_snapshot_hash`, `peer_snapshot_hash`, `artifact_refs` | Required. Hashes preserve the existing record values; artifact refs are the exact sibling names `input.json`, `evidence.json`, `market.json`, `peers.json`, `result.json`, and `manifest.json`. |
+| `result` | closed object: `outcome_resolution`, conditional `final_outcome`, `knockouts[]`, `critical_safety`, `score`, `score_interval`, `score_verdict`, `diagnostics[]` | Required. Exact outcome mapping is in §3. Keep all A7 concerns separate. |
+| `integrity` | closed object containing `digests[]` | Required. Do **not** put a self-referential `manifest_hash` in this object; the existing sibling `manifest.json` covers the record artifact. Digest fields and origins are below. |
 
-## 3. A7 unverified-only representation
+ID uniqueness is enforced within each namespace (`source_id`, `evidence_id`, `observation_id`, `adjudication_id`, `digest_id`); every reference must resolve. Array order follows `serialization_profile.array_order`.
 
-**Verified from A7:** A verified applicable knockout produces `AVOID`; without a verified knockout, missing critical-safety evidence produces `INSUFFICIENT_DATA`; `UNVERIFIED` is neither `TRIGGERED` nor `CLEAR`; score-range uncertainty remains a diagnostic and does not erase other evidence. A7-D2 does **not** choose a terminal label for the unverified-only case.
+| Nested property | Type / allowed value | Requiredness / condition |
+|---|---|---|
+| `evaluation.validation.schema_status`, `semantic_status` | each `NOT_RUN`, `PASSED`, or `FAILED` | Both required. `schema_status` describes the input record's schema check, not self-validation of this output file. |
+| `evaluation.validation.findings[]` | `{code:string, severity:INFO, WARNING, or ERROR, message:string, field_path?:string, evidence_refs:string[]}` | Required array; empty when there are no findings. |
+| `evaluation.evaluation_cutoff` | timestamp-state object `{state, source_text?, normalized_utc?, evidence_refs[], reason?}` | Required; `KNOWN` requires the evidenced cutoff text and offset/UTC normalization where available; `UNKNOWN` requires a reason; `NOT_APPLICABLE` only where the approved metric contract has no cutoff. Never substitute retrieval or evaluation time. |
+| `snapshots.artifact_refs` | closed object with keys `input`, `evidence`, `market`, `peers`, `result`, `manifest`; values are their exact sibling filenames | Required; no absolute paths or remote URI substitution. |
+| `snapshots.*_hash` | non-empty strings for `input_snapshot_hash`, `source_manifest_hash`, `market_snapshot_hash`, `peer_snapshot_hash` | All required and copied without reinterpretation; describe their digest origin in `integrity.digests[]`. |
+| `result.outcome_resolution.state` | `TERMINAL` or `NONTERMINAL_UNRESOLVED` | Required. `NONTERMINAL_UNRESOLVED` requires `reason={code:"UNVERIFIED_KNOCKOUT_NO_SAFE_RESULT", evidence_refs:[…]}`; `TERMINAL` has no `outcome_resolution.reason`. |
+| `result.final_outcome` | non-empty string | Required iff `outcome_resolution.state=TERMINAL`; forbidden otherwise. Semantic validator enforces the precedence/mapping in §3. |
+| `result.knockouts[]` | `{rule_id:string, state:TRIGGERED, CLEAR, or UNVERIFIED, evidence_refs:string[], missing_input_refs:string[]}` | Required array; every rule represented by the current evaluator remains separate. |
+| `result.critical_safety` | `{status:COMPLETE, INCOMPLETE, or UNKNOWN, missing_evidence_refs:string[], reason?:string}` | Required. `reason` is required when status is `INCOMPLETE` or `UNKNOWN`; refs may be empty only when the missing evidence cannot yet be identified, and the reason must say so. |
+| `result.score` | closed object with required finite numbers `base_score`, `final_score`, `completeness_pct`, `available_points`, `unknown_points`, `total_evaluable_points`, `unresolved_penalty_points` | Required; copied from the existing score/confidence payload. `completeness_pct` is 0–100. Do not recompute these values in the serializer. |
+| `result.score_interval` | `{state:AVAILABLE or UNKNOWN, lower_bound?:number, upper_bound?:number}` | Required; `AVAILABLE` requires finite lower and upper bounds; `UNKNOWN` forbids them. |
+| `result.score_verdict` | `{value:string, uncertain:boolean, insufficient_data:boolean}` | Required; copied from existing score output, not recomputed by the serializer. |
+| `result.diagnostics[]` | `{code:string, message:string, evidence_refs:string[]}` | Required array; includes `VERDICT_UNCERTAIN` when emitted; diagnostics never overwrite `final_outcome`. |
 
-**Recommendation — not an existing approval:** Represent that case as:
+### 1.1 Exact serialization and hashing profile
 
-```json
-{
-  "outcome_resolution": {
-    "state": "NONTERMINAL_UNRESOLVED",
-    "reason": {
-      "code": "UNVERIFIED_KNOCKOUT_NO_SAFE_RESULT",
-      "evidence_refs": ["<existing evidence IDs>"]
-    }
-  },
-  "knockouts": [{"state": "UNVERIFIED", "evidence_refs": ["<existing evidence IDs>"]}],
-  "diagnostics": ["<existing score diagnostics>"]
-}
-```
-
-For this state, **omit `final_outcome` entirely**; do not emit `null`, `AVOID`, `CLEAR`, `INSUFFICIENT_DATA`, or a newly invented terminal value. The schema should make `final_outcome` required only for an approved terminal state and forbidden for `NONTERMINAL_UNRESOLVED`. Keep processing and validation statuses separate from outcome resolution. This is the smallest deterministic fail-closed serialization: it records what happened, provides the reason/evidence, and cannot be mistaken for a favorable or terminal decision.
-
-Ramki must approve or amend this exact A7 serialization before implementation. A15 semantic approval did not make that A7 property-level decision. For an ordinary determinate case with no A7 override, this package recommends copying the existing configured v1.5 score verdict into `final_outcome` while retaining it separately as `score_verdict`; verified-knockout and critical-safety precedence still apply. This adds no verdict values or thresholds, but the exact mapping is a proposed property-level choice, not an existing approval.
-
-## 4. Recommended output contract
-
-This is the exact proposed profile to approve or amend; it does not purport to be the approved schema.
-
-### 4.1 Versioned record
-
-Create a new additive artifact named `evaluation-record.v1.json` beside the existing immutable artifacts. Its top-level object contains the A15 groups in the matrix, with:
-
-- `record`: existing evaluation/IPO identity and engine, specification, configuration and config-hash identifiers;
-- `evaluation`: mode, evaluation time, processing status and separate structural/semantic validation results;
-- `sources`, `evidence`, `observations`: only source identities, locators, raw observations, revisions and timestamp facts actually present in the evaluation; references must resolve;
-- `field_values`: field path, explicit value state, raw/source and normalized value/unit where available, formula/version where applicable, verification and qualification statuses, source-observation/evidence references, and reason;
-- `adjudications`: empty unless an actual durable A1 decision exists; any item must carry the field, conflict set, competing observations, rationale, Ramki authority, authorization evidence and date;
-- `snapshots`: IDs/references for the exact immutable input, source, market, peer and other applicable snapshots used;
-- `result`: outcome resolution, terminal `final_outcome` only where approved, per-rule knockouts/evidence, critical-safety completeness, score interval, score-derived verdict and diagnostics as separate members;
-- `integrity`: digest entries with exact subject, algorithm, canonicalization ID where applicable, origin and evidence for source claims/attestations.
-
-A timestamp is never relabeled: source event/session, source-value as-of, source-published, demonstrated source-available, local retrieval, evaluation cutoff and `evaluated_at` remain separate. If source facts are absent or ambiguous, record the available source text and an explicit unknown/unqualified reason; never synthesize UTC, publication time, provider identity, revision precedence or availability.
-
-### 4.2 Hash and artifact behavior
-
-- Preserve the current `EvaluationRecord.result_hash` calculation and existing `evaluation.json`, `input.json`, `evidence.json`, `market.json`, `peers.json` and `result.json` payload meanings/bytes. For new evaluations, `manifest.json` retains its current format and adds one entry for `evaluation-record.v1.json`; historical artifacts and manifests are not rewritten. Do not recompute historical hashes or claim a new source certification.
-- For the new record only, use the existing SHA-256/canonical-JSON implementation if and only if the pinned cross-process and cross-runtime golden-byte tests prove the declared profile. A local digest must identify the exact local object/bytes hashed; a source-declared digest remains a source claim; an independently attested digest requires verifiable attestation evidence.
-- Avoid a self-hash cycle: `integrity.digests` describes named subjects; its proposed `manifest_hash` is over the deterministically ordered digest-entry list, not over a record that includes that same hash. The current manifest logic hashes each parsed artifact object with `sha256_of`; writing the new artifact as the exact canonical JSON bytes (without a trailing newline) makes its file bytes match that declared canonical subject. No old evaluation directory is rewritten.
-- Store the new artifact as deterministic UTF-8 JSON. If canonical bytes use the existing compact `canonical_json` profile, write those exact bytes; do not pretty-print and then describe a different canonical byte sequence. Keep schema version and canonicalization version independent.
-
-### 4.3 Data and policy boundaries
-
-- No conversion of absent/invalid values to zero; no `UNVERIFIED` to `CLEAR`/`TRIGGERED`; no automatic A1 adjudication; no qualification based only on schema validity, URI, or local hash.
-- Represent source-specific requiredness only when the already approved metric contract supplies it. Do not add a global missing-input Final block, A10 subscription Final rule, provider selection, GMP hash qualification, or NIFTY freshness rule.
-- A8-M may remain `UNKNOWN` when source-native session/timezone/availability facts are unavailable. The known `parse_datetime` behavior that attaches UTC to naive timestamps must not be used to qualify an A8-M record; fixing/using that path for NIFTY requires its own authorized source-contract implementation.
-
-## 5. Exact implementation package (after the gates in §8)
-
-**Target:** product review base `4b19faf…` on an explicitly authorized candidate/ref. This is not a change to Candidate M and does not select a canonical delivery branch.
-
-| Path | Change after authorization |
+| Item | Proposed value |
 |---|---|
-| `schema/ipo-evaluation-record.v1.schema.json` | **New.** Draft 2020-12 schema for the approved version-1.0.0 output record; closed objects; conditionals for terminal/nonterminal resolution; strict types/enums/references. |
-| `engine/ipo_screening/evaluation_record.py` | **New.** Pure projection/serializer from the existing `EvaluationRecord` to the versioned A15 record, plus strict schema and semantic validation. It may only pass through evidenced source facts and must preserve unknown/unqualified states. |
-| `engine/ipo_screening/evaluation.py` | **Narrow modification.** Add the new artifact to `ARTIFACT_FILES`, `EvaluationRecord.artifacts()` and the generated manifest for new evaluations; write this artifact using its exact canonical UTF-8 bytes, preserve existing fields/result-hash inputs and historical directories, and have `EvaluationStore.verify_hashes()` verify the new manifest entry without relaxing existing checks. |
-| `tests/test_evaluation_record_v1.py` | **New.** Focused schema, projection, fail-closed A7, deterministic serialization, cross-runtime golden bytes, hash-subject, and compatibility tests listed in §6. |
-| `tests/test_reproducibility_store.py` | **Narrow test update.** Add the new artifact to the required-on-disk assertion and update the manifest artifact-count expectation from six to seven; retain the existing result-hash and append-only assertions unchanged. |
+| On-disk profile | Closed object values: `profile_id="ipo-evaluation-record-json/1.0.0"`, `encoding="UTF-8"`, `indent=2`, `sort_keys=true`, `ensure_ascii=false`, `line_ending="LF"`, `final_newline=true`, `string_normalization="PRESERVE_SOURCE_TEXT"`, `non_finite_numbers="REJECT"`, `array_order="stable-id/path; timestamp-kind/source-text"`. Run schema validation before writing. |
+| Writer | The current `EvaluationStore` JSON style, with the new artifact prevalidated using `allow_nan=false`; do not serialize the record through `canonical_json` as file bytes. |
+| Existing object-hash profile | `canonicalization_id="ipo-engine-canonical-json/1.5.0"`; SHA-256 over the canonicalized JSON **object**, as `sha256_of()` currently does. Keep this for `result_hash` and the store manifest; do not alter `hashing.py` or historical hashes. |
+| New record manifest entry | Same existing manifest convention: hash the parsed `evaluation-record.v1.json` object using `sha256_of()`, not the pretty-printed raw file bytes. Add `artifact_hash_algorithm="SHA-256"`, `artifact_hash_profile="ipo-engine-canonical-json/1.5.0"`, and `artifact_hash_subject="parsed JSON object"` to new manifests so the algorithm and subject are explicit. `verify_hashes()` continues to recompute the same object hash. |
+| `serialization_profile` vs hash profile | Independent. File JSON contains ordinary schema-valid JSON numbers. `canonical_json()` tags floats as `{"__float__":"…"}`; using that text as the `.json` file would turn numeric score fields into objects and fail the proposed schema. That is a real technical incompatibility, not a policy conflict. |
+| Cross-runtime check | A Node.js reference test must reproduce the v1.5 canonical-object bytes/digest for pinned fixtures (including Unicode, key order, finite floats and non-finite rejection). Python golden-byte tests separately pin the record file serialization. A failure blocks the profile; do not silently bump/change the v1.5 hash grammar. |
 
-**No other path is in scope.** If implementation requires changes to `canonical.py`, `canonical_input.py`, enrichment/snapshot models, config, input schemas, API/UI, or any other test file, stop and request amended authority with the concrete dependency. Do not broaden the patch implicitly.
+### 1.2 Canonical field-value and time contract
 
-**Visible product result:** each newly written evaluation directory contains `evaluation-record.v1.json`, independently schema-validatable and covered by the record's artifact manifest. It is additive to the current local single-user evaluation store. This first increment does not add authentication, database, service, API or frontend architecture.
+| Property | Type / values | Requiredness / conditional rule |
+|---|---|---|
+| `field_values[].field_path` | non-empty string | Required; unique within the record. |
+| `value_state` | `VALUE`, `UNKNOWN`, `NOT_APPLICABLE` | Required; existing v1.5 meanings. `UNKNOWN` is never zero. |
+| `value_origin` | `SOURCE`, `DERIVED` | Required only for `VALUE`. |
+| `raw_value`, `normalized_value` | JSON scalar (`string`, finite `number`, or `boolean`) | Both required for `VALUE`; for identity normalization they must agree. Omit for `UNKNOWN`/`NOT_APPLICABLE`. |
+| `raw_unit`, `normalized_unit` | non-empty string | Optional only where the field has a unit; never invent one. |
+| `normalization` | closed object `{kind, formula_id?, formula_version?, input_field_refs[]?}`; `kind` is `IDENTITY`, `NORMALIZED`, or `DERIVED` | Required for `VALUE`. `NORMALIZED` and `DERIVED` require formula ID/version; `DERIVED` also requires at least one input field ref. |
+| `verification_status` | `VERIFIED` or `UNVERIFIED` | Required for `VALUE` and `UNKNOWN`; absent for `NOT_APPLICABLE`. Independent of value state and source qualification. |
+| `qualification_status` | `QUALIFIED`, `UNQUALIFIED`, `PENDING`, `NOT_APPLICABLE` | Required for every field value. `NOT_APPLICABLE` state requires `NOT_APPLICABLE` qualification. Schema validity, a URI or a local hash does not make a source qualified. |
+| `source_observation_ids[]`, `evidence_refs[]` | strings resolving to `observations[]` / `evidence[]` | Required arrays. A source `VALUE` needs source/evidence support; a derived value needs formula inputs. Arrays may be empty only for `UNKNOWN`/`NOT_APPLICABLE` or an evidenced derivation with input-field refs. |
+| `reason` | closed object `{code, message?, evidence_refs[]}` | Required for `UNKNOWN`; `UNVERIFIED`; `UNQUALIFIED`/`PENDING`; unresolved conflict; or invalid/unavailable required evidence. Candidate codes: `MISSING`, `UNAVAILABLE`, `INVALID`, `CONFLICT_UNRESOLVED`, `SOURCE_UNQUALIFIED`, `TIMEZONE_UNRESOLVED`, `NOT_AVAILABLE_BY_CUTOFF`, `UNVERIFIED`, `NOT_APPLICABLE`. Codes are proposals, not existing policy enums. |
+| `timestamps[]` | objects `{kind, state, source_text?, normalized_utc?, evidence_refs[], reason?}`; `state` is `KNOWN`, `UNKNOWN`, or `NOT_APPLICABLE` | Required array on each observation; empty only if no timestamp fact is applicable/available. `kind` is one of `SOURCE_EVENT_OR_SESSION`, `SOURCE_VALUE_AS_OF`, `SOURCE_PUBLISHED_AT`, `SOURCE_AVAILABLE_AT`, `LOCAL_RETRIEVED_AT`. `KNOWN` requires original `source_text`; `SOURCE_AVAILABLE_AT` requires evidence refs; include `normalized_utc` only when timezone/offset is evidenced. `UNKNOWN` requires `reason={code, message?}` and forbids `normalized_utc`; retain naive source text and use `TIMEZONE_UNRESOLVED` where appropriate. Do not rely on current `parse_datetime()`'s naive-to-UTC default to qualify A8-M. |
+| `adjudications[]` item | `{adjudication_id, field_path, competing_observation_ids[≥2], decision, selected_observation_id?, rationale, authority, authorization_evidence_refs[≥1], decided_at}` | `decision` is `SELECT_OBSERVATION` or `NO_SELECTION`; selection requires a selected observation ID; `authority` is `RAMKI`; `decided_at` is RFC 3339. Only serialize an actual A1 decision. |
 
-## 6. Focused validation and acceptance criteria
+### 1.3 Exact digest record
 
-Run only the focused command below after implementation authority is granted; no full-suite or Windows claim follows from this specification.
+Each `integrity.digests[]` item is a closed object with required `digest_id`, `algorithm`, `digest_value`, `subject_kind`, `subject_ref`, `origin`, and `evidence_refs[]`; `canonicalization_id` and `reason` are conditional.
+
+| Property | Proposed values / rule |
+|---|---|
+| `algorithm` | `SHA-256` for locally computed digests. Preserve a source-declared algorithm verbatim; if that source omits it, use `UNKNOWN` plus a reason while retaining `SOURCE_DECLARED` origin. Use `UNKNOWN` for legacy opaque digests with no algorithm. |
+| `digest_value` | Non-empty string; locally computed SHA-256 must be 64 lowercase hexadecimal characters. Source-declared text is preserved verbatim. |
+| `subject_kind` | `RAW_ARTIFACT_BYTES`, `CANONICAL_JSON_OBJECT`, `V1_5_RESULT_PAYLOAD`, `SOURCE_DECLARED_SUBJECT`, `LEGACY_UNSPECIFIED`. |
+| `origin` | `LOCAL_COMPUTED`, `SOURCE_DECLARED`, `INDEPENDENTLY_ATTESTED`, `LEGACY_UNRESOLVED`. The last value is the specified amendment needed to preserve current opaque `content_hash`/manifest values without mislabeling them. |
+| `subject_ref` | Exact artifact path, object role, source ID or source-claimed subject. Use literal `UNKNOWN` plus a reason only for `LEGACY_UNRESOLVED`. |
+| `canonicalization_id` | Required for `CANONICAL_JSON_OBJECT` and `V1_5_RESULT_PAYLOAD`; use `ipo-engine-canonical-json/1.5.0` for existing engine hashes. Absent for raw-byte digests unless the source explicitly states otherwise. |
+| `evidence_refs` | Empty is allowed for a locally computed digest. At least one source/evidence reference is required for `SOURCE_DECLARED` and `INDEPENDENTLY_ATTESTED`; attestation must actually be verifiable. |
+| `reason` | Required for `LEGACY_UNRESOLVED`; preserve the old digest text and state that its algorithm/subject/origin is not established. |
+
+`result_hash` is recorded as local SHA-256 over the existing v1.5 result-payload subject (engine/spec/config hashes, snapshot hashes, mode, plan, derived metrics, knockouts, score, penalties and missing/unverified inputs), canonicalized with v1.5 grammar. Do not change its inputs. Map `input_snapshot_hash` to the local canonical input object; map `source_manifest_hash` as local only when the existing fallback `sha256_of(evidence)` was used, otherwise `LEGACY_UNRESOLVED` unless origin metadata proves more; map market/peer hashes as local only when the local fallback was used, otherwise `LEGACY_UNRESOLVED`; treat existing opaque `SourceRef.content_hash` values as `LEGACY_UNRESOLVED`. None is a provider hash by inference. A9 still has no approved GMP source/hash subject; no digest in this profile qualifies A9 by itself.
+
+## 2. Missing, invalid, conflicting, unverified and outcome rules
+
+| Case | Serialized behavior / consequence | Governing authority check |
+|---|---|---|
+| Verified applicable knockout | `knockouts[].state=TRIGGERED`; `outcome_resolution.state=TERMINAL`; `final_outcome="AVOID"`; retain critical-safety gaps and score uncertainty separately. | A7 approved. |
+| No verified knockout, critical-safety evidence missing | `final_outcome="INSUFFICIENT_DATA"`; preserve missing/unverified evidence and diagnostics. | v1.5 §18 / A7 approved. |
+| Ordinary result, no A7 override | `final_outcome` equals the existing configured v1.5 `verdict.verdict`, including its existing `VERDICT_UNCERTAIN` value where that is what the evaluator emits. Retain the same score-derived verdict separately in `score_verdict`; do not add labels/thresholds or let diagnostics erase an independently established outcome. | Consistent recommendation; exact property mapping still needs Ramki's design approval. |
+| A7 unverified-only case: no verified knockout or critical-safety gap, but an `UNVERIFIED` knockout prevents establishing a safe result | `outcome_resolution.state="NONTERMINAL_UNRESOLVED"`; `reason.code="UNVERIFIED_KNOCKOUT_NO_SAFE_RESULT"`; `reason.evidence_refs` contains the relevant evidence IDs; **omit `final_outcome` entirely** (not `null`). Keep knockout `UNVERIFIED`, processing, validation and score diagnostics separate. | A7 semantics are approved; exact serialization is unresolved. This representation is the recommendation, not approval. |
+| Missing value | `value_state=UNKNOWN`; no raw/normalized numeric substitute; reason/evidence refs retained; never convert to zero. | v1.5/A15 approved semantics. |
+| Invalid input schema/type/required field | Fail before scoring; mark validation/processing failure in the existing error path. The current store creates no `EvaluationRecord` for pre-record rejection, so this increment writes **no** `evaluation-record.v1.json` for that failure and does not add a failure-record subsystem. | v1.5 approved; persistence of failed attempts is outside this increment. |
+| Invalid/unavailable source fact in a persisted record | Keep the field `UNKNOWN`, `UNVERIFIED` or `UNQUALIFIED` as evidenced, with `INVALID`/`UNAVAILABLE` reason; apply only the already approved metric-specific gate. | A15/A8-M/A9 limits retained; no new global missing-input rule. |
+| Conflict without a durable A1 decision | Preserve every observation/revision/evidence ref; canonical field is `UNKNOWN`, `UNVERIFIED`, qualification `PENDING`, reason `CONFLICT_UNRESOLVED`; `adjudications=[]`; field is non-screenable. | A1 approved. |
+| A8-M/A9/A10 | Required NIFTY `UNKNOWN` blocks Final only under A8-M; absent/invalid required qualifying GMP snapshot/hash withholds Final only under A9; subscription observations remain distinct and evidence/display-only, with no inferred A10 Final rule. | Approved scope boundaries retained; no source acquisition, provider qualification or source gate added. |
+
+## 3. Compatibility, actual gaps and disposition
+
+| Choice checked | Authority / evidence | Finding |
+|---|---|---|
+| Separate output schema at the proposed path/version; closed shape and required groups | A15 explicitly leaves path/version, property spellings, enum values and conditional requiredness undecided; v1.5 input schema remains governing | No semantic conflict. Exact path/version and closed/required rules are new owner decisions; do not edit v1.5 input schemas. |
+| State, verification, qualification, validation and processing axes | A15 + v1.5 §§3.2–3.4, 16, 18–20 | The axes are settled; the spellings/conditionals in §1 are proposals only. Unknown is not zero; schema errors stop scoring. |
+| Source observations, conflicts and adjudications | A1 and A15 | Preserve all observations; no automatic winner. A1 adjudication appears only when actual Ramki authorization/evidence exists. Existing record model lacks some raw-lexeme/revision/time/adjudication fields; serialize only evidence present, preserve links to the original artifacts, and mark missing facts UNKNOWN/LEGACY_UNRESOLVED rather than synthesizing them. |
+| Verified knockout, missing safety, uncertain score and unverified-only result | A7-D1/D2 + v1.5 §18 | Precedence is settled; A7's exact unverified-only serialization is expressly unresolved. Recommend the no-final nonterminal profile below. Ordinary score-verdict copying is a property-level proposal, not an A7 approval. |
+| File serialization and digest canonicalization | `hashing.py` grammar 1.5.0 uses float-tag objects; `EvaluationStore` manifests currently hash parsed objects through `sha256_of()` | Actual technical incompatibility only if the hash text is used as the output file. Separate schema-valid JSON file serialization from the existing hash grammar; keep v1.5 hash inputs/bytes unchanged. |
+| Digest origins/subjects | A15; existing `SourceRef.content_hash` and `source_manifest_hash` can be opaque | Origin distinctions align with A15. `LEGACY_UNRESOLVED` is an amendment needed for old opaque values. A9 has no approved provider/event/hash subject; this record cannot qualify a GMP hash. |
+| A8-M/A9/A10 requiredness | A8-M, A9, A10 decisions | Retain NIFTY UNKNOWN and GMP qualifying-hash consequences only in their existing scopes; A10 Final behavior remains open. No source gate/provider is added. |
+| History and result hashes | v1.5 §§19–21, 23 and A15 immutability requirement | Add one artifact and descriptive hash metadata to new manifests only. Preserve existing artifact payloads, `result_hash` inputs and all historical directories. |
+| Failed-attempt artifact persistence | Current pipeline rejects invalid schema before constructing/storing `EvaluationRecord`; v1.5 says invalid input stops scoring | Not a semantic conflict. This increment does not add a failure-record subsystem; no output record is written for pre-record rejection. |
+
+**Recommendation:** **ACCEPT WITH SPECIFIED AMENDMENTS.** A15's semantic baseline is sound and the proposal is implementable after the concrete choices above are accepted. The material amendments are: closed schema with the requiredness table above; ordinary `final_outcome` copying the current configured verdict after A7 precedence; explicit A7 nonterminal/no-final representation; a separate schema-valid JSON writer profile because v1.5 hash canonicalization tags floats; `LEGACY_UNRESOLVED` for opaque existing digests; and no in-record `manifest_hash` (the existing artifact manifest is the external digest record). No reason to re-audit or re-decide settled A15/A1/A7/A8-M/A9/A10 semantics.
+
+## 4. Smallest exact implementation scope after authorization
+
+**User-visible result:** every newly persisted `EvaluationRecord` directory (all five current `LIFECYCLE` stages) contains `evaluation-record.v1.json` alongside the current artifacts. It is directly inspectable and schema-validatable from the existing single-user local store. No API or frontend work is included.
+
+| Exact path | Authorized change proposed |
+|---|---|
+| `schema/ipo-evaluation-record.v1.schema.json` | New Draft 2020-12 schema implementing §1–§2, closed objects, references and terminal/nonterminal conditionals. |
+| `engine/ipo_screening/evaluation_record.py` | New pure `EvaluationRecord` projection, reason/digest-origin mapping, RFC 3339/time-fact normalization only when evidenced, strict schema/semantic validation, and deterministic new-record serialization profile. |
+| `engine/ipo_screening/evaluation.py` | Add artifact name to `ARTIFACT_FILES` and `EvaluationRecord.artifacts()`; append the new artifact to new manifests; add the declared manifest hash algorithm/profile/subject; preserve all old payload/hash inputs; keep write-once semantics. |
+| `tests/test_evaluation_record_v1.py` | New bounded tests: schema/conditionals, field state matrix, A7 precedence, references, timestamp unknowns, digest origins/subjects, golden serialization, Node reference hash vector and historical invariance. |
+| `tests/test_reproducibility_store.py` | Update required-artifact assertion and expected artifact hashes from 6 to 7; keep existing `result_hash`, immutability and append-only assertions unchanged. |
+
+**Explicit exclusions:** no changes to `canonical.py`, `hashing.py`, input schemas, scoring/config, extraction, source acquisition, NIFTY/GMP qualification, A10 policy, failed-attempt persistence, history migration, API/UI, auth, database, multi-user or enterprise architecture. If any listed behavior cannot be implemented within these five paths, stop for amended scope authority—do not broaden implicitly. Candidate M is not edited, rebuilt, rebased or reclassified.
+
+### Focused tests and acceptance
+
+Run only, after implementation authorization:
 
 ```bash
 python -m pytest tests/test_evaluation_record_v1.py tests/test_reproducibility_store.py
 ```
 
-The new-record test module must include an independent Node.js reference check for the cross-runtime golden-byte vector, using the repository's existing JavaScript test runtime; it is part of this bounded command, not a new runtime application feature.
+Pass criteria: (1) all required/conditional schema cases pass and invalid combinations fail closed; (2) all state, reason and evidence references resolve; no unknown-to-zero, unverified-to-clear/triggered or automatic A1 winner; (3) A7 mapping table is exact, including no `final_outcome` in the unverified-only case; (4) Python file bytes match pinned golden output and Node independently matches the v1.5 canonical object-hash vector; non-finite values reject; (5) manifest verifies the new artifact and hash profile; (6) existing v1.5 result hash and old artifact payloads remain unchanged; (7) no old directory is rewritten; (8) no source/runtime gate or excluded path changes. This is implementation validation only, not independent acceptance, Phase 0 closure, canonical selection, merge or release. No A13 85-test or UI-7 rerun is included.
 
-1. **Schema:** valid terminal and nonterminal examples pass; invalid types, unknown properties/enums, duplicate IDs, dangling references and invalid state combinations fail closed.
-2. **Value/evidence states:** `VALUE`, `UNKNOWN`, `NOT_APPLICABLE`, `VERIFIED`, `UNVERIFIED`, qualification, validation and processing remain distinct; unknown is never zero; reason/evidence references are retained.
-3. **A7 matrix:** verified knockout → `AVOID`; no verified knockout plus critical-safety gap → `INSUFFICIENT_DATA`; combined verified knockout/missing safety/score uncertainty preserves all facts; unverified-only case has `NONTERMINAL_UNRESOLVED`, evidence/reason, and no `final_outcome` (only after Ramki approves this representation).
-4. **A1:** competing observations remain; no automatic winner; an adjudication is accepted only when every approved A1 element is present and attributable; otherwise field remains non-screenable.
-5. **Times/revisions/digests:** pure serialization fixtures preserve distinct time meanings and original offsets; retrieval is not availability; unresolved timezone/revision stays unresolved; local/source-declared/attested digest origins and exact subjects cannot be conflated; no generic hash satisfies A9. No source is fetched or newly qualified.
-6. **Metric boundaries:** pure record fixtures keep required-NIFTY UNKNOWN handling scoped to A8-M and required qualifying-hash status scoped to A9; A10 observations stay distinct/display-only and tests do not assert its open Final rule. This increment does not implement or retune any source-specific Final gate.
-7. **Determinism:** serialize twice and in a fresh process to identical declared canonical bytes; compare the pinned fixture byte-for-byte with an independent second-runtime reference (Node.js, using the repository's existing JS test runtime); known-byte digest fixtures match. If the second runtime is unavailable or the existing profile cannot be proven, stop and obtain a test-profile decision—do not silently skip cross-runtime conformance or change the grammar/version.
-8. **Store/compatibility:** the new artifact appears in the manifest and `EvaluationStore.verify_hashes()` reports no mismatch; new writes remain append-only; the existing v1.5 golden result hash and old artifact payloads remain unchanged; no historical directory is migrated or rewritten.
-9. **Scope:** exact changed-path allowlist above; no source acquisition, scoring/config/fixture changes, A9/NIFTY runtime gate, UI, release or production work.
+## 5. Exact Ramki disposition and authority required
 
-A passing result is implementation validation only. It is not independent acceptance, Phase 0 closure, canonical selection, merge, release or activation.
+These are three separate matters. A design decision is not a code grant; a code grant is not Phase 0 closure.
 
-## 7. External dependencies deliberately excluded
+### A. Design approval — required first
 
-These do not block the generic output-record implementation if missing facts remain explicit; they do block claims about the corresponding source-specific Final gate:
+Ramki must record one exact disposition against this file/revision, preferably:
 
-- **A8-M:** authoritative NSE price-index records, complete expected sessions and availability-by-cutoff/session-calendar evidence;
-- **A9:** approved GMP source/event/as-of/cutoff and qualifying snapshot/hash subject;
-- **A10:** subscription source contract and missing/unavailable Final consequence;
-- **A1:** any actual field-level Ramki adjudication, which must be separately recorded when a conflict exists.
+> **A15 PROPERTY/SCHEMA DECISION — ACCEPT WITH SPECIFIED AMENDMENTS.** I approve the profile in §1–§2: schema path/version and closed required fields; the stated value, verification, qualification, timestamp and reason enums/conditionals; the ordinary v1.5 verdict-to-`final_outcome` mapping; A7 `NONTERMINAL_UNRESOLVED` with `UNVERIFIED_KNOCKOUT_NO_SAFE_RESULT`, evidence refs and omitted `final_outcome`; the separate deterministic writer/hash profiles; digest origins including `LEGACY_UNRESOLVED`; and the listed compatibility rules. This is design approval only and grants no implementation authority.
 
-No NDAL contact, data purchase, provider assumption, A5/GCP fixture change, D1/D3 policy choice, or unrelated roadmap item is part of this package.
+If Ramki changes a value, the changed row must be recorded explicitly; settled A15 semantics need not be restated.
 
-## 8. Exact outstanding decision and authorization
+### B. Exact implementation authorization — separate written grant
 
-The smallest genuine owner gate is:
+After A, Ramki must record a separate grant with this exact scope (the code base/Phase 0 option must be completed explicitly):
 
-1. **Design disposition:** Ramki accepts or amends this exact recommended profile—especially closed-schema/conditional requiredness, the ordinary determinate `final_outcome` mapping, and A7 `NONTERMINAL_UNRESOLVED` with omitted `final_outcome`. This does **not** repeat or reopen A15 semantic approval; it resolves only concrete property/schema/serialization choices that A15 expressly left open.
-2. **Implementation grant:** a separate written, exact-scope grant must authorize the five paths in §5, the focused tests in §6, target candidate/ref, and permitted publication. A11/A15 currently say this authority is not granted. If authorization is issued while Phase 0 remains OPEN, it should explicitly say whether this bounded work is permitted as an overlap/exception or must wait for Phase 0 closure; this package does not close Phase 0 or imply that exception.
+> **A15 IMPLEMENTATION AUTHORIZATION.** I authorize only the five paths listed in §4 and the focused command in §4, based on product-review code base `4b19faf848a721265597a678926988d484d30e59`, with all changes committed/published only to `arena/573e69a4-ipo-screening-engine`. Candidate M and its canonical status/tree remain untouched. No other files, source/provider acquisition, source-specific gates, API/UI, config/fixture changes, PR, merge, release or production activation are authorized. This authorization is limited to implementing the design profile I approved in §5A.
 
-Until those two items are recorded, make no product code, schema, test, configuration or fixture change. Once recorded, execute this package without re-investigating A15 semantics or asking for routine implementation choices. Candidate M remains unchanged throughout.
+If Ramki selects a different base, the exact commit must replace `4b19…` in the grant. Do not switch branches or publish to another branch. This grant does not itself close Phase 0.
+
+### C. Phase 0 boundary — explicit choice
+
+A11 still records Phase 0 OPEN; no existing A15 grant authorizes Phase 1. To remove avoidable delay, this package **recommends OVERLAP** for only the five-path increment in §4, with Phase 0 remaining OPEN and Candidate M untouched. That is a recommendation, not an existing exception. Ramki must state either:
+
+- **WAIT:** this implementation grant takes effect only after a separately recorded Phase 0 closure; or
+- **OVERLAP:** record: “I authorize this bounded A15 increment while Phase 0 remains OPEN as an explicit overlap; this does not close Phase 0.”
+
+Until A, B and the Phase 0 choice are recorded, make no product code/schema/test/config/fixture changes. No implicit approval is used to override A11/A15's explicit restriction. GCP/D1/D3 are not blockers for this isolated work.
 
 ---
