@@ -6,6 +6,8 @@
 **Status:** DELIVERED & AUDITED  
 **Date:** 2026-10-06  
 
+> **Current-state correction (2026-10-14):** This describes the original UI-2 read-model delivery. The current application also offers explicit filing-ingestion and evaluation-lifecycle POST actions; scores and configuration remain engine-owned and immutable through the UI. The personal-use server has no authentication and must stay on loopback. See the current README and API contract.
+
 ---
 
 ## 1. Executive Summary

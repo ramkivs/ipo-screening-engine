@@ -88,10 +88,13 @@ test('App - Zero Score Calculation Invariant: source files contain no arithmetic
   assert.equal(appJs.includes("method: 'PATCH'"), false);
   assert.equal(appJs.includes("method: 'DELETE'"), false);
 
-  assert.equal(apiJs.includes("method: 'POST'"), false);
+  // The API client may POST only for its explicit ingestion and lifecycle actions.
+  assert.equal(apiJs.includes("method: 'POST'"), true);
   assert.equal(apiJs.includes("method: 'PUT'"), false);
   assert.equal(apiJs.includes("method: 'PATCH'"), false);
   assert.equal(apiJs.includes("method: 'DELETE'"), false);
+  assert.equal(apiJs.includes("async archiveEvaluation("), true);
+  assert.equal(apiJs.includes("async ingestDocument("), true);
 
   // Verify no credentials / secrets are hardcoded
   assert.equal(appJs.includes('AI71_API_KEY'), false);

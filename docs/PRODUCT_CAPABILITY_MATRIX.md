@@ -6,6 +6,8 @@
 **Program Authority:** Ramki  
 **Status:** Complete Forensic Reconciliation (Read-Only / No Code Mutation / No Activation)  
 
+> **Current-state correction (2026-10-14):** This matrix is a historical snapshot at its stated 2026-10-06 delivery baseline, not the current operating register. Since then, the repository has a working integrated local web UI (`frontend/` plus `engine/ipo_screening/presentation/`) and the A15 immutable evaluation-record artifact. The old `AI` prototype-only classification and historical test totals are not current UI/status evidence. Use the current personal-use register in `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` and the A16 operating-scope decision for current status. The personal application remains single-user/local; no enterprise or production claim is made.
+
 ---
 
 ## 1. Inventory Methodology & Status Definitions

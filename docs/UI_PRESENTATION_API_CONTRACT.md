@@ -5,20 +5,22 @@
 **OpenAPI Specification:** `docs/openapi/presentation-api-v1.yaml` (OpenAPI 3.1.0)  
 **Authoritative Engine Lineage:** Commit `690d4722294f18b4897676ede8392314f63f3128`  
 **Program Authority:** Ramki  
-**Governance Mode:** Read-Only Presentation Layer (No Scoring Calculations / No Store Mutation / No v1.6 Activation)  
+**Governance Mode:** Personal-use presentation API (no scoring/configuration mutation; scoped workflow POST actions)
+
+> **Current-state correction (2026-10-14):** The original 2026-10-06 contract text and file hashes below describe an earlier read-only implementation. The current API has explicit POST routes for filing ingestion and evaluation lifecycle transitions, and the health/meta `read_only` field is `false` accordingly. All other writes are rejected. This personal-use server has no authentication; keep it bound to loopback. Current setup and scope: repository README, `docs/RUNBOOK.md`, and A16.
 
 ---
 
 ## 1. Purpose & Architectural Principles
 
-This document formalizes the frozen data contract for the **IPO Screening Engine Presentation API (v1)**. 
+This document records the data contract for the **IPO Screening Engine Presentation API (v1)**.
 
-The Presentation API serves as a decoupled, read-only bridge between the authoritative calculation engine and future user interfaces (web dashboards, analytical views, and audit tools). It adheres to strict foundational principles:
+The Presentation API serves the single-user local application by projecting engine records for the browser UI and by accepting a small number of explicit filing-ingestion and evaluation-lifecycle actions. It adheres to these principles:
 
 ### Core Principles:
 1. **Zero Calculation Authority**: The API and the frontend client are **strictly forbidden** from calculating scores, deriving metrics, re-evaluating knockouts, computing post-listing returns, or performing statistical correlation math. All numerical and categorical figures are read directly from immutable records created by the Python engine.
 2. **Authoritative Source of Truth**: The on-disk `EvaluationStore` (`<store>/<evaluation_id>/evaluation.json`), child observation stores (`<store>/<evaluation_id>/observations/observation_<horizon>.json`), backtest datasets, and calibration proposal files are the sole sources of truth.
-3. **Pure Read-Only Enforcement**: The API exposes **only safe, idempotent read operations** (`GET`, `HEAD`, `OPTIONS`). Mutation methods (`POST`, `PUT`, `PATCH`, `DELETE`) directed at product state or storage are strictly rejected with `405 Method Not Allowed`.
+3. **Scoped Write Surface**: Read-model resources use `GET`/`HEAD`/`OPTIONS`. The only supported `POST` operations are `/api/v1/ingest/document` and `/api/v1/evaluations/{evaluation_id}/{archive|unarchive|make-active}`. They do not alter scoring rules or configuration. Unscoped `POST`, and all `PUT`, `PATCH`, and `DELETE` requests, are rejected with `405 Method Not Allowed`.
 4. **Preservation of Normative Tri-State & UNKNOWN Semantics**: Missing data is never coerced to zero, false, or fabricated values. The API faithfully preserves:
    * Value states: `VALUE`, `UNKNOWN`, `NOT_APPLICABLE`
    * Knockout states: `CLEAR`, `TRIGGERED`, `UNVERIFIED`
@@ -35,7 +37,7 @@ The API defines explicit data schemas corresponding directly to the authoritativ
 
 | Resource Schema | Engine Source | Key Fields | Description |
 | :--- | :--- | :--- | :--- |
-| **`HealthStatus`** | Service Runtime | `status`, `timestamp`, `read_only` | Liveness and read-only operational state. |
+| **`HealthStatus`** | Service Runtime | `status`, `timestamp`, `read_only` | Liveness and scoped write-surface indicator (`read_only: false`). |
 | **`ApiMeta`** | Engine Metadata | `api_version`, `engine_version`, `spec_version`, `active_config_version`, `candidate_config_version`, `golden_result_hash` | Comprehensive system version and governance status. |
 | **`IpoSummary`** | Canonical Input | `ipo_id`, `company_name`, `sector_profile`, `evaluation_count`, `latest_score`, `latest_verdict` | Directory-level issuer summary. |
 | **`IpoDetail`** | Canonical Input | `ipo_id`, `company_name`, `sector_profile`, `icdr_route`, `evaluations[]` | Authoritative issuer identity and evaluation history. |
@@ -52,10 +54,10 @@ The API defines explicit data schemas corresponding directly to the authoritativ
 
 ---
 
-## 3. Read-Only Endpoints Specification
+## 3. Read-Model Endpoints Specification
 
 ### 3.1 System Endpoints
-* **`GET /api/v1/health`**: Returns HTTP 200 with `{ "status": "healthy", "read_only": true, "timestamp": "..." }`.
+* **`GET /api/v1/health`**: Returns HTTP 200 with `{ "status": "healthy", "read_only": false, "timestamp": "..." }`; `false` indicates the scoped workflow POST actions documented below.
 * **`GET /api/v1/meta`**: Returns system metadata, active engine version (`1.5.0`), active config version (`1.5.0`), candidate config version (`1.6.0`), and golden result hash (`e84f8bc0...`).
 
 ### 3.2 IPO Issuer Discovery & Detail
@@ -98,13 +100,18 @@ The API defines explicit data schemas corresponding directly to the authoritativ
 * **`GET /api/v1/calibration/proposals/{proposal_id}`**:
   * *Response*: Full `CalibrationProposal` artifact including proposed module weight adjustments (Module A: 25$\to$30, Module B: 20$\to$15) and shadow evaluation rescoring metrics.
 * **`GET /api/v1/configuration/current`**:
-  * *Response*: Authoritative configuration lifecycle status proving that `v1.5.0` is `ACTIVE` (`is_active: true`) and candidate `v1.6.0` is `IMPLEMENTED_INACTIVE` (`is_active: false`). Confirms `frozen_core_status: VERIFIED` and `golden_result_status: VERIFIED`.
+  * *Response*: Configuration lifecycle status showing `v1.5.0` active and `v1.6.0` inactive. The current frozen-core and golden-result checks are reported from their verification routines.
+
+### 3.8 Explicit personal-use workflow actions
+* **`POST /api/v1/ingest/document`**: Accepts a bounded PDF upload, runs existing extraction and v1.5 evaluation, and persists an evaluation if valid. The browser cannot choose filesystem paths.
+* **`POST /api/v1/evaluations/{evaluation_id}/archive`**, **`/unarchive`**, and **`/make-active`**: Record explicit evaluation lifecycle transitions in the local lifecycle index. These do not change scores or screening configuration.
+* Any other `POST` route, and every `PUT`, `PATCH`, or `DELETE`, is rejected. No authentication is implemented; keep the server on loopback for personal use.
 
 ---
 
 ## 4. EvaluationStore & Read Boundary Architecture
 
-The Presentation API encapsulates all filesystem access behind a read-only repository service (`PresentationService` in `engine/ipo_screening/presentation/service.py`):
+The `PresentationService` projects immutable evaluation artifacts and delegates the narrowly scoped ingestion and lifecycle writes to existing engine components (`engine/ipo_screening/presentation/service.py`):
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -120,9 +127,9 @@ The Presentation API encapsulates all filesystem access behind a read-only repos
 │  - Traverses <store>/<eval_id>/observations/                │
 │  - Loads config/ and build/ artifacts                       │
 │  - Pure In-Memory Caching & Projection                      │
-│  - Strictly Zero Writes (no open(..., "w"))                 │
+│  - Read projections + explicit workflow writes only         │
 └──────────────────────────────┬──────────────────────────────┘
-                               │ Read-Only File Handles
+                               │ Scoped local read/write operations
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
 │           Immutable Filesystem Evaluation Store             │
@@ -139,7 +146,8 @@ The Presentation API encapsulates all filesystem access behind a read-only repos
 
 * **Zero Client Credentials**: The API does not accept or process LLM API keys (e.g. Anthropic, OpenAI) or exchange credentials.
 * **Safe Extraction Boundary**: Future PDF extraction workflows must be proxied server-side through a dedicated backend extraction gateway where API keys are loaded strictly from environment variables or vault secrets.
-* **CORS & Framing Protections**: The API includes standard security middleware with configurable CORS origins and frame-ancestor restrictions.
+* **Local-use boundary**: The API has no authentication or multi-user controls. Bind it to `127.0.0.1` and do not expose it to an untrusted network.
+* **Same-origin browser boundary**: CORS is not enabled; the bundled frontend calls the API on the same origin. This helps prevent cross-origin websites from reading or invoking the unauthenticated local workflow.
 
 ---
 
@@ -160,17 +168,17 @@ Where the current engine records do not natively provide presentation fields des
 
 ### Prerequisites:
 * Python 3.11+
-* Installed packages: `fastapi`, `uvicorn`, `pydantic`, `httpx`
+* Dependencies installed from the repository's pinned `requirements.txt`
 
 ### Starting the Presentation API Server:
-To run the read-only presentation API locally:
+From the repository root, with the virtual environment activated:
 ```bash
-# Set Python path to include engine/
-export PYTHONPATH=engine
+export PYTHONPATH="$PWD/engine"
 
-# Start the read-only server on port 8000
-uvicorn ipo_screening.presentation.api:app --host 0.0.0.0 --port 8000 --reload
+# Personal-use server: loopback only; no authentication is provided.
+uvicorn ipo_screening.presentation.api:app --host 127.0.0.1 --port 8000
 ```
+Open `http://127.0.0.1:8000/ui/`. For evaluation input, artifact creation, verification, and replay, use the CLI commands in `docs/RUNBOOK.md`.
 
 ### Environment Configuration:
 The service respects the following environment variables:

@@ -10,7 +10,7 @@ Verifies:
 7. Calibration governance boundary callout.
 8. Navigation integration from Dashboard and Performance views.
 9. Zero client-side analytical or return calculation invariant.
-10. Strictly read-only protocol and zero mutation capability.
+10. Scoped API write boundary with no scoring or configuration mutation.
 11. Absence of policy activation controls.
 12. Zero server filesystem path exposure and zero credential leakage.
 """

@@ -1,7 +1,8 @@
-"""UI-1 FastAPI Presentation Read-Model API Implementation.
+"""FastAPI personal-use presentation API.
 
-Implements read-only REST endpoints matching docs/openapi/presentation-api-v1.yaml.
-Strictly read-only: rejects POST / PUT / PATCH / DELETE with 405 Method Not Allowed.
+GET routes expose read-model views. Only the explicit filing-ingestion and
+lifecycle-action POST routes may mutate the local filesystem; arbitrary write
+methods and scoring/configuration mutation routes are rejected.
 """
 
 from __future__ import annotations
@@ -9,10 +10,10 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import Optional
 
 from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .models import (
@@ -66,7 +67,7 @@ def create_router(service: PresentationService) -> APIRouter:
         return HealthStatus(
             status="healthy",
             timestamp=datetime.now(timezone.utc).isoformat(),
-            read_only=True,
+            read_only=False,
         )
 
     @router.get("/meta", response_model=ApiMeta, tags=["System"])
@@ -401,7 +402,7 @@ def create_router(service: PresentationService) -> APIRouter:
 
 
 def create_app(service: Optional[PresentationService] = None) -> FastAPI:
-    """FastAPI application factory with strict read-only enforcement."""
+    """FastAPI application factory with explicit, scoped write routes."""
     if service is None:
         cfg = PresentationConfig(
             store_root=os.getenv("IPO_STORE_ROOT", "build/evaluations"),
@@ -415,39 +416,56 @@ def create_app(service: Optional[PresentationService] = None) -> FastAPI:
     app = FastAPI(
         title="IPO Screening Engine — Presentation Read-Model API",
         version="1.0.0",
-        description="Deterministic read-only presentation API for Indian Mainboard IPO Screening Engine.",
+        description="Personal-use IPO presentation API: deterministic GET read models plus scoped filing-ingestion and evaluation-lifecycle POST actions. Scoring and configuration are not mutable through this API.",
         docs_url="/docs",
         redoc_url="/redoc",
     )
 
-    # Enable CORS for local preview/development
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["GET", "HEAD", "OPTIONS", "POST"],
-        allow_headers=["*"],
-    )
-
-    # Strict Read-Only Middleware: blocks POST, PUT, PATCH, DELETE (except POST /api/v1/ingest/document and lifecycle operations)
+    # Permit the explicit local workflow actions only; block arbitrary writes.
     @app.middleware("http")
-    async def read_only_guard(request: Request, call_next):
+    async def write_scope_guard(request: Request, call_next):
+        if request.method == "POST":
+            origin = request.headers.get("origin")
+            if origin:
+                origin_parts = urlsplit(origin)
+                request_host = request.headers.get("host", "")
+                if (
+                    origin_parts.scheme.lower() != request.url.scheme.lower()
+                    or origin_parts.netloc.lower() != request_host.lower()
+                    or origin_parts.path not in ("", "/")
+                    or origin_parts.query
+                    or origin_parts.fragment
+                ):
+                    return JSONResponse(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        content={
+                            "error": "Forbidden",
+                            "message": "Cross-origin workflow requests are not accepted by the local personal-use API.",
+                            "code": "CROSS_ORIGIN_WRITE_REJECTED",
+                        },
+                    )
+
         if request.method not in ("GET", "HEAD", "OPTIONS"):
-            path = request.url.path
-            # UI-7 ingestion exception and governed lifecycle operations
-            if request.method == "POST" and (
-                path in ("/api/v1/ingest/document", "/api/v1/ingest/document/")
-                or path.endswith("/archive")
-                or path.endswith("/unarchive")
-                or path.endswith("/make-active")
-            ):
+            normalized_path = request.url.path.rstrip("/")
+            segments = normalized_path.strip("/").split("/")
+            is_ingest = normalized_path == "/api/v1/ingest/document"
+            is_lifecycle_action = (
+                len(segments) == 5
+                and segments[:3] == ["api", "v1", "evaluations"]
+                and bool(segments[3])
+                and segments[4] in {"archive", "unarchive", "make-active"}
+            )
+            if request.method == "POST" and (is_ingest or is_lifecycle_action):
                 return await call_next(request)
 
             return JSONResponse(
                 status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
                 content={
                     "error": "Method Not Allowed",
-                    "message": f"Method {request.method} is prohibited. The Presentation API is strictly read-only.",
+                    "message": (
+                        f"Method {request.method} is not enabled on this endpoint. "
+                        "Only GET/HEAD/OPTIONS and the documented ingestion/lifecycle POST actions are supported."
+                    ),
                     "code": "READ_ONLY_METHOD_NOT_ALLOWED",
                 },
                 headers={"Allow": "GET, HEAD, OPTIONS"},

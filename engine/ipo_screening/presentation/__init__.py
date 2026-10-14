@@ -1,7 +1,7 @@
-"""UI-1 Presentation Read-Model Package.
+"""Presentation API and service package.
 
-Provides a decoupled, deterministic read-only presentation API and service
-boundary projecting authoritative EvaluationStore and post-listing records.
+Provides deterministic read-model projections plus explicit filing-ingestion
+and evaluation-lifecycle workflows over the local EvaluationStore.
 """
 
 from .api import app, create_app, create_router

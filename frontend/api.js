@@ -1,8 +1,8 @@
 /**
  * IPO Screening Engine — Presentation API Client (UI-2)
  *
- * Encapsulates read-only HTTP communication with the UI-1 Presentation API.
- * STRICTLY READ-ONLY: performs zero mutations, zero calculations, zero credential storage.
+ * Encapsulates presentation API calls: GET read models plus explicit filing-ingestion
+ * and evaluation-lifecycle POST actions. It never computes scores or stores credentials.
  */
 
 export class ApiError extends Error {
@@ -68,12 +68,11 @@ export class ApiClient {
   }
 
   async _sendLifecycleAction(path, payload = null) {
-    const httpVerb = ['P', 'O', 'S', 'T'].join('');
     const url = new URL(`${this.apiPrefix}${path}`, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000');
     let response;
     try {
       response = await fetch(url.toString(), {
-        method: httpVerb,
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -255,7 +254,6 @@ export class ApiClient {
       throw new ApiError(400, 'INVALID_FILE', 'A filing document file is required.');
     }
 
-    const uploadVerb = ['P', 'O', 'S', 'T'].join('');
     const formData = new FormData();
     let blobFile = file;
     if (typeof Blob !== 'undefined' && !(file instanceof Blob)) {
@@ -275,7 +273,7 @@ export class ApiClient {
     let response;
     try {
       response = await fetch(url.toString(), {
-        method: uploadVerb,
+        method: 'POST',
         headers: {
           Accept: 'application/json',
         },

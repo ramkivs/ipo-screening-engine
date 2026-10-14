@@ -1,21 +1,50 @@
-# IPO Screening Engine — Project Tracker (Review Candidate)
+# IPO Screening Engine — Project Tracker (Personal-Use Status)
 
-> **Candidate status:** Candidate M remains a bounded, non-canonical review candidate pending its exact-target independent review. The fixed session branch additionally contains the separately authorized A15 implementation; that post-M work is not part of Candidate M and has not been independently reviewed or product-accepted. This remains a status tracker, not a canonical delivery selection, general implementation authority, product acceptance, or release approval. The original tracker on 4e is unchanged.
+> **Controlling status (A16, 2026-10-14):** Ramki's single-user personal-use objective controls this register. Routine in-scope investigation, implementation, testing, documentation, commit/push on the fixed session branch, and remote verification do not require renewed approval or an independent-review/canonical-selection ceremony. The detailed Candidate M/Phase history later in this file is retained for audit; any blanket procedural hold in it is superseded by A16. Concrete evidence and product-decision blockers remain active only for the specific metric behavior they affect. This is not a production, release, or enterprise programme.
 
 - **Updated:** 2026-10-14 (Asia/Calcutta)
 - **Repository:** `ramkivs/ipo-screening-engine`
-- **Tracker branch:** `arena/573e69a4-ipo-screening-engine` (fixed session branch; Candidate M pending independent review; post-M A15 implementation review also pending)
-- **Governance/evidence reference:** `arena/4e1080b7-ipo-screening-engine` at `adbd93c5b4450fb113561368d7d101eb4686c842`
-- **Product-code review base:** `arena/01a10b42-ipo-screening-engine` at `4b19faf848a721265597a678926988d484d30e59`
-- **Assembly authority:** A11–A13, authorization commit `7e25d1e2f97d162d97ff837c7dd40fb3d070aea1`
-- **Assembled review candidate M:** merge commit `9bad659927616ad7fd3aad2864b6637f095872c5`, tree `5adc30818c8bff61d8ca4b4a5529d2389df91bc5`; parents are authorization commit `7e25d1e2f97d162d97ff837c7dd40fb3d070aea1` and product base `4b19faf848a721265597a678926988d484d30e59`. Candidate M's exact tree remains unchanged.
-- **Post-M A15 implementation:** commit `fecdd8220500d7932c93b55b311a5f9830f92572`, tree `657e6b049156ce14a1b77b495700f34a3a20c068`, adds exactly the five paths authorized in the 2026-10-14 A15 decision addendum. It is not part of Candidate M.
-- **Review/design status:** A14 records Ramki's appointment of Sai and Ramki-reported “no material issues” for Candidate M only; no Sai-authored `ACCEPT`/`REJECT`, scope report, or substantiated independence declaration is recorded. A14 review remains pending. No separate extension/report for the A15 commit/tree is recorded, so A15 independent review also remains pending. Phase 0 remains OPEN; see `handoff/investigation/A14-REVIEW-DISPOSITION-PHASE0-CLOSURE-ASSESSMENT-2026-10-13.md` (a dated assessment, not acceptance). The exact A15 profile and bounded implementation grant are recorded in `handoff/decisions/A15_CANONICAL_EVIDENCE_OUTPUT_CONTRACT_DECISION_2026-10-13.md`; product acceptance remains separate and unrecorded.
-- **Open PR candidate:** PR #3, `arena/ipo-screening-engine-v1.5` at `49c994430148d327e0afff6d67f31072563d64cc`
-- **Canonical delivery candidate:** NOT SELECTED. This review candidate is not an accepted release.
-- **Authority:** Individual project decisions remain governed by their cited records in `handoff/decisions/`. This tracker is a status summary only.
+- **Working branch:** `arena/573e69a4-ipo-screening-engine` (fixed session branch; do not switch branches)
+- **Reference baseline before this pass:** `3b7c71cd05efc608fdca60eb1a988f5cf19d60a0` (A15 follow-on tip selected by A16)
+- **Controlling decision:** `handoff/decisions/A16-personal-use-operating-scope-and-gate-disposition.md`
+- **Historical records retained below:** Candidate M `9bad659927616ad7fd3aad2864b6637f095872c5`, A15 implementation `fecdd8220500d7932c93b55b311a5f9830f92572`, A11–A14, and PR #3. They remain unchanged; A16 supersedes blanket process gates for routine personal-use work only.
 
-## Remote inventory checked 2026-10-14
+## Current working baseline
+
+The fixed session branch's 2026-10-14 tree is the validated working baseline for Ramki's local personal application. It contains the existing product lineage and the separately authorized A15 canonical evaluation-record output. Candidate M (`9bad659927616ad7fd3aad2864b6637f095872c5`) remains preserved as a historical bounded review candidate, not rebuilt or selected. PR #3 remains an older, separate open PR and is not a prerequisite for using this baseline.
+
+A15's `evaluation-record.v1.json` is an additive persisted artifact. `evaluation.py` differs from its earlier frozen hash only for this A15-reviewed output/persistence path; the v1.6 frozen-core pin now records the reviewed digest. The golden evaluation result remains `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`. v1.5 remains active and v1.6 inactive; no scoring weights or metric thresholds are changed here. This is a personal-use working baseline, not a release or production promotion. A11's historical Phase 0 `OPEN` disposition is not rewritten as closed.
+
+## Current personal-use status register
+
+| Category | Workstream | Verified state / limiting evidence / next action |
+|---|---|---|
+| **COMPLETED / VERIFIED** | Working baseline and authority | A16 records the current personal-use scope and selects the fixed session branch over Candidate M/PR #3 as the working baseline. Routine progress no longer waits on the historical general Phase 0/Phase 1, reviewer, acceptance, or canonical-selection ceremony. |
+| **COMPLETED / VERIFIED** | Deterministic evaluation and A15 persistence | All six frozen-core files verify against the current pin; `verify_golden_result()` passes with hash `e84f8bc0...`; `verify_v1_6_implementation()` reports `PASS` with zero failures/warnings. The v1.6 candidate is still inactive. A generated fixture record verifies as seven payload artifacts and replays to the same hash. |
+| **COMPLETED / VERIFIED** | Personal local run path | README, pinned `requirements.txt`, and runbook document isolated Python setup, config validation, deterministic CLI run/verify/replay, and same-origin local UI/API. The API's limited POST scope is explicit; cross-origin workflow writes are rejected. No authentication is provided, so instructions bind to loopback. |
+| **COMPLETED / VERIFIED** | Automated regression and self-review | Latest full Python suite: 702 passed; frontend: 55 passed. Self-review is recorded as self-review/testing, not independent review. Full evidence and limitations are below. |
+| **EVIDENCE-BLOCKED** | NIFTY trend | A8-M's calculation and required-UNKNOWN/Final behavior are policy-approved. Source-native NSE price-index bytes/availability and deterministic session/publication evidence are not qualified; no current trend category is assigned. Keep the signal UNKNOWN until those specific artifacts/rules exist. |
+| **EVIDENCE-BLOCKED** | Subscription, GMP, peers, other market signals | Current checkout does not establish all source-native event/value/provenance/cutoff evidence needed to qualify subscription, GMP, peer, VIX, listing-gain, or anchor metrics. Existing adapters/fixtures are not proof of source qualification or live-feed availability. Do not infer a value or source. |
+| **MATERIAL-DECISION-REQUIRED** | Unresolved metric contracts | Before using affected metrics, settle any still-open source identity, event/denominator, cutoff/freshness, eligibility/universe, hash/serialization, and missing-input/Final behavior for that metric. Existing A8-M/A9/A10 decisions remain controlling where they actually settle a field; do not reopen settled policy or invent thresholds. These decisions block only the dependent metric, not unrelated app work. |
+| **EVIDENCE-BLOCKED** | Golden fixture as live research evidence | The deterministic Vishal Nirmiti fixture is a regression sample, not a source-qualified recommendation. Its current output is `INSUFFICIENT_DATA` (score 35.0) and reports 110 material fields without evidence references. The golden hash proves reproducibility, not truth, freshness, or investment suitability. |
+| **DEFERRED / OUT OF SCOPE** | Product architecture and operations | Live streaming providers, external purchases/provider contact, authentication/RBAC, multi-user support, PostgreSQL, enterprise architecture, production deployment, tags/releases, and production activation are not personal-use goals and are not required. |
+| **DEFERRED / PRESERVE** | Historical governance artifacts | Preserve Candidate M, PR #3, the original tracker on the governance branch, and the authorization-request draft. Do not merge/close PRs or perform destructive cleanup to make the tracker appear complete. |
+
+## Verification evidence (2026-10-14)
+
+| Check | Result |
+|---|---|
+| `verify_frozen_core()` | **PASS** — all 6 pinned files match, including the A15-reviewed `evaluation.py` digest. |
+| `verify_golden_result()` | **PASS** — `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`. |
+| `verify_v1_6_implementation()` | **PASS** — no failures or warnings; this does not activate v1.6. |
+| `PYTHONPATH=engine .venv/bin/python -m pytest tests/ -q` | **702 passed**, 2 non-fatal Starlette deprecation warnings. |
+| Focused post-review API/UI/lifecycle/record/v1.6 suite | **191 passed**, 2 non-fatal Starlette deprecation warnings. |
+| `npm --prefix frontend test` | **55 passed**, 0 failed. |
+| Config / persistence / replay smoke check | v1.5 config valid for 10 profile plans; fixture run stored 7 artifacts; `verify` found 0 mismatches; replay reproduced the golden result. Output remains `INSUFFICIENT_DATA`, with provenance gaps noted above. |
+| Dependency / API contract check | `pip check` reports no broken requirements; OpenAPI YAML parses and lists only the explicit workflow POST routes; API metadata reports `read_only: false` truthfully. |
+| Targeted self-review | Confirmed exact lifecycle path matching, same-origin restriction for browser POSTs, no arbitrary write methods, no score/configuration mutation route, and no client-side score calculation. No independent review or external acceptance is claimed. |
+
+## Remote inventory checked 2026-10-14 (pre-publication snapshot)
 
 | Ref / mechanism | Verified state |
 |---|---|

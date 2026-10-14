@@ -8,6 +8,8 @@
 **Program Authority:** Ramki  
 **Governance Mode:** Read-Only Investigation & Authoritative Product Reconciliation (No Code Mutation / No Configuration Activation / No Deployment)  
 
+> **Current-state correction (2026-10-14):** This is a historical 2026-10-06 reconciliation, not the current product authority or work register. Its statements that the UI exists only as a prototype and that Phase/roadmap procedures are mandatory are superseded for the single-user personal-use lane by A16. The current session branch contains the integrated FastAPI/static frontend and A15 evaluation-record output; see the repository README and current tracker. The v1.5 active configuration and v1.6 inactive status remain unchanged. Source-evidence and metric-specific correctness limits remain real.
+
 ---
 
 ## 1. Executive Summary

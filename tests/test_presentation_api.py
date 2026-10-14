@@ -1,6 +1,6 @@
 """UI-1 Presentation API & Read-Model Test Suite.
 
-Asserts contract adherence, read-only enforcement, UNKNOWN semantics,
+Asserts contract adherence, scoped write enforcement, UNKNOWN semantics,
 deterministic ordering, provenance preservation, and governance boundaries.
 """
 
@@ -208,12 +208,12 @@ def test_openapi_contract_file_is_valid_and_complete():
 
 
 # -----------------------------------------------------------------------------
-# 2. Read-Only Enforcement
+# 2. Scoped Write Enforcement
 # -----------------------------------------------------------------------------
 
 
-def test_mutation_methods_strictly_prohibited(populated_env):
-    """Spec s2: Read-only enforcement blocks POST, PUT, PATCH, DELETE with 405."""
+def test_unscoped_mutation_methods_are_rejected(populated_env):
+    """Unscoped write requests to read-model collections are rejected with 405."""
     client = populated_env["client"]
 
     for method in ["POST", "PUT", "PATCH", "DELETE"]:
@@ -229,13 +229,13 @@ def test_mutation_methods_strictly_prohibited(populated_env):
 
 
 def test_health_endpoint(populated_env):
-    """GET /api/v1/health returns healthy and read_only: true."""
+    """Health reports the API's limited ingestion/lifecycle write scope accurately."""
     client = populated_env["client"]
     res = client.get("/api/v1/health")
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "healthy"
-    assert data["read_only"] is True
+    assert data["read_only"] is False
 
 
 def test_meta_endpoint(populated_env):
@@ -249,6 +249,7 @@ def test_meta_endpoint(populated_env):
     assert data["active_config_version"] == "1.5.0"
     assert data["candidate_config_version"] == "1.6.0"
     assert data["candidate_config_status"] == "IMPLEMENTED_INACTIVE"
+    assert data["read_only"] is False
     assert data["golden_result_hash"] == "e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1"
 
 

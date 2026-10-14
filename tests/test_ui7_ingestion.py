@@ -7,7 +7,7 @@ Asserts:
 4. Duplicate upload detection and idempotent return without overwriting immutable store.
 5. Golden evaluation result hash preservation (e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1).
 6. Strict validation gates (missing file, invalid format, non-PDF magic bytes, payload size limit, invalid mode).
-7. Strict read-only enforcement on all other presentation routes (HTTP 405).
+7. Scoped write enforcement on all other presentation routes (HTTP 405).
 8. Support for preliminary evaluation mode.
 """
 
@@ -284,8 +284,8 @@ def test_ingest_rejects_oversized_payload(test_env, monkeypatch):
 # -----------------------------------------------------------------------------
 
 
-def test_presentation_routes_remain_strictly_read_only(test_env):
-    """Only POST /api/v1/ingest/document is permitted; all other mutations return 405 Method Not Allowed."""
+def test_presentation_routes_limit_write_scope(test_env):
+    """Only filing ingestion and exact evaluation lifecycle routes accept POST."""
     client = test_env["client"]
 
     # Block POST on read-only collections
@@ -299,6 +299,28 @@ def test_presentation_routes_remain_strictly_read_only(test_env):
         res = client.request(method, "/api/v1/ingest/document")
         assert res.status_code == 405
         assert res.json()["code"] == "READ_ONLY_METHOD_NOT_ALLOWED"
+
+    # Suffix lookalikes are not accepted as lifecycle write routes.
+    res = client.post("/api/v1/not-an-evaluation/archive", json={})
+    assert res.status_code == 405
+    assert res.json()["code"] == "READ_ONLY_METHOD_NOT_ALLOWED"
+
+    # A cross-site browser request cannot use an unauthenticated workflow route.
+    res = client.post(
+        "/api/v1/evaluations/nonexistent-evaluation/archive",
+        json={},
+        headers={"Origin": "https://attacker.example"},
+    )
+    assert res.status_code == 403
+    assert res.json()["code"] == "CROSS_ORIGIN_WRITE_REJECTED"
+
+    # Same-origin requests pass the origin check and reach route validation.
+    res = client.post(
+        "/api/v1/evaluations/nonexistent-evaluation/archive",
+        json={},
+        headers={"Origin": "http://testserver"},
+    )
+    assert res.status_code == 404
 
 
 # -----------------------------------------------------------------------------

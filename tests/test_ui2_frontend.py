@@ -5,7 +5,7 @@ Verifies:
 2. Structural compliance of UI-2 Executive Dashboard & Scorecard.
 3. WCAG AA accessibility landmarks and semantic tagging.
 4. Zero score calculation invariant (no frontend formulas or weighting).
-5. Read-only invariant (zero mutation endpoints, methods, or activation buttons).
+5. Scoped API mutation invariant (only ingestion/lifecycle POST actions; no scoring/configuration controls).
 6. Fail-closed invariant (UNKNOWN states preserved, never converted to 0.00).
 7. Governance display invariant (v1.5 ACTIVE, v1.6 INACTIVE, no activation controls).
 """
@@ -114,18 +114,25 @@ def test_ui2_zero_calculation_invariant():
         assert identifier not in combined, f"Frontend must not define {identifier}"
 
 
-def test_ui2_zero_mutation_and_read_only_protocol():
-    """Verify frontend API client and router do not support HTTP mutations."""
+def test_ui2_scoped_api_mutation_protocol():
+    """Read models use GET; only the explicit ingestion/lifecycle actions use POST."""
     api_js = (FRONTEND_DIR / "api.js").read_text(encoding="utf-8")
+    app_js = (FRONTEND_DIR / "app.js").read_text(encoding="utf-8")
 
-    # No mutation methods in ApiClient
-    assert "POST" not in api_js
-    assert "PUT" not in api_js
-    assert "PATCH" not in api_js
-    assert "DELETE" not in api_js
-
-    # ApiClient must only use GET
     assert "method: 'GET'" in api_js
+    assert "method: 'POST'" in api_js
+    assert "async archiveEvaluation(" in api_js
+    assert "async unarchiveEvaluation(" in api_js
+    assert "async makeEvaluationActive(" in api_js
+    assert "async ingestDocument(" in api_js
+    assert "method: 'PUT'" not in api_js
+    assert "method: 'PATCH'" not in api_js
+    assert "method: 'DELETE'" not in api_js
+
+    # Browser code remains a presentation layer, not an engine or policy writer.
+    assert "calculateScore" not in app_js
+    assert "activatePolicy" not in app_js
+    assert "method: 'POST'" not in app_js
 
 
 def test_ui2_fail_closed_unknown_representation():

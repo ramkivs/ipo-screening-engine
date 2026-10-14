@@ -62,7 +62,9 @@ FROZEN_CORE_HASHES: Dict[str, str] = {
     "engine/ipo_screening/scoring.py": "3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a",
     "engine/ipo_screening/knockouts.py": "8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f",
     "engine/ipo_screening/snapshots.py": "9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27",
-    "engine/ipo_screening/evaluation.py": "d20d87b69e01ced146791fe9a4e61faa5d522281383781bfbf5e97e7055810ae",
+    # A15 adds only an output artifact to evaluation.py; pin that reviewed hash
+    # here while the golden-result check independently protects scoring output.
+    "engine/ipo_screening/evaluation.py": "1258cd82145b6ce2813687a3fe072a2aaad304522abd8d34553eacc8ac4f92e6",
     "engine/ipo_screening/extraction/price_band_notice.py": "779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4",
 }
 

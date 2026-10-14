@@ -7,6 +7,8 @@
 **Status:** DELIVERED & AUDITED  
 **Date:** 2026-10-06  
 
+> **Current-state correction (2026-10-14):** This is a historical UI-4 report. The current local application includes scoped filing-ingestion and evaluation-lifecycle POST actions; the performance/read-model views remain GET projections. No source-policy or scoring mutation is exposed. Use the repository README and current API contract for operating instructions.
+
 ---
 
 ## 1. Executive Summary

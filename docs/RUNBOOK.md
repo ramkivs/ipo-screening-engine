@@ -20,28 +20,50 @@ later. Excel is a projection of those records, never a source of truth.
 
 ## 2. Setup
 
+Use an isolated Python 3.11+ environment. The pinned runtime, web UI, PDF-ingestion,
+and test dependencies are in `requirements.txt`.
+
 ```bash
-cd /home/user/ipo-screening-engine
-
-# Python 3.11+. Install the three runtime/test dependencies.
-python3 -m pip install --break-system-packages jsonschema openpyxl pytest
-
-# pypdf is only needed to re-extract text from an RHP PDF.
-python3 -m pip install --break-system-packages pypdf
-
-# The engine is a plain package: put it on PYTHONPATH, no install step.
-export PYTHONPATH=$PWD/engine
+# From the repository root
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+export PYTHONPATH="$PWD/engine"
 ```
 
 Sanity check:
 
 ```bash
-python3 -c "import ipo_screening as e; print(e.__version__, e.SPEC_VERSION)"
+python -c "import ipo_screening as e; print(e.__version__, e.SPEC_VERSION)"
 # 1.5.0 1.5
-
-python3 -m pytest tests/ -q
-# 238 passed
+python -m pytest tests/ -q
 ```
+
+Test counts in older reports are historical; rely on the output from the run you
+actually perform.
+
+### 2.1 Start the personal-use web application
+
+The FastAPI app serves both the presentation API and the static frontend. First
+create at least one local evaluation so the directory and dashboard have data:
+
+```bash
+python engine/tools/ipo_screen.py run fixtures/vishal_nirmiti/input.json \
+  --at 2026-10-05T12:00:00Z \
+  --store build/evaluations
+```
+
+Then start the server on loopback:
+
+```bash
+uvicorn ipo_screening.presentation.api:app --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000/ui/`; API docs are at `/docs`. The browser client
+uses the same origin. This personal-use server has no authentication and exposes
+limited POST actions for filing ingestion and evaluation lifecycle state, so keep
+it bound to loopback. `IPO_STORE_ROOT` can select another local store before
+starting the server. See the repository README for the shortest setup path.
 
 ---
 
@@ -212,7 +234,7 @@ edit to any file is detected. Exit code `3` means a mismatch.
 
 ```bash
 python3 engine/tools/ipo_screen.py verify --store build/evaluations
-# OK   VISHAL-NIRMITI-LIMITED-20261005-120000Z-final-e84f8bc0  artifacts=6
+# OK   VISHAL-NIRMITI-LIMITED-20261005-120000Z-final-e84f8bc0  artifacts=7
 # 1 evaluation(s) checked, 0 mismatch(es)
 ```
 

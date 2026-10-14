@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ApiClient, ApiError } from '../api.js';
 
-test('ApiClient - Initialisation and read-only protocol', () => {
+test('ApiClient - Initialisation and scoped action surface', () => {
   const client = new ApiClient('/custom/base');
   assert.equal(client.baseUrl, '/custom/base');
   assert.equal(client.apiPrefix, '/custom/base/api/v1');
@@ -12,7 +12,7 @@ test('ApiClient - Initialisation and read-only protocol', () => {
   assert.equal(defaultClient.baseUrl, '');
   assert.equal(defaultClient.apiPrefix, '/api/v1');
 
-  // Verify strictly NO mutation methods exist
+  // No generic mutation surface; only the explicit supported actions are exposed.
   const forbiddenMethods = [
     'post', 'put', 'patch', 'delete',
     'create', 'update', 'remove', 'mutate',
@@ -22,6 +22,8 @@ test('ApiClient - Initialisation and read-only protocol', () => {
   for (const method of forbiddenMethods) {
     assert.equal(typeof defaultClient[method], 'undefined', `Client must not expose ${method}`);
   }
+  assert.equal(typeof defaultClient.archiveEvaluation, 'function');
+  assert.equal(typeof defaultClient.ingestDocument, 'function');
 });
 
 test('ApiClient - System endpoints (getHealth, getMeta, getConfigurationStatus)', async () => {

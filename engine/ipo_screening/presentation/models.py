@@ -1,7 +1,8 @@
-"""UI-1 Presentation Read-Model Pydantic Schemas.
+"""Presentation API Pydantic schemas.
 
-Declares deterministic, read-only DTOs for the Presentation API matching
-OpenAPI specification docs/openapi/presentation-api-v1.yaml.
+GET responses are read-model projections. The local personal-use API also has
+explicit filing-ingestion and evaluation-lifecycle POST operations; it exposes
+no scoring or configuration mutation endpoint.
 """
 
 from __future__ import annotations
@@ -14,7 +15,10 @@ class HealthStatus(BaseModel):
     model_config = ConfigDict(extra="ignore")
     status: str = "healthy"
     timestamp: str
-    read_only: bool = True
+    read_only: bool = Field(
+        default=False,
+        description="False: explicit POST routes can ingest a filing or update evaluation lifecycle state.",
+    )
 
 
 class ApiMeta(BaseModel):
@@ -26,7 +30,10 @@ class ApiMeta(BaseModel):
     candidate_config_version: str = "1.6.0"
     candidate_config_status: str = "IMPLEMENTED_INACTIVE"
     golden_result_hash: str = "e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1"
-    read_only: bool = True
+    read_only: bool = Field(
+        default=False,
+        description="False: limited ingestion and lifecycle POST operations are supported; scoring/configuration are not mutable through this API.",
+    )
 
 
 class IpoSummary(BaseModel):

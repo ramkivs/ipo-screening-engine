@@ -7,6 +7,8 @@
 **Status:** DELIVERED & AUDITED  
 **Date:** 2026-10-06  
 
+> **Current-state correction (2026-10-14):** This is a historical UI-6 report. Calibration and configuration remain read-only views, and v1.6 remains inactive. The integrated personal-use application additionally supports scoped ingestion and evaluation-lifecycle POST actions; no scoring/configuration write route is exposed. Keep the unauthenticated server on loopback. See the current README and API contract.
+
 ---
 
 ## 1. Executive Summary

@@ -7,6 +7,8 @@
 **Status:** DELIVERED & AUDITED  
 **Date:** 2026-10-06  
 
+> **Current-state correction (2026-10-14):** This is a historical UI-5 report. The analytics pages remain read-model projections; the integrated personal-use application separately supports scoped ingestion and evaluation-lifecycle POST actions. Those actions do not change scores or calibration configuration. See the current README and API contract.
+
 ---
 
 ## 1. Executive Summary

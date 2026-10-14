@@ -8,6 +8,8 @@
 **Program Authority:** Ramki  
 **Governance Mode:** READ-ONLY INVESTIGATION (Zero Implementation / Zero Configuration Mutation / Zero Activations / Zero Merges)  
 
+> **Current-state correction (2026-10-14):** This 2026-10-06 report is historical. Its statements that the repository contains only the legacy HTML prototype and that the UI is future mandatory work are superseded. The current tree contains a vanilla-JavaScript frontend (`frontend/`) served by the FastAPI presentation app, with dashboard, directory, evidence, performance, backtest, calibration, and filing-ingestion views. Targeted frontend/API checks are part of the current personal-use work. This is a local single-user application without authentication; bind it to loopback for personal use. See the repository README and current work register for the verified operating path and limits.
+
 ---
 
 ## 1. Executive Summary

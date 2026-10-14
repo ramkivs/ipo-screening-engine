@@ -8,7 +8,7 @@ Verifies:
 5. Backtest analytics and calibration governance boundary affordances.
 6. Scorecard-to-performance bidirectional navigation.
 7. Zero client-side return calculation invariant.
-8. Strictly read-only protocol and zero mutation capability.
+8. Scoped API write boundary with no scoring or configuration mutation.
 9. Absence of policy activation controls.
 10. Zero server filesystem path exposure and zero credential leakage.
 """

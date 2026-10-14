@@ -24,6 +24,8 @@ git diff --shortstat 01ba66c v1.5-delivery
 Design v1.5 → Execution Prompt → Artifact Manifest. The six Claude artifacts are
 reference/prototype material only.
 
+> **Current-state note (2026-10-14):** This remains a historical v1.5 report; its branch/tag and six-artifact/frozen-file statements describe the 2026-10-05 baseline, not the current personal-use working tree. A15 subsequently added `evaluation-record.v1.json` as a seventh payload artifact and changed `evaluation.py` only for this additive persistence/output path. The five scoring/market core files remain hash-pinned, and the golden result hash remains `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`. The current working baseline and operating scope are in `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` and `handoff/decisions/A16-personal-use-operating-scope-and-gate-disposition.md`.
+
 ---
 
 ## A. Implementation summary
@@ -599,7 +601,7 @@ python3 engine/tools/ipo_screen.py replay \
 
 # Re-derive every artifact hash from disk.
 python3 engine/tools/ipo_screen.py verify --store build/evaluations
-# -> OK  … artifacts=6 ; 0 mismatch(es)
+# -> OK  … artifacts=7 ; 0 mismatch(es)  (current A15 profile; six in this report's original 2026-10-05 baseline)
 
 # Same hash across interpreters with different hash seeds.
 for seed in 0 1 12345; do

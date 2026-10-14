@@ -1,8 +1,9 @@
-"""UI-1 Presentation Read-Model Service.
+"""Presentation read-model and explicit personal-use workflow service.
 
-Encapsulates all read operations against on-disk immutable stores
-(EvaluationStore, observation stores, datasets, analytics, and configuration).
-STRICTLY READ-ONLY: zero write operations, zero calculations, zero mutations.
+Read methods project on-disk evaluation, observation, dataset, analytics, and
+configuration records. Separate filing-ingestion and evaluation-lifecycle
+methods perform the narrowly scoped local writes; no method scores an IPO or
+changes screening configuration.
 """
 
 from __future__ import annotations
@@ -136,7 +137,7 @@ class PresentationService:
             candidate_config_version=V1_6_CONFIG_VERSION,
             candidate_config_status="IMPLEMENTED_INACTIVE",
             golden_result_hash=GOLDEN_RESULT_HASH,
-            read_only=True,
+            read_only=False,
         )
 
     # -------------------------------------------------------------------------

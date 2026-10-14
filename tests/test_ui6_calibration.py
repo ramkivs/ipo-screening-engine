@@ -10,7 +10,7 @@ Verifies:
 7. Cryptographic provenance panel displaying proposal, config, dataset, and analysis hashes.
 8. Cross-view navigation integration from Dashboard, Backtest, and Performance views.
 9. Zero client-side calibration or scoring calculation invariant.
-10. Strictly read-only protocol and zero mutation capability.
+10. Scoped API write boundary with no scoring or configuration mutation.
 11. Absence of policy activation controls.
 12. Zero server filesystem path exposure and zero credential leakage.
 """

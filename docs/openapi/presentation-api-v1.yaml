@@ -3,16 +3,18 @@ info:
   title: IPO Screening Engine — Presentation Read-Model API
   version: 1.0.0
   description: |
-    Deterministic, read-only presentation API projecting immutable evaluation,
-    post-listing observation, backtesting, and calibration records produced by
-    the Indian Mainboard IPO Screening Engine.
+    Personal-use presentation API projecting immutable evaluation, post-listing,
+    backtesting, and calibration records. GET routes provide read models; the
+    only supported writes are documented POST actions for filing ingestion and
+    evaluation lifecycle transitions. Scoring and configuration are not mutable
+    through this API.
 
     PRINCIPLES:
-    - Pure presentation read model (GET / HEAD / OPTIONS only; zero mutation endpoints).
-    - Authoritative source of truth remains the immutable EvaluationStore on disk.
+    - Limited write surface: POST /ingest/document and the archive, unarchive, and make-active evaluation routes only.
+    - Authoritative source of truth remains the EvaluationStore and related artifacts on disk.
     - Zero client-side or API-side duplicate scoring or metric calculation.
     - Explicit preservation of UNKNOWN, NOT_APPLICABLE, and INSUFFICIENT_DATA semantics.
-    - Zero exposure of model provider or external data credentials.
+    - No model provider or external data credentials are exposed.
 servers:
   - url: /api/v1
     description: Presentation API v1 prefix
@@ -25,7 +27,7 @@ paths:
       tags: [System]
       responses:
         '200':
-          description: Service is healthy and operating in read-only mode
+          description: Service is healthy; read_only is false because explicit workflow POST actions are available.
           content:
             application/json:
               schema:
@@ -609,7 +611,8 @@ components:
           format: date-time
         read_only:
           type: boolean
-          example: true
+          description: False because explicit filing-ingestion and evaluation-lifecycle POST actions are available.
+          example: false
 
     ApiMeta:
       type: object
@@ -638,7 +641,8 @@ components:
           example: e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1
         read_only:
           type: boolean
-          example: true
+          description: False because explicit filing-ingestion and evaluation-lifecycle POST actions are available.
+          example: false
 
     IpoSummary:
       type: object

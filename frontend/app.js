@@ -7,7 +7,8 @@
  * 3. Evaluation Detail Scorecard (#evaluations/{id})
  * 4. Evidence & Provenance Explorer (#evidence/{id})
  *
- * STRICTLY READ-ONLY: all figures, verdicts, and bounds are delivered by UI-1.
+ * The engine remains the sole scoring authority: figures, verdicts, and bounds are
+ * delivered by the API. Explicit user workflow actions are delegated to API routes.
  * ZERO client-side scoring calculations; ZERO API keys stored.
  */
 
