@@ -16,6 +16,15 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from .canonical_input import MONETARY_FIELDS
+from .gmp_evidence import (
+    GMP_LINK_DIAGNOSTIC_CODE,
+    GmpEvidenceError,
+    GmpEvidenceLinkVerification,
+    verify_gmp_evidence_link,
+    verify_gmp_linkage_projection,
+    _stable_link_artifact_digest_id,
+    _stable_link_manifest_digest_id,
+)
 from .hashing import CANONICAL_GRAMMAR_VERSION, sha256_of
 from .schema_validation import enforce_schema
 
@@ -340,6 +349,7 @@ def _digest_entry(
     local_subject_kind: Optional[str] = None,
     local_subject_ref: Optional[str] = None,
     locally_recomputed: bool = False,
+    evidence_refs: Sequence[str] = (),
     reason_message: str = "The legacy record does not establish this digest's algorithm, subject, or origin.",
 ) -> Dict[str, Any]:
     value = _require_text(digest_value, f"integrity digest {digest_id}.digest_value")
@@ -351,7 +361,7 @@ def _digest_entry(
             "subject_kind": local_subject_kind,
             "subject_ref": local_subject_ref,
             "origin": "LOCAL_COMPUTED",
-            "evidence_refs": [],
+            "evidence_refs": sorted(set(str(ref) for ref in evidence_refs if ref)),
         }
         if local_subject_kind in {"CANONICAL_JSON_OBJECT", "V1_5_RESULT_PAYLOAD"}:
             entry["canonicalization_id"] = CANONICALIZATION_ID
@@ -473,6 +483,88 @@ def _build_integrity_digests(record: Any, sources: Sequence[Mapping[str, Any]]) 
                 )
             )
     return sorted(digests, key=lambda item: item["digest_id"]), by_source
+
+
+def _apply_gmp_link_a15_mapping(
+    verification: Optional[GmpEvidenceLinkVerification],
+    *,
+    digests: List[Dict[str, Any]],
+    source_by_id: Dict[str, Dict[str, Any]],
+) -> None:
+    """Apply only the approved A15 additions for an attempted GMP link."""
+    if verification is None or not verification.source_id:
+        return
+    source = source_by_id.get(verification.source_id)
+    if source is not None and verification.rejected_retrieval_timestamp:
+        # The attempted link explicitly contradicts L1's no-exact-receipt-time
+        # rule. Preserve the supplied field in evidence.json, but do not promote
+        # it to an exact A15 retrieval-time fact.
+        source["timestamps"] = [
+            item
+            for item in source.get("timestamps", [])
+            if item.get("kind") != "LOCAL_RETRIEVED_AT"
+        ]
+
+    # A verified manifest+artifact preserves its interval honestly even when a
+    # later identity/value/cutoff check fails. The interval is never an instant.
+    if (
+        source is not None
+        and verification.manifest_verified
+        and verification.artifact_verified
+        and verification.retrieval_window_utc
+    ):
+        timestamps = source.setdefault("timestamps", [])
+        window_fact = {
+            "kind": "LOCAL_RETRIEVED_AT",
+            "state": "UNKNOWN",
+            "source_text": verification.retrieval_window_utc,
+            "evidence_refs": sorted(set(verification.evidence_refs)),
+            "reason": {
+                "code": "UNAVAILABLE",
+                "message": "exact receipt time not captured; the manifest records only this bracketing window",
+            },
+        }
+        if window_fact not in timestamps:
+            timestamps.append(window_fact)
+            timestamps.sort(key=lambda item: (item.get("kind", ""), item.get("source_text", "")))
+
+    if verification.status != "VERIFIED":
+        return
+    if source is None or not verification.manifest_sha256 or not verification.artifact_sha256:
+        raise EvaluationRecordV1Error("verified GMP link lacks its A15 source or computed digests")
+    if not verification.manifest_path or not verification.artifact_path:
+        raise EvaluationRecordV1Error("verified GMP link lacks repository-relative digest subjects")
+
+    manifest_digest_id = _stable_link_manifest_digest_id(verification.source_id)
+    artifact_digest_id = _stable_link_artifact_digest_id(
+        verification.source_id,
+        verification.artifact_id,
+    )
+    # The manifest pin's legacy-unresolved digest is replaced, not duplicated.
+    digests[:] = [item for item in digests if item.get("digest_id") != manifest_digest_id]
+    digests.append(
+        _digest_entry(
+            manifest_digest_id,
+            verification.manifest_sha256.lower(),
+            local_subject_kind="RAW_ARTIFACT_BYTES",
+            local_subject_ref=verification.manifest_path,
+            locally_recomputed=True,
+            evidence_refs=verification.evidence_refs,
+        )
+    )
+    digests.append(
+        _digest_entry(
+            artifact_digest_id,
+            verification.artifact_sha256.lower(),
+            local_subject_kind="RAW_ARTIFACT_BYTES",
+            local_subject_ref=verification.artifact_path,
+            locally_recomputed=True,
+            evidence_refs=verification.evidence_refs,
+        )
+    )
+    digest_refs = set(source.get("digest_refs", []))
+    digest_refs.update((manifest_digest_id, artifact_digest_id))
+    source["digest_refs"] = sorted(digest_refs)
 
 
 def _source_timestamp_findings(
@@ -928,13 +1020,13 @@ def _a9_final_gmp_gate(
 ) -> Optional[Dict[str, Any]]:
     """Return A9's nonterminal reason for Final under the current GMP contract.
 
-    The current v1.5 input/connector/A15 model has no approved GMP source or
-    qualification signal and does not define the required GMP hash subject.
-    Consequently no supplied block can be promoted to qualifying evidence:
-    a generic market-snapshot digest and an opaque legacy SourceRef.content_hash
-    are deliberately not used as substitutes. Missing values are distinguished
-    from present-but-unqualified observations; no source, event, cutoff,
-    freshness, hash, or serialization semantics are inferred here.
+    The A9 contract still defines no qualifying GMP source or qualification
+    signal and does not define the required A9 GMP hash subject. The separate §7
+    local-byte linkage is recorded for evidence reproducibility only; it does
+    not grant A9 qualification and is not consumed here. A generic market
+    digest, an opaque legacy SourceRef.content_hash, or a verified local link is
+    never substituted for A9 approval. Missing values remain distinct from
+    present-but-unqualified observations, and the A9 outcome gate is unchanged.
     """
     if str(getattr(record, "evaluation_mode", "")).upper() != "FINAL":
         return None
@@ -1142,6 +1234,18 @@ def _project_evaluation_record(record: Any) -> Dict[str, Any]:
     legacy_sources = _record_sources(record)
     legacy_evidence = _record_evidence_items(record)
     findings: List[Dict[str, Any]] = []
+    link_context = getattr(record, "gmp_linkage_context", None)
+    link_verification: Optional[GmpEvidenceLinkVerification] = None
+    if isinstance(link_context, Mapping):
+        link_verification = verify_gmp_evidence_link(
+            link_context,
+            record,
+            evaluation_at=getattr(
+                record,
+                "gmp_linkage_evaluation_at",
+                getattr(record, "evaluation_timestamp", None),
+            ),
+        )
 
     source_by_id: Dict[str, Dict[str, Any]] = {}
     raw_source_by_id: Dict[str, Mapping[str, Any]] = {}
@@ -1213,6 +1317,11 @@ def _project_evaluation_record(record: Any) -> Dict[str, Any]:
     for source_id, digest_id in source_digest_refs.items():
         if source_id in source_by_id:
             source_by_id[source_id]["digest_refs"] = [digest_id]
+    _apply_gmp_link_a15_mapping(
+        link_verification,
+        digests=digests,
+        source_by_id=source_by_id,
+    )
 
     evidence_objects: List[Dict[str, Any]] = []
     evidence_id_set: set[str] = set()
@@ -1394,6 +1503,14 @@ def _project_evaluation_record(record: Any) -> Dict[str, Any]:
                 "evidence_refs": a9_gmp_reason["evidence_refs"],
             }
         )
+    if link_verification is not None:
+        result["diagnostics"].append(
+            {
+                "code": GMP_LINK_DIAGNOSTIC_CODE,
+                "message": link_verification.diagnostic_message,
+                "evidence_refs": list(link_verification.evidence_refs),
+            }
+        )
     result["diagnostics"].sort(key=lambda item: (item["code"], item["message"]))
 
     source_objects = sorted(
@@ -1468,6 +1585,13 @@ def _project_evaluation_record(record: Any) -> Dict[str, Any]:
         "integrity": {"digests": digests},
     }
     _assert_json_safe(payload)
+    if link_verification is not None:
+        try:
+            verify_gmp_linkage_projection(payload, link_verification)
+        except GmpEvidenceError as exc:
+            raise EvaluationRecordV1Error(
+                "assembled A15 evaluation document failed GMP-link verification"
+            ) from exc
     return payload
 
 
