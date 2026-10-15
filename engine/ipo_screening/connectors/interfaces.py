@@ -140,7 +140,8 @@ class ExternalSnapshot:
     snapshot_id: str
     provider_id: str
     source_class: SourceClass
-    retrieval_timestamp: str
+    #: None when the payload records no capture time; GMP never invents one (D2).
+    retrieval_timestamp: Optional[str]
     as_of: Optional[str]
     raw_source_hash: str
     normalized_data: Mapping[str, Any]
@@ -167,8 +168,9 @@ class ExternalSnapshot:
             "source_type": st,
             "uri": f"connector://{self.provider_id}/{self.snapshot_id}",
             "content_hash": self.raw_source_hash,
-            "retrieval_timestamp": self.retrieval_timestamp,
         }
+        if self.retrieval_timestamp:
+            ref["retrieval_timestamp"] = self.retrieval_timestamp
         if self.as_of:
             ref["source_timestamp"] = self.as_of
         if self.notes:

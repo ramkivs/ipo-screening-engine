@@ -5,6 +5,7 @@
 **Branch:** `arena/573e69a4-ipo-screening-engine`
 **Baseline reviewed:** remote branch tip `707405e9e81c80d791cedea9139d2ecfaf3ad02d`
 **Status:** Model A selected as the source-policy direction. No individual publisher is selected, approved, or A9-qualified.
+**Update (2026-10-15):** §6 records Ramki-approved project rules D1–D3 under this contract: evidence artifact and hash, availability by cutoff, and missing versus zero. They qualify no publisher.
 
 ## 1. Selected policy and authority limits
 
@@ -55,3 +56,111 @@ No scoring formulas, schemas, serialization, existing result hashes, or other ve
 ## 5. Next action
 
 Assess **one named publisher** against the eight requirements above using concrete source evidence. Do not restart broad candidate discovery. Until that assessment establishes a qualifying source, preserve the existing A9 fail-closed behavior.
+
+## 6. Approved project rules D1–D3 (2026-10-15)
+
+- **Decision IDs:** D1, D2, D3 (GMP source-policy rules under the §3 contract)
+- **Decision status:** RAMKI-APPROVED PRODUCT POLICY. These are user-approved decisions, not Arena recommendations.
+- **Decision authority:** RAMKI
+- **Decision date:** 2026-10-15 (Asia/Calcutta). No decision time is supplied or asserted.
+- **Authorization basis:** Ramki's explicit approval of the three decisions quoted below, given in the 2026-10-15 instruction "Implement approved GMP source-policy decisions D1–D3".
+- **Repository and baseline:** `ramkivs/ipo-screening-engine`; fixed session branch `arena/573e69a4-ipo-screening-engine` at remotely verified commit `9dba813b88d9f4ff238a4f94c80dd1e7cbb11dd4`.
+- **Scope:** three requirements of the §3 contract, for any named publisher:
+  - D1 covers requirement 5 (artifact and hash);
+  - D2 covers the evaluation-time availability part of requirement 8;
+  - D3 covers requirement 6 (missing versus zero).
+  - The rules select, approve and qualify no publisher.
+- **Where recorded:** here, as Ramki instructed, so that no competing decision document exists. GOV-001's default is a separate `handoff/decisions/` record; this section carries the elements GOV-001 requires.
+- **Implementation authority:** GRANTED, within A16's personal-use scope, for the minimum enforcement listed under "Implementation". Nothing else is authorized.
+
+### 6.1 Approved decisions
+
+**D1 — Evidence artifact and hash.**
+> A retained rendered-text capture plus its file hash is acceptable only as a clearly labelled publisher-reported observation. The hash establishes integrity of the retained capture, not publisher authenticity, source-native bytes, or dealer verification. Never describe a rendered capture as raw/source-native evidence.
+
+**D2 — Availability by cutoff.**
+> To qualify for an evaluation cutoff, the evidence capture must have been obtained at or before the evaluation timestamp. A later capture of a reading with an earlier displayed timestamp does not prove the reading was available at the earlier cutoff. Enforce this consistently with A17-1. Do not infer historical availability from a publisher's displayed timestamp.
+
+**D3 — Missing versus zero.**
+> "Not quoted yet" maps to MISSING. A displayed ₹0 maps to SOURCE_UNQUALIFIED. A numeric zero alone is not valid qualifying GMP evidence.
+
+**Origin.** The [MarketLiveIPOGMP qualification record](A9-GMP-ALTERNATIVE-PUBLISHER-QUALIFICATION-2026-10-15.md) §15.5 framed these as open decisions. They adopt the substance of that record's §8 proposals, to the extent of the approved text above:
+- PR-3 (artifact and hash) for D1;
+- PR-1's "retrieved at or before the evaluation timestamp" clause for D2;
+- PR-4a and PR-4b for D3.
+
+PR-4f and PR-5 remain unadopted.
+
+### 6.2 Relationship to v1.5 and existing decisions
+
+- **v1.5, not changed.** §19 requires the GMP snapshot and source hashes for Final. It defines no GMP hash subject, availability rule or zero semantics. D1–D3 are project-level resolutions of those gaps, not v1.5 text.
+- **A9 is unchanged.** Final stays withheld for every present GMP observation (`SOURCE_UNQUALIFIED`) and every missing one (`MISSING`). D1–D3 add no qualified path.
+- **A17 is unchanged.**
+  - D2 uses A17-1's cutoff instant: the evaluation timestamp, inclusive. As under A17-1, both instants need an explicit UTC offset, with no tolerance, and the check fails closed otherwise.
+  - D2 governs qualification evidence. It does not alter A17 scoring eligibility, which still compares the source timestamp only. A17-2 (24 h) and A17-3 (publisher labels only) are untouched.
+- **Rendered-capture precedent.** D1 departs, for GMP only, from the tracker precedent that rendered captures leave source-native qualification open (tracker l.30, l.107). It accepts a rendered capture only as a publisher-reported observation. It does not make one source-native.
+
+### 6.3 Implementation (minimum necessary)
+
+The artifact and hash follow the existing evidence convention. `capture-manifest.json` declares, for each retained file:
+- the file itself, with its byte count and uppercase SHA-256 of the exact file bytes;
+- the UTC window bracketing its retrieval;
+- `captureMethod.rawProviderResponseBytesCaptured: false` for a rendered capture.
+
+| # | Change | Why |
+|---|---|---|
+| 1 | **New `engine/ipo_screening/gmp_evidence.py`:**<br>• **D1** `load_rendered_capture` accepts only a manifest that declares a rendered capture, and only a file inside the package. It recomputes the file's SHA-256 against the declared digest and byte count. It classifies the result `PUBLISHER_REPORTED_RENDERED_CAPTURE`, with a fixed publisher-reported label. Its source-native, publisher-authentication and dealer-verification properties are always false.<br>• **D2** `capture_obtained_by` is true only when the window end is at or before the evaluation timestamp. The window end is the instant by which the capture had certainly been obtained. A publisher's displayed or site-wide update time is never used.<br>• **D3** `classify_displayed_gmp` returns MISSING for the exact "Not quoted yet", ZERO for a displayed zero (`SOURCE_UNQUALIFIED`), AMOUNT for a well-formed non-zero amount (candidate only), and MALFORMED for anything else (rejected).<br>• `assess_capture` combines the three. Its best result is "eligible for cutoff consideration", which is not qualification; the A9 reason it reports is always nonterminal. | Gives D1–D3 one executable definition over the retained evidence packages. No existing code read the capture manifests to verify a capture's file hash or capture time. |
+| 2 | **`connectors/adapters.py`, `GmpSignalAdapter`:**<br>• D3 classification of the premium and percentage fields. "Not quoted yet" gives no value. A displayed zero is kept as a present 0.0; a rupee-only zero records `pct` 0.0, because `market.gmp` carries only `pct` and a zero premium is 0% of any issue price.<br>• Malformed displays, or ones that contradict each other, raise `ConnectorPayloadError`. Examples: "Not quoted yet" beside a value or trend label, or a zero beside a non-zero value.<br>• D2: the capture time is taken only from the payload. It is no longer filled with the normalisation clock. | The adapter reads both "₹0" and malformed strings as no value, which A9 then reports as MISSING (contrary to D3).<br>It also substitutes the current time for a missing retrieval time. That substitute reaches `_sources` and the A15 record as `LOCAL_RETRIEVED_AT`, an invented capture time. |
+| 3 | **`connectors/interfaces.py`:** `ExternalSnapshot.retrieval_timestamp` may be `None`, and `to_source_ref()` omits an unknown retrieval time. | So no capture time is asserted when none was recorded. Other adapters are unchanged. |
+
+**Already compliant, so not changed:**
+- **Evaluation-input path.**
+  - `pct: null` with no trend gives `MISSING`.
+  - `pct: 0` gives `SOURCE_UNQUALIFIED`: the snapshot keeps a present zero, and the gate counts any non-null value.
+  - A display string in `pct` (for example "₹0" or "Not quoted yet") fails schema validation before any scoring or store write.
+- **A9 gate.** It has no qualified path. It does not accept a generic market-snapshot digest or a connector `content_hash`; A15 already records the latter as `LEGACY_UNRESOLVED` / `LEGACY_UNSPECIFIED`.
+- **A15.** It records a retrieval time as known only when it carries an explicit offset; otherwise the time is `TIMEZONE_UNRESOLVED`.
+
+**Deliberately not changed:**
+- the A9 gate and its messages;
+- the input and A15 schemas;
+- configuration, scoring formulas and weights;
+- the frozen core, the A17 cutoff module and the pipeline;
+- the golden result hash `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`.
+
+No retrieval-time or hash field was added.
+
+**Precise limitation: D1 and D2 cannot be established while an evaluation runs, so A9 keeps failing closed.** Nothing in the v1.5 contracts links an evaluation's `market.gmp` to a retained capture:
+- `market.gmp` is closed, with only `as_of`, `pct`, `trend` and `source_id`.
+- The closed `_sources[]` entry carries one optional `retrieval_timestamp`. It is a single instant, not a window, and is not tied to a declared artifact.
+- That entry's `content_hash` has no declared subject or representation.
+- `source_type` has no class for a publisher-reported rendered capture.
+- The A15 digest vocabulary has no rendered-capture subject. Its `RAW_ARTIFACT_BYTES` would describe the capture as raw, which D1 forbids.
+
+An A9 qualified path would need two things, each requiring its own decision and a schema change:
+1. a persisted, per-evaluation GMP evidence reference — the capture manifest and artifact, or equivalent — carrying the file hash, its publisher-reported rendered class and the capture window;
+2. a matching A15 digest subject and label.
+
+### 6.4 Evidence and tests
+
+- **Focused tests:** `tests/test_d1_d3_gmp_source_policy.py` (84 tests). Coverage:
+  - the publisher-reported label;
+  - hash verification of the declared retained file, including altered, missing and misdeclared copies;
+  - capture at, inside and after the cutoff, and IST offsets;
+  - a later byte-identical recapture;
+  - offset-less and missing windows;
+  - "Not quoted yet", zero, malformed and well-formed displays;
+  - the connector through to the A9 gate;
+  - the evaluation-input path;
+  - A17-2/A17-3 unchanged.
+- **Mutation check:** each of eight reversions fails the focused tests.
+- **Full suite and integrity checks:** the full Python suite, `verify_frozen_core()`, `verify_golden_result()` and `verify_v1_6_implementation()` results are recorded in the tracker's D1–D3 section.
+
+### 6.5 Consequences and unresolved dependencies
+
+- **No publisher qualifies.** For MarketLiveIPOGMP, R7 still needs source evidence. See the qualification record §16.
+- **Still open:**
+  - the A9 qualified path and its representation (§6.3);
+  - R7, and R8's history before capture;
+  - §8 PR-4f and PR-5.
+- **D3 covers only the exact "Not quoted yet" and a displayed zero.** Other markers fail closed as malformed, for example InvestorGain's "₹ --" or PapsDigital's "N/A". Well-formed negative amounts keep their existing treatment as values (the input schema allows `pct` down to −1000). D3 does not address them, and no qualification follows.

@@ -13,9 +13,16 @@ from __future__ import annotations
 import copy
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from ..canonical import ExtractionMethod, Verification
+from ..gmp_evidence import (
+    NOT_QUOTED_YET,
+    PERCENT,
+    RUPEE,
+    DisplayedGmpState,
+    classify_displayed_gmp,
+)
 from .interfaces import (
     ANCHOR_FRESHNESS_POLICY,
     GMP_FRESHNESS_POLICY,
@@ -195,6 +202,21 @@ def _map_gmp_trend_label(value: Any) -> Optional[str]:
     return _GMP_TREND_LABELS.get(str(value).strip().lower())
 
 
+#: Payload placeholders the adapters already read as "no value" (see ``_safe_float``).
+_NO_VALUE_MARKERS = ("", "UNKNOWN", "null", "[●]")
+
+
+def _displayed_gmp_value(value: Any, unit: str) -> Tuple[DisplayedGmpState, Optional[float]]:
+    """D3 classification of one GMP payload field; the existing no-value markers stay MISSING."""
+    if value is None or (isinstance(value, str) and value in _NO_VALUE_MARKERS):
+        return DisplayedGmpState.MISSING, None
+    return classify_displayed_gmp(value, unit=unit)
+
+
+def _is_not_quoted_yet(value: Any) -> bool:
+    return isinstance(value, str) and value.strip() == NOT_QUOTED_YET
+
+
 class GmpSignalAdapter(BaseConnectorAdapter):
     """Adapter for grey market premium (GMP) and secondary sentiment signals."""
 
@@ -220,13 +242,19 @@ class GmpSignalAdapter(BaseConnectorAdapter):
         clean_raw = sanitize_credentials(dict(raw_payload))
         raw_hash = compute_payload_hash(clean_raw)
 
-        retrieval_ts = clean_raw.get("retrieval_timestamp") or datetime.now(timezone.utc).isoformat()
+        # D2: the capture (retrieval) time is only what the payload records. It is
+        # never invented from the normalisation clock; when absent it stays unknown,
+        # so no LOCAL_RETRIEVED_AT is asserted downstream. Other adapters unchanged.
+        retrieval_ts = clean_raw.get("retrieval_timestamp") or None
         as_of = clean_raw.get("as_of")
 
         freshness = self.freshness_policy.evaluate_freshness(as_of, reference_time)
 
-        gmp_val = _safe_float(clean_raw.get("gmp_rupees", clean_raw.get("gmp")))
-        gmp_pct = _safe_float(clean_raw.get("gmp_pct", clean_raw.get("pct")))
+        # D3: classify the displayed premium and percentage instead of coercing them.
+        rupee_raw = clean_raw.get("gmp_rupees", clean_raw.get("gmp"))
+        pct_raw = clean_raw.get("gmp_pct", clean_raw.get("pct"))
+        rupee_state, gmp_val = _displayed_gmp_value(rupee_raw, RUPEE)
+        pct_state, gmp_pct = _displayed_gmp_value(pct_raw, PERCENT)
 
         # A17-3: publisher-supplied trend label only, mapped to an accepted v1.5
         # label solely through the exact-match table; never derived.
@@ -237,6 +265,14 @@ class GmpSignalAdapter(BaseConnectorAdapter):
         if trend is not None and "trend" in clean_raw and clean_raw.get("gmp_trend") is not None:
             if _map_gmp_trend_label(clean_raw.get("gmp_trend")) != trend:
                 trend = None
+
+        self._reject_ambiguous_gmp(rupee_raw, rupee_state, pct_raw, pct_state, trend)
+        # D3: a displayed ₹0 must reach A9 as a present zero (SOURCE_UNQUALIFIED),
+        # not as MISSING. ``market.gmp`` carries the reading as ``pct`` only, and a
+        # zero premium is 0% of any issue price, so a rupee-only zero records pct
+        # 0.0. No non-zero percentage is ever derived.
+        if rupee_state is DisplayedGmpState.ZERO and pct_state is DisplayedGmpState.MISSING:
+            gmp_pct = 0.0
 
         normalized = {
             "gmp_rupees": gmp_val,
@@ -263,6 +299,38 @@ class GmpSignalAdapter(BaseConnectorAdapter):
             notes="Secondary market grey-market estimate (unofficial signal, non-statutory)",
             raw_payload=clean_raw,
         )
+
+    def _reject_ambiguous_gmp(
+        self,
+        rupee_raw: Any,
+        rupee_state: DisplayedGmpState,
+        pct_raw: Any,
+        pct_state: DisplayedGmpState,
+        trend: Optional[str],
+    ) -> None:
+        """D3: reject malformed or self-contradictory displays rather than coerce them."""
+        for raw, state in ((rupee_raw, rupee_state), (pct_raw, pct_state)):
+            if state is DisplayedGmpState.MALFORMED:
+                raise ConnectorPayloadError(
+                    f"GMP value {raw!r} is neither {NOT_QUOTED_YET!r}, a displayed zero nor a "
+                    "well-formed amount, so it is rejected rather than coerced (D3)",
+                    provider_id=self.provider_id,
+                )
+        states = {rupee_state, pct_state}
+        if (_is_not_quoted_yet(rupee_raw) or _is_not_quoted_yet(pct_raw)) and (
+            states & {DisplayedGmpState.ZERO, DisplayedGmpState.AMOUNT} or trend is not None
+        ):
+            raise ConnectorPayloadError(
+                f"{NOT_QUOTED_YET!r} conflicts with a GMP value or trend label in the same "
+                "payload, so the observation is rejected (D3)",
+                provider_id=self.provider_id,
+            )
+        if {DisplayedGmpState.ZERO, DisplayedGmpState.AMOUNT} <= states:
+            raise ConnectorPayloadError(
+                "the GMP premium and percentage disagree on whether the reading is zero, "
+                "so the observation is rejected (D3)",
+                provider_id=self.provider_id,
+            )
 
 
 # --------------------------------------------------------------------------

@@ -593,6 +593,59 @@ The rest of §8 PR-4 is already covered:
 | capture manifest, README | `evidence/gmp-observations/marketliveipogmp-tonbo-20261015/capture-manifest.json`, `…/README.md` |
 | schema | `schema/ipo-input.v1.5.schema.json` |
 
+## 16. Decisions D1–D3 adopted — 2026-10-15
+
+Ramki approved D1–D3. They are recorded as user-approved policy in [`A9-GMP-SOURCE-POLICY-SELECTION-2026-10-15.md`](A9-GMP-SOURCE-POLICY-SELECTION-2026-10-15.md) §6, together with their implementation.
+
+This addendum applies them to §15; nothing above is edited. The baseline is the authoritative `arena/573e69a4-ipo-screening-engine` at `9dba813`, verified at 17:58 UTC. The addendum is committed on `arena/5ccbfd5d-ipo-screening-engine`.
+
+### 16.1 Effect on §15
+
+| §15 item | Under D1–D3 |
+|---|---|
+| D1 (Q5, R5; Q2 context) | **Adopted.**<br>• The artifact is the retained rendered-text capture. The hash subject is its exact file bytes, digested with SHA-256. The label is "publisher-reported observation".<br>• `gmp_evidence.load_rendered_capture` re-verifies ML-T against `33516F86…705D`.<br>• R5 is therefore met by rule, and the retained captures conform.<br>• Source-native context (Q2) stays unestablished. D1 accepts the capture without it and forbids describing it as source-native. |
+| D2 (Q4, R8 availability) | **Adopted.**<br>• A capture supports an evaluation only if its retrieval window ended at or before the evaluation timestamp. The displayed stamp is never the capture time.<br>• ML-T supports evaluations from 13:17:58.770Z.<br>• Under A17-2, its reading is fresh only until 2026-10-16T10:32:00Z. No Tonbo Final evaluation, on or after the 19 Oct close, can therefore use any retained capture. |
+| D3 (Q6, R6) | **Adopted.** "Not quoted yet" ⇒ `MISSING`; a displayed ₹0 ⇒ `SOURCE_UNQUALIFIED`; malformed or contradictory displays are rejected. R6 is met by rule. |
+| E1 (R7) | **Unchanged.** This needs source evidence; no D1–D3 rule can close it. |
+| IMP-1 (A9 qualified path) | **Not built.** The v1.5 input and A15 contracts cannot link an evaluation to a retained capture (source-policy §6.3), so A9 keeps failing closed. A qualified path needs its own representation decision. |
+
+### 16.2 MarketLiveIPOGMP — resulting status
+
+- **Met within stated limits:** R1–R4 (§15.7); R5 (D1); R6 (D3).
+- **R8:**
+  - The identity of a captured observation is PASS (§7).
+  - Evaluation-time availability now has a checkable rule (D2), but no retained capture serves a Tonbo Final.
+  - History before capture and correction information depend on R7.
+  - R8 is therefore **UNRESOLVED**.
+- **R7: UNRESOLVED.** Claims ML-C2, ML-C4 and ML-C5 remain unverified, and ML-O7 contradicts ML-C5.
+- **Determination: NOT QUALIFIED.** The policy is now enforced, but two things are still missing:
+  - The evidence does not establish corrections and revisions, append-only history, historical availability before capture, or source-native context.
+  - A9 has no qualified path.
+
+### 16.3 Evidence that would change the disposition
+
+1. **R7.** The §13.1 chain of single, condition-triggered captures during bidding, followed by the §9 post-listing freeze checks. In that chain:
+   - each new reading's "since last reading" change must agree with the previously captured value;
+   - no value may change under an existing stamp.
+
+   A raw capture of the stored readings, taken from an environment that can reach the host, would be direct evidence.
+2. **For any specific Final evaluation:** a D1 capture, obtained at or before its evaluation timestamp (D2), of a positive reading stamped within the 24 h before it (A17-1, A17-2).
+3. **The IMP-1 representation decision,** so that the A9 gate can see items 1 and 2.
+
+### 16.4 R7 this pass
+
+No capture was taken.
+- The pass ran from 17:58 UTC (23:28 IST) on 15 Oct.
+- That was about two hours after the last capture (21:27 IST), and before the 16 Oct IST daytime that §13.1 item 5 infers is the earliest likely time for a new reading.
+- §15.2 still applies.
+
+### 16.5 Unchanged
+
+- **InvestorGain:** NOT QUALIFIED.
+- **PapsDigital:** closed as a non-independent alternative.
+- **R7:** UNRESOLVED.
+- **A9:** fail-closed; Final is withheld.
+
 ## Evidence keys
 
 Line references are `[KEY:line]` against these retained files. Quotations omit Markdown emphasis markers (for example, `₹ **495**` is quoted as "₹ 495").

@@ -91,6 +91,10 @@ The A9 message clause "it does not define source-specific cutoff or freshness se
 3. **Not adopted by A17:**
    - the investigation record's §8 PR-3 (artifact and hash), PR-4 (fail-closed A9 code mapping) and PR-5 (single source and labelling);
    - §8 PR-1's "latest reading" selection and its "retrieved at or before the evaluation timestamp" clause. The latter cannot be represented today: `market.gmp` has no retrieval-time field (investigation record §13.3).
+   - *Cross-reference (2026-10-15).* Ramki later approved D1–D3, recorded in [`docs/investigation/A9-GMP-SOURCE-POLICY-SELECTION-2026-10-15.md`](../../docs/investigation/A9-GMP-SOURCE-POLICY-SELECTION-2026-10-15.md) §6. They adopt the substance of the following, and leave A17 itself unchanged:
+     - §8 PR-3 (D1);
+     - the retrieval clause above (D2);
+     - PR-4a/4b (D3).
 4. **Remaining A8-G items:** snapshot and hash representation, an A9 qualified path, and capture tooling. These require separate decisions and evidence.
 5. **Connector reference time:** `GmpSignalAdapter` uses the current time when the caller supplies no `reference_time`. For evaluation eligibility, the pipeline check against the evaluation timestamp is authoritative.
 6. **Synonym table:** the existing exact-match synonyms are retained unchanged. Narrowing them would be a separate decision.
