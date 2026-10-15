@@ -19,6 +19,8 @@ All retrieval windows are on 2026-10-15. Each was read from the sandbox UTC cloc
 
 A second retrieval of the Tonbo page at 13:32:55.692Z – 13:33:04.729Z (19:02–19:03 IST) produced a transcription byte-identical to ML-T, so it is recorded in the manifest (`derivedChecks.tonboRecapture`) rather than retained as a duplicate file. The R7 follow-up retrieval at 13:54:22.896Z – 13:54:30.144Z (19:24 IST) was also byte-identical: no reading newer than 15 Oct 4:02 pm IST was displayed (`derivedChecks.tonboRecaptureR7Followup`).
 
+A second R7 follow-up retrieval at 15:57:54.203Z – 15:57:59.792Z (21:27 IST), made once with no retry, was again byte-identical: the ₹500 reading stamped 15 Oct 4:02 pm IST was still the latest displayed (`derivedChecks.tonboRecaptureR7Followup2`).
+
 [`capture-manifest.json`](capture-manifest.json) records byte counts, SHA-256 digests, page titles, IST conversions of each window, the sandbox clock check, the excerpt boundary for ML-S, and the items not retrieved.
 
 ## What these files are — and are not

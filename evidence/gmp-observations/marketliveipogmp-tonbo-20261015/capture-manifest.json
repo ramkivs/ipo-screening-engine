@@ -267,6 +267,25 @@
       "transcriptionBytes": 1693,
       "transcriptionSha256": "33516F86EBB2CC7E53AD0491FFAD05BAE1CA7115C6008ECFB7F41A9C6C79705D",
       "result": "transcription byte-identical to ml-tonbo-chunk-0 (same SHA-256); the latest displayed reading was still ₹500 stamped 15 Oct 4:02 pm IST, so no newer observation was publicly available and the R7 delta check could not be performed. Not retained as a separate file; no further polling was done."
+    },
+    "tonboRecaptureR7Followup2": {
+      "purpose": "Second R7 follow-up (record section 13): one capture, with no retry, to check whether a reading stamped after 15 Oct 4:02 pm IST is publicly displayed",
+      "url": "https://marketliveipogmp.com/ipo/tonbo-imaging-india",
+      "chunkIndex": 0,
+      "toolPageTitle": "Tonbo Imaging India IPO GMP Today — ₹500 Grey Market Premium | MarketLiveIPOGMP",
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T15:57:54.203Z",
+        "notAfter": "2026-10-15T15:57:59.792Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T21:27:54.203+05:30",
+        "notAfter": "2026-10-15T21:27:59.792+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "clockCheck": "sandbox UTC reads 16:08:09Z and 16:08:10Z bracketed the api.github.com Date header 'Thu, 15 Oct 2026 16:08:10 GMT' (one-second resolution)",
+      "transcriptionBytes": 1693,
+      "transcriptionSha256": "33516F86EBB2CC7E53AD0491FFAD05BAE1CA7115C6008ECFB7F41A9C6C79705D",
+      "result": "transcription byte-identical to ml-tonbo-chunk-0 (same SHA-256); the latest displayed reading was still ₹500, '▲₹32 since last reading', stamped 15 Oct 4:02 pm IST (5 h 25 min before retrieval), and the timeline still showed 'Closes 19 Oct'. No newer observation was publicly available, so the R7 delta check could not be performed. The unchanged page is evidence of neither qualification nor disqualification. Not retained as a separate file; no further polling was done."
     }
   },
   "retrievedNotRetained": [],

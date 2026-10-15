@@ -230,6 +230,69 @@ MarketLiveIPOGMP publishes no trend label — only a value and a "since last rea
 - **InvestorGain:** NOT QUALIFIED.
 - **A9 and Final:** behaviour unchanged.
 
+## 13. Follow-up — 2026-10-15, 15:58 UTC (convergence pass)
+
+This addendum reuses §§1–12 and the retained evidence. Nothing above is edited, and no determination changes.
+
+It is committed on `arena/5ccbfd5d-ipo-screening-engine`, a fast-forward of `arena/ba8f663e-ipo-screening-engine` at `6ecd26c`. Both descend from the authoritative `arena/573e69a4-ipo-screening-engine` at `97b2eb5`, which this pass verified but did not update.
+
+### 13.1 R7 second follow-up
+
+- **Check made:** one capture of https://marketliveipogmp.com/ipo/tonbo-imaging-india at 15:57:54.203Z – 15:57:59.792Z (21:27:54–21:27:59 IST), with no retry.
+- **Observed:** byte-identical to ML-T (SHA-256 `33516F86…705D`; manifest `derivedChecks.tonboRecaptureR7Followup2`).
+  - The latest reading was still ₹500, "▲₹32 since last reading", stamped "15 Oct, 4:02 pm IST". That is 5 h 25 min before the check.
+  - The timeline still showed "Closes 19 Oct" [ML-T:39–43].
+- **Status:** no newer observation, so the delta check could not run. R7 remains **UNRESOLVED**. The unchanged page is evidence of neither qualification nor disqualification.
+
+**Condition for the single follow-up capture.** Everything else is as in the §9 protocol.
+
+1. **Trigger:** the Tonbo page shows a reading stamped later than "15 Oct, 4:02 pm IST", before the page's "Closes 19 Oct".
+2. **Capture:** one clock-bracketed capture, retained with a manifest entry. No retry in the same pass.
+3. **Test:** the displayed "since last reading" change, signed by ▲ or ▼, must equal the new value minus ₹500.
+4. **Reading the result:**
+   - *Equal:* consistent with an unbroken chain from the 4:02 pm reading. It supports R7 for this pair of readings only; it does not establish the publisher's retention or correction policy.
+   - *Unequal:* inconclusive. A reading stamped after the 21:27 IST check could have been published and then superseded unseen.
+   - *A different value under the 4:02 pm stamp:* an in-place change, which §9 treats as R7 FAIL.
+   - *A new stamp earlier than the 21:27 IST check:* that reading was not displayed at the check. Record it as an anomaly bearing on I2 and R7; it is not a pass.
+5. **Timing (inference, not a rule):** InvestorGain's 15 Oct entries were all made during the day (02:37, 03:37 and 05:02 pm [IG-T0:81–83]). This page showed no new reading from 4:02 pm to at least 9:27 pm IST. A capture during the IST day on 16 Oct is therefore the earliest likely to find one.
+
+### 13.2 Minimum open product decisions
+
+These refine PR-1, PR-2 (§8) and §12.2. None is adopted, and this addendum introduces no threshold, lookback, comparison interval or classification rule.
+
+| Item | What existing artifacts establish | What remains undefined | Smallest decision (Ramki) | Recommendation |
+|---|---|---|---|---|
+| **Cutoff and time eligibility** (PR-1) | Final is "Generated at a defined evaluation timestamp on/after closing" and freezes the GMP snapshot (spec v1.5 §19 l.784–790); the v1.3 baseline put Final, "incl. … GMP", in the "Closing hours of Day 3" (v1.3 l.149). Market values carry as-of time, zone and source (spec §4.6 l.297–302). Cutoffs are source-specific and may not be invented; a scheduled event is not a completed one (A8 l.15). Observation, publication and retrieval times stay separate (A8 l.39, l.57). The engine measures GMP age from the evaluation timestamp (`snapshots.py` l.450). | The value of `GMP_CUTOFF`. A8 l.45 and A9 l.30, l.50 leave the GMP cutoff open. | Is `GMP_CUTOFF` the Final evaluation timestamp or the actual bid close? The answer decides whether readings published after the close but before listing can be used. | **Use the evaluation timestamp as the mechanism.** It is the only instant v1.5 defines, it is the engine's existing age reference, and it is the per-evaluation cutoff Ramki approved for NIFTY (A8-M observation contract l.23). **Ramki's judgment:** whether also to exclude post-close readings. A bid-close cutoff would need evidence that the close actually occurred (A8 l.15). |
+| **Maximum age and freshness** (PR-2) | Thresholds are versioned policy (spec §3.5 l.122–123). The v1.5 config sets `thresholds.market_staleness_hours: 24` (`config/ipo-config.v1.5.0.json` l.104), which `pipeline.py` reads at l.232. The GMP block is STALE when evaluation time − `as_of` exceeds 24 h, or when `as_of` is missing or unparseable (`snapshots.py` l.443–465). STALE makes `gmp_bucket` UNKNOWN (`derived.py` l.1664–1670) and yields the A9 reason `SOURCE_UNQUALIFIED` (`tests/test_evaluation_record_v1.py` l.299–318). The connector's 24 h default affects confidence only (`connectors/interfaces.py` l.243; `adapters.py` l.239). The v1.3 baseline used the same 24 h (l.209). | Whether the generic 24 h is the A9 qualification `MAX_AGE`. A8 l.45 leaves GMP "stale or unverifiable handling" open, and the A9 gate infers no freshness semantics (`evaluation_record.py` l.929–937). A8-M rejected the generic 24 h only for the session-close NIFTY metric (observation contract l.37) and excludes GMP (l.76). PR-2 did not cite the existing value. | Ratify `market_staleness_hours` (24 h, measured from `GMP_CUTOFF`) as `MAX_AGE`, or name a GMP-specific value? | **Ratify 24 h.** It is the only value in the v1.5 contract and is already enforced on the GMP block. Ratifying it adds no new number (A8 l.15) and needs no code or config change. With the cutoff at the evaluation timestamp, PR-2 and the engine compute the same age. **Adoption is Ramki's** (A8 l.45). |
+| **Trend labels:** strong / flat / falling | Only the labels and their points: the schema enum (`schema/ipo-input.v1.5.schema.json` l.988–994) and the 2 / 1 / 0 map, excluded in `preliminary` (`config/ipo-config.v1.5.0.json` l.751–763, l.34–41). `gmp_bucket` passes `market.gmp.trend` through (config l.1950–1956; `derived.py` l.1721–1723). The connector only normalises synonyms (`adapters.py` l.202–216). Tests cover only pass-through, normalisation and rejection (`tests/test_connectors.py` l.107, l.322; `tests/test_evaluation_record_v1.py` l.291). Spec v1.5 says only that GMP is "sentiment-only and cannot dominate the result" (§13 l.589). | **v1.5 does not explicitly adopt the v1.3 definition.** The v1.5 spec, technical design and execution prompt never define GMP trend. The v1.5 config copies the labels and points from the reference config (`handoff/reference/ipo-config.json` l.125–126) without any definition. The manifest ranks v1.3 as reference material that yields to v1.5 on conflict, with no adoption statement (manifest l.8–9, l.19–22, l.50–52). The prototype treats the label as a manual choice (`ipo-scorer_4.html` l.257). v1.3 says "Stable/rising >10% = 2; flat = 1; falling = 0" (l.123) but does not say whether ">10%" means GMP as a share of the issue price or the size of a rise. It also defines no comparison interval, no lookback and no line between "stable" and "flat". That ambiguity is preserved here; §12.2's inference is not relied on. | Is `market.gmp.trend` **(a)** a publisher-supplied label passed through, as v1.5 implements today, or **(b)** derived by the project with the v1.3 meaning? Only under (b): what ">10%" measures, and the comparison interval. | **None; this is Ramki's product judgment.** Under (a), MarketLiveIPOGMP publishes no label [ML-T:7–9], so `trend` is null and `gmp_trend` is UNKNOWN, with no change needed. Under (b), a derivation rule, implementation authority and tests are needed. |
+
+### 13.3 Implementation dependencies (documented; nothing changed)
+
+- **PR-1 vs the future-stamp tolerance.** The generic snapshot accepts an `as_of` up to 1 h after the evaluation time as FRESH (`snapshots.py` l.460). PR-1 requires a stamp at or before `GMP_CUTOFF`, so the A9 qualified path would have to enforce that itself. Changing the generic tolerance would alter existing scoring behaviour.
+- **PR-1 vs the input schema.** PR-1's condition "retrieved at or before the evaluation timestamp" cannot be represented today. `market.gmp` carries only `as_of`, `pct`, `trend` and `source_id`, with `additionalProperties: false` (`schema/ipo-input.v1.5.schema.json` l.978–1000). This falls under §9 item 4, which needs implementation authority.
+
+### 13.4 Unchanged
+
+- **MarketLiveIPOGMP:** NOT QUALIFIED; the leading candidate.
+- **PapsDigital:** closed as an alternative.
+- **InvestorGain:** NOT QUALIFIED.
+- **R7:** UNRESOLVED.
+- **A9:** fail-closed; Final withheld.
+- **No code or contract change.** No engine, schema, configuration, test, fixture or result-hash change. The full test suite passed on `6ecd26c` (710 tests, fresh run); this addendum changes only documentation and evidence metadata.
+
+**Files cited in §13 by short name:**
+
+| Short name | File |
+|---|---|
+| A8 | `handoff/decisions/A8-final-snapshot-event-cutoffs-investigation.md` |
+| A8-M observation contract | `handoff/decisions/A8-M-OBSERVATION-CONTRACT-AND-UNKNOWN-DECISION-APPROVAL-2026-10-13.md` |
+| A9 | `handoff/decisions/A9-missing-gmp-final-fail-closed.md` |
+| spec v1.5 | `handoff/authoritative/IPO_Screening_Engine_Specification_v1.5.md` |
+| v1.3 | `handoff/reference/Claude_IPO Screening Engine v 1.3 — Specification.md` |
+| manifest | `handoff/authoritative/ARENA_IPO_Screening_Artifact_Manifest_v1.5.md` |
+| `ipo-scorer_4.html` | `handoff/reference/ipo-scorer_4.html` |
+| engine files | under `engine/ipo_screening/` |
+
 ## Evidence keys
 
 Line references are `[KEY:line]` against these retained files. Quotations omit Markdown emphasis markers (for example, `₹ **495**` is quoted as "₹ 495").
