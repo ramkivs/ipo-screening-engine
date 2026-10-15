@@ -1,7 +1,7 @@
 # A9 — Alternative Publisher-Level GMP Qualification: PapsDigital and MarketLiveIPOGMP (2026-10-15)
 
 - **Record type:** Non-authoritative investigation record. It assesses two candidate publishers against the Model A source contract; it approves no source.
-- **Date:** 2026-10-15 (Asia/Calcutta). Captures were taken between 13:11 and 13:33 UTC (18:41–19:03 IST).
+- **Date:** 2026-10-15 (Asia/Calcutta). Captures were taken between 13:11 and 13:33 UTC (18:41–19:03 IST); the R7 follow-up check in §12 was made at 13:54 UTC (19:24 IST).
 - **Repository and baseline:** `ramkivs/ipo-screening-engine`, session branch `arena/ba8f663e-ipo-screening-engine` at `643b91a`. That commit descends from the authoritative branch `arena/573e69a4-ipo-screening-engine` at `97b2eb5`, which was unchanged when this pass began (13:10:06 UTC).
 - **Contract applied:** [A9 GMP source-policy selection](A9-GMP-SOURCE-POLICY-SELECTION-2026-10-15.md) §3, requirements R1–R8 (Model A: one named publisher's own reported observation, never presented as a dealer quote).
 - **Evidence:**
@@ -158,7 +158,7 @@ These are proposals for Ramki. They define project handling only and assert no s
 |---|---|---|---|
 | 1 | Evidence that readings are append-only and final readings are frozen | Source evidence (public pages only) | R7; R8 together with item 2 |
 | 2 | Adopt PR-1 to PR-5, with values for `GMP_CUTOFF` and `MAX_AGE` | Ramki decision | R3, R4, R5, R6; R8 together with item 1 |
-| 3 | Define how `market.gmp.trend` (strong / flat / falling) is derived. v1.5 defines no derivation for any publisher (`schema/ipo-input.v1.5.schema.json` `market.gmp`; `config/ipo-config.v1.5.0.json` `gmp_trend`). | Ramki decision on a scoring input | Engine use; not a source requirement |
+| 3 | Define how `market.gmp.trend` (strong / flat / falling) is derived. v1.5 defines no derivation for any publisher (`schema/ipo-input.v1.5.schema.json` `market.gmp`; `config/ipo-config.v1.5.0.json` `gmp_trend`). | Ramki decision on a scoring input; the smallest open question is stated in §12.2 | Engine use; not a source requirement |
 | 4 | Capture tooling, snapshot and hash representation, an A9 gate qualified path, and tests | Requires implementation authority | Final eligibility |
 
 **Evidence protocol for item 1.** Public pages only; no provider contact.
@@ -192,7 +192,43 @@ No remaining work is useful. Its value, zero, revision, and history semantics ar
 
 ## 11. Next action
 
-**Single smallest next action:** re-capture https://marketliveipogmp.com/ipo/tonbo-imaging-india once it shows a reading stamped after 15 Oct 4:02 pm IST and before the 19 Oct close. Check that its "since last reading" delta equals its value minus ₹500. This is the first direct test of R7 — the only gap no project rule can close — and it is possible only while Tonbo's bidding window is open. Adopting PR-1 to PR-5 (§8) is the other required step and does not depend on this result.
+**Single smallest next action:** re-capture https://marketliveipogmp.com/ipo/tonbo-imaging-india once it shows a reading stamped after 15 Oct 4:02 pm IST and before the 19 Oct close. Check that its "since last reading" delta equals its value minus ₹500. This is the first direct test of R7 — the only gap no project rule can close — and it is possible only while Tonbo's bidding window is open. Adopting PR-1 to PR-5 (§8) is the other required step and does not depend on this result. A follow-up check at 19:24 IST found no newer reading (§12.1), so this action remains open.
+
+## 12. Follow-up — 2026-10-15, 13:54 UTC
+
+This addendum reuses the evidence above. R3, R4 and R8 are not reopened, and no determination changes.
+
+### 12.1 R7 follow-up result
+
+- **Check made:** one capture of https://marketliveipogmp.com/ipo/tonbo-imaging-india at 13:54:22.896Z – 13:54:30.144Z (19:24:22–19:24:30 IST).
+- **Observed:** the transcription is byte-identical to ML-T (SHA-256 `33516F86…705D`; manifest `derivedChecks.tonboRecaptureR7Followup`). The latest displayed reading was still ₹500, "▲₹32 since last reading", stamped "15 Oct, 4:02 pm IST" — 3 h 22 min before the check.
+- **Result:** no newer observation was publicly available, so the delta check could not be performed. Per instruction, no further polling was done.
+- **Status:** R7 remains **UNRESOLVED**. MarketLiveIPOGMP remains the leading candidate and **NOT QUALIFIED**.
+
+### 12.2 `market.gmp.trend` — smallest unresolved semantic decision
+
+What v1.5 defines:
+- The schema allows `strong`, `flat`, `falling` or `null` (`schema/ipo-input.v1.5.schema.json` l.988–994).
+- The config scores the label 2 / 1 / 0 (`config/ipo-config.v1.5.0.json` l.751–763) in every mode except `preliminary` (l.34–41).
+- The engine passes a source-supplied label straight through (`engine/ipo_screening/derived.py` l.1721–1723). The connector only normalises synonyms: strong/rising/bullish/up → `strong`; flat/steady/neutral → `flat`; falling/declining/bearish/down → `falling` (`engine/ipo_screening/connectors/adapters.py` l.202–216).
+- Tests cover only pass-through, normalisation and rejection (`tests/test_connectors.py` l.107, l.322; `tests/test_evaluation_record_v1.py` l.291). The v1.5 specification, technical design and execution prompt never define GMP trend.
+
+The only written definition is in the reference baseline, `handoff/reference/Claude_IPO Screening Engine v 1.3 — Specification.md` l.123: "GMP trend … Stable/rising >10% = 2; flat = 1; falling = 0". The v1.5 artifact manifest classifies that file as reference material, with v1.5 as the target contract (manifest l.8, l.50). The definition was not carried into v1.5.
+
+MarketLiveIPOGMP publishes no trend label — only a value and a "since last reading" change [ML-T:7–9]. Under the current contract its `trend` would therefore be `null`, and `gmp_trend` would be UNKNOWN.
+
+**Decision needed (Ramki, one question):** do v1.5's `strong / flat / falling` carry the baseline meaning "Stable/rising >10% = strong; flat = flat; falling = falling"? If yes, does ">10%" mean the GMP level as a percentage of the issue price, or the size of the rise?
+
+- **Inference, not adopted:** because the baseline pairs "stable" with ">10%", only the level reading is internally consistent.
+- **Follow-on parameter:** if the meaning is adopted, a comparison base for stable/rising/falling must also be named. MarketLiveIPOGMP exposes only "since last reading".
+- **No new threshold:** this record introduces none — the 10% figure is the baseline's own — and nothing in scoring, configuration, schemas or result hashes is changed.
+
+### 12.3 Unchanged
+
+- **MarketLiveIPOGMP:** NOT QUALIFIED; the leading candidate.
+- **PapsDigital:** closed as an independent alternative.
+- **InvestorGain:** NOT QUALIFIED.
+- **A9 and Final:** behaviour unchanged.
 
 ## Evidence keys
 

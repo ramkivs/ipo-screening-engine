@@ -17,7 +17,7 @@ All retrieval windows are on 2026-10-15. Each was read from the sandbox UTC cloc
 | ML-S | `marketliveipogmp-sitemap-chunk-0-prefix.txt` | https://marketliveipogmp.com/sitemap.xml | 0 of 4 | 13:17:58.770Z – 13:18:17.492Z | contiguous prefix (first 20 entries) |
 | ML-R | `marketliveipogmp-robots.txt` | https://marketliveipogmp.com/robots.txt | 0 of 1 | 13:11:09.958Z – 13:11:32.551Z | none |
 
-A second retrieval of the Tonbo page at 13:32:55.692Z – 13:33:04.729Z (19:02–19:03 IST) produced a transcription byte-identical to ML-T, so it is recorded in the manifest (`derivedChecks.tonboRecapture`) rather than retained as a duplicate file.
+A second retrieval of the Tonbo page at 13:32:55.692Z – 13:33:04.729Z (19:02–19:03 IST) produced a transcription byte-identical to ML-T, so it is recorded in the manifest (`derivedChecks.tonboRecapture`) rather than retained as a duplicate file. The R7 follow-up retrieval at 13:54:22.896Z – 13:54:30.144Z (19:24 IST) was also byte-identical: no reading newer than 15 Oct 4:02 pm IST was displayed (`derivedChecks.tonboRecaptureR7Followup`).
 
 [`capture-manifest.json`](capture-manifest.json) records byte counts, SHA-256 digests, page titles, IST conversions of each window, the sandbox clock check, the excerpt boundary for ML-S, and the items not retrieved.
 

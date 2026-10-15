@@ -250,7 +250,24 @@
       "result": "transcription byte-identical to ml-tonbo-chunk-0 (same SHA-256); not retained as a separate file. The ₹500 reading stamped 15 Oct 4:02 pm IST was still displayed, with the same stamp, at 19:02:55-19:03:04 IST."
     },
     "trackRecordCoverage": "chunk 0 lists entries from 'SME · 12 Oct' (line 61) to 'SME · 22 Sept' (line 529); the list is cut mid-link at line 539. The five listings shown on the home page with 'Final GMP Not quoted yet' (Paramount Syntex, Dove Soft, Eventions, Omara Ventures India, SJP Ultrasonic; listed 8-9 Oct) do not occur in this chunk.",
-    "pageTitleVsBody": "toolPageTitle of ml-track-record-chunk-0 says '195 Listings'; the body says 199 (lines 7, 31, 55)."
+    "pageTitleVsBody": "toolPageTitle of ml-track-record-chunk-0 says '195 Listings'; the body says 199 (lines 7, 31, 55).",
+    "tonboRecaptureR7Followup": {
+      "purpose": "R7 follow-up (record section 11): check whether a reading stamped after 15 Oct 4:02 pm IST is publicly displayed",
+      "url": "https://marketliveipogmp.com/ipo/tonbo-imaging-india",
+      "chunkIndex": 0,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T13:54:22.896Z",
+        "notAfter": "2026-10-15T13:54:30.144Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T19:24:22.896+05:30",
+        "notAfter": "2026-10-15T19:24:30.144+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "transcriptionBytes": 1693,
+      "transcriptionSha256": "33516F86EBB2CC7E53AD0491FFAD05BAE1CA7115C6008ECFB7F41A9C6C79705D",
+      "result": "transcription byte-identical to ml-tonbo-chunk-0 (same SHA-256); the latest displayed reading was still ₹500 stamped 15 Oct 4:02 pm IST, so no newer observation was publicly available and the R7 delta check could not be performed. Not retained as a separate file; no further polling was done."
+    }
   },
   "retrievedNotRetained": [],
   "notRetrieved": [
