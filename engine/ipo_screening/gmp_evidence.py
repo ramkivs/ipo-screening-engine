@@ -11,12 +11,16 @@ Decision record: ``docs/investigation/A9-GMP-SOURCE-POLICY-SELECTION-2026-10-15.
   convention: ``capture-manifest.json`` declares each retained file, its byte
   count, its uppercase SHA-256 and the UTC window bracketing its retrieval.
 * **D2 - availability by cutoff.** A capture supports an evaluation only if it had
-  been obtained at or before the evaluation timestamp. The capture time used is
-  the end of the recorded retrieval window, the instant by which the capture had
-  certainly been obtained. A publisher's displayed or site-wide update time is
-  never used as capture time, so a later capture of an earlier-stamped reading
-  never supports an earlier evaluation. As with A17-1, both instants need an
-  explicit UTC offset; otherwise the check fails closed.
+  been obtained at or before the evaluation timestamp. The exact capture instant
+  is not recorded (the manifests state ``exactReceiptTimeCaptured: false``); the
+  manifest records only a UTC window bracketing the retrieval. The window end is
+  therefore the latest possible capture time, not the capture time, and it is used
+  only as an upper bound: the rule is proven when the window ends at or before the
+  evaluation timestamp. An evaluation inside the window is not proven and fails
+  closed. A publisher's displayed or site-wide update time is never used as
+  capture time, so a later capture of an earlier-stamped reading never supports
+  an earlier evaluation. As with A17-1, both instants need an explicit UTC
+  offset; otherwise the check fails closed.
 * **D3 - missing versus zero.** The exact display "Not quoted yet" is ``MISSING``.
   A displayed zero (₹0) is ``SOURCE_UNQUALIFIED``: a numeric zero alone is never
   qualifying evidence. A display that is not a well-formed amount is rejected
@@ -25,9 +29,10 @@ Decision record: ``docs/investigation/A9-GMP-SOURCE-POLICY-SELECTION-2026-10-15.
 Nothing here qualifies a source. Passing D1-D3 makes a capture eligible for
 cutoff consideration only, subject to every other qualification requirement.
 The A9 Final gate is unchanged and still withholds ``FINAL`` for every GMP
-observation. The v1.5 input, connector and A15 contracts have no field that
-links an evaluation to a retained capture, so the gate cannot establish D1 or D2
-when an evaluation runs.
+observation. No approved contract links an evaluation's GMP value to a retained
+capture, so the gate cannot establish D1 or D2 when an evaluation runs. Generic
+v1.5 ``_sources``/``_evidence`` fields could carry such a reference, but its
+meaning and verification are an unapproved proposal (decision record §7, L1-L4).
 """
 
 from __future__ import annotations
@@ -201,9 +206,10 @@ def load_rendered_capture(manifest_path: Union[str, Path], artifact_id: str) -> 
     Raises :class:`GmpEvidenceError` unless the manifest declares a rendered-text
     capture (``captureMethod.rawProviderResponseBytesCaptured`` is ``false``) and
     the artifact declares a file inside the manifest's directory, a byte count
-    and a SHA-256. A missing or altered file is reported, not raised:
+    and a SHA-256. An artifact id declared more than once is ambiguous and is
+    rejected. A missing or altered file is reported, not raised:
     ``integrity_verified`` is ``False``. Retrieval-window bounds without an
-    explicit UTC offset, or an inverted window, establish no capture time.
+    explicit UTC offset, or an inverted window, establish no retrieval window.
     """
     path = Path(manifest_path)
     manifest = json.loads(path.read_text(encoding="utf-8"))
@@ -213,16 +219,17 @@ def load_rendered_capture(manifest_path: Union[str, Path], artifact_id: str) -> 
             "D1 covers only a retained rendered-text capture, and this manifest does not "
             "declare one (captureMethod.rawProviderResponseBytesCaptured must be false)"
         )
-    entry = next(
-        (
-            item
-            for item in manifest.get("artifacts") or []
-            if isinstance(item, Mapping) and item.get("id") == artifact_id
-        ),
-        None,
-    )
-    if entry is None:
+    entries = [
+        item
+        for item in manifest.get("artifacts") or []
+        if isinstance(item, Mapping) and item.get("id") == artifact_id
+    ]
+    if not entries:
         raise GmpEvidenceError(f"artifact {artifact_id!r} is not declared in {path.name}")
+    if len(entries) > 1:
+        # Two declarations would let one reference resolve to either file.
+        raise GmpEvidenceError(f"artifact {artifact_id!r} is declared more than once in {path.name}")
+    entry = entries[0]
 
     file_name = entry.get("file")
     declared = entry.get("sha256")
@@ -285,9 +292,11 @@ def load_rendered_capture(manifest_path: Union[str, Path], artifact_id: str) -> 
 def capture_obtained_by(capture: RenderedGmpCapture, evaluation_at: datetime) -> bool:
     """D2: True only if the capture had been obtained at or before ``evaluation_at``.
 
-    The capture time is the end of its retrieval window. An evaluation that falls
-    inside the window, or one without a timezone, cannot establish that the
-    capture existed in time, so the result is ``False``.
+    The exact capture instant is unknown; it lies somewhere in the recorded
+    retrieval window. The window end is the latest possible capture time and is
+    used only as an upper bound: if it is at or before ``evaluation_at``, the
+    capture was obtained in time. An evaluation that falls inside the window, or
+    one without a timezone, cannot establish that, so the result is ``False``.
     """
     obtained = capture.retrieved_not_after
     if obtained is None or not isinstance(evaluation_at, datetime):

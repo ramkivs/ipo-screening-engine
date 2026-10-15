@@ -145,10 +145,11 @@ An A9 qualified path would need two things, each requiring its own decision and 
 
 ### 6.4 Evidence and tests
 
-- **Focused tests:** `tests/test_d1_d3_gmp_source_policy.py` (84 tests). Coverage:
+- **Focused tests:** `tests/test_d1_d3_gmp_source_policy.py`. It had 84 tests at `805affe`, and 85 after the 2026-10-16 duplicate-id test (§7.11.4). Coverage:
   - the publisher-reported label;
   - hash verification of the declared retained file, including altered, missing and misdeclared copies;
-  - capture at, inside and after the cutoff, and IST offsets;
+  - an artifact id declared more than once (added 2026-10-16);
+  - a window ending at the cutoff, a cutoff inside the window, a window ending after the cutoff, and IST offsets;
   - a later byte-identical recapture;
   - offset-less and missing windows;
   - "Not quoted yet", zero, malformed and well-formed displays;
@@ -170,11 +171,15 @@ An A9 qualified path would need two things, each requiring its own decision and 
 ## 7. Proposal — minimum GMP evidence linkage (2026-10-16)
 
 - **Status:** PROPOSAL — NOT APPROVED. This is Arena analysis for Ramki's decisions L1–L4 (§7.10). Nothing in this section is implemented, and A9 stays fail-closed.
-- **Baseline:** D1–D3 implementation `805affe` on `arena/5ccbfd5d-ipo-screening-engine`; the authoritative `arena/573e69a4-ipo-screening-engine` is at `9dba813`.
+- **Baseline:** D1–D3 implementation `805affe`, which is also the authoritative `arena/573e69a4-ipo-screening-engine` tip (verified 2026-10-15T19:00:14Z). First published in `2de60b6`.
+- **Revision (2026-10-16, second pass):** revised in place after the decision-boundary review in §7.11. The superseded wording remains in `2de60b6`. Three changes:
+  1. The capture window is never entered as an exact retrieval time.
+  2. The pin covers the manifest.
+  3. An issue-identity binding is added.
 
 ### 7.1 The gap, and a correction to §6.3
 
-`gmp_evidence.py` can verify a retained capture: D1 integrity, D2 capture time and D3 displayed state. No approved contract says how an evaluation's `market.gmp` value identifies the capture, its digest, its capture time or the displayed text it was transcribed from.
+`gmp_evidence.py` can verify a retained capture: D1 integrity, D2 availability by cutoff and D3 displayed state. No approved contract says how an evaluation's `market.gmp` value identifies the capture, its digest, its capture time or the displayed text it was transcribed from.
 
 The v1.5 input already has generic fields that can carry such a reference:
 - `market.gmp.source_id` → a `_sources[]` entry with `uri`, `content_hash` and `retrieval_timestamp`;
@@ -182,7 +187,8 @@ The v1.5 input already has generic fields that can carry such a reference:
 
 A probe on 2026-10-16 added the §7.2 reference for ML-T to the golden input, validated it against the unchanged v1.5 schema, and ran it in Final mode:
 - The input validated with no findings.
-- A15 kept the `uri`, the capture time as `LOCAL_RETRIEVED_AT` (KNOWN) and the line locators. The quotes stayed in `evidence.json`.
+- A15 kept the `uri` and the line locators. The quotes stayed in `evidence.json`.
+- The probe supplied the window end as `retrieval_timestamp`, and A15 recorded it as a KNOWN `LOCAL_RETRIEVED_AT`. That overstates it, because the window end is not the capture time (§7.11.1).
 - The pinned SHA-256 was recorded as `LEGACY_UNRESOLVED` / `LEGACY_UNSPECIFIED`, with algorithm and subject `UNKNOWN`.
 - No quote was checked against the artifact, and the A9 gate read none of these fields. The outcome stayed `SOURCE_UNQUALIFIED`.
 - A capture dated after the evaluation drew no D2 signal.
@@ -198,10 +204,11 @@ A probe on 2026-10-16 added the §7.2 reference for ML-T to the golden input, va
 | `market.gmp.source_id` | `S`, the linked source |
 | `_sources[S].source_type` | `MARKET_DATA` |
 | `_sources[S].uri` | repository-relative path to a capture manifest under `evidence/gmp-observations/`, then `#`, then the artifact id |
-| `_sources[S].content_hash` | `sha256:` followed by the artifact file's 64-hex digest. This pins the exact file. |
-| `_sources[S].retrieval_timestamp` | the manifest's `retrievalWindowUtc.notAfter` |
+| `_sources[S].content_hash` | `sha256:` followed by the 64-hex digest of the capture manifest's bytes. The manifest declares the artifact's SHA-256, its byte count and its retrieval window, so this one pin makes all three tamper-evident. *(Revised: the first version pinned only the artifact, which left the window unprotected.)* |
+| `_sources[S].retrieval_timestamp` | **absent.** The manifest records no exact receipt time (`exactReceiptTimeCaptured: false`), and its window end is not one (§7.11.1). This field may be set only if a future manifest records an exact receipt time, and it must then equal that time. *(Revised: the first version entered the window end here.)* |
 | `_evidence["market.gmp.pct"]` | `source_id` `S`; `locator` `line <n>` of the artifact; `quote` = the exact displayed percentage on that line; `extraction_method` `MANUAL_ENTRY` |
 | `_evidence["market.gmp.as_of"]` | `source_id` `S`; `locator` `line <n>`; `quote` = the publisher stamp that `as_of` was transcribed from |
+| `_evidence["company_name"]` | `source_id` `S`; `locator` `line 1`; `quote` = the capture's title line, which names the issue. This binds the capture to the evaluated IPO (L3). *(Added in the revision.)* |
 
 Worked example (ML-T):
 
@@ -209,9 +216,9 @@ Worked example (ML-T):
 "market": {"gmp": {"as_of": "2026-10-15T16:02:00+05:30", "pct": 71.4, "trend": null, "source_id": "SRC-MLGMP-TONBO-T"}},
 "_sources": [{"source_id": "SRC-MLGMP-TONBO-T", "source_type": "MARKET_DATA",
   "uri": "evidence/gmp-observations/marketliveipogmp-tonbo-20261015/capture-manifest.json#ml-tonbo-chunk-0",
-  "content_hash": "sha256:33516f86ebb2cc7e53ad0491ffad05bae1ca7115c6008ecfb7f41a9c6c79705d",
-  "retrieval_timestamp": "2026-10-15T13:17:58.770Z"}],
+  "content_hash": "sha256:a4f83492455f4691159ba1f049547803cfa0db2aee248b7dbdfb4c990cfbb87d"}],
 "_evidence": {
+  "company_name": {"source_id": "SRC-MLGMP-TONBO-T", "locator": "line 1", "quote": "# Tonbo Imaging IndiaIPO GMP Today", "extraction_method": "MANUAL_ENTRY"},
   "market.gmp.pct": {"source_id": "SRC-MLGMP-TONBO-T", "locator": "line 7", "quote": "+71.4%", "extraction_method": "MANUAL_ENTRY"},
   "market.gmp.as_of": {"source_id": "SRC-MLGMP-TONBO-T", "locator": "line 84", "quote": "4:02 pm IST on Thu, 15 Oct, 2026", "extraction_method": "MANUAL_ENTRY"}}
 ```
@@ -219,17 +226,41 @@ Worked example (ML-T):
 Notes on the example:
 - ML-T line 7 is `₹500+71.4%`. Line 84 gives the stamp with its year and zone; lines 11 and 13 split `15 Oct, 4:02 pm` from `IST`.
 - A ₹0 reading quotes `0.0%` with `pct: 0`. "Not quoted yet" is quoted with `pct: null`.
-- A publisher trend label would need a third entry, `_evidence["market.gmp.trend"]`. MarketLiveIPOGMP publishes none.
+- A publisher trend label would need one more entry, `_evidence["market.gmp.trend"]`. MarketLiveIPOGMP publishes none.
+- The pin is the SHA-256 of `capture-manifest.json` as it stands at `9e0e4ed`. The artifact's own digest, `33516f86…705d`, is declared inside that manifest.
+- **The pinned manifest must not change.** This manifest was amended twice after it was created (`6ecd26c`, `9e0e4ed`). Once an evaluation references a manifest, any later follow-up goes into a new file or package. A changed manifest makes the link fail closed (§7.5), and the pinned bytes stay in the repository history.
+- `S` must be the `source_id` of exactly one `_sources` entry. The v1.5 schema does not enforce unique source ids, so the verifier must.
 
 ### 7.3 Minimum evaluation-record linkage (A15 1.1.0)
 
 The existing mapping already gives:
-- the source `S` with `uri` and `LOCAL_RETRIEVED_AT`;
+- the source `S` with `uri`. With `retrieval_timestamp` absent, it records no `LOCAL_RETRIEVED_AT` fact;
 - the evidence objects with `locator`, and `artifact_ref` pointing to the preserved `evidence.json` entry that holds the quote.
 
-The proposal adds only two things, and only when a link is attempted:
-1. **For a verified link, a digest on `S`** (`digest_refs`): `algorithm` `SHA-256`; `digest_value` recomputed from the file, in lowercase hex; `subject_kind` `RAW_ARTIFACT_BYTES` (L2-a); `subject_ref` = the repository-relative artifact path; `origin` `LOCAL_COMPUTED`; `evidence_refs` = the two evidence objects. It replaces the `LEGACY_UNRESOLVED` mapping of that `content_hash`. That amends the A15 package rule §1.3 for this case only.
-2. **One diagnostic.** The code is free text (for example `A9_GMP_EVIDENCE_LINK`). It records the result (`VERIFIED`, `NOT_AVAILABLE_BY_CUTOFF` or `FAILED: <reason>`), the D1 label verbatim and the D3 state.
+The proposal adds only three things, and only when a link is attempted:
+1. **For a verified link, two digests on `S`** (`digest_refs`): one for the manifest and one for the artifact. Each has:
+   - `algorithm` `SHA-256`;
+   - `digest_value` recomputed from the bytes read, in lowercase hex;
+   - `subject_kind` `RAW_ARTIFACT_BYTES` (L2-a);
+   - `subject_ref` = the repository-relative path;
+   - `origin` `LOCAL_COMPUTED`;
+   - `evidence_refs` = the link's evidence objects.
+
+   They replace the `LEGACY_UNRESOLVED` mapping of that `content_hash`. That amends the A15 package rule §1.3 for this case only.
+2. **For a verified manifest, the window as an unknown retrieval time.** This is one `LOCAL_RETRIEVED_AT` fact:
+   - `state` `UNKNOWN`;
+   - `source_text` = the ISO 8601 interval `<notBefore>/<notAfter>`, copied from the manifest;
+   - `reason` `UNAVAILABLE`, with the message "exact receipt time not captured; the manifest records only this bracketing window".
+
+   The A15 1.1.0 schema requires a reason for `UNKNOWN` and forbids `normalized_utc`, so no instant is asserted. No schema change is needed. *(Added in the revision.)*
+3. **One diagnostic.** The code is free text (for example `A9_GMP_EVIDENCE_LINK`). It records:
+   - the result: `VERIFIED`, `NOT_AVAILABLE_BY_CUTOFF` or `FAILED: <reason>`;
+   - the D1 label verbatim;
+   - the D3 state;
+   - both digests;
+   - the window.
+
+   The record therefore keeps what was verified even if the files later change.
 
 `outcome_resolution` is unchanged: `SOURCE_UNQUALIFIED`, or `MISSING`, and no `final_outcome`.
 
@@ -237,25 +268,40 @@ The proposal adds only two things, and only when a link is attempted:
 
 All of the following must pass; otherwise the result is `FAILED`.
 
-1. **Location:** `uri` names a manifest inside `evidence/gmp-observations/` (no absolute path, `..` or URL) and an artifact that manifest declares.
-2. **D1:** `load_rendered_capture` accepts the manifest and recomputes the file's SHA-256 and byte count. This establishes integrity only.
-3. **Pin:** `content_hash` equals the recomputed digest, so a substituted file, or a manifest edited to declare one, fails.
-4. **Capture time:** taken from the manifest's window end, never from the publisher stamp. `retrieval_timestamp` must be the same instant. Then D2 applies: `capture_obtained_by(capture, evaluation timestamp)`.
-5. **Value:** the `pct` quote occurs on its `locator` line of the verified text. `classify_displayed_gmp(quote, unit="%")` must give ZERO or AMOUNT equal to `pct`, or MISSING with `pct: null`. MALFORMED fails.
-6. **Stamp:** the `as_of` quote occurs on its line and equals `as_of` rendered in the publisher's stamp format (L3). `as_of` must not be later than the capture time.
-7. **A17:** the existing rules then apply to `as_of` unchanged: cutoff, 24 h maximum age, and publisher labels only.
+1. **Location:**
+   - `S` is the `source_id` of exactly one `_sources` entry.
+   - Its `uri` names a manifest inside `evidence/gmp-observations/`, with no absolute path, `..` or URL.
+   - It names an artifact that the manifest declares exactly once. D1 rejects a duplicated id (§7.11.4).
+2. **Manifest pin:** read the manifest bytes once. `content_hash` must equal their SHA-256, and the same bytes are parsed. A manifest edited after pinning fails, including one with a shifted window.
+3. **D1:** `load_rendered_capture` recomputes the artifact's SHA-256 and byte count against the pinned manifest's declaration. This establishes integrity only. All later checks use the bytes that were hashed.
+4. **Capture time** *(revised)*:
+   - The exact capture instant is unknown. The pinned window brackets it: it lies between `notBefore` and `notAfter`.
+   - D2 is proven only if `notAfter`, the latest possible capture time, is at or before the evaluation timestamp: `capture_obtained_by(capture, evaluation timestamp)`.
+   - An evaluation inside the window fails closed, and so does a window without explicit offsets.
+   - `retrieval_timestamp` must be absent unless the manifest records an exact receipt time. No current manifest does.
+   - The publisher stamp is never the capture time.
+5. **Identity** *(added)*: the `company_name` quote is line 1 of the verified text.
+   - Take the text between `# ` and the first `IPO GMP`. The two evidenced titles are ML-T:1 `# Tonbo Imaging IndiaIPO GMP Today` and ML-HM:1 `# Hero MotorsIPO GMP & Listing Price`. The rendering joins the name to "IPO".
+   - Case-fold it and collapse each run of non-alphanumeric characters to one space.
+   - The result must equal `company_name` normalized the same way, after dropping one trailing `Limited`, `Ltd` or `Ltd.`.
+6. **Value:** the `pct` quote occurs on its `locator` line of the verified text. `classify_displayed_gmp(quote, unit="%")` must give ZERO or AMOUNT equal to `pct`, or MISSING with `pct: null`. MALFORMED fails.
+7. **Stamp:** the `as_of` quote occurs on its line and equals `as_of` rendered in the publisher's stamp format (L3).
+   - `as_of` must not be later than `notAfter`.
+   - A stamp inside the window is possible and is not a contradiction. *(Revised: "the capture time" was not a known instant.)*
+8. **A17:** the existing rules then apply to `as_of` unchanged: cutoff, 24 h maximum age, and publisher labels only.
 
 **Trust limit:**
 - The window is the sandbox clock read before and after the tool call, checked against GitHub's `Date` header. The manifest itself says the window "does not establish when the publisher generated the content or whether the tool served cached content".
-- The pin covers the artifact, not the manifest. The window's integrity rests on the repository history of the manifest.
+- The pin makes the recorded window tamper-evident from the moment the evaluation input is written. It does not prove the window was true when it was recorded.
+- A contradictory duplicate `_evidence` key cannot be detected. The input loader uses plain `json.load` (`pipeline.py` l.190, l.339), which keeps the last of duplicate JSON keys. Detecting it would need a loader change that affects every input. That is outside L1–L4 and is not proposed here.
 
 ### 7.5 Behaviour
 
 | Case | Link result | A9 | Scoring |
 |---|---|---|---|
 | **Absent:** `S` has no evidence-manifest `uri`; this covers every current input | none, and no diagnostic | unchanged | unchanged (A17) |
-| **Malformed:** bad `uri`; pin not `sha256:` plus 64 hex; missing or offset-less `retrieval_timestamp`; missing `_evidence` entry | `FAILED: <reason>` | `SOURCE_UNQUALIFIED` / `MISSING` | unchanged |
-| **Mismatched:**<br>• pin, manifest and file digests differ, or the file is missing;<br>• `retrieval_timestamp` ≠ window end;<br>• a quote is not on its line;<br>• the value ≠ `pct`, or the stamp ≠ `as_of`;<br>• `as_of` is after the capture;<br>• the manifest is not a rendered capture. | `FAILED: <reason>` | same | unchanged |
+| **Malformed:**<br>• bad `uri`;<br>• pin not `sha256:` plus 64 hex;<br>• a `retrieval_timestamp` present although the manifest records no exact receipt time;<br>• a window that is missing, inverted or without offsets;<br>• a missing `_evidence` entry (`pct`, `as_of` or `company_name`);<br>• `S` not exactly one `_sources` entry. | `FAILED: <reason>` | `SOURCE_UNQUALIFIED` / `MISSING` | unchanged |
+| **Mismatched:**<br>• pin ≠ the manifest's digest, for example an edited manifest or a shifted window;<br>• the artifact ≠ its declared digest or byte count, or a file is missing;<br>• an artifact id declared more than once;<br>• the title quote ≠ `company_name` (another issue's capture);<br>• a quote is not on its line;<br>• the value ≠ `pct`, or the stamp ≠ `as_of`;<br>• `as_of` after the window end;<br>• the manifest is not a rendered capture. | `FAILED: <reason>` | same | unchanged |
 | **Captured after the cutoff:** window end after the evaluation timestamp, evaluation inside the window, or an evaluation time with no timezone | `NOT_AVAILABLE_BY_CUTOFF`, never retroactive | same | unchanged |
 | **All checks pass** | `VERIFIED`: eligible for cutoff consideration only | same | unchanged |
 
@@ -285,21 +331,23 @@ Each case is schema-valid v1.5 input, so failures are recorded rather than rejec
 
 - **Substitution:**
   - swapped artifact bytes;
-  - a manifest digest edited to match them;
+  - a manifest digest edited to match them (caught by the manifest pin);
   - another artifact id in the same manifest;
-  - another IPO's capture;
+  - a duplicated artifact id;
+  - another IPO's capture with an equal value and stamp (caught by the identity line);
   - a later recapture used for an earlier evaluation.
 - **Stale evidence:**
   - `as_of` older than 24 h at evaluation;
   - window end after the evaluation;
   - evaluation inside the window;
-  - an offset-less window or retrieval time;
-  - retrieval time ≠ window end.
+  - a manifest window shifted earlier (caught by the pin);
+  - an offset-less window;
+  - a `retrieval_timestamp` present without an exact receipt time.
 - **Missing evidence:**
-  - no `S`;
+  - no `S`, or two `_sources` entries with id `S`;
   - an `S` without an evidence-manifest `uri` (record unchanged);
   - a missing manifest or artifact;
-  - a missing `pct` or `as_of` evidence entry.
+  - a missing `pct`, `as_of` or `company_name` evidence entry.
 - **Mismatched value or artifact:**
   - a quote on another line;
   - a quoted value ≠ `pct`;
@@ -307,7 +355,11 @@ Each case is schema-valid v1.5 input, so failures are recorded rather than rejec
   - "Not quoted yet" with a non-null `pct`;
   - `0.0%` must give ZERO and `SOURCE_UNQUALIFIED`;
   - a stamp ≠ the rendered `as_of`;
-  - `as_of` after the capture.
+  - `as_of` after the window end;
+  - a title line naming another issue.
+- **A15 record:**
+  - the window is `UNKNOWN` with an interval `source_text` and no `normalized_utc`;
+  - two `LOCAL_COMPUTED` digests in lowercase hex.
 - **Non-regression:**
   - golden hash and existing A15 records byte-identical;
   - connector sources stay `LEGACY_UNRESOLVED`;
@@ -326,9 +378,80 @@ A `VERIFIED` link shows only that one evaluated observation meets D1–D3 for th
 
 | Decision | (a) | (b) |
 |---|---|---|
-| **L1:** input convention | Adopt §7.2 over existing v1.5 fields | Not adopted |
-| **L2:** A15 digest subject | `RAW_ARTIFACT_BYTES` in A15's raw-byte sense, with the D1 label in the diagnostic; no schema change | A dedicated subject kind; A15 1.2.0 |
-| **L3:** stamp binding | Check `as_of` against the quoted stamp in the publisher's format: MarketLiveIPOGMP `h:mm am/pm IST on Ddd, D Mon, YYYY`, ML-T line 84 | Require only `as_of` ≤ capture time. A mistranscribed later stamp could then make stale evidence look fresh. |
+| **L1:** input convention | Adopt §7.2 as revised over existing v1.5 fields:<br>• manifest pin;<br>• no `retrieval_timestamp`;<br>• quotes for `pct`, `as_of` and `company_name`. | Not adopted |
+| **L2:** A15 digest subject | `RAW_ARTIFACT_BYTES` in A15's raw-byte sense for the manifest and the artifact, with the D1 label in the diagnostic. The window is recorded as an `UNKNOWN` `LOCAL_RETRIEVED_AT` (§7.3). No schema change. | A dedicated subject kind; A15 1.2.0 |
+| **L3:** stamp and identity binding | Check `as_of` against the quoted stamp in the publisher's format: MarketLiveIPOGMP `h:mm am/pm IST on Ddd, D Mon, YYYY` (ML-T line 84). Check the title line against `company_name` (§7.4 step 5). | Require only `as_of` ≤ window end. A mistranscribed later stamp could then make stale evidence look fresh, and another issue's capture with equal values would pass. |
 | **L4:** failure handling | Record failures as nonterminal diagnostics | Reject structurally malformed references before scoring |
 
-**Recommendation:** L1, L2-a, L3-a and L4-a, which need no schema or version change. Then implement the verifier and the A15 mapping with the §7.8 tests. A9 stays fail-closed throughout.
+**Recommendation:** L1 as revised, L2-a, L3-a and L4-a, which need no schema or version change. Then implement the verifier and the A15 mapping with the §7.8 tests. A9 stays fail-closed throughout. The authorization review and the single question are in §7.11.
+
+### 7.11 Decision-boundary review (2026-10-16)
+
+Checked at 2026-10-15T19:00:14Z (00:30 IST, 16 Oct) against `805affe`, the authoritative tip. This section records why §7 was revised and what still needs Ramki. It approves nothing.
+
+#### 7.11.1 Capture-time semantics
+
+What the retained evidence says (ML-T `capture-manifest.json`, `captureMethod`):
+- `exactReceiptTimeCaptured: false`. No retained field records when the capture was received.
+- `retrievalWindowBasis`: the window is the sandbox UTC clock read before and after the sequential tool call, and one read can close one window and open the next. The window "does not establish when the publisher generated the content or whether the tool served cached content".
+- The displayed stamp (`4:02 pm IST`) is the publisher's recording time (qualification record R3, I2). It is not a capture time.
+
+Resolution, with no invented semantics:
+- **Where the capture instant lies.** It lies between `notBefore` and `notAfter`, and nothing narrows it further.
+- **Upper bound only.** `notAfter` is the latest possible capture time and is used only as an upper bound.
+  - If `notAfter` ≤ E, the capture happened at or before E. D2 as implemented (`capture_obtained_by`) is therefore sound.
+  - It is also conservative: an E inside the window is not proven and fails closed, even though the capture may have come first.
+- **Never recorded as the capture time.** No contract shows that the window end equals the capture time.
+  - The first §7.2 put it in `retrieval_timestamp`, which A15 persists as an exact KNOWN `LOCAL_RETRIEVED_AT` (probe, §7.1). That row is withdrawn.
+- **Honest A15 representation.** A15 1.1.0 can carry the window as `LOCAL_RETRIEVED_AT` with `state` `UNKNOWN`, the interval as `source_text` and `reason` `UNAVAILABLE` (§7.3).
+  - Checked by validating instances against `timestampFact` on 2026-10-16. That form is valid.
+  - Adding `normalized_utc`, omitting the reason, or using a code outside the enum is rejected.
+- **Not an interval in `retrieval_timestamp`.** The builder records any non-instant `retrieval_timestamp` as UNKNOWN `INVALID` (`evaluation_record.py` l.202–204). An interval must not go in that field.
+- **Code wording.** Wording that called the window end "the capture time" was corrected (§7.11.4). The behaviour was already the upper-bound rule.
+
+#### 7.11.2 Authorization of L1–L4
+
+Prior explicit decisions checked:
+- **D1–D3** (§6.1): implementation authority covered only the listed minimum.
+- **A15 decision:** l.41 requires later versions and migrations to be separately specified and approved. l.62 authorizes no in-place v1.5 schema change.
+- **A15 package §1.3:** an opaque `content_hash` maps to `LEGACY_UNRESOLVED`.
+- **A16:**
+  - l.20: no authority for "unqualified source behavior";
+  - l.28: "A15's approved output profile remains bounded to its exact implementation";
+  - l.32: a policy or data decision remains necessary for metric behaviour that depends on it;
+  - l.34: no "live-source integrations without evidence/contracts".
+
+| | Exact rule | Existing behaviour | Validity evidence | Compatibility | Already authorized? | New decision |
+|---|---|---|---|---|---|---|
+| **L1** | §7.2 as revised | Fields accepted and carried; `content_hash` → `LEGACY_UNRESOLVED`; quotes unchecked; no link | Probe: schema-valid v1.5 input; A9 `SOURCE_UNQUALIFIED` | No current input has an evidence-manifest `uri`, so none changes | No. It gives generic fields a GMP-evidence meaning (A16 l.32, l.34). | Yes |
+| **L2** | Two `LOCAL_COMPUTED` digests and the `UNKNOWN` window fact, for a verified link (§7.3) | `LEGACY_UNRESOLVED` digest; no retrieval fact when `retrieval_timestamp` is absent | Schema enum values exist; window fact validated (§7.11.1) | Only linked evaluations change; stored records are not re-interpreted | No. It amends the A15 mapping (A15 l.41; A16 l.28). | Yes |
+| **L3** | Stamp in the publisher's format; title-line identity; `as_of` ≤ window end (§7.4 steps 5 and 7) | None | Evidenced only for MarketLiveIPOGMP: ML-T:84, ML-T:1, ML-HM:1 | Publisher-specific; another publisher needs its own evidence | No. It sets publisher-specific verification semantics (A16 l.32). | Yes |
+| **L4** | Failures are nonterminal diagnostics (§7.5) | No link, so no failure | Matches the existing A9 nonterminal pattern | No input is newly rejected | No. It is part of the same contract. | Yes, with L1 |
+
+None is authorized, so none is implemented. The (a)/(b) alternatives in §7.10 are technical sub-choices, and the recommendation picks one of each. They therefore reduce to one approval question (§7.11.5).
+
+#### 7.11.3 Questions A–G
+
+| | Under the revised proposal | Today (no linkage) |
+|---|---|---|
+| **A. Identity** | Manifest, artifact and issue are identified separately:<br>• the manifest pin fixes the manifest;<br>• the manifest's single declaration of the `#` artifact id fixes the artifact's digest and bytes, and D1 rejects an undeclared or duplicated id;<br>• the title quote fixes the issue. | Not established |
+| **B. Hash** | Both digests are recomputed from the bytes read. A mismatch is `FAILED`. This proves integrity only (D1). | Not checked |
+| **C. Value** | `pct` and `as_of` must equal quotes on their lines of the verified text. A substituted capture fails on the pin, the identity line or the values. | Quotes unchecked |
+| **D. Time** | §7.11.1. Neither the window end nor the stamp is ever treated as the capture time. A window ending after E, or an E inside the window, fails D2. | No signal |
+| **E. Failures** | • Missing reference: no link, and the record is unchanged.<br>• `FAILED`: missing manifest or artifact; malformed reference; hash mismatch; missing or malformed window; `pct` or `as_of` mismatch; duplicated or contradictory entries; untied value.<br>• Late capture: `NOT_AVAILABLE_BY_CUTOFF`.<br>• "Not quoted yet": MISSING, with `pct: null`. ₹0: ZERO and `SOURCE_UNQUALIFIED`.<br>• Duplicate `_evidence` JSON keys stay undetectable (§7.4).<br>• A9 stays nonterminal in every case. | Every case is silently unlinked |
+| **F. Reproducibility** | The input plus the pinned manifest and artifact re-derive the result. The A15 record keeps both digests, the window text and the D1 label. If the manifest is later amended, re-verification fails closed, and the pinned bytes stay in history. | Only an opaque pin is recorded |
+| **G. Compatibility** | No schema or version change. Existing inputs and records are unchanged, with no reinterpretation. | — |
+
+#### 7.11.4 Done in this pass under existing D1–D2 authority
+
+- **D2 wording.** The `gmp_evidence.py` module and `capture_obtained_by` docstrings no longer call the window end "the capture time". They now state that it is the latest possible capture time, used only as an upper bound. Three focused tests were renamed to match. Behaviour is unchanged.
+- **D1 identity.** `load_rendered_capture` now rejects an artifact id declared more than once, instead of taking the first. A new focused test covers it, and a mutation run without the guard fails that test.
+- **Module docstring.** It no longer says that no field could link an evaluation; it now matches §7.1.
+- **Not done:** the linkage verifier, the A15 mapping and any schema change.
+
+#### 7.11.5 Question for Ramki
+
+**Approve §7, as revised on 2026-10-16, as the GMP evidence-linkage contract (L1 as revised, L2-a, L3-a, L4-a), with no schema or version change?**
+- **Recommended answer:** yes.
+- **If yes:** implement the verifier in `gmp_evidence.py` and the §7.3 mapping in the A15 builder, with the §7.8 tests. A9 stays fail-closed, and MarketLiveIPOGMP stays NOT QUALIFIED (§7.9).
+- **If no:** nothing changes. Evaluations stay unlinked, and A9 stays fail-closed.
