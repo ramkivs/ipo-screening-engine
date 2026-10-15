@@ -1,0 +1,117 @@
+# PapsDigital — https://www.papsdigital.com
+# The IPO GMP pages are public reference data and are meant to be crawled.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# Why every group below repeats `Disallow: /api/`.
+#
+# It is not redundancy. A crawler follows exactly one group — the most
+# specific one whose name matches it — and Google's spec is explicit that
+# "user agent specific groups and global groups (*) are not combined". So
+# every crawler named below was reading its own two-line group and never saw
+# the wildcard's Disallow at all.
+#
+# That mattered, because the functions behind the rewrites answer on their own
+# paths too: /api/ipo-gmp, /api/home and /api/ipo-gmp?slug=<company> each
+# return the full HTML of the page they render. Those are duplicates of
+# /ipo-gmp, / and /ipo-gmp/<company>. Each carries a canonical pointing at the
+# real URL, which is what has kept Google straight, but an engine that does
+# not consolidate on canonicals had an open invitation to crawl and quote the
+# duplicate. Repeating the line is the only way to say it to them.
+# https://developers.google.com/search/docs/crawling-indexing/robots/robots_txt
+
+# ── Answer engines, allowed deliberately ─────────────────────────────────
+#
+# Being cited when someone asks ChatGPT, Claude or Perplexity "best IPO GMP
+# tracker" is an acquisition channel, not a nice-to-have. Several of these
+# crawlers are opt-in by convention: they do not read the wildcard rule above
+# as consent, so naming them is the only thing that grants it. Listing them is
+# meaningful, not decorative.
+#
+# The three OpenAI tokens do different jobs and are listed separately on
+# purpose: GPTBot crawls for model training, OAI-SearchBot builds the search
+# index behind ChatGPT's answers, and ChatGPT-User fetches a page live when a
+# user's question sends it there. Allowing all three is a choice to be both
+# trainable and citable. https://developers.openai.com/api/docs/bots
+
+User-agent: GPTBot
+Allow: /
+Disallow: /api/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /api/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /api/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /api/
+
+User-agent: Claude-User
+Allow: /
+Disallow: /api/
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /api/
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /api/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /api/
+
+User-agent: Perplexity-User
+Allow: /
+Disallow: /api/
+
+User-agent: CCBot
+Allow: /
+Disallow: /api/
+
+User-agent: meta-externalagent
+Allow: /
+Disallow: /api/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
+
+# ── Google's and Apple's AI-training tokens ──────────────────────────────
+#
+# These two are allowed because this site is content it wants read and reused
+# with attribution, not because they do anything for Search. An earlier
+# comment here claimed they "buy eligibility for AI Overviews and Apple
+# Intelligence". They do not, and it is worth being precise about, because
+# believing it invites the opposite mistake — blocking them in the belief it
+# costs a ranking, or adding AI-only files in the belief something else is
+# needed.
+#
+# Google's own wording: Google-Extended "does not impact a site's inclusion in
+# Google Search nor is it used as a ranking signal", and it governs training
+# and grounding for Gemini, not Search. Eligibility for AI Overviews and AI
+# Mode comes from the ordinary things — be indexed, be eligible for a snippet,
+# meet the technical requirements — and Google states there are "no additional
+# requirements ... nor other special optimizations necessary", and that no
+# AI text file or special schema is needed.
+# https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers
+# https://developers.google.com/search/docs/appearance/ai-features
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /api/
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /api/
+
+# `Host:` used to sit here. It is a Yandex directive; Google and Bing ignore
+# it, and the canonical tag on every page already states the same thing.
+Sitemap: https://www.papsdigital.com/sitemap.xml

@@ -1,0 +1,200 @@
+{
+  "artifactType": "papsdigital-gmp-rendered-source-capture-manifest",
+  "status": "NON-AUTHORITATIVE INVESTIGATION EVIDENCE. Not a source approval, not an A9 qualification, not a qualifying GMP snapshot, and not an A9 required hash.",
+  "recordRef": "docs/investigation/A9-GMP-ALTERNATIVE-PUBLISHER-QUALIFICATION-2026-10-15.md",
+  "createdDate": "2026-10-15",
+  "publisherIssuePage": {
+    "url": "https://www.papsdigital.com/ipo-gmp/tonbo-imaging-india",
+    "displayedIssueName": "Tonbo Imaging India",
+    "declaredUpstream": "https://www.investorgain.com/report/ipo-gmp-live/331/ (stated on the page itself; see pd-ipo-gmp-chunk-1 lines 23-32)"
+  },
+  "captureMethod": {
+    "tool": "functions.fetch_page",
+    "representation": "rendered Markdown text: the tool's JSON-decoded 'content' string for the stated chunk; not HTML and not provider response bytes",
+    "rawProviderResponseBytesCaptured": false,
+    "responseHeadersCaptured": false,
+    "exactReceiptTimeCaptured": false,
+    "toolCacheStatusDisclosed": false,
+    "transcription": "Each scratch input held the tool-returned content string in its JSON-escaped form as returned to the agent; it was JSON-decoded and written without adding a trailing newline. The tool result is not delivered to the sandbox filesystem, so transcription fidelity cannot be machine-verified against the tool output.",
+    "retrievalWindowBasis": "sandbox UTC clock read before and after each sequential tool call (one clock read can close one window and open the next). The window brackets the tool call; it does not establish when the publisher generated the content or whether the tool served cached content.",
+    "sandboxClockCheck": [
+      {
+        "sandboxBeforeUtc": "2026-10-15T13:24:26.607Z",
+        "githubApiDateHeader": "Thu, 15 Oct 2026 13:24:26 GMT",
+        "sandboxAfterUtc": "2026-10-15T13:24:26.866Z"
+      }
+    ],
+    "sandboxClockCheckResult": "consistent with https://api.github.com/ Date header to the header's one-second resolution",
+    "sha256Scope": "exact bytes of each retained local UTF-8 file as stored in this directory; never provider response bytes",
+    "fileEncoding": "UTF-8 without BOM; no trailing newline added",
+    "hashFormat": "SHA-256, uppercase hexadecimal (repository evidence convention)",
+    "directSandboxRetrieval": {
+      "possible": false,
+      "evidence": "curl -sS -m 8 https://www.papsdigital.com/robots.txt from the sandbox returned 'curl: (35) OpenSSL SSL_connect: SSL_ERROR_SYSCALL in connection to www.papsdigital.com:443' (sandbox egress allowlist). Run between 2026-10-15T13:11:09.751Z and 2026-10-15T13:11:09.958Z."
+    },
+    "robotsCompliance": "robots.txt for User-agent * states 'Allow: /' and 'Disallow: /api/' (retained as pd-robots-txt). Only public HTML pages were requested; no /api/ path was queried."
+  },
+  "artifacts": [
+    {
+      "id": "pd-ipo-gmp-chunk-0",
+      "url": "https://www.papsdigital.com/ipo-gmp",
+      "toolResultStatus": "success",
+      "toolPageTitle": "IPO GMP Today, Live IPO Grey Market Premium | PapsDigital",
+      "chunkIndex": 0,
+      "totalChunks": 3,
+      "hasMore": true,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T13:11:32.551Z",
+        "notAfter": "2026-10-15T13:12:01.221Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T18:41:32.551+05:30",
+        "notAfter": "2026-10-15T18:42:01.221+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/papsdigital-ipo-gmp-chunk-0.md",
+      "bytes": 8195,
+      "sha256": "0FAE5A1D0344BDD6F61D37EFA43C237F215F3FF8A51952F724BF549EF3351935",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": []
+    },
+    {
+      "id": "pd-ipo-gmp-chunk-1",
+      "url": "https://www.papsdigital.com/ipo-gmp",
+      "toolResultStatus": "success",
+      "toolPageTitle": "IPO GMP Today, Live IPO Grey Market Premium | PapsDigital",
+      "chunkIndex": 1,
+      "totalChunks": 3,
+      "hasMore": true,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T13:12:01.221Z",
+        "notAfter": "2026-10-15T13:12:33.851Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T18:42:01.221+05:30",
+        "notAfter": "2026-10-15T18:42:33.851+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/papsdigital-ipo-gmp-chunk-1.md",
+      "bytes": 8035,
+      "sha256": "F57AEEEBBD01004D5D6C24D66ED1BA7F2A0632A71D6B88FAA5359ECA0A498FCB",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": []
+    },
+    {
+      "id": "pd-ipo-gmp-chunk-2",
+      "url": "https://www.papsdigital.com/ipo-gmp",
+      "toolResultStatus": "success",
+      "toolPageTitle": "IPO GMP Today, Live IPO Grey Market Premium | PapsDigital",
+      "chunkIndex": 2,
+      "totalChunks": 3,
+      "hasMore": false,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T13:12:33.851Z",
+        "notAfter": "2026-10-15T13:12:37.335Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T18:42:33.851+05:30",
+        "notAfter": "2026-10-15T18:42:37.335+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/papsdigital-ipo-gmp-chunk-2.md",
+      "bytes": 6150,
+      "sha256": "8F1FBCD0416C3E6DFAD41277AAEA9C864395A52DB6CC5C43442ADA99C7FD90A3",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": []
+    },
+    {
+      "id": "pd-tonbo-chunk-0",
+      "url": "https://www.papsdigital.com/ipo-gmp/tonbo-imaging-india",
+      "toolResultStatus": "success",
+      "toolPageTitle": "Tonbo Imaging India IPO GMP Today — Grey Market Premium | PapsDigital",
+      "chunkIndex": 0,
+      "totalChunks": 2,
+      "hasMore": true,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T13:12:37.335Z",
+        "notAfter": "2026-10-15T13:12:53.473Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T18:42:37.335+05:30",
+        "notAfter": "2026-10-15T18:42:53.473+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/papsdigital-ipo-gmp-tonbo-imaging-india-chunk-0.md",
+      "bytes": 8100,
+      "sha256": "E05B5517C461BCD5AC5E3E781C8B7C630A94D9F80B372002AF0747CA3B542131",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": []
+    },
+    {
+      "id": "pd-tonbo-chunk-1",
+      "url": "https://www.papsdigital.com/ipo-gmp/tonbo-imaging-india",
+      "toolResultStatus": "success",
+      "toolPageTitle": "Tonbo Imaging India IPO GMP Today — Grey Market Premium | PapsDigital",
+      "chunkIndex": 1,
+      "totalChunks": 2,
+      "hasMore": false,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T13:12:53.473Z",
+        "notAfter": "2026-10-15T13:14:14.112Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T18:42:53.473+05:30",
+        "notAfter": "2026-10-15T18:44:14.112+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/papsdigital-ipo-gmp-tonbo-imaging-india-chunk-1.md",
+      "bytes": 1736,
+      "sha256": "91023836CC83EB67D8A4DE29F157188DA71A9DA04D0B87908B4321F07F5D1445",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": [],
+      "windowNotes": "window is wide because the closing clock read followed local-only repository inspection; no other network request was made inside it"
+    },
+    {
+      "id": "pd-robots-txt",
+      "url": "https://www.papsdigital.com/robots.txt",
+      "toolResultStatus": "success",
+      "toolPageTitle": "",
+      "chunkIndex": 0,
+      "totalChunks": 1,
+      "hasMore": false,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T13:11:09.958Z",
+        "notAfter": "2026-10-15T13:11:32.551Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T18:41:09.958+05:30",
+        "notAfter": "2026-10-15T18:41:32.551+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/papsdigital-robots.txt",
+      "bytes": 4204,
+      "sha256": "B023A9D73D565FC0BFD3F85055596815CC74916989239A1E600513B8AFE45B85",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": [],
+      "windowNotes": "fetched in parallel with https://marketliveipogmp.com/robots.txt inside the same window"
+    }
+  ],
+  "derivedChecks": {
+    "listingChunkJoins": "chunk 0 ends 'Every number' and chunk 1 begins ' on this page is stamped'; chunk 1 ends 'is guarante' and chunk 2 begins 'ed. GMP can fall'. Direct concatenation is consistent with one rendered document split by the tool; whether the chunks came from one HTTP retrieval is not disclosed.",
+    "tonboChunkJoin": "chunk 0 ends '**Estimated listing gain** is' and chunk 1 begins ' that premium as a percentage'; consistent with one rendered document split by the tool.",
+    "issuePageClockTimes": "neither Tonbo chunk contains a clock time (regex [0-9]{1,2}:[0-9]{2} has no match); the phrase 'Source updated' occurs only in the methodology definition (chunk 0 line 151)."
+  },
+  "retrievedNotRetained": [],
+  "notRetrieved": [
+    {
+      "url": "https://www.papsdigital.com/api/ipo-gmp (and other /api/ paths)",
+      "reason": "disallowed by robots.txt; not queried"
+    },
+    {
+      "url": "https://www.papsdigital.com/ipo-gmp (Table view)",
+      "reason": "client-side view toggle ('CardsTable'); the rendered-page tool returns the default view only"
+    },
+    {
+      "url": "https://www.papsdigital.com/legal/notice/contact",
+      "reason": "operator identity was not needed for the determination; not retrieved"
+    }
+  ],
+  "a9HashStatement": "The A9 decision defines no required GMP hash algorithm or subject. These digests establish integrity of the retained local files only; they do not establish source authenticity, provider-byte identity, or the truth of any GMP value."
+}
