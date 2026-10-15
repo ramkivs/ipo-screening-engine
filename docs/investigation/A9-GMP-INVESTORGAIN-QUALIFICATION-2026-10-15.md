@@ -4,8 +4,9 @@
 **Date:** 2026-10-15
 **Candidate:** InvestorGain (`https://www.investorgain.com/`), the first named publisher assessed under the selected Model A policy
 **Issue record assessed:** Tonbo Imaging India IPO, publisher page ID `2369`: `https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/`
-**Baseline:** `arena/573e69a4-ipo-screening-engine` at `31f04e8f0d50f3bc05a5236f9664e350eefe6e03`, remote-verified 2026-10-15. A9 implementation commit `953b621ed27a2bdd1a2e06232f275687810e59d9` is an ancestor.
-**Publication branch:** Arena session branch `arena/ba8f663e-ipo-screening-engine`, a fast-forward descendant of the baseline.
+**Baseline:** `arena/573e69a4-ipo-screening-engine` at `31f04e8f0d50f3bc05a5236f9664e350eefe6e03`, remote-verified 2026-10-15. A9 implementation commit `953b621ed27a2bdd1a2e06232f275687810e59d9` is an ancestor. The authoritative branch advanced to `97b2eb5a2c7fbfa48b51dce1dd9ef84b5ab4cf0a` during this pass; that tip was merged without modification.
+**Publication branch:** Arena session branch `arena/ba8f663e-ipo-screening-engine`, a fast-forward descendant of authoritative tip `97b2eb5`.
+**Parallel record:** [`A9-INVESTORGAIN-PUBLISHER-QUALIFICATION-2026-10-15.md`](A9-INVESTORGAIN-PUBLISHER-QUALIFICATION-2026-10-15.md) (`97b2eb5`) reaches the same NOT QUALIFIED result but assigns different statuses to some requirements; see §11.
 **Evidence package:** [`evidence/gmp-observations/investorgain-tonbo-20261015/`](../../evidence/gmp-observations/investorgain-tonbo-20261015/README.md)
 **Determination:** **NOT QUALIFIED.** A9 remains fail-closed. Final, scoring, and implementation are unchanged and not authorized to change.
 
@@ -267,6 +268,30 @@ InvestorGain values must not be entered or labelled as a qualifying GMP snapshot
 
   The draft would still require separate implementation authority.
 
+## 11. Relationship to the parallel InvestorGain record
+
+While this pass was in progress, another session published [`A9-INVESTORGAIN-PUBLISHER-QUALIFICATION-2026-10-15.md`](A9-INVESTORGAIN-PUBLISHER-QUALIFICATION-2026-10-15.md) to the authoritative branch at `97b2eb5` (committed 12:38:56 UTC). It assessed the same issue page with the same retrieval tool about a minute earlier (12:28:07–12:28:47 UTC). Its evidence is under `evidence/market-observations/investorgain-tonbo-20261015/`.
+
+This record does not modify, supersede, or withdraw that record. Ramki should designate which record governs.
+
+**Agreement.**
+- Both records conclude **NOT QUALIFIED**.
+- Both leave A9 and Final unchanged.
+- Both pass requirement 1 and treat requirements 3, 4, 6, and 7 as unmet.
+- The two independent transcriptions match exactly on all 41 history rows, the ₹495 headline, "updated on Oct 15, 2026 05:37:03 PM", and the price band.
+- That record's `SHA256SUMS` verifies against its capture.
+
+**Differences.**
+
+| # | Parallel record | This record | Basis for this record's status |
+|---|---|---|---|
+| 2 | PASS | FAIL | The engine's only scored GMP input, `market.gmp.trend`, has no source-defined counterpart (O8). The page's GMP statistics conflict (O5), and its derived fields render unknown inputs as 0 (O6). |
+| 3, 4, 6, 7 | BLOCKED | FAIL | The underlying gaps are the same. This record classifies publisher-intrinsic gaps that more capture cannot cure as FAIL (§1 definitions). The full disclaimer (DS), which that record did not retain, adds no definitions or correction policy and disclaims accuracy and completeness. |
+| 5 | PASS | BLOCKED | Repository precedent treats rendered/local captures as leaving source-native qualification "OPEN / BLOCKED — evidence required" (tracker l.29, l.106). A9 defines no required hash subject. |
+| 8 | PASS | FAIL | The policy-selection record §3 row 8 requires relevant version or correction information. The publisher exposes none (O10). |
+
+**Next action.** The parallel record proposes checking whether InvestorGain publishes evidence that resolves the open requirements. This pass checked the publisher pages most likely to carry it: the issue page, the dashboard's methodology/FAQ text, and the full disclaimer (T0, T1, D2, DS). None defines time fields, freshness, missing values, or corrections. This record therefore treats the §10 policy decision as the smaller next step, without precluding a further publisher-page check.
+
 ## References
 
 - [A9 GMP source-policy selection](A9-GMP-SOURCE-POLICY-SELECTION-2026-10-15.md) §§1–5
@@ -276,3 +301,4 @@ InvestorGain values must not be entered or labelled as a qualifying GMP snapshot
 - `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` l.29, l.106 (precedent for rendered/local captures)
 - `schema/ipo-input.v1.5.schema.json` (`market.gmp`); `config/ipo-config.v1.5.0.json` (`gmp_trend`, `gmp_bucket`)
 - [Evidence package README](../../evidence/gmp-observations/investorgain-tonbo-20261015/README.md) and `capture-manifest.json`
+- [Parallel InvestorGain record](A9-INVESTORGAIN-PUBLISHER-QUALIFICATION-2026-10-15.md) (`97b2eb5`) and `evidence/market-observations/investorgain-tonbo-20261015/`
