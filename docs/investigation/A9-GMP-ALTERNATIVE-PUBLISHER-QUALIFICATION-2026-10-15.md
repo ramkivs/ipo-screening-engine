@@ -314,6 +314,285 @@ Ramki approved three product decisions, recorded as user-approved policy in [`ha
 
 **R7 is unchanged.** No capture was made in this pass. It ran at 22:07 IST, 40 minutes after the last capture (§13.1) and before the 16 Oct IST daytime window inferred there. The single follow-up capture condition in §13.1 still applies. The approved cutoff, freshness and trend policy says nothing about the publisher's retention, append-only behaviour, corrections or historical availability.
 
+## 15. A17 follow-through — 2026-10-15, 17:17 UTC (focused qualification gap matrix)
+
+This addendum applies the approved A17 decisions to MarketLiveIPOGMP's outstanding requirements. It reuses §§1–14 and the retained evidence; nothing above is edited, and no publisher page was captured.
+
+- "A17-1/2/3" are Ramki's approved decisions.
+- "§8 PR-n" always means this record's proposals, which remain unadopted except as mapped in §14.
+- §7's source-fact findings for R3, R4 and R8 are not reopened.
+- In two cases §7's overall status waited only on a project rule that A17 now supplies: the cutoff for R3 and the maximum age for R4. The resulting status for those is given below.
+- R8's dependency on §8 PR-3 is not supplied by A17.
+
+### 15.1 Verification and limits
+
+- **Baseline:** `arena/573e69a4-ipo-screening-engine` and `arena/5ccbfd5d-ipo-screening-engine` were both at `5bb5eae1f35d41e6f670af0be77064bc178390a5` (tree `d619a5a`), verified with `git ls-remote` and a fetch at 17:17 UTC. This addendum is committed on `arena/5ccbfd5d-ipo-screening-engine`.
+- **Evidence integrity:** all 20 retained files in the three `evidence/gmp-observations/` packages match their capture-manifest byte counts and SHA-256 digests.
+- **Capability:** direct retrieval is still impossible.
+  - `curl` to `https://marketliveipogmp.com/robots.txt` failed with `(35) OpenSSL SSL_connect: SSL_ERROR_SYSCALL` at 17:26:00.814Z–17:26:00.885Z, and no content was retrieved.
+  - The sandbox clock matched the `api.github.com` `Date` header (17:26:01 GMT).
+- **Cache limit (applies to every capture in this record):** the fetch tool does not disclose cache status (capture manifest `captureMethod.toolCacheStatusDisclosed: false`).
+  - Content returned inside a retrieval window was therefore published no later than the window's end.
+  - A byte-identical recapture shows what the tool returned. It does not prove that the publisher's page was unchanged at that moment.
+
+### 15.2 R7 — condition not met; no capture
+
+- **Trigger (§13.1):** a Tonbo reading stamped after "15 Oct, 4:02 pm IST", before "Closes 19 Oct". It can be checked only by capturing.
+- **When the decision was made:** 17:26 UTC (22:56 IST) on 15 Oct.
+  - That was 1 h 28 min after the last capture (21:27 IST).
+  - It was before the 16 Oct IST daytime that §13.1 item 5 infers is the earliest likely time for a new reading.
+- **Outcome:** a capture then would have been an immediate repeat, so **none was warranted or taken**.
+- **Status:** R7 remains **UNRESOLVED**. The §13.1 condition, test and reading of results are unchanged, and the capture remains possible until bidding closes on 19 Oct.
+
+### 15.3 Additional observations and inferences from retained evidence
+
+No new capture underlies these.
+
+- **ML-O12 — One stamp for every displayed reading.**
+  - All nine home-page cards that show a GMP value, covering open and upcoming issues, end with the same "4:02 pm" [ML-H:57, 82, 107, 132, 180, 205, 230, 283, 306]. This matches "Updated Thu, 15 Oct, 2026 at 4:02 pm IST" [ML-H:5].
+  - The two "Not quoted yet" cards show no time [ML-H:141–155, 239–253].
+  - Eight of the nine show a non-zero "since last" change. Paras Healthcare shows a value and the stamp but no change line [ML-H:284–306].
+- **ML-O13 — Signed values.** The site displays negative premiums ("₹-51" [ML-TR:42]; "Range so far: -₹2 low" [ML-HM:15]) as well as "₹0" [ML-HM:7] and "Not quoted yet".
+- **I4 — Stamp granularity (inference).**
+  - ML-O12 fits a batch sync time applied to every displayed reading, consistent with I2.
+  - Paras's missing change line fits either of two readings: a first reading, or an unchanged value re-stamped at the sync with its zero change not displayed. The evidence therefore does not show whether a stamp marks when a value was first recorded or the latest sync that carried it.
+  - ML-O7, a reading described as published "before listing" but stamped on listing day, fits either re-stamping or an inaccurate claim.
+- **I5 — Zero is numeric (inference).** Because signed values are displayed (ML-O13), "₹0" sits on a numeric scale rather than acting as a missing-value marker. The publisher does not say so.
+
+### 15.4 Gap matrix — MarketLiveIPOGMP
+
+| Row | Requirement | Disposition | What closes the gap |
+|---|---|---|---|
+| Q1 | Publisher identity and its relationship to the displayed observation (R1) | **PASS** | — |
+| Q2 | Displayed value and its source-native context (R2; R5 representation) | **PASS** for the value; **BLOCKED** for source-native context | D1, or a capture environment that can reach the host |
+| Q3 | Meaning of the displayed timestamp (R3) | **PASS**, with a limitation carried to Q7 | — |
+| Q4 | Availability by the A17 cutoff (R8) | **UNRESOLVED** | D2, then a prospective capture |
+| Q5 | Evidence artifact and hash subject/representation (R5) | **UNRESOLVED** | D1, then IMP-1 |
+| Q6 | Missing, zero, stale, corrected and conflicting observations (R6; R4; R7) | Stale **PASS**; missing vs zero **UNRESOLVED**; corrected and conflicting **UNRESOLVED** | D3; E1 |
+| Q7 | Corrections, historical retention and append-only behaviour (R7; R8) | R7 **UNRESOLVED**; R8 partly open | E1, then the §9 post-listing checks |
+
+Each row below gives:
+- (a) existing evidence;
+- (b) what it proves;
+- (c) what it does not prove;
+- (d) whether more evidence is obtainable with this environment and permissions;
+- (e) the resulting disposition.
+
+D1–D3, E1 and IMP-1 are defined in §15.5.
+
+**Q1 — Publisher identity and its relationship to the displayed observation (R1)**
+
+- **(a) Existing evidence:**
+  - the named site and domain [ML-A:1];
+  - the issue page, which carries the value and its stamp [ML-T:1–13, 84];
+  - readings presented as the site's own: "Every premium we published" [ML-TR:3]; "the one published here" [ML-HM:49];
+  - the sourcing claim ML-C1 and a corrections contact [ML-A:27];
+  - no operating entity named (ML-O11);
+  - value overlap with InvestorGain, with one counter-example (ML-O9).
+- **(b) Proves:** the observation is this named publisher's own reported reading for the identified issue, which is what Model A requires (policy §1).
+- **(c) Does not prove:**
+  - who operates the site;
+  - that the quotes come from "dealer channels";
+  - what the cross-check is, or what it found;
+  - independence from InvestorGain (I3).
+- **(d) Obtainable:** no.
+  - Operator and sourcing facts would need provider contact, which is excluded, or hosts this environment cannot reach.
+  - Independence would need the publisher's stored readings, which are unreachable (§15.1).
+- **(e) Disposition:** **PASS** (R1, §7). Two constraints carry forward:
+  - it is labelled as MarketLiveIPOGMP's reported value, never as a dealer quote (policy §1);
+  - it is never corroborated with InvestorGain (I3).
+
+**Q2 — Displayed value and its source-native context (R2; R5 representation)**
+
+- **(a) Existing evidence:**
+  - the ML-T rendered text (1,693 B, SHA-256 `33516F86…705D`), retrieved 13:15:14–13:17:58Z;
+  - three byte-identical recaptures, the last ending 15:57:59Z;
+  - the value, percentage, change and stamp [ML-T:7–13], restated with year and weekday [ML-T:84];
+  - arithmetic that reproduces (ML-O2);
+  - the definition and units [ML-L:7, 25].
+- **(b) Proves:** one internally consistent observation, as returned by the fetch tool:
+  - ₹500 per share over the ₹700 price (+71.4%);
+  - "▲₹32 since last reading";
+  - "as of 4:02 pm IST on Thu, 15 Oct, 2026".
+- **(c) Does not prove:**
+  - provider response bytes, headers or receipt time (none was captured);
+  - the chart's stored readings, or anything rendered client-side (ML-O8; README l.31);
+  - transcription fidelity against the tool output (README l.33);
+  - the price band (ML-O10).
+  - Rendered or local evidence leaves source-native qualification open (tracker l.30, l.107). These are the precedent rows cited above as l.29 and l.106; A17's header bullet renumbered them.
+- **(d) Obtainable:** no. Direct retrieval fails (§15.1), and the fetch tool returns rendered text only.
+- **(e) Disposition:**
+  - Value: **PASS** (R2, §7).
+  - Source-native context: **BLOCKED** here. Only D1, or a capture environment that can reach the host, can close it.
+
+**Q3 — Meaning of the displayed timestamp (R3)**
+
+- **(a) Existing evidence:**
+  - One stamp per reading: "15 Oct, 4:02 pm" with "IST" [ML-T:11–13].
+  - The publisher's own words:
+    - the value is "as of 4:02 pm IST on Thu, 15 Oct, 2026" [ML-T:84];
+    - a final reading was "recorded at 3:37 pm IST" [ML-HM:128];
+    - "Each reading is stored with a timestamp" [ML-A:11].
+  - The same instant appears as (ML-O3):
+    - the "Last data sync" [ML-A:3];
+    - the site-wide "Updated" line [ML-H:5];
+    - the sitemap `lastmod` `2026-10-15T16:02:00+05:30` [ML-S:1];
+    - the subscription "as of" [ML-T:60].
+  - Every displayed reading shares it (ML-O12).
+  - An ageing reading keeps its stamp (ML-O5).
+  - A final reading is stamped on listing day (ML-O7).
+- **(b) Proves:**
+  - The stamp is a source-supplied IST time, fully dated (the year is given in [ML-T:84]).
+  - The publisher itself calls it the reading's "as of" and "recorded at" time.
+  - It is the site-wide data-sync (batch) time.
+  - **Classification: publisher update (recording/sync) time.** It is not an event time.
+  - Normalising "IST" to +05:30 uses the publisher's own sitemap offset, not an assumed zone.
+- **(c) Does not prove:**
+  - when the underlying grey-market quote prevailed (never exposed; I2);
+  - when the reading first became publicly visible (no separate publication time is shown; see Q4);
+  - whether a stamp marks the first recording of a value or the latest sync that carried it (I4).
+- **(d) Obtainable:** no. That would need the publisher's stored readings or a statement from the publisher. The pending R7 capture could show one new stamp with its change, but cannot define the stamp's meaning.
+- **(e) Disposition:** **PASS** on source facts (§7, not reopened).
+  - A17-1 now supplies the cutoff that §7 found missing. This stamp, the only source time exposed, is what A17-1 compares.
+  - This answers A17's unresolved dependency 2 for this publisher. It is an investigation finding, not an approval.
+  - A17-1 also excludes listing-day recordings (ML-O7) from any evaluation timed before them.
+  - **Limitation, carried to Q7:** if a sync re-stamps unchanged values (I4), A17-2 measures age from the latest "as of" stamp rather than from when the value was first recorded. Whether a re-stamp reflects re-confirmation is unverified publisher behaviour.
+
+**Q4 — Availability by the A17 cutoff (R8 "evaluation-time availability")**
+
+- **(a) Existing evidence:**
+  - Retrieval windows are bracketed by a sandbox clock checked against `api.github.com` (capture manifest).
+  - ML-T's window ends at 13:17:58.770Z. The stamp normalises to 10:32:00Z (capture manifest `normalizedSourceTimeUtc`).
+  - A17-1 and A17-2 compare only the stamp. §8 PR-1's "retrieved at or before the evaluation timestamp" clause was not adopted (§14).
+  - `market.gmp` has no retrieval-time field (schema l.978–1000; §13.3).
+- **(b) Proves:**
+  - The ₹500 reading had been published by 13:17:58.770Z (see the §15.1 cache limit).
+  - For an evaluation timestamp between then and 2026-10-16T10:32:00Z (the A17-2 limit), the retained capture shows the reading was available by the cutoff.
+- **(c) Does not prove:**
+  - Availability before 13:15:14Z. The stamp asserts "as of" 10:32Z, but no publication time is exposed and no earlier capture exists.
+  - The engine also cannot record retrieval evidence, and A17 does not make availability an eligibility condition.
+  - **Tonbo Final:** for an evaluation on or after the 19 Oct close, every retained reading is more than 24 h old. All are therefore ineligible under A17-2, whatever the qualification outcome.
+- **(d) Obtainable:** only going forward. That means a capture whose retrieval window ends at or before the chosen evaluation timestamp, of a reading stamped within the 24 h before it. A mutable page cannot supply this after the fact.
+- **(e) Disposition:** **UNRESOLVED** — it needs D2, then prospective evidence. Until then, A17-1 accepts a reading stamped at or before the cutoff without proof that it was visible by then.
+
+**Q5 — Evidence artifact and hash subject/representation (R5)**
+
+- **(a) Existing evidence:**
+  - The retained rendered-text files and the capture manifest.
+  - The hash subject is the exact local file bytes, digested with SHA-256 in uppercase hex (README "Hash subject"). All 20 files were re-verified (§15.1).
+  - The A9 decision defines no GMP hash subject (A9 l.30, l.50).
+  - The A9 gate refuses a generic market-snapshot digest and an opaque `SourceRef.content_hash` (`evaluation_record.py` l.929–937).
+  - §8 PR-3 was drafted but not adopted (§14).
+- **(b) Proves:** the integrity of the retained local files, and a reproducible procedure for re-hashing them.
+- **(c) Does not prove:**
+  - provider-byte identity, source authenticity or transcription fidelity (capture manifest `a9HashStatement`);
+  - that any artifact is acceptable as A9 GMP evidence, because no rule says which is.
+  - Nor is there anywhere to carry a GMP artifact hash:
+    - `market.gmp` holds only `as_of`, `pct`, `trend` and `source_id`;
+    - the A15 record's generic digests, such as `market_snapshot_hash`, are deliberately not accepted by the gate.
+- **(d) Obtainable:** no provider bytes (§15.1). More rendered captures are possible, but they add nothing until D1 decides whether rendered text is acceptable.
+- **(e) Disposition:** **UNRESOLVED** — it needs D1, then IMP-1. No evidence obtainable here closes it.
+
+**Q6 — Missing, zero, stale, corrected and conflicting observations (R6; R4; R7)**
+
+| State | (a) Displayed by the source (observed) | (b) Established | (c) Not established |
+|---|---|---|---|
+| Missing | "Not quoted yet", with no stamp and "Est. listing —" [ML-H:141–155, 239–253]. For listed issues: "Final GMP … Not quoted yet" and "GMP said —" (ML-O6). | Displayed distinctly from any number. | A definition. How missing finals are retained: the unquoted listings are absent from the track-record chunk (ML-O6). |
+| Zero | "₹0" / "0.0%" [ML-HM:5–7], counted in the track record (ML-O6). Signed values are shown (ML-O13). | Displayed as a number on a signed scale (I5). | A definition. The only example is a listing-day recording (ML-O7); no pre-listing zero was observed. |
+| Stale | No stale marker; the original stamp stays (ML-O5). Claim ML-C3. | The stamp is the staleness signal, and A17-2 computes staleness from it. | Refresh failure beyond the stamp. ML-O5 is subject to the §15.1 cache limit. |
+| Corrected | Nothing observed. Claim ML-C4. | — | Any correction marker or disclosure. No corrections page appears among the retained site-level sitemap entries [ML-S:1]; chunks 1–3 were not retrieved. |
+| Conflicting | One value per reading. Claim ML-C1 ("cross-checked"). | — | The cross-check outcome, precedence, or any conflict marker. |
+
+- **(d) Obtainable:**
+  - Definitions: no, because provider contact is excluded.
+  - A pre-listing ₹0 or a correction would have to appear unprompted. Searching other issue pages for one would be the broad search this pass excludes.
+  - The §13.1 capture tests only for an in-place change.
+- **(e) Disposition:**
+  - Stale: **PASS** (R4). The §7 source facts stand, and A17-2 now sets the maximum age.
+  - Missing vs zero: **UNRESOLVED** (R6). D3 can close it.
+  - Corrected and conflicting: **UNRESOLVED** (R7). This needs source evidence (Q7). §8 PR-4f and PR-5 would limit exposure, but cannot establish the publisher's behaviour.
+
+**Q7 — Corrections, historical retention and append-only behaviour (R7; R8)**
+
+- **(a) Existing evidence:**
+  - Claims ML-C2 (never overwritten), ML-C4 (corrections disclosed) and ML-C5 (final frozen).
+  - The text shows only the range and axis labels, with no list of readings (ML-O8).
+  - "▲₹32 since last reading" implies a previous reading of ₹468 (ML-O9).
+  - Four retrievals of the 4:02 pm reading, from 13:15:14Z to 15:57:59Z, are byte-identical (capture manifest `derivedChecks`).
+  - ML-O7 contradicts the "before listing" part of ML-C5.
+- **(b) Proves:**
+  - As returned by the tool, the 4:02 pm reading's value and stamp were the same at all four retrievals across those 2 h 43 min (subject to the §15.1 cache limit).
+  - The publisher keeps at least the previous value and the range. That is consistent with stored readings, but does not prove them.
+- **(c) Does not prove:**
+  - append-only storage;
+  - disclosure of corrections;
+  - freezing of final readings;
+  - any reading before 13:15Z on 15 Oct;
+  - whether past readings stay available to third parties.
+  - A future pair of readings can only be consistent for that pair (§13.1).
+- **(d) Obtainable:**
+  - the single §13.1 capture, which needs a newer reading (§15.2);
+  - the §9 post-listing checks after 23 Oct.
+  - The chart's stored readings are unreachable here (§15.1).
+- **(e) Disposition:**
+  - R7: **UNRESOLVED** — it needs source evidence, and no project rule can close it.
+  - R8: **PASS** for the identity of a captured observation (§7, not reopened).
+  - R8: **UNRESOLVED** for history before capture, for correction information (R7) and for evaluation-time availability (Q4).
+
+### 15.5 What remains
+
+| ID | Exact missing item | Type | Closes | Obtainable here |
+|---|---|---|---|---|
+| E1 | The §13.1 single capture of a reading stamped after 15 Oct 4:02 pm IST, before "Closes 19 Oct"; then the §9 post-listing checks | Source evidence | R7, progressively; one pair never closes it | Yes. One capture, during IST daytime on 16 Oct or later (§13.1 item 5), before bidding closes on 19 Oct |
+| D1 | Artifact and hash rule for A9 GMP: accept the rendered-text capture with a file-byte SHA-256 (§8 PR-3), or require provider bytes. §8 PR-3 departs, for GMP only, from the rendered-capture precedent (tracker l.30, l.107). Requiring provider bytes blocks qualification from this environment (§15.1). | Ramki decision | R5; part of R8 | — |
+| D2 | Evaluation-time availability: require a retained capture whose window ends at or before the evaluation timestamp (§8 PR-1's unadopted clause), or accept a later capture of an earlier-stamped reading. For NIFTY only, A8-M's approved contract already requires the close to be "demonstrably available by that cutoff" (A8-M observation contract l.23). | Ramki decision | R8 availability (Q4) | — |
+| D3 | Missing vs zero: "Not quoted yet" ⇒ `MISSING` and a displayed ₹0 ⇒ `SOURCE_UNQUALIFIED` (§8 PR-4a/4b), or another fail-closed rule | Ramki decision | R6 | — |
+| IMP-1 | The A9 qualified path; GMP snapshot, hash and retrieval-time representation; capture tooling; and tests | Implementation | Final eligibility | Not before D1–D3. Not incidental work: no retrieval-time field, hash contract or schema change is made here |
+
+The rest of §8 PR-4 is already covered:
+- PR-4c (a missing or unparsable stamp, or no IST label) is covered by A17-1's fail-closed rule.
+- PR-4d (a stamp on or after the listing date) is covered by A17-1 for any evaluation timed before the listing-day stamp.
+- PR-4e (over-age) is covered by A17-2.
+
+§8 PR-4f and PR-5 stay open with IMP-1.
+
+### 15.6 Consequences — no change made
+
+- **No scoring effect, even if qualified.**
+  - MarketLiveIPOGMP publishes no trend label [ML-T:7–9].
+  - `gmp_bucket` reads only `market.gmp.trend` (`derived.py` l.1721–1723).
+  - `pct` is not scored. It only separates `MISSING` from `SOURCE_UNQUALIFIED` in the A9 gate (`evaluation_record.py` l.956–958).
+  - Under A17-3, qualifying this publisher could therefore never make `gmp_trend` scorable unless it begins publishing a label. After D1–D3 and IMP-1, it could only let a `pct` observation meet A9's Final snapshot requirement.
+- **The retained reading has no scoring effect in any mode.**
+  - Under A17-2 it is fresh only for evaluations up to 2026-10-16T10:32:00Z, while Tonbo's bidding is still open.
+  - A9 applies only to Final, and the reading carries no trend label.
+- **No runtime or evidence change.**
+  - Only this record and the tracker's GMP row changed.
+  - No engine, schema, configuration, test, fixture or evidence file was changed.
+  - No application test was rerun, because nothing executable changed.
+
+### 15.7 Determination — unchanged
+
+- **MarketLiveIPOGMP: NOT QUALIFIED** (the leading candidate).
+  - After A17, R1–R4 are met within the limits stated in Q1–Q3 and Q6.
+  - R5 (D1), R6 (D3), R7 (E1) and R8 (D2, R7 and D1) remain open.
+- **InvestorGain:** NOT QUALIFIED.
+- **PapsDigital:** closed as a non-independent alternative.
+- Neither InvestorGain nor PapsDigital is reassessed; no new evidence bears on them.
+- **A9:** fail-closed; Final is withheld.
+- **Smallest next actionable step:** E1 — one capture during IST daytime on 16 Oct, under §13.1. The opportunity ends when bidding closes on 19 Oct.
+- Qualification also needs D1–D3. Even then, `gmp_trend` stays UNKNOWN (§15.6).
+
+**Files cited in §15 by short name** (in addition to the §13 table):
+
+| Short name | File |
+|---|---|
+| policy | `docs/investigation/A9-GMP-SOURCE-POLICY-SELECTION-2026-10-15.md` |
+| A17 | `handoff/decisions/A17-gmp-cutoff-freshness-and-trend-labels.md` |
+| tracker | `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` |
+| capture manifest, README | `evidence/gmp-observations/marketliveipogmp-tonbo-20261015/capture-manifest.json`, `…/README.md` |
+| schema | `schema/ipo-input.v1.5.schema.json` |
+
 ## Evidence keys
 
 Line references are `[KEY:line]` against these retained files. Quotations omit Markdown emphasis markers (for example, `₹ **495**` is quoted as "₹ 495").
