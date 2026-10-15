@@ -146,8 +146,8 @@ The `PresentationService` projects immutable evaluation artifacts and delegates 
 
 * **Zero Client Credentials**: The API does not accept or process LLM API keys (e.g. Anthropic, OpenAI) or exchange credentials.
 * **Safe Extraction Boundary**: Future PDF extraction workflows must be proxied server-side through a dedicated backend extraction gateway where API keys are loaded strictly from environment variables or vault secrets.
-* **Local-use boundary**: The API has no authentication or multi-user controls. Bind it to `127.0.0.1` and do not expose it to an untrusted network.
-* **Same-origin browser boundary**: CORS is not enabled; the bundled frontend calls the API on the same origin. This helps prevent cross-origin websites from reading or invoking the unauthenticated local workflow.
+* **Local-use boundary**: The API has no authentication or multi-user controls. Bind it to `127.0.0.1` and do not expose it to an untrusted network. Every request must also use a `Host` authority that is literally `localhost` or a loopback IP; arbitrary hostnames are rejected to prevent DNS-rebinding access to local read models.
+* **Same-origin browser boundary**: CORS is not enabled; the bundled frontend calls the API on the same origin. Workflow `POST`s require an explicit `Origin` matching the request scheme and exact loopback `Host`; absent or cross-origin `Origin` values are rejected. Non-browser callers should use the documented CLI rather than bypass this browser-write boundary.
 
 ---
 

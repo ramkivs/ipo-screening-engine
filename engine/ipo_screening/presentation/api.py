@@ -2,16 +2,19 @@
 
 GET routes expose read-model views. Only the explicit filing-ingestion and
 lifecycle-action POST routes may mutate the local filesystem; arbitrary write
-methods and scoring/configuration mutation routes are rejected.
+methods and scoring/configuration mutation routes are rejected. Every request
+is restricted to a localhost/loopback Host, and workflow POSTs require an
+explicit same-origin Origin header.
 """
 
 from __future__ import annotations
 
+import ipaddress
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
 from typing import Optional
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse
@@ -53,6 +56,42 @@ from .service import (
     PresentationConfig,
     PresentationService,
 )
+
+
+def _is_loopback_authority(authority: str) -> bool:
+    """Return whether an HTTP authority names only an explicit loopback host.
+
+    The API is unauthenticated and intended to bind to loopback. Checking the
+    Host authority prevents DNS-rebinding origins from making a remote site
+    appear same-origin to a browser after its DNS answer changes to loopback.
+    """
+    if not authority:
+        return False
+    try:
+        parsed = urlsplit(f"//{authority}")
+        hostname = parsed.hostname
+        # Accessing ``port`` validates malformed and out-of-range port text.
+        _ = parsed.port
+    except ValueError:
+        return False
+
+    if (
+        not hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path
+        or parsed.query
+        or parsed.fragment
+    ):
+        return False
+
+    normalized = hostname.lower()
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
 
 
 def create_router(service: PresentationService) -> APIRouter:
@@ -416,34 +455,27 @@ def create_app(service: Optional[PresentationService] = None) -> FastAPI:
     app = FastAPI(
         title="IPO Screening Engine — Presentation Read-Model API",
         version="1.0.0",
-        description="Personal-use IPO presentation API: deterministic GET read models plus scoped filing-ingestion and evaluation-lifecycle POST actions. Scoring and configuration are not mutable through this API.",
+        description="Personal-use IPO presentation API: deterministic GET read models plus scoped filing-ingestion and evaluation-lifecycle POST actions. Requests require a localhost/loopback Host, and workflow POSTs require an explicit same-origin Origin. Scoring and configuration are not mutable through this API.",
         docs_url="/docs",
         redoc_url="/redoc",
     )
 
-    # Permit the explicit local workflow actions only; block arbitrary writes.
+    # Restrict every browser-facing route to loopback Host authorities. This
+    # prevents DNS rebinding from making an untrusted site appear same-origin.
+    # Only explicit local workflow POSTs are accepted, and those require an
+    # exact same-origin Origin header (missing Origin fails closed).
     @app.middleware("http")
     async def write_scope_guard(request: Request, call_next):
-        if request.method == "POST":
-            origin = request.headers.get("origin")
-            if origin:
-                origin_parts = urlsplit(origin)
-                request_host = request.headers.get("host", "")
-                if (
-                    origin_parts.scheme.lower() != request.url.scheme.lower()
-                    or origin_parts.netloc.lower() != request_host.lower()
-                    or origin_parts.path not in ("", "/")
-                    or origin_parts.query
-                    or origin_parts.fragment
-                ):
-                    return JSONResponse(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        content={
-                            "error": "Forbidden",
-                            "message": "Cross-origin workflow requests are not accepted by the local personal-use API.",
-                            "code": "CROSS_ORIGIN_WRITE_REJECTED",
-                        },
-                    )
+        request_host = request.headers.get("host", "")
+        if not _is_loopback_authority(request_host):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "error": "Bad Request",
+                    "message": "The personal-use API accepts only localhost or loopback Host authorities.",
+                    "code": "LOOPBACK_HOST_REQUIRED",
+                },
+            )
 
         if request.method not in ("GET", "HEAD", "OPTIONS"):
             normalized_path = request.url.path.rstrip("/")
@@ -455,21 +487,62 @@ def create_app(service: Optional[PresentationService] = None) -> FastAPI:
                 and bool(segments[3])
                 and segments[4] in {"archive", "unarchive", "make-active"}
             )
-            if request.method == "POST" and (is_ingest or is_lifecycle_action):
-                return await call_next(request)
+            if request.method != "POST" or not (is_ingest or is_lifecycle_action):
+                return JSONResponse(
+                    status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+                    content={
+                        "error": "Method Not Allowed",
+                        "message": (
+                            f"Method {request.method} is not enabled on this endpoint. "
+                            "Only GET/HEAD/OPTIONS and the documented ingestion/lifecycle POST actions are supported."
+                        ),
+                        "code": "READ_ONLY_METHOD_NOT_ALLOWED",
+                    },
+                    headers={"Allow": "GET, HEAD, OPTIONS"},
+                )
 
-            return JSONResponse(
-                status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
-                content={
-                    "error": "Method Not Allowed",
-                    "message": (
-                        f"Method {request.method} is not enabled on this endpoint. "
-                        "Only GET/HEAD/OPTIONS and the documented ingestion/lifecycle POST actions are supported."
-                    ),
-                    "code": "READ_ONLY_METHOD_NOT_ALLOWED",
-                },
-                headers={"Allow": "GET, HEAD, OPTIONS"},
-            )
+            origin = request.headers.get("origin")
+            if not origin:
+                return JSONResponse(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    content={
+                        "error": "Forbidden",
+                        "message": "Workflow POST requests require an explicit same-origin Origin header.",
+                        "code": "ORIGIN_REQUIRED",
+                    },
+                )
+
+            try:
+                origin_parts = urlsplit(origin)
+                # Reject malformed/out-of-range ports before comparing origins.
+                _ = origin_parts.port
+            except ValueError:
+                return JSONResponse(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    content={
+                        "error": "Forbidden",
+                        "message": "Workflow POST requests require a valid same-origin Origin header.",
+                        "code": "CROSS_ORIGIN_WRITE_REJECTED",
+                    },
+                )
+
+            if (
+                origin_parts.scheme.lower() != request.url.scheme.lower()
+                or origin_parts.netloc.lower() != request_host.lower()
+                or not _is_loopback_authority(origin_parts.netloc)
+                or origin_parts.path not in ("", "/")
+                or origin_parts.query
+                or origin_parts.fragment
+            ):
+                return JSONResponse(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    content={
+                        "error": "Forbidden",
+                        "message": "Cross-origin workflow requests are not accepted by the local personal-use API.",
+                        "code": "CROSS_ORIGIN_WRITE_REJECTED",
+                    },
+                )
+
         response: Response = await call_next(request)
         return response
 

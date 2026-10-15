@@ -24,7 +24,7 @@ uvicorn ipo_screening.presentation.api:app --host 127.0.0.1 --port 8000
 
 Open <http://127.0.0.1:8000/ui/>. The API is at `/api/v1`; interactive API docs are at `/docs`.
 
-The UI reads `IPO_STORE_ROOT` (default `build/evaluations`). To use another local store, set that environment variable before starting Uvicorn. The normal API includes GET read-model routes and limited POST operations for filing ingestion and evaluation lifecycle actions. It does not provide scoring/configuration mutation endpoints. The personal server has **no authentication**; keep it on loopback and do not expose it to a network you do not control.
+The UI reads `IPO_STORE_ROOT` (default `build/evaluations`). To use another local store, set that environment variable before starting Uvicorn. The normal API includes GET read-model routes and limited POST operations for filing ingestion and evaluation lifecycle actions. It does not provide scoring/configuration mutation endpoints. Every request must use a literal `localhost` or loopback-IP `Host` authority (arbitrary hostnames are rejected), and workflow POSTs require a same-origin `Origin` header. The personal server has **no authentication**; keep it on loopback and do not expose it to a network you do not control.
 
 ## Verify a stored evaluation
 

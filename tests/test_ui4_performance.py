@@ -109,7 +109,7 @@ def populated_ui4_env(tmp_path: Path, golden_input: Dict[str, Any], config: Dict
     cfg = PresentationConfig(store_root=str(store_dir), config_dir=str(REPO_ROOT / "config"))
     service = PresentationService(cfg)
     app = create_app(service)
-    client = TestClient(app)
+    client = TestClient(app, base_url="http://127.0.0.1:8000", headers={"Origin": "http://127.0.0.1:8000"})
 
     return {
         "store": store,

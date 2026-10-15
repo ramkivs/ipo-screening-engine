@@ -62,7 +62,10 @@ uvicorn ipo_screening.presentation.api:app --host 127.0.0.1 --port 8000
 Open `http://127.0.0.1:8000/ui/`; API docs are at `/docs`. The browser client
 uses the same origin. This personal-use server has no authentication and exposes
 limited POST actions for filing ingestion and evaluation lifecycle state, so keep
-it bound to loopback. `IPO_STORE_ROOT` can select another local store before
+it bound to loopback. Every request must use a literal `localhost` or loopback-IP
+`Host` authority (arbitrary hostnames are rejected to prevent DNS rebinding), and
+workflow POSTs require a matching `Origin` header. Do not put the API behind a
+reverse proxy or tunnel. `IPO_STORE_ROOT` can select another local store before
 starting the server. See the repository README for the shortest setup path.
 
 ---

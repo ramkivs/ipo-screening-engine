@@ -56,7 +56,7 @@ def populated_ui6_env(tmp_path: Path, golden_input: Dict[str, Any], config: Dict
     )
     service = PresentationService(cfg)
     app = create_app(service)
-    client = TestClient(app)
+    client = TestClient(app, base_url="http://127.0.0.1:8000", headers={"Origin": "http://127.0.0.1:8000"})
 
     return {
         "store": store,

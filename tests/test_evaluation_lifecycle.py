@@ -401,7 +401,7 @@ def test_p_no_delete_endpoint(store_dir):
     """P. No DELETE endpoint: Presentation API blocks DELETE with HTTP 405."""
     cfg = PresentationConfig(store_root=store_dir)
     app = create_app(PresentationService(cfg))
-    client = TestClient(app)
+    client = TestClient(app, base_url="http://127.0.0.1:8000", headers={"Origin": "http://127.0.0.1:8000"})
 
     resp = client.delete("/api/v1/evaluations/SOME-EVAL-ID")
     assert resp.status_code == 405

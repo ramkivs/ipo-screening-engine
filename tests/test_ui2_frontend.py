@@ -25,7 +25,7 @@ FRONTEND_DIR = REPO_ROOT / "frontend"
 @pytest.fixture
 def client():
     app = create_app()
-    return TestClient(app)
+    return TestClient(app, base_url="http://127.0.0.1:8000", headers={"Origin": "http://127.0.0.1:8000"})
 
 
 def test_ui2_static_assets_served(client):

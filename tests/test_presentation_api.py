@@ -159,7 +159,7 @@ def populated_env(tmp_path: Path, golden_input: Dict[str, Any], config: Dict[str
     )
     service = PresentationService(pres_cfg)
     app = create_app(service)
-    client = TestClient(app)
+    client = TestClient(app, base_url="http://127.0.0.1:8000", headers={"Origin": "http://127.0.0.1:8000"})
 
     return {
         "client": client,
@@ -531,7 +531,7 @@ def test_empty_store_returns_empty_lists(tmp_path: Path):
     )
     service = PresentationService(pres_cfg)
     app = create_app(service)
-    client = TestClient(app)
+    client = TestClient(app, base_url="http://127.0.0.1:8000", headers={"Origin": "http://127.0.0.1:8000"})
 
     res_ipos = client.get("/api/v1/ipos")
     assert res_ipos.status_code == 200

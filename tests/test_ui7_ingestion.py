@@ -57,7 +57,7 @@ def test_env(tmp_path: Path, golden_input: Dict[str, Any], config: Dict[str, Any
     )
     service = PresentationService(cfg)
     app = create_app(service)
-    client = TestClient(app)
+    client = TestClient(app, base_url="http://127.0.0.1:8000", headers={"Origin": "http://127.0.0.1:8000"})
 
     return {
         "store": store,
@@ -314,13 +314,61 @@ def test_presentation_routes_limit_write_scope(test_env):
     assert res.status_code == 403
     assert res.json()["code"] == "CROSS_ORIGIN_WRITE_REJECTED"
 
+    # Malformed authority syntax also fails closed rather than raising a 500.
+    res = client.post(
+        "/api/v1/evaluations/nonexistent-evaluation/archive",
+        json={},
+        headers={"Origin": "http://[::1"},
+    )
+    assert res.status_code == 403
+    assert res.json()["code"] == "CROSS_ORIGIN_WRITE_REJECTED"
+
     # Same-origin requests pass the origin check and reach route validation.
     res = client.post(
         "/api/v1/evaluations/nonexistent-evaluation/archive",
         json={},
-        headers={"Origin": "http://testserver"},
+        headers={"Origin": "http://127.0.0.1:8000"},
     )
     assert res.status_code == 404
+
+
+def test_local_api_rejects_dns_rebinding_host(test_env):
+    """A matching attacker Host/Origin must not turn a rebinding site into same-origin."""
+    app = create_app(test_env["service"])
+    localhost_client = TestClient(app, base_url="http://localhost:8000")
+    assert localhost_client.get("/api/v1/health").status_code == 200
+
+    attacker_origin = "http://rebinding.example:8000"
+    client = TestClient(
+        create_app(test_env["service"]),
+        base_url=attacker_origin,
+        headers={"Origin": attacker_origin},
+    )
+
+    read_response = client.get("/api/v1/ipos")
+    assert read_response.status_code == 400
+    assert read_response.json()["code"] == "LOOPBACK_HOST_REQUIRED"
+
+    write_response = client.post(
+        "/api/v1/evaluations/nonexistent-evaluation/archive",
+        json={},
+    )
+    assert write_response.status_code == 400
+    assert write_response.json()["code"] == "LOOPBACK_HOST_REQUIRED"
+
+
+def test_workflow_post_requires_origin_header(test_env):
+    """A local write without browser same-origin evidence fails closed."""
+    client = TestClient(
+        create_app(test_env["service"]),
+        base_url="http://127.0.0.1:8000",
+    )
+    response = client.post(
+        "/api/v1/evaluations/nonexistent-evaluation/archive",
+        json={},
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "ORIGIN_REQUIRED"
 
 
 # -----------------------------------------------------------------------------
