@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:ipo-screening-engine:ipo-evaluation-record:1.0.0",
+  "$id": "urn:ipo-screening-engine:ipo-evaluation-record:1.1.0",
   "title": "IPO Screening Canonical Evaluation Record v1",
-  "description": "Closed A15 output record profile. This schema does not replace or modify the v1.5 input schemas.",
+  "description": "Closed A15 output record profile 1.1.0. It accepts prior 1.0.0 records and adds an A9 GMP-withheld nonterminal reason; it does not replace or modify the v1.5 input schemas.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,7 +21,10 @@
   ],
   "properties": {
     "record_schema_version": {
-      "const": "1.0.0"
+      "enum": [
+        "1.0.0",
+        "1.1.0"
+      ]
     },
     "serialization_profile": {
       "$ref": "#/$defs/serializationProfile"
@@ -1362,7 +1365,14 @@
       ],
       "properties": {
         "code": {
-          "const": "UNVERIFIED_KNOCKOUT_NO_SAFE_RESULT"
+          "enum": [
+            "UNVERIFIED_KNOCKOUT_NO_SAFE_RESULT",
+            "MISSING",
+            "SOURCE_UNQUALIFIED"
+          ]
+        },
+        "message": {
+          "$ref": "#/$defs/nonEmptyString"
         },
         "evidence_refs": {
           "type": "array",

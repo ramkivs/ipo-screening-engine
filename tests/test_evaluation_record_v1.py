@@ -13,6 +13,8 @@ from pathlib import Path
 import pytest
 
 from conftest import EVAL_AT, run
+from ipo_screening.connectors.adapters import GmpSignalAdapter
+from ipo_screening.connectors.coordinator import ConnectorCoordinator
 from ipo_screening.errors import SchemaValidationError
 from ipo_screening.evaluation import EvaluationStore
 from ipo_screening.evaluation_record import (
@@ -54,8 +56,8 @@ def test_projected_record_uses_draft_2020_12_closed_a15_envelope(golden_input, c
     schema_path = Path(__file__).resolve().parents[1] / "schema" / "ipo-evaluation-record.v1.schema.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
-    assert schema["$id"] == "urn:ipo-screening-engine:ipo-evaluation-record:1.0.0"
-    assert document["record_schema_version"] == "1.0.0"
+    assert schema["$id"] == "urn:ipo-screening-engine:ipo-evaluation-record:1.1.0"
+    assert document["record_schema_version"] == "1.1.0"
     assert set(document) == set(schema["required"])
     assert document["evaluation"]["mode"] == "FINAL"
     assert document["evaluation"]["validation"]["schema_status"] == "PASSED"
@@ -81,6 +83,15 @@ def test_projected_record_uses_draft_2020_12_closed_a15_envelope(golden_input, c
         and item.get("field_path", "").endswith("/source_timestamp")
     )
     assert unresolved_source_time["field_path"].startswith("evidence.json#/evidence/sources/")
+
+
+def test_v1_1_schema_accepts_legacy_v1_0_terminal_records(golden_input, config):
+    legacy_record = build_evaluation_record_v1(
+        run(golden_input, config, mode="preliminary").record
+    )
+    legacy_record["record_schema_version"] = "1.0.0"
+    validate_evaluation_record_v1(legacy_record)
+    assert legacy_record["result"]["outcome_resolution"]["state"] == "TERMINAL"
 
 
 def test_field_values_preserve_raw_unknown_and_unit_normalized_values(golden_input, config):
@@ -120,7 +131,7 @@ def test_field_values_preserve_raw_unknown_and_unit_normalized_values(golden_inp
 def test_ordinary_outcome_copies_configured_v15_verdict_and_keeps_score_verdict_distinct(
     golden_input, config
 ):
-    outcome = run(_safe_ordinary_input(golden_input), config)
+    outcome = run(_safe_ordinary_input(golden_input), config, mode="preliminary")
     document = build_evaluation_record_v1(outcome.record)
     result = document["result"]
 
@@ -137,17 +148,208 @@ def test_ordinary_outcome_copies_configured_v15_verdict_and_keeps_score_verdict_
         assert result["final_outcome"] == outcome.record.verdict["verdict"]
 
 
+def test_a9_missing_gmp_blocks_final_despite_generic_hash_and_persists_deterministically(
+    golden_input, config, tmp_path
+):
+    document = _safe_ordinary_input(golden_input)
+    document["market"].pop("gmp", None)
+
+    first_root = tmp_path / "first-store"
+    first_root.mkdir()
+    first_store = EvaluationStore(first_root)
+    first = run(copy.deepcopy(document), config, store=first_store)
+    first_path = first_store.path_for(first.record.evaluation_id) / RECORD_ARTIFACT_NAME
+    projected = first_store.read_artifact(
+        first.record.evaluation_id, RECORD_ARTIFACT_NAME[:-5]
+    )
+    result = projected["result"]
+
+    assert first.record.evaluation_mode == "FINAL"
+    assert result["outcome_resolution"]["state"] == "NONTERMINAL_UNRESOLVED"
+    assert result["outcome_resolution"]["reason"]["code"] == "MISSING"
+    assert "final_outcome" not in result
+    assert result["score_verdict"]["value"] == first.record.score["verdict"]
+    assert any(
+        item["status"] == "MISSING"
+        for item in first.record.market_snapshot["blocks"]
+        if item["block"] == "gmp"
+    )
+
+    market_digest = next(
+        item
+        for item in projected["integrity"]["digests"]
+        if item["digest_id"] == "market-snapshot"
+    )
+    assert market_digest["origin"] == "LOCAL_COMPUTED"
+    assert market_digest["subject_ref"] == "market.json#snapshot.hash_payload"
+    assert market_digest["digest_value"] == first.record.market_snapshot_hash
+    assert "market-snapshot" not in result["outcome_resolution"]["reason"]["evidence_refs"]
+
+    reason_refs = set(result["outcome_resolution"]["reason"]["evidence_refs"])
+    evidence_by_id = {item["evidence_id"]: item for item in projected["evidence"]}
+    assert reason_refs
+    assert reason_refs.issubset(evidence_by_id)
+    assert any(
+        evidence_by_id[ref]["artifact_ref"] == "market.json"
+        and evidence_by_id[ref]["extraction_method"] == "DERIVED"
+        for ref in reason_refs
+    )
+    assert any(
+        item["code"] == "A9_GMP_FINAL_WITHHELD"
+        and set(item["evidence_refs"]) == reason_refs
+        for item in result["diagnostics"]
+    )
+    assert any(
+        item["code"] == "A9_GMP_FINAL_WITHHELD"
+        for item in projected["evaluation"]["validation"]["findings"]
+    )
+    verification = first_store.verify_hashes(first.record.evaluation_id)
+    assert verification["result_hash_matches"] is True
+    assert verification["artifact_mismatches"] == []
+
+    second_root = tmp_path / "second-store"
+    second_root.mkdir()
+    second_store = EvaluationStore(second_root)
+    second = run(copy.deepcopy(document), config, store=second_store)
+    second_path = second_store.path_for(second.record.evaluation_id) / RECORD_ARTIFACT_NAME
+    assert second.record.evaluation_id == first.record.evaluation_id
+    assert second.record.result_hash == first.record.result_hash
+    assert second_path.read_bytes() == first_path.read_bytes()
+
+
+def test_a9_unqualified_connector_gmp_hash_stays_blocked_and_preliminary_is_unchanged(
+    golden_input, config
+):
+    adapter = GmpSignalAdapter()
+    snapshot = adapter.normalize(
+        {
+            "as_of": EVAL_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "retrieval_timestamp": EVAL_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "gmp_rupees": 42.0,
+            "gmp_pct": 15.91,
+            "trend": "flat",
+        },
+        reference_time=EVAL_AT,
+        snapshot_id="A9-SYNTHETIC-GMP",
+    )
+    assert snapshot.verification == "UNVERIFIED"
+    assert snapshot.raw_source_hash
+
+    market_payload, _peer_payload, connector_sources = ConnectorCoordinator(
+        adapters=[adapter]
+    ).reconcile_snapshots([snapshot], reference_time=EVAL_AT)
+    document = _safe_ordinary_input(golden_input)
+    document["market"]["gmp"] = market_payload["gmp"]
+    # The v1.5 SourceRef schema is closed; the connector's human note is not a
+    # source-qualification field and is intentionally not promoted into it.
+    document["_sources"].extend(
+        {key: value for key, value in source.items() if key != "note"}
+        for source in connector_sources
+    )
+
+    final = run(copy.deepcopy(document), config)
+    projected = build_evaluation_record_v1(final.record)
+    result = projected["result"]
+    assert result["outcome_resolution"]["state"] == "NONTERMINAL_UNRESOLVED"
+    assert result["outcome_resolution"]["reason"]["code"] == "SOURCE_UNQUALIFIED"
+    assert "final_outcome" not in result
+    assert result["score_verdict"]["value"] == final.record.score["verdict"]
+
+    gmp_source_id = market_payload["gmp"]["source_id"]
+    gmp_source = next(item for item in projected["sources"] if item["source_id"] == gmp_source_id)
+    assert gmp_source["digest_refs"]
+    raw_hash_digest = next(
+        item
+        for item in projected["integrity"]["digests"]
+        if item["digest_id"] == gmp_source["digest_refs"][0]
+    )
+    assert raw_hash_digest["origin"] == "LEGACY_UNRESOLVED"
+    assert raw_hash_digest["subject_kind"] == "LEGACY_UNSPECIFIED"
+
+    market_digest = next(
+        item
+        for item in projected["integrity"]["digests"]
+        if item["digest_id"] == "market-snapshot"
+    )
+    assert market_digest["origin"] == "LOCAL_COMPUTED"
+    assert market_digest["digest_value"] == final.record.market_snapshot_hash
+
+    # The gate is Final-only: the same unqualified observation does not change
+    # Preliminary's existing A7/A15 terminal-outcome behavior.
+    preliminary = run(copy.deepcopy(document), config, mode="preliminary")
+    preliminary_record = build_evaluation_record_v1(preliminary.record)
+    assert preliminary_record["result"]["outcome_resolution"] == {"state": "TERMINAL"}
+    assert preliminary_record["result"]["final_outcome"] == preliminary.record.verdict["verdict"]
+    assert all(
+        item["code"] != "A9_GMP_FINAL_WITHHELD"
+        for item in preliminary_record["result"]["diagnostics"]
+    )
+
+
+def test_a9_invalid_gmp_rejects_final_before_any_store_write(golden_input, config, tmp_path):
+    document = _safe_ordinary_input(golden_input)
+    document["market"]["gmp"]["trend"] = "unsupported-value"
+    store = EvaluationStore(tmp_path / "invalid-gmp-store")
+
+    with pytest.raises(SchemaValidationError):
+        run(document, config, store=store)
+    assert store.list_evaluations() == []
+
+
+def test_a9_stale_generic_gmp_block_remains_nonterminal(golden_input, config):
+    document = _safe_ordinary_input(golden_input)
+    document["market"]["gmp"]["as_of"] = "2026-10-03T12:00:00Z"
+    outcome = run(document, config)
+    projected = build_evaluation_record_v1(outcome.record)
+    result = projected["result"]
+    gmp_block = next(
+        item
+        for item in outcome.record.market_snapshot["blocks"]
+        if item["block"] == "gmp"
+    )
+
+    assert gmp_block["status"] == "STALE"
+    assert result["outcome_resolution"]["state"] == "NONTERMINAL_UNRESOLVED"
+    assert result["outcome_resolution"]["reason"]["code"] == "SOURCE_UNQUALIFIED"
+    assert (
+        "generic market classification is STALE"
+        in result["outcome_resolution"]["reason"]["message"]
+    )
+    assert "final_outcome" not in result
+
+
+def test_a9_final_gate_precedes_triggered_knockout_and_critical_safety(
+    golden_input, config
+):
+    triggered = _safe_ordinary_input(golden_input)
+    triggered["market"].pop("gmp", None)
+    triggered["governance"]["going_concern_uncertainty"] = True
+    triggered_result = build_evaluation_record_v1(run(triggered, config).record)["result"]
+    assert any(item["state"] == "TRIGGERED" for item in triggered_result["knockouts"])
+    assert triggered_result["outcome_resolution"]["state"] == "NONTERMINAL_UNRESOLVED"
+    assert triggered_result["outcome_resolution"]["reason"]["code"] == "MISSING"
+    assert "final_outcome" not in triggered_result
+
+    incomplete = copy.deepcopy(golden_input)
+    incomplete["market"].pop("gmp", None)
+    incomplete_result = build_evaluation_record_v1(run(incomplete, config).record)["result"]
+    assert incomplete_result["critical_safety"]["status"] == "INCOMPLETE"
+    assert incomplete_result["outcome_resolution"]["state"] == "NONTERMINAL_UNRESOLVED"
+    assert incomplete_result["outcome_resolution"]["reason"]["code"] == "MISSING"
+    assert "final_outcome" not in incomplete_result
+
+
 def test_a7_verified_trigger_and_critical_safety_precedence(golden_input, config):
     triggered_input = copy.deepcopy(golden_input)
     triggered_input["governance"]["going_concern_uncertainty"] = True
-    outcome = run(triggered_input, config)
+    outcome = run(triggered_input, config, mode="preliminary")
     result = build_evaluation_record_v1(outcome.record)["result"]
     assert any(item["state"] == "TRIGGERED" for item in result["knockouts"])
     assert result["outcome_resolution"]["state"] == "TERMINAL"
     assert result["final_outcome"] == "AVOID"
     assert result["critical_safety"]["status"] == "COMPLETE"
 
-    missing_critical = run(golden_input, config)
+    missing_critical = run(golden_input, config, mode="preliminary")
     missing_result = build_evaluation_record_v1(missing_critical.record)["result"]
     assert missing_result["critical_safety"]["status"] == "INCOMPLETE"
     assert missing_result["final_outcome"] == "INSUFFICIENT_DATA"
@@ -159,7 +361,7 @@ def test_a7_unverified_only_is_nonterminal_and_omits_final_outcome(golden_input,
     # K6 remains UNVERIFIED; the other known critical and knockout inputs are
     # sufficient to exercise A7's unverified-only representation.
     document["governance"]["rpt_pct_of_revenue_growth"] = None
-    outcome = run(document, config)
+    outcome = run(document, config, mode="preliminary")
     projected = build_evaluation_record_v1(outcome.record)
     result = projected["result"]
 
@@ -207,7 +409,9 @@ def test_record_serialization_is_stable_utf8_lf_and_separate_from_hash_grammar(
 
 
 def test_terminal_conditionals_fail_closed(golden_input, config):
-    document = build_evaluation_record_v1(run(golden_input, config).record)
+    document = build_evaluation_record_v1(
+        run(golden_input, config, mode="preliminary").record
+    )
     missing_final = copy.deepcopy(document)
     missing_final["result"].pop("final_outcome", None)
     with pytest.raises(SchemaValidationError):
@@ -224,6 +428,27 @@ def test_terminal_conditionals_fail_closed(golden_input, config):
     nonterminal_with_final["result"]["final_outcome"] = "AVOID"
     with pytest.raises(SchemaValidationError):
         validate_evaluation_record_v1(nonterminal_with_final)
+
+    a9_reason_ref = document["evidence"][0]["evidence_id"]
+    a9_nonfinal = copy.deepcopy(document)
+    a9_nonfinal["result"]["outcome_resolution"] = {
+        "state": "NONTERMINAL_UNRESOLVED",
+        "reason": {
+            "code": "MISSING",
+            "message": "A9 test reason.",
+            "evidence_refs": [a9_reason_ref],
+        },
+    }
+    a9_nonfinal["result"].pop("final_outcome", None)
+    a9_nonfinal["result"]["diagnostics"].append(
+        {
+            "code": "A9_GMP_FINAL_WITHHELD",
+            "message": "A9 test reason.",
+            "evidence_refs": [a9_reason_ref],
+        }
+    )
+    with pytest.raises(EvaluationRecordV1Error, match="only valid for FINAL"):
+        validate_evaluation_record_v1(a9_nonfinal)
 
 
 def test_integrity_subjects_are_explicit_and_deterministic(golden_input, config):

@@ -19,10 +19,13 @@ from .canonical_input import MONETARY_FIELDS
 from .hashing import CANONICAL_GRAMMAR_VERSION, sha256_of
 from .schema_validation import enforce_schema
 
-RECORD_SCHEMA_VERSION = "1.0.0"
+RECORD_SCHEMA_VERSION = "1.1.0"
 RECORD_ARTIFACT_NAME = "evaluation-record.v1.json"
 CANONICALIZATION_ID = f"ipo-engine-canonical-json/{CANONICAL_GRAMMAR_VERSION}"
 SERIALIZATION_PROFILE_ID = "ipo-evaluation-record-json/1.0.0"
+
+_A9_GMP_FINAL_DIAGNOSTIC = "A9_GMP_FINAL_WITHHELD"
+_A9_GMP_OUTCOME_REASON_CODES = frozenset({"MISSING", "SOURCE_UNQUALIFIED"})
 
 _SCHEMA_PATH = (
     Path(__file__).resolve().parents[2]
@@ -915,6 +918,112 @@ def _result_artifact_evidence(
     return output_knockouts, sorted(set(unverified_refs)), sorted(set(critical_refs))
 
 
+def _a9_final_gmp_gate(
+    record: Any,
+    *,
+    result_source_id: str,
+    evidence_objects: List[Dict[str, Any]],
+    field_values: Sequence[Mapping[str, Any]],
+    findings: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Return A9's nonterminal reason for Final under the current GMP contract.
+
+    The current v1.5 input/connector/A15 model has no approved GMP source or
+    qualification signal and does not define the required GMP hash subject.
+    Consequently no supplied block can be promoted to qualifying evidence:
+    a generic market-snapshot digest and an opaque legacy SourceRef.content_hash
+    are deliberately not used as substitutes. Missing values are distinguished
+    from present-but-unqualified observations; no source, event, cutoff,
+    freshness, hash, or serialization semantics are inferred here.
+    """
+    if str(getattr(record, "evaluation_mode", "")).upper() != "FINAL":
+        return None
+
+    market_snapshot = getattr(record, "market_snapshot", {}) or {}
+    raw_blocks = market_snapshot.get("blocks", []) if isinstance(market_snapshot, Mapping) else []
+    blocks = raw_blocks if isinstance(raw_blocks, (list, tuple)) else []
+    gmp_index = next(
+        (
+            index
+            for index, block in enumerate(blocks)
+            if isinstance(block, Mapping) and block.get("block") == "gmp"
+        ),
+        None,
+    )
+    gmp_block = blocks[gmp_index] if gmp_index is not None else None
+    block_status = gmp_block.get("status") if isinstance(gmp_block, Mapping) else None
+    gmp_values = gmp_block.get("values", {}) if isinstance(gmp_block, Mapping) else {}
+    has_observation_value = isinstance(gmp_values, Mapping) and any(
+        gmp_values.get(key) is not None for key in ("pct", "trend")
+    )
+    missing_observation = (
+        gmp_block is None or block_status == "MISSING" or not has_observation_value
+    )
+
+    if missing_observation:
+        reason_code = "MISSING"
+        message = (
+            "A9 requires a qualifying GMP snapshot and its required hash for FINAL, "
+            "but the projected GMP block has no non-null pct or trend observation. "
+            "The generic market-snapshot digest is a local digest over all market "
+            "blocks, not a GMP qualification hash. FINAL is withheld."
+        )
+    else:
+        reason_code = "SOURCE_UNQUALIFIED"
+        message = (
+            "A9 requires a qualifying GMP snapshot and its required hash for FINAL, "
+            "but the current input/connector/A15 contract cannot establish an "
+            "approved GMP source, qualifying observation, or hash subject. A generic "
+            "market-snapshot digest and opaque legacy SourceRef.content_hash do not "
+            "establish GMP qualification."
+        )
+        if isinstance(block_status, str):
+            message += (
+                f" The existing generic market classification is {block_status}; "
+                "it does not define source-specific cutoff or freshness semantics."
+            )
+        message += " FINAL is withheld."
+
+    locator = (
+        f"market.json#/snapshot/blocks/{gmp_index}"
+        if gmp_index is not None
+        else "market.json#/snapshot/blocks"
+    )
+    block_evidence_id = _result_evidence_id(locator)
+    evidence_objects.append(
+        {
+            "evidence_id": block_evidence_id,
+            "source_id": result_source_id,
+            "locator": locator,
+            "extraction_method": "DERIVED",
+            "timestamps": [],
+            "artifact_ref": "market.json",
+        }
+    )
+
+    evidence_refs = {block_evidence_id}
+    for field_value in field_values:
+        field_path = field_value.get("field_path")
+        if not isinstance(field_path, str) or not field_path.startswith("/input/market/gmp/"):
+            continue
+        refs = field_value.get("evidence_refs", [])
+        if isinstance(refs, (list, tuple)):
+            evidence_refs.update(ref for ref in refs if isinstance(ref, str) and ref)
+    reason = {
+        "code": reason_code,
+        "message": message,
+        "evidence_refs": sorted(evidence_refs),
+    }
+    _append_finding(
+        findings,
+        _A9_GMP_FINAL_DIAGNOSTIC,
+        message,
+        field_path="/result/outcome_resolution",
+        evidence_refs=reason["evidence_refs"],
+    )
+    return reason
+
+
 def _critical_safety(record: Any, available_refs: Sequence[str]) -> Dict[str, Any]:
     score = getattr(record, "score", {}) or {}
     missing = []
@@ -1162,6 +1271,13 @@ def _project_evaluation_record(record: Any) -> Dict[str, Any]:
         evidence_objects=evidence_objects,
     )
     critical_safety = _critical_safety(record, critical_refs)
+    a9_gmp_reason = _a9_final_gmp_gate(
+        record,
+        result_source_id=result_source_id,
+        evidence_objects=evidence_objects,
+        field_values=field_values,
+        findings=findings,
+    )
 
     # Add an auditable diagnostic if the legacy score says insufficient data
     # but the missing critical reference list is not recoverable.
@@ -1227,10 +1343,17 @@ def _project_evaluation_record(record: Any) -> Dict[str, Any]:
     else:
         result["score_interval"] = {"state": "UNKNOWN"}
 
-    # A7 precedence: triggered knockout, then missing critical-safety data,
-    # then the unverified-only nonterminal state, then the configured v1.5
-    # verdict unchanged. Diagnostics and score_verdict remain independent.
-    if any(item["state"] == "TRIGGERED" for item in knockout_rows):
+    # A9 Final eligibility precedes A7 outcome selection: when required GMP
+    # qualification cannot be established, Final is withheld regardless of a
+    # score verdict, knockout, or critical-safety status. When the A9 gate does
+    # not apply (all non-Final modes), retain the established A7 precedence.
+    if a9_gmp_reason is not None:
+        result["outcome_resolution"] = {
+            "state": "NONTERMINAL_UNRESOLVED",
+            "reason": a9_gmp_reason,
+        }
+        # The property is intentionally absent for this nonterminal case.
+    elif any(item["state"] == "TRIGGERED" for item in knockout_rows):
         result["final_outcome"] = "AVOID"
     elif critical_safety["status"] != "COMPLETE":
         result["final_outcome"] = "INSUFFICIENT_DATA"
@@ -1261,6 +1384,14 @@ def _project_evaluation_record(record: Any) -> Dict[str, Any]:
                 "code": "INSUFFICIENT_DATA",
                 "message": "The existing v1.5 score marks one or more configured critical inputs unavailable.",
                 "evidence_refs": critical_safety["missing_evidence_refs"],
+            }
+        )
+    if a9_gmp_reason is not None:
+        result["diagnostics"].append(
+            {
+                "code": _A9_GMP_FINAL_DIAGNOSTIC,
+                "message": a9_gmp_reason["message"],
+                "evidence_refs": a9_gmp_reason["evidence_refs"],
             }
         )
     result["diagnostics"].sort(key=lambda item: (item["code"], item["message"]))
@@ -1443,6 +1574,37 @@ def _validate_outcome(document: Mapping[str, Any]) -> None:
     unverified = [item for item in knockouts if item["state"] == "UNVERIFIED"]
     critical_status = result["critical_safety"]["status"]
     resolution = result["outcome_resolution"]
+    evaluation_mode = str(document["evaluation"]["mode"]).upper()
+    reason = resolution.get("reason") or {}
+    reason_code = reason.get("code") if isinstance(reason, Mapping) else None
+    a9_diagnostics = [
+        item
+        for item in result.get("diagnostics", [])
+        if item.get("code") == _A9_GMP_FINAL_DIAGNOSTIC
+    ]
+
+    # A9 withholding is independent of A7's scored-outcome precedence and must
+    # remain nonterminal in FINAL mode, even when a knockout or safety gap is
+    # also present. It is invalid in non-Final lifecycle stages.
+    if a9_diagnostics or reason_code in _A9_GMP_OUTCOME_REASON_CODES:
+        if evaluation_mode != "FINAL":
+            raise EvaluationRecordV1Error("A9 GMP withholding is only valid for FINAL mode")
+        if (
+            resolution["state"] != "NONTERMINAL_UNRESOLVED"
+            or "final_outcome" in result
+            or reason_code not in _A9_GMP_OUTCOME_REASON_CODES
+            or len(a9_diagnostics) != 1
+        ):
+            raise EvaluationRecordV1Error(
+                "A9 GMP withholding must be one nonterminal FINAL reason with no final_outcome"
+            )
+        required_refs = set(reason.get("evidence_refs", []))
+        diagnostic_refs = set(a9_diagnostics[0].get("evidence_refs", []))
+        if not required_refs or not required_refs.issubset(diagnostic_refs):
+            raise EvaluationRecordV1Error(
+                "A9 GMP withholding diagnostic must retain all outcome-reason evidence references"
+            )
+        return
 
     if triggered:
         if resolution["state"] != "TERMINAL" or result.get("final_outcome") != "AVOID":
