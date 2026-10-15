@@ -1,0 +1,144 @@
+{
+  "artifactType": "a8m-session-availability-review-check",
+  "assessmentDate": "2026-10-15",
+  "assessmentTimezone": "Asia/Kolkata",
+  "report": "handoff/investigation/A8-M-SESSION-AVAILABILITY-QUALIFICATION-REVIEW-2026-10-15.md",
+  "scope": "Offline, bounded re-review of retained A8-M source, calendar, cutoff and availability evidence. This is a local review record, not an NSE source capture or a source-qualification approval.",
+  "externalRetrieval": {
+    "attemptedDuringThisReview": false,
+    "reason": "The sandbox outbound-host allowlist excludes nseindia.com, niftyindices.com and nsearchives.nseindia.com; direct HTTP/download was not feasible or permitted.",
+    "httpOutcome": "No request was attempted; no HTTP response, status or failure exists to record.",
+    "rawProviderResponseBytesCaptured": false,
+    "httpStatusCaptured": false,
+    "responseHeadersCaptured": false,
+    "contentTypeCaptured": false,
+    "exactRetrievalTimeCaptured": false,
+    "devToolsWebSocketAttempted": false,
+    "providerContactOrNdalRequestMade": false,
+    "subscriptionOrPurchaseMade": false
+  },
+  "latestRetainedSourceInspection": {
+    "inspectionDate": "2026-10-13",
+    "basis": "Existing source-capture manifest and prior A8-M investigation report",
+    "exactRetrievalTime": null,
+    "exactTimeTimezone": null,
+    "retrievedOnAssessmentDate": false,
+    "interpretation": "The prior date-only page-tool observations are not an HTTP receipt log, a source-provided publication time or evidence of availability at an earlier cutoff."
+  },
+  "existingApiCapture": {
+    "manifest": "evidence/market-observations/official-index-history-20261013/source-captures/response-capture-manifest.json",
+    "endpointFamily": "https://www.nseindia.com/api/historicalOR/indicesHistory",
+    "captureTool": "functions.fetch_page",
+    "representation": "Rendered JSON text fragments and locally reconstructed JSON",
+    "rawProviderResponseBytesCaptured": false,
+    "responseHeadersCaptured": false,
+    "exactReceiptTimeCaptured": false,
+    "newRenderedWindows": [
+      {"from": "2025-10-13", "to": "2026-01-22", "recordCount": 70, "retrievedDate": "2026-10-13", "retrievalTime": null},
+      {"from": "2026-01-23", "to": "2026-02-27", "recordCount": 26, "retrievedDate": "2026-10-13", "retrievalTime": null},
+      {"from": "2026-03-02", "to": "2026-04-15", "recordCount": 28, "retrievedDate": "2026-10-13", "retrievalTime": null},
+      {"from": "2026-04-16", "to": "2026-05-29", "recordCount": 30, "retrievedDate": "2026-10-13", "retrievalTime": null},
+      {"from": "2026-06-01", "to": "2026-06-30", "recordCount": 21, "retrievedDate": "2026-10-13", "retrievalTime": null}
+    ],
+    "reusedBroadResponse": {
+      "file": "evidence/market-observations/official-index-history-20261013/nse-nifty50-20260701-20261013.json",
+      "recordCount": 70,
+      "latestReturnedSessionDate": "2026-10-08",
+      "firstReturnedSessionDate": "2026-10-08",
+      "lastReturnedSessionDate": "2026-07-01",
+      "recordOrdering": "descending by EOD_TIMESTAMP",
+      "retrievedDate": null,
+      "retrievalTime": null
+    },
+    "hashScope": "Existing fragment, reconstructed-response and local-file hashes identify local workspace bytes only; they are not provider-byte hashes."
+  },
+  "existingTailCrossCheck": {
+    "priorReport": "handoff/investigation/A8-M-SOURCE-QUALIFICATION-AND-AVAILABILITY-INVESTIGATION-DRAFT-2026-10-13.md",
+    "priorReportSection": "4.3",
+    "inspectionDate": "2026-10-13",
+    "reportedRenderedApiAndDailySnapshotValues": [
+      {"sessionDate": "2026-10-09", "close": 22520.45, "displayedValuesMatched": true},
+      {"sessionDate": "2026-10-12", "close": 22363.35, "displayedValuesMatched": true}
+    ],
+    "exactProviderBodiesRetained": false,
+    "httpMetadataRetained": false,
+    "exactRetrievalTimeRetained": false,
+    "independentUnderlyingGenerationProvenanceEstablished": false,
+    "broaderQueryTailGapCause": "Unresolved",
+    "historicalAvailabilityByEarlierCutoff": "Not established",
+    "newComparisonPerformedDuringThisReview": false,
+    "rowsAppendedTo245CloseSeries": 0
+  },
+  "calendarReview": {
+    "validationArtifact": "evidence/market-observations/official-index-history-20261013/nse-cm-session-calendar-validation-20261013.json",
+    "calendarRange": {"from": "2025-10-13", "to": "2026-10-08"},
+    "captureForm": "Rendered holiday-master extract plus locally rendered circular extracts",
+    "rawProviderCalendarBytesCaptured": false,
+    "exactCalendarReceiptTimeCaptured": false,
+    "weekdayCandidates": 259,
+    "weekdayClosuresApplied": 15,
+    "specialSessionsRecognized": [
+      {"date": "2025-10-21", "event": "Diwali Muhurat", "normalMarketLocalTime": "13:45-14:45", "circular": "NSE/CMTR/70319 (124/2025)"},
+      {"date": "2026-02-01", "event": "Union Budget Sunday session", "normalMarketLocalTime": "09:15-15:30", "circular": "NSE/CMTR/72349 (11/2026)"}
+    ],
+    "sundaySpecialSessionsAddedToWeekdayCandidates": 1,
+    "expectedSessions": 245,
+    "observedUniqueSessions": 245,
+    "missingExpectedSessions": 0,
+    "unexpectedObservedDates": 0,
+    "scopeLimit": "Supports session-date reconciliation through 2026-10-08; does not establish publication or receipt time."
+  },
+  "timestampAndRevisionAssessment": {
+    "apiSessionField": "EOD_TIMESTAMP",
+    "apiSessionFieldSemantics": "Date-valued session field in the inspected rendered output; no time or timezone offset.",
+    "apiCloseField": "EOD_CLOSE_INDEX_VAL",
+    "apiIndexLabel": "EOD_INDEX_NAME = NIFTY 50",
+    "hiTimestamp": "Present in inspected output; no retained field specification establishes its semantics or timezone; not used as event, publication, receipt or revision time.",
+    "dailySnapshotSessionField": "Index Date; date/report date only in the retained description.",
+    "sourcePublicationTimestampFound": false,
+    "providerRecordIdOrStableRevisionIdFound": false,
+    "sourceDefinedRevisionPrecedenceFound": false,
+    "evaluationCutoffSupplied": false
+  },
+  "availabilityDisposition": {
+    "currentRetrievalObservation": "Prior rendered API/Daily Snapshot values were reported accessible during the 2026-10-13 inspection; exact retrieval instant and provider bytes were not retained.",
+    "retrievalOn2026-10-15": false,
+    "availabilityByEarlierCutoff": "Unproven",
+    "latestQualifyingCloseForAnEvaluation": "Not determined; no evaluation cutoff was supplied and availability/latest-session completeness is unqualified.",
+    "numericPublicationDelayOrFreshnessThresholdApproved": false,
+    "currentNiftyCategoryAssigned": null,
+    "requiredNiftyUnknownToFinalWithheld": "Preserved"
+  },
+  "seriesAndScopeChecks": {
+    "reusedCloseSeries": "evidence/market-observations/official-index-history-20261013/nse-nifty50-close-observations-20251013-20261013.csv",
+    "reportedExistingCloseCount": 245,
+    "reportedExistingSeriesEnd": "2026-10-08",
+    "closeSeriesRecalculated": false,
+    "sma50Recalculated": false,
+    "sma200Recalculated": false,
+    "newObservationsAppended": false,
+    "classifierOrScoringChanged": false,
+    "configurationSchemaOrApplicationBehaviorChanged": false,
+    "providerEvidenceAdded": false
+  },
+  "repositoryBaseline": {
+    "fixedBranch": "arena/573e69a4-ipo-screening-engine",
+    "checkoutHeadBeforeBaselineReconciliation": "01ba66c12ca1195fd7acbd287c3e39a019808094",
+    "verifiedRemoteFixedTipBeforeBaselineReconciliation": "65de3bd91e6a56eaba8d724f22666ffc6b9100ed",
+    "reviewBaselineCommitAfterFastForward": "65de3bd91e6a56eaba8d724f22666ffc6b9100ed",
+    "remoteTreePathCount": 269,
+    "allRemoteTreePathsMatchedWorktreeBytesAndModesBeforeFastForward": true,
+    "baselineFastForwardWasNonDestructive": true,
+    "reviewBaselineIsAncestorOfCurrentBranchTip": true,
+    "onlyOutOfScopePreexistingFileNotInRemoteTree": "handoff/investigation/DOCUMENTATION-PUBLICATION-AUTHORIZATION-REQUEST-DRAFT-2026-10-13.md",
+    "preservedDraftSha256": "f5a5309cf2180913ec7b756d3e75c7442caf0d264b659bf75f7d7ab433d5238d"
+  },
+  "localReviewChecks": {
+    "existingCaptureManifestInspected": true,
+    "existingCalendarValidationInspected": true,
+    "priorA8MInvestigationAndApprovedDecisionRecordsInspected": true,
+    "seriesOrSmaArithmeticRecomputed": false,
+    "newProviderFetchAttempted": false,
+    "a8mPolicyOrApplicationBehaviorChanged": false
+  }
+}
