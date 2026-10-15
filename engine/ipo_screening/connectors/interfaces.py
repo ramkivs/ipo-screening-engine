@@ -14,7 +14,7 @@ import copy
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
@@ -49,7 +49,7 @@ class FreshnessStatus(str, Enum):
 
     FRESH = "FRESH"                              # Age within staleness threshold
     STALE = "STALE"                              # Age exceeds staleness threshold
-    FUTURE = "FUTURE"                            # Timestamp is in the future (> 1h ahead)
+    FUTURE = "FUTURE"                            # Timestamp is ahead of the policy's future tolerance (1h by default; none for GMP, A17)
     MISSING = "MISSING"                          # Timestamp missing or unparseable
 
 
@@ -199,6 +199,17 @@ class ExternalSnapshot:
 # --------------------------------------------------------------------------
 
 
+def _carries_explicit_offset(value: Any) -> bool:
+    """True when an ISO 8601 timestamp states its UTC offset (``Z`` or ``+hh:mm``)."""
+    if isinstance(value, datetime):
+        return value.tzinfo is not None and value.utcoffset() is not None
+    try:
+        parsed = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
+
+
 @dataclass(frozen=True)
 class FreshnessPolicy:
     """Rules for evaluating whether an external observation is current."""
@@ -206,6 +217,9 @@ class FreshnessPolicy:
     max_age_hours: float
     allow_missing_timestamp: bool = False
     allow_future_tolerance_seconds: float = 3600.0  # 1 hour clock skew tolerance
+    #: When True, an offset-less timestamp (or reference time) is never given an
+    #: assumed UTC zone; freshness cannot be established and is MISSING (A17).
+    require_explicit_offset: bool = False
 
     def evaluate_freshness(
         self,
@@ -219,6 +233,11 @@ class FreshnessPolicy:
         ref = reference_time or datetime.now(timezone.utc)
         parsed = parse_datetime(as_of)
         if not parsed:
+            return FreshnessStatus.MISSING
+
+        if self.require_explicit_offset and (
+            not _carries_explicit_offset(as_of) or ref.tzinfo is None or ref.utcoffset() is None
+        ):
             return FreshnessStatus.MISSING
 
         # Ensure timezone awareness
@@ -243,3 +262,11 @@ class FreshnessPolicy:
 MARKET_FRESHNESS_POLICY = FreshnessPolicy(max_age_hours=24.0)
 PEER_FRESHNESS_POLICY = FreshnessPolicy(max_age_hours=30.0 * 24.0)  # 30 days
 ANCHOR_FRESHNESS_POLICY = FreshnessPolicy(max_age_hours=72.0)       # 3 days
+# A17 (handoff/decisions/A17-gmp-cutoff-freshness-and-trend-labels.md): GMP keeps
+# the market 24-hour maximum age, but the reference (evaluation) time is its
+# cutoff - no future tolerance - and an offset-less timestamp is never assumed UTC.
+GMP_FRESHNESS_POLICY = replace(
+    MARKET_FRESHNESS_POLICY,
+    allow_future_tolerance_seconds=0.0,
+    require_explicit_offset=True,
+)

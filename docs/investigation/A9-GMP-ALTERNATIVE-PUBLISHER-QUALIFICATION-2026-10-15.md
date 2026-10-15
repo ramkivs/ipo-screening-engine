@@ -293,6 +293,27 @@ These refine PR-1, PR-2 (§8) and §12.2. None is adopted, and this addendum int
 | `ipo-scorer_4.html` | `handoff/reference/ipo-scorer_4.html` |
 | engine files | under `engine/ipo_screening/` |
 
+## 14. Decisions adopted — 2026-10-15 (A17)
+
+Ramki approved three product decisions, recorded as user-approved policy in [`handoff/decisions/A17-gmp-cutoff-freshness-and-trend-labels.md`](../../handoff/decisions/A17-gmp-cutoff-freshness-and-trend-labels.md). This addendum maps them onto this record. Nothing above is edited.
+
+| This record | Disposition under A17 |
+|---|---|
+| §8 PR-1 (cutoff); §13.2 row 1 | **Adopted as A17-1.** `GMP_CUTOFF` is the evaluation timestamp. A reading stamped after it is ineligible, with no one-hour allowance. A missing, malformed or offset-less stamp fails closed. PR-1's "latest reading" selection and "retrieved at or before the evaluation timestamp" clause are not part of the approved text and stay open. |
+| §8 PR-2 (maximum age); §13.2 row 2 | **Adopted as A17-2.** `MAX_AGE` is the existing `market_staleness_hours` (24 h), measured from the evaluation timestamp. |
+| §9 item 3; §12.2; §13.2 row 3 (trend) | **Resolved by A17-3.** Only publisher-supplied labels count; the v1.3 definition is not adopted. MarketLiveIPOGMP publishes no trend label [ML-T:7–9], so its `trend` is null and `gmp_trend` is UNKNOWN. |
+| §8 PR-3 (artifact and hash), PR-4 (fail-closed mapping), PR-5 (single source) | **Not adopted.** The approval instruction's "PR-3" is A17-3 (trend), not this record's PR-3. |
+| §13.3 dependency 1 (future-stamp tolerance) | **Implemented for GMP only**, without modifying the frozen `snapshots.py` (A17, "Implementation"). |
+| §13.3 dependency 2 (no retrieval-time field) | **Still open.** It belongs with §9 item 4. |
+
+**Determinations are unchanged.** §7 recorded R3 and R4 as UNRESOLVED only because PR-1 and PR-2 had not been adopted. A17 adopts them, but this addendum does not re-score R3, R4 or any other requirement.
+- **MarketLiveIPOGMP: NOT QUALIFIED** (the leading candidate). R5–R8 remain open, and R7 needs source evidence.
+- **PapsDigital:** closed as a non-independent alternative.
+- **InvestorGain:** NOT QUALIFIED.
+- **A9:** fail-closed; Final is withheld.
+
+**R7 is unchanged.** No capture was made in this pass. It ran at 22:07 IST, 40 minutes after the last capture (§13.1) and before the 16 Oct IST daytime window inferred there. The single follow-up capture condition in §13.1 still applies. The approved cutoff, freshness and trend policy says nothing about the publisher's retention, append-only behaviour, corrections or historical availability.
+
 ## Evidence keys
 
 Line references are `[KEY:line]` against these retained files. Quotations omit Markdown emphasis markers (for example, `₹ **495**` is quoted as "₹ 495").

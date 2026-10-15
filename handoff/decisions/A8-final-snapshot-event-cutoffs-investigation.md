@@ -2,7 +2,7 @@
 
 - **Decision ID:** A8
 - **Title:** Approved policy directions and source-specific event/cutoff requirements for Final snapshots
-- **Status:** RAMKI-APPROVED POLICY DIRECTIONS RECORDED; SOURCE/PROVIDER/EVENT/CUTOFF CONTRACTS OPEN; MISSING-GMP FINAL RULE RESOLVED BY A9; PHASE 0 OPEN; PHASE 1 UNAUTHORIZED
+- **Status:** RAMKI-APPROVED POLICY DIRECTIONS RECORDED; SOURCE/PROVIDER/EVENT/CUTOFF CONTRACTS OPEN; MISSING-GMP FINAL RULE RESOLVED BY A9; GMP CUTOFF, MAXIMUM AGE AND TREND-LABEL RULES RESOLVED BY A17; PHASE 0 OPEN; PHASE 1 UNAUTHORIZED
 - **Decision authority:** RAMKI for approved A8 policy directions and remaining selections (A1 designates RAMKI as conflict-adjudication authority; this record does not adjudicate source conflicts).
 - **Approval provenance and date:** Ramki's explicit approval of A8-S, A8-M, A8-G and A8-P, and the common timestamp/evidence safeguards, in the TASK 18 instruction received 2026-10-10 (Asia/Calcutta). Earlier general A8 principles and investigation recorded 2026-10-09 (Asia/Calcutta).
 - **Repository:** `ramkivs/ipo-screening-engine`
@@ -42,7 +42,14 @@ The following are **RAMKI-APPROVED DECISIONS** recorded from Ramki's explicit Ta
 
 **RESOLVED BY A9 — MISSING-GMP FINAL POLICY:** If a required qualifying GMP snapshot or its required hash is absent or invalid, withhold `FINAL`. A blocked-input marker is not a qualifying snapshot or hash. No exception is authorized by A9.
 
-**UNRESOLVED:** Approved source; qualifying actual observation; source-native event/as-of and timestamp semantics; source-specific cutoff; snapshot/hash representation; and stale or unverifiable handling beyond the A9 condition. Do not infer any other provider-specific behavior.
+**RESOLVED BY A17 — GMP CUTOFF, MAXIMUM AGE AND TREND LABELS (2026-10-15):** See `handoff/decisions/A17-gmp-cutoff-freshness-and-trend-labels.md`.
+- **A17-1:** the evaluation timestamp is the GMP eligibility cutoff. An observation stamped after it is ineligible, with no one-hour allowance. A missing, malformed or offset-less timestamp fails closed.
+- **A17-2:** the existing 24-hour maximum age applies, measured from the evaluation timestamp.
+- **A17-3:** only publisher-supplied trend labels count; an absent, unsupported or ambiguous label leaves trend unknown.
+
+A17 is not source qualification. A9 is unchanged.
+
+**UNRESOLVED:** Approved source; qualifying actual observation; source-native event/as-of and timestamp semantics, including each source's timestamp meaning against the A17 cutoff; snapshot/hash representation; and stale or unverifiable handling beyond the A9 and A17 conditions. Do not infer any other provider-specific behavior.
 
 ### A8-P — Peers
 

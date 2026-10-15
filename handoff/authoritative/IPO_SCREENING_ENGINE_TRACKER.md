@@ -8,6 +8,7 @@
 - **Reference baseline selected by A16:** `3b7c71cd05efc608fdca60eb1a988f5cf19d60a0` (A15 follow-on tip)
 - **Published implementation/docs baseline:** `953b621ed27a2bdd1a2e06232f275687810e59d9` (A9 runtime gate commit on the fixed session branch; remote-verified)
 - **A9 runtime implementation commit:** `953b621ed27a2bdd1a2e06232f275687810e59d9` (four changed file blobs independently matched the fetched remote ref)
+- **A17 GMP policy runtime change (2026-10-15):** built on the remote-verified tip `9e0e4ed562dd49a260482806afc92e7ef98d8a67`. See the A17 section at the end of this file.
 - **Fixed-branch tip immediately before A9 work:** `a912d5293b3fa17b32e1a46a5ba118eaac6f7055` (remote-verified A16 baseline).
 - **Controlling decision:** `handoff/decisions/A16-personal-use-operating-scope-and-gate-disposition.md`
 - **Historical records retained below:** Candidate M `9bad659927616ad7fd3aad2864b6637f095872c5`, A15 implementation `fecdd8220500d7932c93b55b311a5f9830f92572`, A11–A14, and PR #3. They remain unchanged; A16 supersedes blanket process gates for routine personal-use work only.
@@ -25,10 +26,10 @@ A15's `evaluation-record.v1.json` is an additive persisted artifact. `evaluation
 | **COMPLETED / VERIFIED** | Working baseline and authority | A16 records the current personal-use scope and selects the fixed session branch over Candidate M/PR #3 as the working baseline. Routine progress no longer waits on the historical general Phase 0/Phase 1, reviewer, acceptance, or canonical-selection ceremony. |
 | **COMPLETED / VERIFIED** | Deterministic evaluation and A15 persistence | All six frozen-core files verify against the current pin; `verify_golden_result()` passes with hash `e84f8bc0...`; `verify_v1_6_implementation()` reports `PASS` with zero failures/warnings. The v1.6 candidate is still inactive. A generated fixture record verifies as seven payload artifacts and replays to the same hash. |
 | **COMPLETED / VERIFIED** | Personal local run path | README, pinned `requirements.txt`, and runbook document isolated Python setup, config validation, deterministic CLI run/verify/replay, and same-origin local UI/API. The API's limited POST scope is explicit; cross-origin workflow writes are rejected. No authentication is provided, so instructions bind to loopback. |
-| **COMPLETED / VERIFIED** | Automated regression and self-review | Latest full Python suite: 710 passed with two non-fatal Starlette deprecation warnings; frontend: 55 passed at the prior A16 baseline (no frontend files changed in this A9 task). Self-review is recorded as self-review/testing, not independent review. Full evidence and limitations are below. |
+| **COMPLETED / VERIFIED** | Automated regression and self-review | Latest full Python suite (A17 pass, 2026-10-15): 757 passed with two non-fatal Starlette deprecation warnings. Frontend: 55 passed at the prior A16 baseline; no frontend files have changed since. Self-review is recorded as self-review/testing, not independent review. Full evidence and limitations are below. |
 | **EVIDENCE-BLOCKED** | NIFTY trend | A8-M's price-index, completed-session, trailing SMA-50/SMA-200, strict supportive/weak, neutral-otherwise, and required-UNKNOWN/Final-withholding semantics remain approved and unchanged. The recovered 245-row close/SMA package is descriptive rendered/local evidence only; source-native bytes and publication/availability by cutoff remain unqualified. Do not assign a category. |
 | **EVIDENCE-BLOCKED** | Subscription (A8-S/A10) | The A8-S register and 10-file VNL package already exist on the fixed tree and are blob-identical to the inspected 01a ref. Seven of eight `SHA256-MANIFEST.json` file entries match; its HTML entry expects 313,040 bytes / `2AE7009B…`, while the retained blob is 313,038 bytes / `6BEB26DC…`. Preserve both without rewriting and do not claim full package hash verification. A10 remains evidence/display-only; NSE, BSE and All Exchange stay distinct. The official GraphLogic URL is captured, but the PDF itself and a retained PDF analysis are absent from the inspected refs. Source/event/denominator/cutoff/scoring and missing-input handling remain unresolved. |
-| **FAIL-CLOSED / SOURCE CONTRACT OPEN** | GMP (A8-G/A9) | A9's narrow rule is implemented at the A15 Final-disposition boundary: missing/no-value GMP is `MISSING`; any present observation is `SOURCE_UNQUALIFIED` under the current model, so Final has no terminal `final_outcome`. The model has no approved GMP source/qualification or required hash-subject contract; neither a generic local market-snapshot digest nor opaque `SourceRef.content_hash` qualifies. No provider, event/as-of, cutoff, freshness, hash or serialization semantics are inferred. Preliminary and other non-Final behavior/scoring are unchanged. See the A9 implementation note below; valid source qualification remains evidence/policy blocked. |
+| **FAIL-CLOSED / SOURCE CONTRACT OPEN** | GMP (A8-G/A9) | A9's narrow rule is implemented at the A15 Final-disposition boundary: missing/no-value GMP is `MISSING`; any present observation is `SOURCE_UNQUALIFIED` under the current model, so Final has no terminal `final_outcome`. The model has no approved GMP source/qualification or required hash-subject contract; neither a generic local market-snapshot digest nor opaque `SourceRef.content_hash` qualifies. **A17 (Ramki-approved, 2026-10-15) now sets the GMP eligibility rules:** the evaluation timestamp is the cutoff, with no future allowance; the existing 24 h maximum age applies; only publisher-supplied trend labels count. A GMP block that is after the cutoff, over-age, or has a missing, malformed or offset-less timestamp is STALE, so `gmp_trend` is UNKNOWN. No provider, event/as-of, hash or serialization semantics are inferred. MarketLiveIPOGMP and InvestorGain remain NOT QUALIFIED; PapsDigital is closed; R7 is UNRESOLVED. See the A9 and A17 notes below; valid source qualification remains evidence/policy blocked. |
 | **EVIDENCE-BLOCKED** | Peers (A8-P/A5) | `CALIBRATION_EVIDENCE_INSUFFICIENT` remains. The R.K. Fashion filing reports one Banaras Beads peer and CMP, P/E and P/B values as of 2026-09-28, but no exchange-native quote/session, listing date, point-in-time universe or calibration is retained. Do not infer peer eligibility or adopt proposed thresholds. |
 | **EVIDENCE-BLOCKED** | Other A8 metrics (VIX, listing gains, anchor) | Keep VIX separate from NIFTY. VNL issue evidence supplies a listing date but not a qualifying listing-session price/cohort. Existing Moneyview evidence supports only a candidate issue-specific anchor amount; quality/cutoff/source qualification remain open, and the 6,020,296-share residual plus Anchor/OFS mapping remain unresolved. Do not infer metric values or thresholds. |
 | **MATERIAL-DECISION-REQUIRED** | Unresolved metric contracts | Before using affected metrics, settle any still-open source identity, event/denominator, cutoff/freshness, eligibility/universe, hash/serialization, and missing-input/Final behavior for that metric. Existing A8-M/A9/A10 decisions remain controlling where they actually settle a field; do not reopen settled policy or invent thresholds. These decisions block only the dependent metric, not unrelated app work. |
@@ -180,3 +181,49 @@ The audit draft contains the item-by-item missing/completed/authority/dependency
 - `PYTHONPATH=engine .venv/bin/python -m pytest tests/ -q` — **710 passed**, with two non-fatal Starlette deprecation warnings.
 - Direct integrity checks: `verify_frozen_core()` **PASS** (all six pinned files), `verify_golden_result()` **PASS** (`e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`), and `verify_v1_6_implementation()` **PASS** (zero failures/warnings; v1.6 remains inactive).
 - Remote verification (2026-10-15): `git ls-remote` and the fetched `origin/arena/573e69a4-ipo-screening-engine` resolved to A9 code commit `953b621ed27a2bdd1a2e06232f275687810e59d9`; its four code/schema/test/tracker blobs matched. This tracker-only follow-up records that proof. No PR, merge, release, or deployment was created or required.
+
+## A17 GMP cutoff, maximum age and trend labels — implementation (2026-10-15)
+
+**Status:** A17 is recorded as Ramki-approved product policy in `handoff/decisions/A17-gmp-cutoff-freshness-and-trend-labels.md`, and its narrow enforcement is implemented. Source qualification is unchanged:
+- MarketLiveIPOGMP: NOT QUALIFIED (leading candidate).
+- InvestorGain: NOT QUALIFIED.
+- PapsDigital: closed as a non-independent alternative.
+- R7: UNRESOLVED.
+
+No provider was contacted, and no GMP page was captured in this pass.
+
+### Runtime effect
+
+- **Cutoff on the scoring path (A17-1).** `pipeline.evaluate` calls `gmp_policy.apply_gmp_cutoff` right after the frozen `build_market_snapshot`. It demotes a FRESH GMP block to STALE when:
+  - its `as_of` is later than the evaluation timestamp (the builder's generic one-hour allowance no longer applies to GMP);
+  - its `as_of` has no explicit UTC offset (it is never assumed UTC);
+  - the evaluation time has no timezone.
+- **Scope of the demotion.** It never promotes a block and never changes the anchor, subscription or regime blocks. A STALE GMP block makes `gmp_bucket` and the `gmp_trend` criterion UNKNOWN through the existing frozen logic.
+- **Maximum age (A17-2).** The existing configured 24 h, measured from the evaluation timestamp, was already enforced by the builder and is unchanged. Exactly 24 h old is FRESH; one second older is STALE.
+- **Connector freshness.** `GmpSignalAdapter` defaults to `GMP_FRESHNESS_POLICY`, which is `MARKET_FRESHNESS_POLICY` with no future tolerance and an explicit offset required:
+  - a stamp after the reference time is FUTURE;
+  - an offset-less stamp is MISSING;
+  - a malformed stamp still raises `ValueError`;
+  - other connectors keep their policies.
+- **Trend labels (A17-3).** The adapter maps a publisher label only through the existing exact-match table. An unmapped label becomes `None` instead of passing through raw, and conflicting `trend`/`gmp_trend` labels become `None`. Nothing derives trend from values, movement, history or issue price.
+- **A9 is unchanged.** In Final, any present GMP stays `NONTERMINAL_UNRESOLVED` with `SOURCE_UNQUALIFIED`, missing GMP stays `MISSING`, and `final_outcome` is never set.
+- **Not modified:** frozen-core files, scoring formulas and weights, configuration, the input and A15 record schemas, A9 messages, fixtures, frontend, and the golden result hash.
+
+### Verification (2026-10-15)
+
+- **Before vs after** (scoring path, evaluation at `2026-10-05T12:00:00Z`):
+  - GMP `as_of` at +1 s, +30 min and +59 min, IST +1 s, and an offset-less stamp were FRESH and scored before; all are now STALE and UNKNOWN.
+  - At the cutoff, the same instant in IST, and exactly 24 h old: FRESH both before and after.
+  - Over 24 h old, +90 min, malformed and missing: STALE both before and after.
+- **Focused tests:** `PYTHONPATH=engine python -m pytest tests/test_a17_gmp_policy.py -q` — **47 passed**.
+- **Mutation check:** reverting each change in a scratch copy fails its tests:
+  - removing the pipeline cutoff fails 7;
+  - restoring the generic connector policy fails 5;
+  - restoring the raw trend pass-through fails 6.
+- **Full suite:** `PYTHONPATH=engine python -m pytest tests/ -q` — **757 passed** (710 existing plus 47 new), with two non-fatal Starlette deprecation warnings. No existing test was modified.
+- **Direct integrity checks:**
+  - `verify_frozen_core()`: **PASS** (6/6 pinned files).
+  - `verify_golden_result()`: **PASS** (`e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`).
+  - `verify_v1_6_implementation()`: **PASS** (zero failures or warnings; v1.6 inactive).
+- **Frontend:** `npm --prefix frontend test` was not re-run, because no frontend file or API contract changed. Python API/UI tests are part of the full suite.
+- **Remaining limitation:** schema `format: date-time` is not enforced in the pinned environment (the optional `rfc3339-validator` is absent). The A17 runtime check does not depend on it.

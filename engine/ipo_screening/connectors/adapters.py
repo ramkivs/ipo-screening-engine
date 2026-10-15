@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 from ..canonical import ExtractionMethod, Verification
 from .interfaces import (
     ANCHOR_FRESHNESS_POLICY,
+    GMP_FRESHNESS_POLICY,
     MARKET_FRESHNESS_POLICY,
     PEER_FRESHNESS_POLICY,
     ConnectorPayloadError,
@@ -166,6 +167,34 @@ class OfficialSubscriptionAdapter(BaseConnectorAdapter):
 # --------------------------------------------------------------------------
 
 
+#: A17-3 exact-match map from a publisher-supplied trend label to an accepted
+#: v1.5 label (schema enum strong / flat / falling). Unchanged synonym set;
+#: each token maps to exactly one label. Anything else - including "unknown",
+#: unsupported labels and the superseded v1.3 phrase "stable/rising" - is not
+#: mapped, so the trend stays unknown (None). No trend is derived from GMP
+#: values, percentage movement, history or issue price.
+_GMP_TREND_LABELS: Dict[str, str] = {
+    "strong": "strong",
+    "rising": "strong",
+    "bullish": "strong",
+    "up": "strong",
+    "flat": "flat",
+    "steady": "flat",
+    "neutral": "flat",
+    "falling": "falling",
+    "declining": "falling",
+    "bearish": "falling",
+    "down": "falling",
+}
+
+
+def _map_gmp_trend_label(value: Any) -> Optional[str]:
+    """Map one publisher-supplied trend label to an accepted v1.5 label, else None."""
+    if value is None:
+        return None
+    return _GMP_TREND_LABELS.get(str(value).strip().lower())
+
+
 class GmpSignalAdapter(BaseConnectorAdapter):
     """Adapter for grey market premium (GMP) and secondary sentiment signals."""
 
@@ -177,7 +206,7 @@ class GmpSignalAdapter(BaseConnectorAdapter):
         super().__init__(
             provider_id=provider_id,
             source_class=SourceClass.SECONDARY_TRACKER,
-            freshness_policy=freshness_policy or MARKET_FRESHNESS_POLICY,
+            freshness_policy=freshness_policy or GMP_FRESHNESS_POLICY,  # A17-1/A17-2
             verification=Verification.UNVERIFIED.value,  # GMP is always unverified secondary signal
             extraction_method=ExtractionMethod.MARKET_DATA.value,
         )
@@ -199,21 +228,15 @@ class GmpSignalAdapter(BaseConnectorAdapter):
         gmp_val = _safe_float(clean_raw.get("gmp_rupees", clean_raw.get("gmp")))
         gmp_pct = _safe_float(clean_raw.get("gmp_pct", clean_raw.get("pct")))
 
-        # Standardize trend enum
+        # A17-3: publisher-supplied trend label only, mapped to an accepted v1.5
+        # label solely through the exact-match table; never derived.
         raw_trend = clean_raw.get("trend", clean_raw.get("gmp_trend"))
-        trend = None
-        if raw_trend is not None:
-            t_str = str(raw_trend).strip().lower()
-            if t_str in ("strong", "rising", "bullish", "up"):
-                trend = "strong"
-            elif t_str in ("flat", "steady", "neutral"):
-                trend = "flat"
-            elif t_str in ("falling", "declining", "bearish", "down"):
-                trend = "falling"
-            elif t_str in ("null", "unknown", "none"):
+        trend = _map_gmp_trend_label(raw_trend)
+        # Two publisher labels that do not map to the same accepted label are
+        # ambiguous, so the trend stays unknown rather than one being preferred.
+        if trend is not None and "trend" in clean_raw and clean_raw.get("gmp_trend") is not None:
+            if _map_gmp_trend_label(clean_raw.get("gmp_trend")) != trend:
                 trend = None
-            else:
-                trend = t_str
 
         normalized = {
             "gmp_rupees": gmp_val,

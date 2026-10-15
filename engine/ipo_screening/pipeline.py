@@ -43,6 +43,7 @@ from .evaluation import (
     build_record,
     compute_preliminary_delta,
 )
+from .gmp_policy import apply_gmp_cutoff
 from .knockouts import KnockoutSummary, evaluate_knockouts
 from .overlays import EffectiveScoringPlan, resolve_overlays
 from .schema_validation import enforce_schema, load_schema
@@ -231,6 +232,9 @@ def evaluate(
         evaluation_datetime=moment,
         staleness_hours=int(thresholds.get("market_staleness_hours", DEFAULT_MARKET_STALENESS_HOURS)),
     )
+    # A17-1: the evaluation timestamp is the GMP eligibility cutoff - no
+    # future-timestamp allowance and no assumed timezone for the GMP block.
+    market = apply_gmp_cutoff(market, evaluation_datetime=moment)
 
     # -- 4. semantic validation (hard gate) ---------------------------------
     report = validate_semantics(canonical, config, peers, market)
