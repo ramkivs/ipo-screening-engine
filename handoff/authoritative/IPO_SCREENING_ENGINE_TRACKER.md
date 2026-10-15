@@ -6,8 +6,9 @@
 - **Repository:** `ramkivs/ipo-screening-engine`
 - **Working branch:** `arena/573e69a4-ipo-screening-engine` (fixed session branch; do not switch branches)
 - **Reference baseline selected by A16:** `3b7c71cd05efc608fdca60eb1a988f5cf19d60a0` (A15 follow-on tip)
-- **Published implementation/docs baseline:** `a912d5293b3fa17b32e1a46a5ba118eaac6f7055` (A16 Host/Origin hardening, remotely verified before this A9 pass)
-- **Fixed-branch tip immediately before A9 work:** `a912d5293b3fa17b32e1a46a5ba118eaac6f7055` (local and origin-tracking ref matched; current A9 publication status is recorded below).
+- **Published implementation/docs baseline:** `953b621ed27a2bdd1a2e06232f275687810e59d9` (A9 runtime gate commit on the fixed session branch; remote-verified)
+- **A9 runtime implementation commit:** `953b621ed27a2bdd1a2e06232f275687810e59d9` (four changed file blobs independently matched the fetched remote ref)
+- **Fixed-branch tip immediately before A9 work:** `a912d5293b3fa17b32e1a46a5ba118eaac6f7055` (remote-verified A16 baseline).
 - **Controlling decision:** `handoff/decisions/A16-personal-use-operating-scope-and-gate-disposition.md`
 - **Historical records retained below:** Candidate M `9bad659927616ad7fd3aad2864b6637f095872c5`, A15 implementation `fecdd8220500d7932c93b55b311a5f9830f92572`, A11–A14, and PR #3. They remain unchanged; A16 supersedes blanket process gates for routine personal-use work only.
 
@@ -178,4 +179,4 @@ The audit draft contains the item-by-item missing/completed/authority/dependency
 - `PYTHONPATH=engine .venv/bin/python -m pytest tests/test_evaluation_record_v1.py tests/test_reproducibility_store.py -q` — **49 passed**. The A15 persisted bytes are deterministic across identical runs; `EvaluationStore.verify_hashes()` reports no artifact mismatches and the v1.5 result hash matches.
 - `PYTHONPATH=engine .venv/bin/python -m pytest tests/ -q` — **710 passed**, with two non-fatal Starlette deprecation warnings.
 - Direct integrity checks: `verify_frozen_core()` **PASS** (all six pinned files), `verify_golden_result()` **PASS** (`e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`), and `verify_v1_6_implementation()` **PASS** (zero failures/warnings; v1.6 remains inactive).
-- Remote publication/verification is recorded below after the commit and push; no remote-success claim is made here before that check.
+- Remote verification (2026-10-15): `git ls-remote` and the fetched `origin/arena/573e69a4-ipo-screening-engine` resolved to A9 code commit `953b621ed27a2bdd1a2e06232f275687810e59d9`; its four code/schema/test/tracker blobs matched. This tracker-only follow-up records that proof. No PR, merge, release, or deployment was created or required.
