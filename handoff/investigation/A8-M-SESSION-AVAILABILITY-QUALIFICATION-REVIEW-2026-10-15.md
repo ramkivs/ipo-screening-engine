@@ -28,7 +28,7 @@ This report evaluates evidence sufficiency only. It does not qualify the saved r
 
 ## 2. Review baseline and evidence forms
 
-The checkout initially had local `HEAD` at `01ba66c12ca1195fd7acbd287c3e39a019808094` while the fixed remote branch was at `65de3bd91e6a56eaba8d724f22666ffc6b9100ed`. Before aligning it, all 269 paths in the fetched fixed-branch tree were verified to exist locally with matching Git blob bytes and file modes; the only additional untracked path was the unrelated authorization-request draft. The local branch was safely fast-forwarded to the already-published `65de3bd…` tip without changing the verified worktree contents. The draft remains untouched and unstaged. The following evidence review is based on that fixed-branch baseline.
+The checkout initially had local `HEAD` at `01ba66c12ca1195fd7acbd287c3e39a019808094` while the fixed remote branch was at `65de3bd91e6a56eaba8d724f22666ffc6b9100ed`. Before aligning it, all 269 paths in the fetched fixed-branch tree were verified to exist locally with matching Git blob bytes and file modes. Although the initial Git status showed many of those paths as untracked because the local branch pointer was stale, the only worktree path not present in the fetched fixed-branch tree was the unrelated authorization-request draft. The local branch was safely fast-forwarded to the already-published `65de3bd…` tip without changing the verified worktree contents. The draft remains untouched and unstaged. The following evidence review is based on that fixed-branch baseline.
 
 
 The principal reusable artifacts are in [`evidence/market-observations/official-index-history-20261013/`](../../evidence/market-observations/official-index-history-20261013/):
