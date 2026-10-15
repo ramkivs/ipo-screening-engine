@@ -46,9 +46,10 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, Mapping, Optional, Tuple, Union
 
 from .gmp_policy import explicit_offset_instant
+from .strict_json import loads_strict
 
 #: D1 evidence class of a retained rendered-text capture of a publisher page.
 PUBLISHER_REPORTED_RENDERED_CAPTURE = "PUBLISHER_REPORTED_RENDERED_CAPTURE"
@@ -200,8 +201,46 @@ class RenderedGmpCapture:
         )
 
 
+def parse_manifest_bytes(manifest_path: Union[str, Path], raw: bytes) -> Dict[str, Any]:
+    """Parse one capture manifest from the exact bytes that were hashed.
+
+    Duplicate JSON keys are rejected here, before any window, hash or cutoff
+    decision, because a repeated ``retrievalWindowUtc`` or ``sha256`` would
+    otherwise be collapsed to its last value without any error.
+    """
+    path = Path(manifest_path)
+    try:
+        manifest = loads_strict(raw)
+    except ValueError as exc:
+        raise GmpEvidenceError(f"manifest {path.name} is not a strict JSON object: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise GmpEvidenceError(f"manifest {path.name} is not a JSON object")
+    method = manifest.get("captureMethod")
+    if not isinstance(method, Mapping) or method.get("rawProviderResponseBytesCaptured") is not False:
+        raise GmpEvidenceError(
+            "D1 covers only a retained rendered-text capture, and this manifest does not "
+            "declare one (captureMethod.rawProviderResponseBytesCaptured must be false)"
+        )
+    return manifest
+
+
 def load_rendered_capture(manifest_path: Union[str, Path], artifact_id: str) -> RenderedGmpCapture:
     """D1: read one declared artifact from a capture manifest and verify its hash.
+
+    The manifest is read once; its bytes are parsed strictly (duplicate keys are
+    rejected). See :func:`load_rendered_capture_from_manifest` for the rules.
+    """
+    path = Path(manifest_path)
+    manifest = parse_manifest_bytes(path, path.read_bytes())
+    return load_rendered_capture_from_manifest(path, manifest, artifact_id)
+
+
+def load_rendered_capture_from_manifest(
+    manifest_path: Union[str, Path], manifest: Mapping[str, Any], artifact_id: str
+) -> RenderedGmpCapture:
+    """D1 for an already-parsed manifest (the caller parsed the hashed bytes).
+
+    The caller must have parsed the manifest with :func:`parse_manifest_bytes`.
 
     Raises :class:`GmpEvidenceError` unless the manifest declares a rendered-text
     capture (``captureMethod.rawProviderResponseBytesCaptured`` is ``false``) and
@@ -212,16 +251,9 @@ def load_rendered_capture(manifest_path: Union[str, Path], artifact_id: str) -> 
     explicit UTC offset, or an inverted window, establish no retrieval window.
     """
     path = Path(manifest_path)
-    manifest = json.loads(path.read_text(encoding="utf-8"))
-    method = manifest.get("captureMethod") if isinstance(manifest, Mapping) else None
-    if not isinstance(method, Mapping) or method.get("rawProviderResponseBytesCaptured") is not False:
-        raise GmpEvidenceError(
-            "D1 covers only a retained rendered-text capture, and this manifest does not "
-            "declare one (captureMethod.rawProviderResponseBytesCaptured must be false)"
-        )
     entries = [
         item
-        for item in manifest.get("artifacts") or []
+        for item in (manifest.get("artifacts") or [])
         if isinstance(item, Mapping) and item.get("id") == artifact_id
     ]
     if not entries:

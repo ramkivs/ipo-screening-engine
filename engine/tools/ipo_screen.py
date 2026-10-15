@@ -67,6 +67,7 @@ from ipo_screening.extraction.price_band_notice import (  # noqa: E402
     PriceBandNoticeParser,
 )
 from ipo_screening.pipeline import load_config, replay  # noqa: E402
+from ipo_screening.strict_json import DuplicateJSONKeyError, load_strict, loads_strict  # noqa: E402
 from ipo_screening.version import (  # noqa: E402
     DEFAULT_CONFIG_PATH,
     SPEC_VERSION,
@@ -112,9 +113,11 @@ def load_notice(notice_arg: str | None) -> Any:
         text = p.read_text(encoding="utf-8")
         if p.suffix.lower() == ".json":
             try:
-                data = json.loads(text)
+                data = loads_strict(text)
                 if isinstance(data, dict) and "price_band_high" in data:
                     return data
+            except DuplicateJSONKeyError:
+                raise
             except Exception:
                 pass
         return parser.parse_from_text(text)
@@ -127,11 +130,11 @@ def load_json_or_file(arg: str | None) -> Optional[dict]:
         return None
     p = Path(arg)
     if p.exists() and p.is_file():
-        return json.loads(p.read_text(encoding="utf-8"))
+        return loads_strict(p.read_bytes())
     stripped = arg.strip()
     if not (stripped.startswith("{") or stripped.startswith("[")):
         raise FileNotFoundError(f"file not found: {arg}")
-    return json.loads(arg)
+    return loads_strict(arg)
 
 
 def fmt_score(value: float | None) -> str:
@@ -237,7 +240,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(f"error: input not found: {input_path}", file=sys.stderr)
         return EXIT_USAGE
     with input_path.open("r", encoding="utf-8") as handle:
-        document = json.load(handle)
+        document = load_strict(handle)
     config = load_config(args.config)
     store = EvaluationStore(args.store) if args.store else None
 
@@ -451,7 +454,7 @@ def cmd_assemble(args: argparse.Namespace) -> int:
         print(f"error: input file not found: {input_path}", file=sys.stderr)
         return EXIT_REFUSED
 
-    base_input = json.loads(input_path.read_text(encoding="utf-8"))
+    base_input = loads_strict(input_path.read_bytes())
 
     pbn = load_notice(getattr(args, "notice", None))
     supp = load_json_or_file(getattr(args, "supplemental", None))

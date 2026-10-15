@@ -42,6 +42,7 @@ from ipo_screening.gmp_evidence import (
     capture_obtained_by,
     classify_displayed_gmp,
     load_rendered_capture,
+    parse_manifest_bytes,
 )
 
 ML_DIR = REPO_ROOT / "evidence" / "gmp-observations" / "marketliveipogmp-tonbo-20261015"
@@ -541,3 +542,58 @@ def test_a17_age_limit_and_trend_label_policy_are_unchanged(golden_input, config
     assert (scored.state, scored.score) == ("SCORED", 2.0)
     document["market"]["gmp"]["as_of"] = "2026-10-04T11:59:59Z"  # over 24 h old
     assert criterion(run(document, config), "gmp_trend").state == "UNKNOWN"
+
+
+# --------------------------------------------------------------------------
+# Duplicate JSON keys in a manifest are rejected before any window or hash
+# decision (regression: a second earlier retrievalWindowUtc was accepted).
+# --------------------------------------------------------------------------
+
+
+_ML_SHA_MEMBER = '"sha256": "33516F86EBB2CC7E53AD0491FFAD05BAE1CA7115C6008ECFB7F41A9C6C79705D"'
+
+
+def _manifest_with_raw_insertion(tmp_path, insertion, *, before=None):
+    """Copy the retained package and insert raw JSON text. ``before`` anchors the insertion."""
+    target = tmp_path / "package"
+    shutil.copytree(ML_DIR, target)
+    manifest_path = target / "capture-manifest.json"
+    text = manifest_path.read_text(encoding="utf-8")
+    if before is None:
+        needle = f'"id": "{ML_TONBO}",'
+        assert text.count(needle) == 1
+        text = text.replace(needle, needle + insertion, 1)
+    else:
+        assert text.count(before) == 1
+        text = text.replace(before, insertion + before, 1)
+    manifest_path.write_text(text, encoding="utf-8")
+    return manifest_path
+
+
+def test_duplicate_window_key_cannot_move_the_capture_before_the_cutoff(tmp_path, ml_capture):
+    # The earlier, fabricated window used to be accepted (last key wins) and made
+    # D2 pass at 11:00Z, before the real capture (13:15Z-13:17Z). It must now be
+    # rejected at parse time, so no cutoff decision is made from it.
+    before_real_capture = datetime(2026, 10, 15, 11, 0, tzinfo=timezone.utc)
+    assert capture_obtained_by(ml_capture, before_real_capture) is False
+    # The fabricated window follows the real one, so last-wins parsing would take it.
+    manifest = _manifest_with_raw_insertion(
+        tmp_path,
+        ' "retrievalWindowUtc": {"notBefore": "2026-10-15T10:40:00.000Z", '
+        '"notAfter": "2026-10-15T10:41:00.000Z"},\n      ',
+        before=_ML_SHA_MEMBER,
+    )
+    with pytest.raises(GmpEvidenceError, match="duplicate JSON key 'retrievalWindowUtc'"):
+        load_rendered_capture(manifest, ML_TONBO)
+
+
+def test_duplicate_hash_key_in_a_manifest_is_rejected(tmp_path):
+    manifest = _manifest_with_raw_insertion(tmp_path, ' "sha256": "' + "0" * 64 + '",')
+    with pytest.raises(GmpEvidenceError, match="duplicate JSON key 'sha256'"):
+        load_rendered_capture(manifest, ML_TONBO)
+
+
+def test_the_retained_manifest_itself_has_no_duplicate_keys():
+    # Guards the regression fixture above: the real manifest must parse strictly.
+    raw = ML_MANIFEST.read_bytes()
+    assert parse_manifest_bytes(ML_MANIFEST, raw)["artifacts"]

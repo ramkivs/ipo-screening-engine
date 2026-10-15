@@ -455,3 +455,21 @@ None is authorized, so none is implemented. The (a)/(b) alternatives in §7.10 a
 - **Recommended answer:** yes.
 - **If yes:** implement the verifier in `gmp_evidence.py` and the §7.3 mapping in the A15 builder, with the §7.8 tests. A9 stays fail-closed, and MarketLiveIPOGMP stays NOT QUALIFIED (§7.9).
 - **If no:** nothing changes. Evaluations stay unlinked, and A9 stays fail-closed.
+
+### 7.12 Implementation record (2026-10-16)
+
+- **Approval basis:** the user approved L1 as revised, L2-a, L3-a and L4-a with R1–R8, plus strict duplicate-key rejection at evaluation-input boundaries and in the GMP manifest parser. No schema or version change was made. Frozen core, scoring, qualification and A9 are unchanged. The §7.10 "not approved" status above is superseded by this record.
+- **Implemented:**
+  - `engine/ipo_screening/gmp_linkage.py`: the verifier. It runs on the evaluated `market.gmp`, `company_name`, registry sources and evidence, and the evaluation timestamp. It reads no separate input file.
+  - `engine/ipo_screening/evaluation_record.py`: the A15 mapping (§7.3) and one diagnostic `A9_GMP_EVIDENCE_LINK`.
+  - `engine/ipo_screening/gmp_evidence.py`: the D1 manifest now reads its bytes once and parses them strictly. This fixes the duplicate-key defect (§7.4 step 2), where a second, earlier `retrievalWindowUtc` was accepted.
+  - `engine/ipo_screening/strict_json.py`: duplicate keys raise `DuplicateJSONKeyError` at `evaluate_file`, `validate_input_schema_path`, and the CLI run, assemble, inline-JSON and notice inputs.
+- **Interpretations to confirm** (where the approved text did not settle a detail):
+  1. **Write-once marker.** No earlier record defined one. The verifier requires the top-level key `writeOnce` with JSON value `true`. The retained ML-T manifest has no such key, so it is ineligible and was not modified.
+  2. **`pct` null.** Recorded as `FAILED` with no value binding, not `MISSING`. This follows the approved rule, and it supersedes the `pct: null` row in §7.5 and §7.11.3.
+  3. **Digests and window.** Recorded whenever the manifest pin and the artifact's D1 integrity pass, including `NOT_AVAILABLE_BY_CUTOFF` and value-binding failures. They are never recorded when the pin or artifact fails.
+  4. **Evidence IDs.** The canonical ID is `EV-<field path>`. An explicit `evidence_id` must equal it. For a linked source, `company_name`, `market.gmp.pct` and `market.gmp.as_of` must each appear exactly once and be attributed to that source.
+  5. **Binding.** The `pct` token and the stamp sentence must each occur exactly once on the locator line as a whole token, not as a substring of a longer number. The stamp must equal the publisher-format rendering of `as_of`.
+  6. **Trend.** A non-null `market.gmp.trend`, or any trend evidence entry for the linked source, is `FAILED`.
+- **Superseded wording:** the §7.4 trust-limit sentence saying duplicate `_evidence` keys remain undetectable no longer holds. Strict parsing now rejects them at the input boundary.
+- **Not done:** no qualification of MarketLiveIPOGMP, no R7 capture, no tracker or Library edit, and no change to A9 outcome logic. A `VERIFIED` link is eligibility for cutoff consideration only (§7.9).

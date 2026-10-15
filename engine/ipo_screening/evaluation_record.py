@@ -18,6 +18,13 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 from .canonical_input import MONETARY_FIELDS
 from .hashing import CANONICAL_GRAMMAR_VERSION, sha256_of
 from .schema_validation import enforce_schema
+from .gmp_linkage import (
+    LINK_DIAGNOSTIC_CODE,
+    GmpLinkResult,
+    entries_from_registry,
+    normalise_evidence,
+    verify_gmp_linkage,
+)
 
 RECORD_SCHEMA_VERSION = "1.1.0"
 RECORD_ARTIFACT_NAME = "evaluation-record.v1.json"
@@ -372,7 +379,33 @@ def _digest_entry(
     }
 
 
-def _build_integrity_digests(record: Any, sources: Sequence[Mapping[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+def _gmp_link_digest_entries(linked: "GmpLinkResult") -> List[Dict[str, Any]]:
+    """Two LOCAL_COMPUTED RAW_ARTIFACT_BYTES digests for a verified manifest and artifact."""
+    refs = sorted(set(linked.evidence_ids))
+    entries = []
+    for label, subject_path, value in (
+        ("manifest", linked.manifest_path, linked.manifest_sha256),
+        ("artifact", linked.artifact_path, linked.artifact_sha256),
+    ):
+        entries.append(
+            {
+                "digest_id": _stable_id("gmp-link-" + label, f"{linked.source_id}|{value}"),
+                "algorithm": "SHA-256",
+                "digest_value": value,
+                "subject_kind": "RAW_ARTIFACT_BYTES",
+                "subject_ref": subject_path,
+                "origin": "LOCAL_COMPUTED",
+                "evidence_refs": refs,
+            }
+        )
+    return entries
+
+
+def _build_integrity_digests(
+    record: Any,
+    sources: Sequence[Mapping[str, Any]],
+    linked: Optional["GmpLinkResult"] = None,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     digests: List[Dict[str, Any]] = []
     by_source: Dict[str, str] = {}
     snapshot = getattr(record, "input_snapshot", {}) or {}
@@ -459,6 +492,13 @@ def _build_integrity_digests(record: Any, sources: Sequence[Mapping[str, Any]]) 
     for source in sources:
         source_id = source.get("source_id")
         content_hash = source.get("content_hash")
+        if linked is not None and linked.digests_verified and source_id == linked.source_id:
+            # L2-a: the pinned manifest and artifact get LOCAL_COMPUTED digests instead
+            # of the opaque LEGACY_UNRESOLVED mapping of the same content_hash.
+            link_digests = _gmp_link_digest_entries(linked)
+            digests.extend(link_digests)
+            by_source[source_id] = [entry["digest_id"] for entry in link_digests]
+            continue
         if isinstance(source_id, str) and isinstance(content_hash, str) and content_hash:
             digest_id = _stable_id("source-content-hash", source_id)
             by_source[source_id] = digest_id
@@ -1138,7 +1178,36 @@ def _validation_projection(
     }
 
 
-def _project_evaluation_record(record: Any) -> Dict[str, Any]:
+def _gmp_link_for_record(record: Any, repo_root: Optional[Path] = None) -> Optional["GmpLinkResult"]:
+    """Verify the GMP link against the evaluated input the record carries.
+
+    The inputs are the scored ``market.gmp`` and ``company_name``, the registry
+    sources and evidence, and the evaluation timestamp. Nothing is read from a
+    separate input file, so an assembled value that differs from its quote fails
+    here, before the record is projected or persisted.
+    """
+    snapshot = getattr(record, "input_snapshot", None)
+    document = snapshot.get("input") if isinstance(snapshot, Mapping) else None
+    if not isinstance(document, Mapping):
+        return None
+    market = document.get("market")
+    gmp = market.get("gmp") if isinstance(market, Mapping) else None
+    if not isinstance(gmp, Mapping):
+        return None
+    evidence = _record_evidence(record)
+    sources = [item for item in (evidence.get("sources") or []) if isinstance(item, Mapping)]
+    evidence_items = _record_evidence_items(record)
+    return verify_gmp_linkage(
+        repo_root=repo_root,
+        market_gmp=gmp,
+        company_name=document.get("company_name"),
+        sources=sources,
+        evidence=normalise_evidence(entries_from_registry(evidence_items)),
+        evaluation_timestamp=getattr(record, "evaluation_timestamp", None),
+    )
+
+
+def _project_evaluation_record(record: Any, repo_root: Optional[Path] = None) -> Dict[str, Any]:
     legacy_sources = _record_sources(record)
     legacy_evidence = _record_evidence_items(record)
     findings: List[Dict[str, Any]] = []
@@ -1209,10 +1278,26 @@ def _project_evaluation_record(record: Any) -> Dict[str, Any]:
                 evidence_refs=[str(item.get("evidence_id"))] if item.get("evidence_id") else [],
             )
 
-    digests, source_digest_refs = _build_integrity_digests(record, legacy_sources)
-    for source_id, digest_id in source_digest_refs.items():
+    linked = _gmp_link_for_record(record, repo_root)
+    digests, source_digest_refs = _build_integrity_digests(record, legacy_sources, linked)
+    for source_id, digest_ref in source_digest_refs.items():
         if source_id in source_by_id:
-            source_by_id[source_id]["digest_refs"] = [digest_id]
+            source_by_id[source_id]["digest_refs"] = list(digest_ref) if isinstance(digest_ref, list) else [digest_ref]
+    if linked is not None and linked.digests_verified and linked.window_source_text and linked.source_id in source_by_id:
+        # The window is an interval with an unknown retrieval instant (§7.3, §7.11.1).
+        window_fact = {
+            "kind": "LOCAL_RETRIEVED_AT",
+            "state": "UNKNOWN",
+            "source_text": linked.window_source_text,
+            "evidence_refs": sorted(set(linked.evidence_ids)),
+            "reason": {
+                "code": "UNAVAILABLE",
+                "message": "exact receipt time not captured; the manifest records only this bracketing window",
+            },
+        }
+        timestamps = source_by_id[linked.source_id]["timestamps"]
+        timestamps.append(window_fact)
+        timestamps.sort(key=lambda item: (item["kind"], item.get("source_text", "")))
 
     evidence_objects: List[Dict[str, Any]] = []
     evidence_id_set: set[str] = set()
@@ -1392,6 +1477,14 @@ def _project_evaluation_record(record: Any) -> Dict[str, Any]:
                 "code": _A9_GMP_FINAL_DIAGNOSTIC,
                 "message": a9_gmp_reason["message"],
                 "evidence_refs": a9_gmp_reason["evidence_refs"],
+            }
+        )
+    if linked is not None:
+        result["diagnostics"].append(
+            {
+                "code": LINK_DIAGNOSTIC_CODE,
+                "message": linked.message,
+                "evidence_refs": sorted(set(linked.evidence_ids)),
             }
         )
     result["diagnostics"].sort(key=lambda item: (item["code"], item["message"]))
@@ -1649,9 +1742,13 @@ def validate_evaluation_record_v1(document: Mapping[str, Any]) -> None:
     _validate_outcome(document)
 
 
-def build_evaluation_record_v1(record: Any) -> Dict[str, Any]:
-    """Project a v1.5 ``EvaluationRecord`` to its schema-validated A15 form."""
-    payload = _project_evaluation_record(record)
+def build_evaluation_record_v1(record: Any, *, repo_root: Optional[Path] = None) -> Dict[str, Any]:
+    """Project a v1.5 ``EvaluationRecord`` to its schema-validated A15 form.
+
+    ``repo_root`` locates GMP evidence links. It defaults to the repository root
+    and exists so that tests can place fixtures under ``tmp_path``.
+    """
+    payload = _project_evaluation_record(record, repo_root)
     validate_evaluation_record_v1(payload)
     return payload
 

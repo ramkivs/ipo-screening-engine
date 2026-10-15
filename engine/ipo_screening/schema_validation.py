@@ -20,6 +20,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError
 
 from .errors import Finding, SEVERITY_ERROR, SchemaValidationError
+from .strict_json import load_strict
 
 _DEFAULT_SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "ipo-input.v1.5.schema.json"
 
@@ -91,7 +92,7 @@ def enforce_schema(
 def validate_input_schema_path(path: str) -> None:
     """Validate a candidate input file against the schema, for CLI use."""
     with Path(path).open("r", encoding="utf-8") as handle:
-        document = json.load(handle)
+        document = load_strict(handle)
     enforce_schema(document)
 
 

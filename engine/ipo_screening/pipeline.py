@@ -36,6 +36,7 @@ from . import excel as excel_module
 from .canonical_input import CanonicalInput, build_canonical_input
 from .config_validation import compile_config, config_fingerprint
 from .derived import DerivedMetrics, derive
+from .strict_json import load_strict
 from .errors import ValidationError
 from .evaluation import (
     EvaluationRecord,
@@ -336,7 +337,7 @@ def evaluate_file(
 ) -> EvaluationOutcome:
     """Convenience wrapper: evaluate an input JSON file against a config file."""
     with Path(input_path).open("r", encoding="utf-8") as handle:
-        document = json.load(handle)
+        document = load_strict(handle)
     config = load_config(config_path)
     store = EvaluationStore(store_root) if store_root else None
     return evaluate(
