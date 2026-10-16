@@ -242,7 +242,24 @@ class EnrichmentEngine:
         pbn_data, pbn_source_ref = cls._extract_pbn_payload(price_band_notice)
 
         if pbn_source_ref and pbn_source_ref.get("source_id") not in existing_source_ids:
-            canonical["_sources"].append(pbn_source_ref)
+            # The canonical _sources schema is closed: register only the
+            # fields it permits. The enrichment-document payload may carry
+            # extra annotations (e.g. "note": "PRICE_BAND_NOTICE") that must
+            # not leak into the canonical input, or evaluate() would reject
+            # an otherwise legitimate Price Band Notice assembly.
+            canonical_source_ref = {
+                key: pbn_source_ref[key]
+                for key in (
+                    "source_id",
+                    "source_type",
+                    "uri",
+                    "content_hash",
+                    "retrieval_timestamp",
+                    "source_timestamp",
+                )
+                if pbn_source_ref.get(key) not in (None, "")
+            }
+            canonical["_sources"].append(canonical_source_ref)
             existing_source_ids.add(pbn_source_ref["source_id"])
 
         cls._reconcile_pricing_terms(
