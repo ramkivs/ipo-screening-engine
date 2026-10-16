@@ -47,13 +47,15 @@ class CanonicalInputBuilder:
         sector_profile = self.base.get("sector_profile") or self._detect_sector_profile()
         sector = self.base.get("sector") or self._detect_sector()
 
+        # D-PEER-1: no synthetic peer fallback. When neither the reference
+        # input nor extraction supplies genuine peers, the honest
+        # representation is an empty list (permitted by the input
+        # contract); peer-relative metrics then resolve UNKNOWN.
         peers_list = self.base.get("peers")
         if not peers_list:
             peers_list = self._get_field("peers")
         if not peers_list:
-            peers_list = [
-                {"name": "Generic Listed Peer Ltd", "listed_years": 5, "business_match": "partial"}
-            ]
+            peers_list = []
 
         output: Dict[str, Any] = {
             "ipo_id": self.base.get("ipo_id") or self._slugify(company_name or "UNKNOWN-IPO"),
