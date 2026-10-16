@@ -231,6 +231,8 @@ class EvidenceDetail(BaseModel):
     quote: Optional[str] = None
     extracted_value: Optional[Any] = None
     unit: Optional[str] = None
+    # OFFICIAL_VERIFIED | FILING | DERIVED | RETAINED_UNVERIFIED | UNVERIFIED
+    verification: Optional[str] = None
 
 
 class EvidenceResponse(BaseModel):

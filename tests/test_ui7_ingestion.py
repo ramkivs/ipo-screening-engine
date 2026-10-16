@@ -583,28 +583,30 @@ def test_ingest_vishal_rhp_undisclosed_issue_terms_fail_precisely(test_env):
 
 
 def test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice(tmp_path, golden_input, config):
-    """End-to-end: Vishal RHP + runtime resolver with the retained official
-    Price Band Notice -> assembled, evaluated, persisted, idempotent.
+    """End-to-end: Vishal RHP + runtime resolver -> assembled, evaluated,
+    persisted, idempotent.
 
-    The notice is the retained real-issuer document in fixtures/notices;
-    its terms enter only through the resolver/enrichment path with
-    provenance, never through fixture defaults.
+    MOCKED verified channel: an HttpNoticeProvider with an injected
+    fetcher serves the retained notice text from an official-host URL.
+    This proves the verified-retrieval mechanics; it is not live
+    retrieval, and the served text remains the repository-retained
+    fixture text (see tests/test_cross_ipo_issue_term_provenance.py).
     """
-    from ipo_screening.issue_terms import IssueTermsResolver, NoticeSnapshotCache, RetainedNoticeProvider
+    from ipo_screening.issue_terms import HttpNoticeProvider, IssueTermsResolver, NoticeSnapshotCache
 
     store_dir = tmp_path / "evaluations"
     store = EvaluationStore(store_dir)
     baseline = evaluate(golden_input, config, mode="final", evaluation_datetime=EVAL_AT, store=store)
     historical_id = baseline.record.evaluation_id
 
-    notice_dir = tmp_path / "notices"
-    notice_dir.mkdir()
-    (notice_dir / "vishal_price_band_notice.txt").write_text(
-        (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
+    notice_bytes = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes()
     resolver = IssueTermsResolver(
-        providers=[RetainedNoticeProvider([notice_dir])],
+        providers=[
+            HttpNoticeProvider(
+                {"VISHAL-NIRMITI-LIMITED": "https://www.nseindia.com/announcements/vishal-price-band"},
+                fetcher=lambda url: notice_bytes,
+            )
+        ],
         cache=NoticeSnapshotCache(tmp_path / "terms-cache"),
     )
     cfg = PresentationConfig(store_root=store_dir, config_dir=REPO_ROOT / "config", issue_terms_resolver=resolver)

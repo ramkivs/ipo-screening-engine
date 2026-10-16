@@ -91,7 +91,14 @@ def _values_valid(values: Mapping[str, Any]) -> Optional[str]:
 
 @dataclass
 class NoticeCandidate:
-    """A parsed Price Band Notice matched to an issuer."""
+    """A parsed Price Band Notice matched to an issuer.
+
+    ``verified`` is True only when the document was retrieved from an
+    allow-listed official source host (NSE/BSE/SEBI) and issuer-matched.
+    Retained local copies are reported but never treated as verified
+    official disclosures: their provenance cannot be established from
+    the file alone.
+    """
 
     result: PriceBandNoticeResult
     provider: str
@@ -99,6 +106,7 @@ class NoticeCandidate:
     retrieved_at: str
     from_cache: bool = False
     raw_bytes: Optional[bytes] = None
+    verified: bool = False
 
     @property
     def values(self) -> Dict[str, Any]:
@@ -114,7 +122,7 @@ class ProviderReport:
 
 @dataclass
 class ResolutionOutcome:
-    status: str  # RESOLVED | PARTIAL | UNPUBLISHED | UNAVAILABLE | CONFLICT
+    status: str  # RESOLVED | PARTIAL | UNPUBLISHED | UNAVAILABLE | CONFLICT | UNVERIFIED
     notice: Optional[PriceBandNoticeResult] = None
     resolved_fields: List[str] = field(default_factory=list)
     unresolved_fields: List[str] = field(default_factory=list)
@@ -122,15 +130,21 @@ class ResolutionOutcome:
     provider_reports: List[ProviderReport] = field(default_factory=list)
     from_cache: bool = False
     source_uri: Optional[str] = None
+    verified: bool = False
+    provider: Optional[str] = None
+    retrieved_at: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "status": self.status,
+            "verified": self.verified,
             "resolved_fields": list(self.resolved_fields),
             "unresolved_fields": list(self.unresolved_fields),
             "conflicts": list(self.conflicts),
             "from_cache": self.from_cache,
             "source_uri": self.source_uri,
+            "provider": self.provider,
+            "retrieved_at": self.retrieved_at,
             "providers": [
                 {"provider": r.provider, "outcome": r.outcome, "detail": r.detail}
                 for r in self.provider_reports
@@ -243,6 +257,7 @@ class HttpNoticeProvider:
                 uri=url,
                 retrieved_at=_utcnow().isoformat().replace("+00:00", "Z"),
                 raw_bytes=raw,
+                verified=True,
             ),
             ProviderReport(self.name, "FOUND", f"notice retrieved from {url}"),
         )
@@ -294,6 +309,7 @@ class NoticeSnapshotCache:
                 retrieved_at=meta["retrieved_at"],
                 from_cache=True,
                 raw_bytes=bin_path.read_bytes(),
+                verified=bool(meta.get("verified", False)),
             ),
             stale,
         )
@@ -311,6 +327,7 @@ class NoticeSnapshotCache:
                     "provider": candidate.provider,
                     "uri": candidate.uri,
                     "retrieved_at": candidate.retrieved_at,
+                    "verified": bool(candidate.verified),
                     "content_hash": hashlib.sha256(candidate.raw_bytes).hexdigest(),
                 },
                 indent=2,
@@ -362,6 +379,25 @@ class IssueTermsResolver:
             outcome.status = "UNPUBLISHED" if searched else "UNAVAILABLE"
             return outcome
 
+        # Provenance gate: only documents retrieved from allow-listed
+        # official hosts count as verified disclosures. Retained copies
+        # (including any file shipped or staged locally) are reported so
+        # the operator can act, but they never resolve canonical terms.
+        verified_candidates = [c for c in candidates if c.verified]
+        if not verified_candidates:
+            outcome.status = "UNVERIFIED"
+            for candidate in candidates:
+                outcome.provider_reports.append(
+                    ProviderReport(
+                        candidate.provider,
+                        "UNVERIFIED",
+                        f"issuer-matched notice at {candidate.uri} is a retained copy whose "
+                        "official provenance is not established; not used for evaluation",
+                    )
+                )
+            return outcome
+        candidates = verified_candidates
+
         # Conflict detection: never arbitrarily select between disclosures.
         conflicts: List[str] = []
         baseline = candidates[0].values
@@ -388,36 +424,30 @@ class IssueTermsResolver:
         outcome.notice = chosen.result
         outcome.from_cache = from_cache
         outcome.source_uri = chosen.uri
+        outcome.verified = True
+        outcome.provider = chosen.provider
+        outcome.retrieved_at = chosen.retrieved_at
         outcome.status = "RESOLVED" if len(resolved) == len(missing) else "PARTIAL"
 
-        if self.cache is not None and not from_cache and chosen.raw_bytes is not None:
+        if self.cache is not None and not from_cache and chosen.verified and chosen.raw_bytes is not None:
             self.cache.put(ipo_id, chosen)
         return outcome
-
-
-def default_retained_notice_dirs() -> List[Path]:
-    """Retained official-notice directories shipped with the application.
-
-    Resolved relative to this module (never the process working
-    directory), so the packaged notices are discoverable identically on
-    every platform and from any launch directory. The parser-test corpus
-    under ``fixtures/notices`` is deliberately NOT a runtime source; the
-    notices retained for runtime use live in ``resources/notices``.
-    """
-    packaged = Path(__file__).resolve().parent / "resources" / "notices"
-    return [packaged] if packaged.is_dir() else []
 
 
 def build_resolver_from_env() -> IssueTermsResolver:
     """Default runtime resolver wired from environment configuration.
 
-    - Retained notices shipped with the application
-      (``resources/notices``) are always searched, so the normal
-      application works without operator configuration.
-    - ``IPO_PRICE_BAND_NOTICE_DIR``: additional operator-retained
-      official-notice directories (os.pathsep-separated).
-    - ``IPO_PRICE_BAND_NOTICE_URLS``: JSON map of ipo_id -> official URL.
+    - ``IPO_PRICE_BAND_NOTICE_URLS``: JSON map of ipo_id -> official URL
+      (allow-listed NSE/BSE/SEBI hosts). Documents retrieved this way are
+      the only verified notice source.
+    - ``IPO_PRICE_BAND_NOTICE_DIR``: operator-retained notice directories
+      (os.pathsep-separated). Retained copies are searched and reported,
+      but classified UNVERIFIED and never used to resolve terms.
     - ``IPO_ISSUE_TERMS_CACHE_DIR`` / ``IPO_ISSUE_TERMS_CACHE_TTL_HOURS``.
+
+    No notice document is shipped with the application as production
+    evidence: the files under ``fixtures/notices`` are authored parser
+    test fixtures, not retrieved official disclosures.
     """
     providers: List[Any] = []
     urls_raw = os.getenv("IPO_PRICE_BAND_NOTICE_URLS", "").strip()
@@ -426,8 +456,7 @@ def build_resolver_from_env() -> IssueTermsResolver:
             providers.append(HttpNoticeProvider(json.loads(urls_raw)))
         except Exception:
             pass
-    dirs = [str(d) for d in default_retained_notice_dirs()]
-    dirs += [d for d in os.getenv("IPO_PRICE_BAND_NOTICE_DIR", "").split(os.pathsep) if d]
+    dirs = [d for d in os.getenv("IPO_PRICE_BAND_NOTICE_DIR", "").split(os.pathsep) if d]
     if dirs:
         providers.append(RetainedNoticeProvider(dirs))
     cache_dir = os.getenv("IPO_ISSUE_TERMS_CACHE_DIR")

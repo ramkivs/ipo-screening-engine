@@ -554,21 +554,104 @@ class PresentationService:
         evidence_payload = ev_artifact.get("evidence") or {}
         raw_items = evidence_payload.get("evidence") or []
         sources = list(evidence_payload.get("sources") or [])
+        sources_by_id = {
+            s.get("source_id"): s for s in sources if isinstance(s, dict) and s.get("source_id")
+        }
+
+        # The persisted evidence artifact is a citation registry (quote,
+        # locator, source); canonical values live in the persisted input
+        # snapshot. Join them here -- read-only, without mutating stored
+        # records -- so the Explorer shows the value each citation
+        # supports, its unit, the source document identity, and an honest
+        # verification classification. Values are taken from the
+        # canonical field itself, never parsed out of the quotation, so
+        # floor/cap (or any pair sharing one quote) cannot be swapped.
+        snapshot = rec.get("input_snapshot") or {}
+        canonical_input = snapshot.get("input") if isinstance(snapshot.get("input"), dict) else snapshot
+        reporting_unit = snapshot.get("reporting_unit") or canonical_input.get("reporting_unit")
+
+        def _canonical_value(path: str):
+            node: Any = canonical_input
+            for part in path.split("."):
+                if not isinstance(node, dict) or part not in node:
+                    return None
+                node = node[part]
+            return node if isinstance(node, (int, float, str)) and not isinstance(node, bool) else None
+
+        def _unit_for(path: str) -> Optional[str]:
+            leaf = path.rsplit(".", 1)[-1]
+            if leaf in ("price_band_low", "price_band_high"):
+                return "INR per equity share"
+            if leaf == "lot_size":
+                return "equity shares"
+            if leaf in ("ofs", "fresh_issue", "issue_size") and reporting_unit:
+                return f"INR {reporting_unit}"
+            return None
 
         items: List[EvidenceDetail] = []
         for idx, item in enumerate(raw_items):
             ev_id = item.get("evidence_id") or f"ev_{idx+1:03d}"
+            field_path = item.get("field") or item.get("evidence_id") or f"field_{idx+1}"
+            source_id = item.get("source_id") or item.get("source")
+            source_entry = sources_by_id.get(source_id) or {}
+
+            extracted_value = item.get("extracted_value")
+            unit = item.get("unit")
+            candidate_paths = []
+            if isinstance(field_path, str) and "." in field_path:
+                candidate_paths.append(field_path)
+            if ev_id.startswith("EV-"):
+                candidate_paths.append(ev_id[3:])
+                # Extraction evidence IDs join the section with a hyphen
+                # (EV-issue-price_band_low -> issue.price_band_low).
+                candidate_paths.append(ev_id[3:].replace("-", ".", 1))
+            if extracted_value is None:
+                for candidate in candidate_paths:
+                    value = _canonical_value(candidate)
+                    if value is not None:
+                        extracted_value = value
+                        if unit is None:
+                            unit = _unit_for(candidate)
+                        break
+
+            document = item.get("document")
+            if not document:
+                uri = source_entry.get("uri")
+                if isinstance(uri, str) and uri and " " not in uri and ("/" in uri or "\\" in uri):
+                    document = uri.replace("\\", "/").rsplit("/", 1)[-1] or None
+
+            source_type = source_entry.get("source_type")
+            uri = source_entry.get("uri") or ""
+            host = ""
+            if isinstance(uri, str) and "://" in uri:
+                host = uri.split("://", 1)[1].split("/", 1)[0].lower()
+            from ..issue_terms import OFFICIAL_HOSTS
+
+            if item.get("extraction_method") == "DERIVED" or source_type == "DERIVED":
+                verification = "DERIVED"
+            elif not source_entry:
+                verification = "UNVERIFIED"
+            elif source_type in ("RHP", "DRHP"):
+                verification = "FILING"
+            elif host in OFFICIAL_HOSTS:
+                verification = "OFFICIAL_VERIFIED"
+            elif source_type == "EXCHANGE":
+                verification = "RETAINED_UNVERIFIED"
+            else:
+                verification = "UNVERIFIED"
+
             items.append(
                 EvidenceDetail(
                     evidence_id=ev_id,
-                    field=item.get("field") or item.get("evidence_id") or f"field_{idx+1}",
-                    source=item.get("source_id") or item.get("source"),
-                    document=item.get("document"),
+                    field=field_path,
+                    source=source_id,
+                    document=document,
                     page=item.get("page"),
                     locator=item.get("locator") or item.get("section"),
                     quote=item.get("quoted_text") or item.get("quote"),
-                    extracted_value=item.get("extracted_value"),
-                    unit=item.get("unit"),
+                    extracted_value=extracted_value,
+                    unit=unit,
+                    verification=verification,
                 )
             )
 
@@ -961,9 +1044,21 @@ class PresentationService:
             resolution_dict = outcome.to_dict()
             if outcome.notice is not None:
                 try:
+                    # Carry the verified retrieval provenance (official
+                    # URL + retrieval timestamp) into the canonical source
+                    # manifest so the persisted record identifies the
+                    # actual disclosure document, not a local filename.
+                    notice_payload = outcome.notice.to_enrichment_dict()
+                    if notice_payload.get("sources"):
+                        source_ref = dict(notice_payload["sources"][0])
+                        if outcome.source_uri:
+                            source_ref["uri"] = outcome.source_uri
+                        if outcome.retrieved_at:
+                            source_ref["retrieval_timestamp"] = outcome.retrieved_at
+                        notice_payload["sources"] = [source_ref]
                     assembled = EnrichmentEngine.assemble(
                         base_input=canonical_dict,
-                        price_band_notice=outcome.notice,
+                        price_band_notice=notice_payload,
                         mode=mode_clean,
                     )
                     canonical_dict = assembled.canonical_input
@@ -992,6 +1087,7 @@ class PresentationService:
                     "CONFLICT": "official sources conflict and no value was arbitrarily selected",
                     "UNAVAILABLE": "official sources could not be retrieved or verified",
                     "PARTIAL": "only some required terms could be verified from official sources",
+                    "UNVERIFIED": "an issuer-matched notice exists only as a retained copy whose official provenance is not established (configure the official exchange announcement via IPO_PRICE_BAND_NOTICE_URLS to use it)",
                 }.get(outcome.status, "the terms have not yet been published in the configured official sources")
                 raise IngestionAwaitingIssueTermsError(
                     "AWAITING_ISSUE_TERMS: required issue terms are unavailable: "

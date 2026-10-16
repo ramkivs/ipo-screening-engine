@@ -257,3 +257,15 @@ test('UI-3 App - Evidence Detail Inspector dialog structure', () => {
   assert.ok(stylesCss.includes('.raw-json-box'));
   assert.ok(stylesCss.includes('.btn-evidence-link'));
 });
+
+test('UI-3 App - Unverified retained source is never presented as verified', () => {
+  const appJs = fs.readFileSync(path.resolve(__dirname, '../app.js'), 'utf8');
+
+  // The Explorer must distinguish a retained copy whose official
+  // provenance is not established from verified official evidence,
+  // even when a canonical value is present.
+  assert.ok(appJs.includes("item.verification === 'RETAINED_UNVERIFIED'"));
+  assert.ok(appJs.includes('UNVERIFIED RETAINED SOURCE'));
+  assert.ok(appJs.includes('UNVERIFIED RETAINED SOURCE (official provenance not established)'));
+  assert.ok(appJs.includes('SOURCE EVIDENCE (Verified Official Source)'));
+});

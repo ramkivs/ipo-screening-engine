@@ -2,11 +2,16 @@
 IPO issue terms (price band, bid lot, OFS) before final evaluation.
 
 Coverage distinguishes:
-- RETAINED real-document evidence: the Vishal Nirmiti Price Band Notice
-  retained in fixtures/notices (a real notice text for a real issuer).
+- RETAINED copies: the Vishal notice text retained in fixtures/notices
+  is an authored parser-test fixture (commit 3cddb64), NOT a retrieved
+  official disclosure. Retained copies are therefore reported as
+  UNVERIFIED and never resolve canonical terms.
 - MOCKED retrieval: HttpNoticeProvider with an injected fetcher — these
-  tests prove provider mechanics only, not live retrieval.
-- SYNTHETIC conflicts/partials crafted by mutating the retained notice.
+  tests prove verified-channel mechanics only, not live retrieval. The
+  notice text served is the retained fixture text; authenticity of
+  content is established only by genuine retrieval from an official
+  host in production, which the sandbox cannot perform.
+- SYNTHETIC conflicts/partials crafted by mutating the retained text.
 
 Jio Platforms is exercised explicitly: no Jio filing or notice exists in
 the configured sources at execution time, so the resolver must report
@@ -44,13 +49,17 @@ def _resolve(resolver: IssueTermsResolver, company="VISHAL NIRMITI LIMITED", ipo
     return resolver.resolve(company_name=company, ipo_id=ipo, missing_fields=MISSING)
 
 
-def test_retained_official_notice_resolves_vishal_terms(tmp_path):
+def test_retained_notice_is_reported_but_never_verified(tmp_path):
+    """A retained copy may match the issuer and parse cleanly, yet its
+    official provenance cannot be established from the file alone, so
+    it must not resolve canonical terms."""
     resolver = IssueTermsResolver(providers=[RetainedNoticeProvider([_notice_dir(tmp_path)])])
     outcome = _resolve(resolver)
-    assert outcome.status == "RESOLVED"
-    assert outcome.notice is not None
-    values = {f: getattr(outcome.notice, f).value for f in ("price_band_low", "price_band_high", "lot_size")}
-    assert values == {"price_band_low": 208, "price_band_high": 220, "lot_size": 68}
+    assert outcome.status == "UNVERIFIED"
+    assert outcome.notice is None
+    assert outcome.verified is False
+    assert outcome.resolved_fields == []
+    assert any(r.outcome == "UNVERIFIED" for r in outcome.provider_reports)
 
 
 def test_other_issuers_notice_is_never_borrowed(tmp_path):
@@ -61,26 +70,35 @@ def test_other_issuers_notice_is_never_borrowed(tmp_path):
     assert sorted(outcome.unresolved_fields) == sorted(MISSING)
 
 
-def test_conflicting_official_disclosures_are_not_arbitrarily_selected(tmp_path):
+def test_conflicting_official_disclosures_are_not_arbitrarily_selected():
+    """MOCKED verified channel: two official-host retrievals disagree."""
     conflicting = NOTICE_TEXT.replace("₹208", "₹300").replace("₹220", "₹330")
-    resolver = IssueTermsResolver(
-        providers=[
-            RetainedNoticeProvider([_notice_dir(tmp_path, "a")]),
-            RetainedNoticeProvider([_notice_dir(tmp_path, "b", conflicting)]),
-        ]
-    )
-    outcome = _resolve(resolver)
+    providers = [
+        HttpNoticeProvider(
+            {"VISHAL-NIRMITI-LIMITED": "https://www.nseindia.com/notice/vishal-a"},
+            fetcher=lambda url: NOTICE_TEXT.encode("utf-8"),
+        ),
+        HttpNoticeProvider(
+            {"VISHAL-NIRMITI-LIMITED": "https://www.bseindia.com/notice/vishal-b"},
+            fetcher=lambda url: conflicting.encode("utf-8"),
+        ),
+    ]
+    outcome = _resolve(IssueTermsResolver(providers=providers))
     assert outcome.status == "CONFLICT"
     assert outcome.notice is None
     assert any("price_band_low" in c for c in outcome.conflicts)
 
 
-def test_partial_notice_reports_unresolved_fields(tmp_path):
+def test_partial_notice_reports_unresolved_fields():
+    """MOCKED verified channel serving a notice without the bid lot."""
     partial = "\n".join(
         line for line in NOTICE_TEXT.splitlines() if "minimum of 68" not in line
     )
-    resolver = IssueTermsResolver(providers=[RetainedNoticeProvider([_notice_dir(tmp_path, text=partial)])])
-    outcome = _resolve(resolver)
+    provider = HttpNoticeProvider(
+        {"VISHAL-NIRMITI-LIMITED": "https://www.nseindia.com/notice/vishal-partial"},
+        fetcher=lambda url: partial.encode("utf-8"),
+    )
+    outcome = _resolve(IssueTermsResolver(providers=[provider]))
     assert outcome.status in ("PARTIAL", "UNPUBLISHED", "UNAVAILABLE")
     if outcome.status == "PARTIAL":
         assert "lot_size" in outcome.unresolved_fields
@@ -88,9 +106,11 @@ def test_partial_notice_reports_unresolved_fields(tmp_path):
 
 def test_cache_reuse_and_stale_refresh_semantics(tmp_path):
     cache = NoticeSnapshotCache(tmp_path / "cache", ttl_hours=24)
-    resolver = IssueTermsResolver(
-        providers=[RetainedNoticeProvider([_notice_dir(tmp_path)])], cache=cache
+    verified_provider = HttpNoticeProvider(
+        {"VISHAL-NIRMITI-LIMITED": "https://www.nseindia.com/notice/vishal-cache"},
+        fetcher=lambda url: NOTICE_TEXT.encode("utf-8"),
     )
+    resolver = IssueTermsResolver(providers=[verified_provider], cache=cache)
     first = _resolve(resolver)
     assert first.status == "RESOLVED" and not first.from_cache
 

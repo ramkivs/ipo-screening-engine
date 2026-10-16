@@ -1091,7 +1091,9 @@ export class App {
       const isExtractedPresent = item.extracted_value !== null && item.extracted_value !== undefined;
 
       let distinctionBadge = '';
-      if (isQuotePresent) {
+      if (item.verification === 'RETAINED_UNVERIFIED') {
+        distinctionBadge = `<span class="badge badge-unknown-evidence" title="Retained copy whose official provenance is not established">UNVERIFIED RETAINED SOURCE</span>`;
+      } else if (isQuotePresent) {
         distinctionBadge = `<span class="badge badge-source-evidence" title="Extracted verbatim from prospectus">SOURCE EVIDENCE</span>`;
       } else if (!isExtractedPresent) {
         distinctionBadge = `<span class="badge badge-unknown-evidence" title="Data point is missing or unverified">UNKNOWN / UNVERIFIED</span>`;
@@ -1193,7 +1195,11 @@ export class App {
     const isExtractedPresent = item.extracted_value !== null && item.extracted_value !== undefined;
 
     let provenanceStatusLabel = 'SOURCE EVIDENCE (Extracted from Filing)';
-    if (!isExtractedPresent) {
+    if (item.verification === 'RETAINED_UNVERIFIED') {
+      provenanceStatusLabel = 'UNVERIFIED RETAINED SOURCE (official provenance not established)';
+    } else if (item.verification === 'OFFICIAL_VERIFIED' && isExtractedPresent) {
+      provenanceStatusLabel = 'SOURCE EVIDENCE (Verified Official Source)';
+    } else if (!isExtractedPresent) {
       provenanceStatusLabel = 'UNKNOWN / UNVERIFIED (Missing or Incomplete Data)';
     } else if (!isQuotePresent) {
       provenanceStatusLabel = 'DERIVED VALUE (Engine-Computed Metric)';
@@ -1211,7 +1217,7 @@ export class App {
             <div class="inspector-row">
               <span class="inspector-label">Provenance Classification</span>
               <div class="inspector-val">
-                <span class="badge ${isQuotePresent ? 'badge-source-evidence' : !isExtractedPresent ? 'badge-unknown-evidence' : 'badge-derived-value'}">
+                <span class="badge ${item.verification === 'RETAINED_UNVERIFIED' ? 'badge-unknown-evidence' : isQuotePresent ? 'badge-source-evidence' : !isExtractedPresent ? 'badge-unknown-evidence' : 'badge-derived-value'}">
                   ${provenanceStatusLabel}
                 </span>
               </div>
