@@ -194,13 +194,24 @@ def test_an_undeclared_artifact_is_rejected():
         load_rendered_capture(ML_MANIFEST, "ml-tonbo-chunk-9")
 
 
+def test_an_artifact_id_declared_more_than_once_is_rejected(tmp_path):
+    # A second, individually valid declaration under the same id (here the
+    # retained Hero Motors file) would let one reference resolve to either capture.
+    def duplicate(data):
+        hero = next(item for item in data["artifacts"] if item["id"] == "ml-hero-motors-chunk-0")
+        data["artifacts"].append({**hero, "id": ML_TONBO})
+
+    with pytest.raises(GmpEvidenceError, match="declared more than once"):
+        load_rendered_capture(_package_copy(tmp_path, duplicate), ML_TONBO)
+
+
 # --------------------------------------------------------------------------
 # D2 - the capture must have been obtained at or before the evaluation timestamp
 # --------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("evaluation_at", [ML_T_CAPTURED_BY, ML_T_CAPTURED_BY.astimezone(IST)])
-def test_capture_obtained_at_the_evaluation_timestamp_is_eligible_for_cutoff_consideration_only(
+def test_capture_window_ending_at_the_evaluation_timestamp_is_eligible_for_cutoff_consideration_only(
     ml_capture, evaluation_at
 ):
     assert ml_capture.retrieved_not_after == ML_T_CAPTURED_BY
@@ -225,11 +236,13 @@ def test_capture_obtained_at_the_evaluation_timestamp_is_eligible_for_cutoff_con
         ML_T_CAPTURED_BY - timedelta(milliseconds=1),
     ],
 )
-def test_capture_obtained_after_the_evaluation_is_ineligible_despite_an_earlier_displayed_stamp(
+def test_capture_not_proven_obtained_by_the_evaluation_is_ineligible_despite_an_earlier_displayed_stamp(
     ml_capture, evaluation_at
 ):
     # Every one of these instants is after the reading's displayed 4:02 pm IST
-    # stamp, but none is after the capture was certainly obtained.
+    # stamp, but none is at or after the window end, the latest possible capture
+    # time. The window start and inside-window cases may postdate the actual
+    # capture, but that is not proven, so they fail closed.
     assert evaluation_at >= ML_T_DISPLAYED_STAMP
     assert capture_obtained_by(ml_capture, evaluation_at) is False
     assessment = assess_capture(ml_capture, "₹500", evaluation_at=evaluation_at)
@@ -262,7 +275,7 @@ def test_a_later_capture_does_not_retroactively_qualify_an_earlier_evaluation(tm
     assert capture_obtained_by(later, after_both)
 
 
-def test_capture_time_needs_explicit_offsets_and_is_never_the_publisher_stamp(tmp_path, ml_capture):
+def test_retrieval_window_needs_explicit_offsets_and_is_never_the_publisher_stamp(tmp_path, ml_capture):
     naive = ML_T_CAPTURED_BY.replace(tzinfo=None) + timedelta(hours=1)
     assert capture_obtained_by(ml_capture, naive) is False
 
