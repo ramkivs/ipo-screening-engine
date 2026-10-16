@@ -61,6 +61,7 @@ from ipo_screening.enrichment_engine import (  # noqa: E402
 )
 from ipo_screening.errors import EngineError  # noqa: E402
 from ipo_screening.evaluation import EvaluationStore  # noqa: E402
+from ipo_screening.json_strict import load_strict_json, loads_strict_json  # noqa: E402
 from ipo_screening.excel import SHEET_ORDER, project  # noqa: E402
 from ipo_screening.extraction import DocumentExtractor  # noqa: E402
 from ipo_screening.extraction.price_band_notice import (  # noqa: E402
@@ -112,12 +113,20 @@ def load_notice(notice_arg: str | None) -> Any:
         text = p.read_text(encoding="utf-8")
         if p.suffix.lower() == ".json":
             try:
-                data = json.loads(text)
-                if isinstance(data, dict) and "price_band_high" in data:
-                    return data
-            except Exception:
-                pass
+                data = loads_strict_json(text)
+            except json.JSONDecodeError:
+                data = None
+            if isinstance(data, dict) and "price_band_high" in data:
+                return data
         return parser.parse_from_text(text)
+    stripped = notice_arg.strip()
+    if stripped.startswith("{") or stripped.startswith("["):
+        try:
+            data = loads_strict_json(stripped)
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict) and "price_band_high" in data:
+            return data
     return parser.parse_from_text(notice_arg)
 
 
@@ -127,11 +136,11 @@ def load_json_or_file(arg: str | None) -> Optional[dict]:
         return None
     p = Path(arg)
     if p.exists() and p.is_file():
-        return json.loads(p.read_text(encoding="utf-8"))
+        return load_strict_json(p)
     stripped = arg.strip()
     if not (stripped.startswith("{") or stripped.startswith("[")):
         raise FileNotFoundError(f"file not found: {arg}")
-    return json.loads(arg)
+    return loads_strict_json(arg)
 
 
 def fmt_score(value: float | None) -> str:
@@ -236,8 +245,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     if not input_path.exists():
         print(f"error: input not found: {input_path}", file=sys.stderr)
         return EXIT_USAGE
-    with input_path.open("r", encoding="utf-8") as handle:
-        document = json.load(handle)
+    document = load_strict_json(input_path)
     config = load_config(args.config)
     store = EvaluationStore(args.store) if args.store else None
 
@@ -451,7 +459,7 @@ def cmd_assemble(args: argparse.Namespace) -> int:
         print(f"error: input file not found: {input_path}", file=sys.stderr)
         return EXIT_REFUSED
 
-    base_input = json.loads(input_path.read_text(encoding="utf-8"))
+    base_input = load_strict_json(input_path)
 
     pbn = load_notice(getattr(args, "notice", None))
     supp = load_json_or_file(getattr(args, "supplemental", None))

@@ -26,6 +26,7 @@ configuration and the same engine version, it produces the same
 
 from __future__ import annotations
 
+import copy
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -44,6 +45,8 @@ from .evaluation import (
     compute_preliminary_delta,
 )
 from .gmp_policy import apply_gmp_cutoff
+from .gmp_evidence import capture_gmp_linkage_context, GMP_LINK_EVIDENCE_FIELDS
+from .json_strict import load_strict_json
 from .knockouts import KnockoutSummary, evaluate_knockouts
 from .overlays import EffectiveScoringPlan, resolve_overlays
 from .schema_validation import enforce_schema, load_schema
@@ -54,6 +57,61 @@ from .version import DEFAULT_CONFIG_PATH, ENGINE_VERSION, SPEC_VERSION
 
 DEFAULT_PEER_STALENESS_DAYS = 30
 DEFAULT_MARKET_STALENESS_HOURS = 24
+
+
+def _build_canonical_input_for_evaluation(
+    input_document: Mapping[str, Any],
+    *,
+    has_gmp_link_attempt: bool,
+) -> CanonicalInput:
+    """Keep malformed attempted-link duplicates diagnostic rather than fatal.
+
+    The private source/evidence registries normally reject conflicting ids.
+    Under L4-a, a malformed GMP link is a nonterminal diagnostic. For that case
+    only, build scoring input from the first declaration while retaining the
+    untouched raw entries in the link context so the verifier fails closed.
+    """
+    try:
+        return build_canonical_input(input_document)
+    except ValueError as exc:
+        if not has_gmp_link_attempt or not any(
+            message in str(exc)
+            for message in (
+                "registered twice with different metadata",
+                "registered twice with different content",
+            )
+        ):
+            raise
+
+    sanitized = copy.deepcopy(dict(input_document))
+    raw_sources = sanitized.get("_sources")
+    if isinstance(raw_sources, list):
+        unique_sources = []
+        seen_sources = set()
+        for source in raw_sources:
+            if not isinstance(source, Mapping):
+                unique_sources.append(source)
+                continue
+            source_id = source.get("source_id")
+            if source_id in seen_sources:
+                continue
+            seen_sources.add(source_id)
+            unique_sources.append(source)
+        sanitized["_sources"] = unique_sources
+
+    raw_evidence = sanitized.get("_evidence")
+    if isinstance(raw_evidence, Mapping):
+        unique_evidence: Dict[str, Any] = {}
+        seen_evidence = set()
+        for path, spec in raw_evidence.items():
+            if isinstance(spec, Mapping):
+                evidence_id = spec.get("evidence_id") or f"EV-{path}"
+                if evidence_id in seen_evidence:
+                    continue
+                seen_evidence.add(evidence_id)
+            unique_evidence[str(path)] = spec
+        sanitized["_evidence"] = unique_evidence
+    return build_canonical_input(sanitized)
 
 
 @dataclass
@@ -212,12 +270,16 @@ def evaluate(
 
     moment = evaluation_datetime or datetime.now(timezone.utc)
     timestamp = moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+    gmp_linkage_context = capture_gmp_linkage_context(input_document)
 
     # -- 1. structural validation (hard gate) -------------------------------
     enforce_schema(input_document, schema)
 
     # -- 2. canonicalisation + evidence -------------------------------------
-    canonical = build_canonical_input(input_document)
+    canonical = _build_canonical_input_for_evaluation(
+        input_document,
+        has_gmp_link_attempt=gmp_linkage_context is not None,
+    )
 
     # -- 3. snapshots --------------------------------------------------------
     thresholds = config.get("thresholds", {})
@@ -299,6 +361,17 @@ def evaluate(
             "Unknown values are never converted to zero; they widen the score range (spec s3.2).",
         ),
     )
+    if gmp_linkage_context is not None:
+        # Preserve the raw L1 fields for A15 projection and replay. The canonical
+        # source/evidence registries intentionally deduplicate declarations;
+        # this private provenance entry retains contradictions that must replay
+        # as the same nonterminal diagnostic. It does not enter scoring hashes.
+        record.gmp_linkage_context = gmp_linkage_context
+        record.gmp_linkage_evaluation_at = moment
+        record.provenance = {
+            **record.provenance,
+            "_gmp_linkage_context": gmp_linkage_context,
+        }
 
     outcome = EvaluationOutcome(
         record=record,
@@ -335,8 +408,7 @@ def evaluate_file(
     evaluation_datetime: Optional[datetime] = None,
 ) -> EvaluationOutcome:
     """Convenience wrapper: evaluate an input JSON file against a config file."""
-    with Path(input_path).open("r", encoding="utf-8") as handle:
-        document = json.load(handle)
+    document = load_strict_json(input_path)
     config = load_config(config_path)
     store = EvaluationStore(store_root) if store_root else None
     return evaluate(
@@ -380,10 +452,24 @@ def replay(
 
     evidence_artifact = store.read_artifact(evaluation_id, "evidence")
     evidence = evidence_artifact.get("evidence") or {}
-    input_document["_sources"] = evidence.get("sources") or []
-    input_document["_evidence"] = {
-        item["evidence_id"]: item for item in evidence.get("evidence", [])
-    }
+    provenance = record.get("provenance") or {}
+    linkage_context = provenance.get("_gmp_linkage_context") if isinstance(provenance, Mapping) else None
+    if isinstance(linkage_context, Mapping):
+        # Link attempts are verified against their raw declarations, not only
+        # the canonical source/evidence registries. Preserve duplicate and
+        # contradictory declarations so replay reproduces a nonterminal failure.
+        input_document["_sources"] = copy.deepcopy(linkage_context.get("sources"))
+        input_document["_evidence"] = copy.deepcopy(linkage_context.get("evidence"))
+    else:
+        input_document["_sources"] = evidence.get("sources") or []
+        evidence_path_by_id = {
+            evidence_id: field_path for field_path, evidence_id in GMP_LINK_EVIDENCE_FIELDS
+        }
+        input_document["_evidence"] = {
+            evidence_path_by_id.get(item["evidence_id"], item["evidence_id"]): item
+            for item in evidence.get("evidence", [])
+            if isinstance(item, Mapping) and isinstance(item.get("evidence_id"), str)
+        }
     resolved_config = config
     if resolved_config is None:
         with (Path(__file__).resolve().parents[2] / DEFAULT_CONFIG_PATH).open("r", encoding="utf-8") as handle:
