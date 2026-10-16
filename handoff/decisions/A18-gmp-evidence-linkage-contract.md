@@ -48,7 +48,9 @@ Verification record:
   - `.venv/bin/python -m compileall -q engine tests` — **PASS**;
   - `git show --check --oneline HEAD` and `git diff --check HEAD^ HEAD` — **PASS**.
 
-The latest full verification before this tracker/A18 documentation reconciliation ran at `HEAD=ca6c9862c5809d72a73d1493ef5f6fe31ec7f34f`: focused tests **128 passed** in 9.64 seconds; full suite **885 passed** in 316.21 seconds with the same two Starlette deprecation warnings; compileall **PASS**; `verify_frozen_core()` **PASS** for all six pinned files; and `git show --check` / `git diff --check` **PASS**. Those results are self-run, not independent verification. The current tracker and A18 edits are documentation-only, and tests have not been rerun after them.
+On implementation commit `ca6c9862c5809d72a73d1493ef5f6fe31ec7f34f`, verification passed: focused tests **128 passed** in 9.64 seconds; full suite **885 passed** in 316.21 seconds with two Starlette deprecation warnings; compileall and frozen-core **PASS**; `git show --check` / `git diff --check` **PASS**.
+
+A further clean-baseline patch run completed after session documentation commit `775f82bc7e0e6f58ae4c1cd7501f8b692950fec0`, before the current docs-only update. A temporary archive of authoritative baseline `805affe10ef387b649717facb31b0378f7b233d7` plus the exact eight-path implementation patch passed apply-check and byte comparison against `ca6c986`. With `PYTHONPATH=<temporary-tree>/engine`, the focused linkage/strict-JSON/D1–D3 command exited **0** (**128 passed**, 10.12 seconds); the full suite exited **0** (**885 passed**, two Starlette deprecation warnings, 321.24 seconds); compileall exited **0**; `verify_frozen_core()` passed **6/6**; `verify_golden_result()` passed with hash `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`; `verify_v1_6_implementation()` passed with zero failures or warnings. This was a temporary materialization, not a clean Git commit or branch. All checks were self-run, not independent verification. The current tracker/A18 edits are documentation-only; no code changed after the test run.
 
 ## Dependencies and next steps
 
