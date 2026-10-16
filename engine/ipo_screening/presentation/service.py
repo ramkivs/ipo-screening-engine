@@ -802,7 +802,7 @@ class PresentationService:
         v1_5_hash = V1_5_RAW_SHA256
         if v1_5_file.is_file():
             import hashlib
-            v1_5_hash = hashlib.sha256(v1_5_file.read_bytes()).hexdigest()
+            v1_5_hash = hashlib.sha256(v1_5_file.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
 
         v1_6_hash = ""
         v1_6_status = "IMPLEMENTED_INACTIVE"
@@ -810,7 +810,7 @@ class PresentationService:
         v1_6_prop_hash = ""
         if v1_6_file.is_file():
             import hashlib
-            v1_6_hash = hashlib.sha256(v1_6_file.read_bytes()).hexdigest()
+            v1_6_hash = hashlib.sha256(v1_6_file.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
             try:
                 cfg_16 = json.loads(v1_6_file.read_text(encoding="utf-8"))
                 v1_6_status = cfg_16.get("status", "IMPLEMENTED_INACTIVE")

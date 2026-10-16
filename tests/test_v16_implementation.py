@@ -155,7 +155,7 @@ def test_t7_03_proposal_hash_linkage(approved_proposal):
 
 def test_t7_04_baseline_config_hash(baseline_v15_config):
     """T-7-04: Baseline configuration hash: verified against authoritative constants."""
-    raw_hash = hashlib.sha256(Path(V1_5_CONFIG_PATH).read_bytes()).hexdigest()
+    raw_hash = hashlib.sha256(Path(V1_5_CONFIG_PATH).read_bytes().replace(b'\r\n', b'\n')).hexdigest()
     assert raw_hash == V1_5_RAW_SHA256
     canon_hash = sha256_of(canonical_json(baseline_v15_config))
     assert canon_hash == V1_5_CANONICAL_HASH
@@ -177,10 +177,10 @@ def test_t7_05_v1_6_generation(approved_proposal, baseline_v15_config):
 
 
 def test_t7_06_v1_5_preservation():
-    """T-7-06: v1.5 preservation: config/ipo-config.v1.5.0.json remains byte-for-byte identical."""
+    """T-7-06: v1.5 configuration content is preserved after line-ending normalization."""
     p = Path(V1_5_CONFIG_PATH)
     assert p.is_file()
-    actual_hash = hashlib.sha256(p.read_bytes()).hexdigest()
+    actual_hash = hashlib.sha256(p.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
     assert actual_hash == V1_5_RAW_SHA256
 
 

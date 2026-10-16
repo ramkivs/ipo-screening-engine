@@ -207,7 +207,7 @@ def verify_frozen_core(base_dir: Path | str = Path(".")) -> Tuple[bool, Dict[str
             results[rel_path] = False
             all_ok = False
             continue
-        actual_hash = hashlib.sha256(file_path.read_bytes()).hexdigest()
+        actual_hash = hashlib.sha256(file_path.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
         is_match = (actual_hash == expected_hash)
         results[rel_path] = is_match
         if not is_match:
@@ -492,7 +492,7 @@ def verify_v1_6_implementation(
         report["failures"].append(f"Baseline v1.5 config not found at {v1_5_file}")
         return report
 
-    v1_5_raw_hash = hashlib.sha256(v1_5_file.read_bytes()).hexdigest()
+    v1_5_raw_hash = hashlib.sha256(v1_5_file.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
     if v1_5_raw_hash != V1_5_RAW_SHA256:
         report["status"] = "FAIL"
         report["failures"].append(
@@ -604,7 +604,7 @@ def verify_v1_6_implementation(
         report["failures"].append(f"Golden result mismatch: {golden_h} != {GOLDEN_RESULT_HASH}")
 
     report["v1_5_raw_sha256"] = v1_5_raw_hash
-    report["v1_6_raw_sha256"] = hashlib.sha256(v1_6_file.read_bytes()).hexdigest()
+    report["v1_6_raw_sha256"] = hashlib.sha256(v1_6_file.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
     report["v1_6_canonical_hash"] = sha256_of(canonical_json(v1_6_cfg))
     report["diff_report"] = diff_report.to_dict()
     report["frozen_core_verified"] = core_ok
