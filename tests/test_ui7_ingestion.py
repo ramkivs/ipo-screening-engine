@@ -534,9 +534,25 @@ def test_ingest_vishal_rhp_undisclosed_issue_terms_fail_precisely(test_env):
     Re-uploading it must fail closed with a precise, actionable error
     naming the undisclosed fields -- not four opaque schema violations --
     and must leave the pre-existing historical evaluation untouched.
+
+    This test injects a provider-less resolver: it exercises the
+    genuinely-unavailable path. Under the DEFAULT runtime configuration
+    the retained notice is discovered automatically instead (covered by
+    tests/test_vishal_default_notice_wiring.py).
     """
-    client = test_env["client"]
+    from ipo_screening.issue_terms import IssueTermsResolver
+
     store = test_env["store"]
+    cfg = PresentationConfig(
+        store_root=test_env["store_dir"],
+        config_dir=REPO_ROOT / "config",
+        issue_terms_resolver=IssueTermsResolver(providers=[]),
+    )
+    client = TestClient(
+        create_app(PresentationService(cfg)),
+        base_url="http://127.0.0.1:8000",
+        headers={"Origin": "http://127.0.0.1:8000"},
+    )
     assert VISHAL_RHP_PDF.is_file(), f"Real filing missing at {VISHAL_RHP_PDF}"
 
     res = client.post(

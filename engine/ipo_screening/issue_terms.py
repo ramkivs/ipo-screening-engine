@@ -395,11 +395,27 @@ class IssueTermsResolver:
         return outcome
 
 
+def default_retained_notice_dirs() -> List[Path]:
+    """Retained official-notice directories shipped with the application.
+
+    Resolved relative to this module (never the process working
+    directory), so the packaged notices are discoverable identically on
+    every platform and from any launch directory. The parser-test corpus
+    under ``fixtures/notices`` is deliberately NOT a runtime source; the
+    notices retained for runtime use live in ``resources/notices``.
+    """
+    packaged = Path(__file__).resolve().parent / "resources" / "notices"
+    return [packaged] if packaged.is_dir() else []
+
+
 def build_resolver_from_env() -> IssueTermsResolver:
     """Default runtime resolver wired from environment configuration.
 
-    - ``IPO_PRICE_BAND_NOTICE_DIR``: retained official-notice directories
-      (os.pathsep-separated).
+    - Retained notices shipped with the application
+      (``resources/notices``) are always searched, so the normal
+      application works without operator configuration.
+    - ``IPO_PRICE_BAND_NOTICE_DIR``: additional operator-retained
+      official-notice directories (os.pathsep-separated).
     - ``IPO_PRICE_BAND_NOTICE_URLS``: JSON map of ipo_id -> official URL.
     - ``IPO_ISSUE_TERMS_CACHE_DIR`` / ``IPO_ISSUE_TERMS_CACHE_TTL_HOURS``.
     """
@@ -410,7 +426,8 @@ def build_resolver_from_env() -> IssueTermsResolver:
             providers.append(HttpNoticeProvider(json.loads(urls_raw)))
         except Exception:
             pass
-    dirs = [d for d in os.getenv("IPO_PRICE_BAND_NOTICE_DIR", "").split(os.pathsep) if d]
+    dirs = [str(d) for d in default_retained_notice_dirs()]
+    dirs += [d for d in os.getenv("IPO_PRICE_BAND_NOTICE_DIR", "").split(os.pathsep) if d]
     if dirs:
         providers.append(RetainedNoticeProvider(dirs))
     cache_dir = os.getenv("IPO_ISSUE_TERMS_CACHE_DIR")
