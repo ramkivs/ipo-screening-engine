@@ -35,16 +35,20 @@ Strict duplicate-key parsing is scoped to the evaluation-input and manifest boun
 
 The correction is commit `e473f0090916cf6a125447be077316ea694b2675` on `arena/ea6e5bc2-ipo-screening-engine`. It changes only `engine/ipo_screening/gmp_evidence.py` and `tests/test_gmp_evidence_linkage.py` relative to its implementation parent. The code binds the quote to one complete signed percentage token, rejects embedded or multiple tokens, parses the sign before comparing the numeric value, and rejects an ambiguous repeated `IPO GMP` title marker. Focused tests also cover wrong-issuer and empty-issuer identity, final A15 field tampering, negative-value binding, and replay/failure boundaries.
 
-Verification against the implementation commit:
+Verification record:
 
 - Before correction, the new regression using source line `-71.4%`, quote `71.4%`, and input `71.4` failed because the verifier reported `result=VERIFIED` instead of `FAILED`.
-- `.venv/bin/python -m pytest tests/test_gmp_evidence_linkage.py tests/test_strict_evaluation_json.py tests/test_d1_d3_gmp_source_policy.py -q` — **128 passed**.
-- `.venv/bin/python -m pytest tests/ -q` — **885 passed**, two Starlette deprecation warnings, 316.45 seconds.
-- `.venv/bin/python -m compileall -q engine tests` — passed.
-- `verify_frozen_core()` — passed, all six pinned files.
-- `git show --check --oneline HEAD` — passed.
+- After correction, on implementation commit `e473f0090916cf6a125447be077316ea694b2675`:
+  - `.venv/bin/python -m pytest tests/test_gmp_evidence_linkage.py tests/test_strict_evaluation_json.py tests/test_d1_d3_gmp_source_policy.py -q` — **128 passed**.
+  - `.venv/bin/python -m pytest tests/ -q` — **885 passed**, two Starlette deprecation warnings, 316.45 seconds.
+- The same focused/full tests and integrity checks were rerun after the separate documentation commit `99759bcad75db3b16451c90e3b74960e04219e11`:
+  - focused: **128 passed** in 9.86 seconds;
+  - full: **885 passed** in 316.98 seconds, with the same two Starlette deprecation warnings;
+  - `verify_frozen_core()` — **PASS**, all six pinned files;
+  - `.venv/bin/python -m compileall -q engine tests` — **PASS**;
+  - `git show --check --oneline HEAD` and `git diff --check HEAD^ HEAD` — **PASS**.
 
-The focused and full test runs were performed on implementation commit `e473f0090916cf6a125447be077316ea694b2675`, before this documentation record was added. They are not represented as tests run on a later documentation-only commit.
+The implementation change itself is `e473f0090916cf6a125447be077316ea694b2675`; the post-documentation verification was actually run with `HEAD=99759bcad75db3b16451c90e3b74960e04219e11`. The subsequent edit to this record is documentation-only; the final report will distinguish that commit from the test-run commit.
 
 ## Dependencies and next steps
 

@@ -461,11 +461,13 @@ At the time of this decision-boundary review, none was authorized. That review-t
 
 **Implementation.** Commit `e473f0090916cf6a125447be077316ea694b2675` on `arena/ea6e5bc2-ipo-screening-engine` corrects percentage-token binding and adds focused linkage regressions. The verifier now requires the quote to equal the one complete signed percentage token on its locator line; an omitted sign, substring of a larger number, or multiple percentage tokens fails closed. It parses the token sign before numeric comparison. A repeated `IPO GMP` title marker is rejected as ambiguous. Wrong/empty issuer identity and altered assembled A15 field values are also covered by focused tests. Existing failure diagnostics, replay context, and A9 behavior remain unchanged.
 
-**Verification on the implementation commit:** the pre-correction regression reproduced `-71.4%` / quote `71.4%` / input `71.4` as `VERIFIED`. After correction:
-- `.venv/bin/python -m pytest tests/test_gmp_evidence_linkage.py tests/test_strict_evaluation_json.py tests/test_d1_d3_gmp_source_policy.py -q` — **128 passed**;
-- `.venv/bin/python -m pytest tests/ -q` — **885 passed**, with two Starlette deprecation warnings;
+**Verification.** The pre-correction regression reproduced `-71.4%` / quote `71.4%` / input `71.4` as `VERIFIED`. After correction, the focused group and full suite passed on implementation commit `e473f0090916cf6a125447be077316ea694b2675` (128 and 885 passed respectively). They were rerun after documentation commit `99759bcad75db3b16451c90e3b74960e04219e11`:
+- `.venv/bin/python -m pytest tests/test_gmp_evidence_linkage.py tests/test_strict_evaluation_json.py tests/test_d1_d3_gmp_source_policy.py -q` — **128 passed** in 9.86 seconds;
+- `.venv/bin/python -m pytest tests/ -q` — **885 passed**, two Starlette deprecation warnings, 316.98 seconds;
 - `PYTHONPATH=engine .venv/bin/python` calling `verify_frozen_core()` — **PASS** (six pinned files);
 - `.venv/bin/python -m compileall -q engine tests` — **PASS**;
-- `git show --check --oneline e473f0090916cf6a125447be077316ea694b2675` — **PASS**.
+- `git show --check --oneline HEAD` and `git diff --check HEAD^ HEAD` — **PASS**.
+
+The above post-documentation test run was on `99759bcad75db3b16451c90e3b74960e04219e11`; the later change to A18 is documentation-only.
 
 **Boundaries.** No frozen-core, scoring, A9, schema, or version change. The retrieval window remains an honest `UNKNOWN` fact, not an exact receipt time. Linkage and manifest write-once checks do not qualify a publisher. MarketLiveIPOGMP remains **NOT QUALIFIED**, R7 remains **UNRESOLVED**, and no R7 capture was taken. The tracker was not edited in this task; it must be reconciled through its authorized process before its historical linkage wording is treated as current.
