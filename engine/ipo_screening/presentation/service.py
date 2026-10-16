@@ -915,6 +915,32 @@ class PresentationService:
         finally:
             shutil.rmtree(staging_dir, ignore_errors=True)
 
+        # Fail closed with a precise, actionable error when the filing does
+        # not disclose issue terms the v1.5 input contract requires. RHPs
+        # routinely leave these as [●] placeholders (to be set by the Price
+        # Band Notice); extraction therefore legitimately finds nothing and
+        # the builder carries them as null (unknown, never zero). Naming the
+        # fields here keeps the raw schema gate from surfacing as opaque
+        # "None is not of type ..." violations. No value is invented.
+        issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+        missing_issue_fields = [
+            field
+            for field in ("price_band_low", "price_band_high", "lot_size", "ofs")
+            if issue.get(field) is None
+        ]
+        if missing_issue_fields:
+            raise IngestionExtractionError(
+                "Filing does not disclose required issue terms: "
+                + ", ".join(f"issue.{field}" for field in missing_issue_fields)
+                + ". These values are absent from the uploaded document "
+                "(an RHP may leave them as undisclosed placeholders pending "
+                "the Price Band Notice), so no evaluation was produced and "
+                "no values were assumed. Upload a filing that discloses the "
+                "price band, minimum bid lot and offer-for-sale amount, or "
+                "assemble the input with the Price Band Notice through the "
+                "enrichment path."
+            )
+
         # Execute deterministic pipeline evaluation
         try:
             outcome = evaluate(

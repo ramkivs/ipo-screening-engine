@@ -519,7 +519,48 @@ def test_ingest_incomplete_stub_fails_closed_without_fallbacks(test_env):
     assert res.status_code == 422
     body = res.json()
     assert body["code"] == "PROCESSING_FAILED"
-    assert "schema validation failed" in body["message"].lower()
+    # Fail-closed either via the precise undisclosed-issue-terms error or
+    # the schema gate; both reject the incomplete stub without fallbacks.
+    message = body["message"].lower()
+    assert "does not disclose required issue terms" in message or "schema validation failed" in message
+
+
+VISHAL_RHP_PDF = REPO_ROOT / "handoff" / "reference" / "U01122MH1994PLC185445-vishal nirmiti.pdf"
+
+
+def test_ingest_vishal_rhp_undisclosed_issue_terms_fail_precisely(test_env):
+    """Regression (Windows UI PROCESSING_FAILED): the Vishal Nirmiti RHP
+    leaves price band, minimum bid lot and OFS amount as [●] placeholders.
+    Re-uploading it must fail closed with a precise, actionable error
+    naming the undisclosed fields -- not four opaque schema violations --
+    and must leave the pre-existing historical evaluation untouched.
+    """
+    client = test_env["client"]
+    store = test_env["store"]
+    assert VISHAL_RHP_PDF.is_file(), f"Real filing missing at {VISHAL_RHP_PDF}"
+
+    res = client.post(
+        "/api/v1/ingest/document",
+        files={"file": ("vishal_nirmiti_rhp.pdf", io.BytesIO(VISHAL_RHP_PDF.read_bytes()), "application/pdf")},
+        data={"mode": "final"},
+    )
+
+    assert res.status_code == 422, f"Unexpected ingestion outcome: {res.text}"
+    body = res.json()
+    assert body["code"] == "PROCESSING_FAILED"
+    message = body["message"]
+    for field in ("issue.price_band_low", "issue.price_band_high", "issue.lot_size", "issue.ofs"):
+        assert field in message
+    assert "Price Band Notice" in message
+    assert "None is not of type" not in message
+
+    # Historical evaluation preserved: exactly the baseline record remains,
+    # with its original id and golden result hash, and no new record exists.
+    ipos = client.get("/api/v1/ipos").json()["items"]
+    assert len(ipos) == 1
+    assert store.exists(test_env["vishal_eval_id"])
+    detail = client.get(f"/api/v1/evaluations/{test_env['vishal_eval_id']}").json()
+    assert detail["result_hash"] == GOLDEN_RESULT_HASH
 
 
 def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):
