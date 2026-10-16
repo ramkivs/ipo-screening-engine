@@ -442,7 +442,13 @@ GMP_LINK_EVIDENCE_FIELDS = (
     ("market.gmp.as_of", "EV-market.gmp.as_of"),
 )
 _LINK_LOCATOR = re.compile(r"^line ([1-9][0-9]*)$")
-_PERCENT_TOKEN = re.compile(rf"[+-]?(?:{_NUMBER})%")
+# Locate whole signed percentage tokens only. Adjoining alphanumerics, decimal
+# punctuation, percent signs, and sign-like characters block subtoken matches.
+_PERCENT_TOKEN = re.compile(
+    rf"(?<![\w.,%+\-\u2010-\u2015\u2212\uFE62\uFE63\uFF0B\uFF0D])"
+    rf"(?P<token>[+-]?\s*(?:{_NUMBER})\s*%)"
+    rf"(?![\w.,%+\-\u2010-\u2015\u2212\uFE62\uFE63\uFF0B\uFF0D])"
+)
 _SHA256_PIN = re.compile(r"^sha256:([0-9A-Fa-f]{64})$")
 _PUBLISHER_STAMP = re.compile(
     r"^(?P<hour>1[0-2]|[1-9]):(?P<minute>[0-5][0-9]) "
@@ -974,8 +980,8 @@ def verify_gmp_evidence_link(
         title_line = lines[company_line_number - 1]
         if company_line_number != 1 or company_quote != title_line:
             raise GmpEvidenceError("company_name quote is not the exact line-1 capture title")
-        if not title_line.startswith("# ") or "IPO GMP" not in title_line[2:]:
-            raise GmpEvidenceError("capture title line does not identify an IPO issue")
+        if not title_line.startswith("# ") or title_line.count("IPO GMP") != 1:
+            raise GmpEvidenceError("capture title line is malformed or has an ambiguous IPO GMP marker")
         title_issue = title_line[2:].split("IPO GMP", 1)[0]
 
         if _normalize_issue_name(title_issue) != _normalize_issue_name(company_name):
@@ -988,16 +994,24 @@ def verify_gmp_evidence_link(
                 raise GmpEvidenceError("null pct must be tied to the exact 'Not quoted yet' display")
             d3_state = DisplayedGmpState.MISSING.value
         else:
-            if pct_line.count(pct_quote) != 1 or _PERCENT_TOKEN.fullmatch(pct_quote) is None:
-                raise GmpEvidenceError("pct quote is not an exact displayed percentage on its locator line")
+            pct_tokens = [match.group("token") for match in _PERCENT_TOKEN.finditer(pct_line)]
+            if len(pct_tokens) != 1 or pct_tokens[0] != pct_quote:
+                raise GmpEvidenceError(
+                    "pct quote is not the complete, unique signed percentage token on its locator line"
+                )
             displayed_state, _displayed_amount = classify_displayed_gmp(pct_quote, unit=PERCENT)
             if displayed_state not in {DisplayedGmpState.ZERO, DisplayedGmpState.AMOUNT}:
                 raise GmpEvidenceError("pct quote is not a well-formed displayed percentage")
             pct_number = _decimal_number(market_gmp.get("pct"))
+            percentage_match = _PERCENT_AMOUNT.fullmatch(pct_quote)
+            if percentage_match is None:
+                raise GmpEvidenceError("pct quote has a malformed numeric value")
             try:
-                quote_number = Decimal(pct_quote[:-1].replace(",", ""))
+                quote_number = Decimal(percentage_match.group("number").replace(",", ""))
             except InvalidOperation as exc:
                 raise GmpEvidenceError("pct quote has a malformed numeric value") from exc
+            if percentage_match.group("lead") == "-":
+                quote_number = -quote_number
             if pct_number is None or quote_number != pct_number:
                 raise GmpEvidenceError("market.gmp.pct does not equal the displayed percentage quote")
             d3_state = displayed_state.value

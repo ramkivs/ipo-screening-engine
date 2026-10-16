@@ -17,6 +17,7 @@ from ipo_screening.evaluation import EvaluationStore
 from ipo_screening.gmp_evidence import (
     GMP_LINK_DIAGNOSTIC_CODE,
     GMP_LINK_EVIDENCE_FIELDS,
+    capture_gmp_linkage_context,
     verify_gmp_evidence_link,
 )
 from ipo_screening.pipeline import evaluate, replay
@@ -245,6 +246,94 @@ def test_verified_link_maps_two_byte_digests_unknown_window_and_fixed_a15_diagno
     assert any(item["code"] == "A9_GMP_FINAL_WITHHELD" for item in a15["result"]["diagnostics"])
 
 
+@pytest.mark.parametrize(
+    ("case", "display", "quote", "pct", "expected_status"),
+    [
+        ("negative_source_quote_omits_sign", "-71.4%", "71.4%", 71.4, "FAILED"),
+        ("positive_source_negative_input", "+71.4%", "+71.4%", -71.4, "FAILED"),
+        ("negative_source_matching_quote_and_input", "-71.4%", "-71.4%", -71.4, "VERIFIED"),
+        ("substring_inside_larger_numeric_token", "+171.4%", "71.4%", 71.4, "FAILED"),
+        ("multiple_signed_percentage_tokens", "+71.4% and -71.4%", "+71.4%", 71.4, "FAILED"),
+    ],
+)
+def test_percentage_quote_binds_one_complete_signed_token(
+    tmp_path, monkeypatch, golden_input, config, case, display, quote, pct, expected_status
+):
+    artifact_text = CAPTURE_TEXT.replace("+71.4%", display)
+    repo, _manifest_hash, source = _make_capture_repo(
+        tmp_path,
+        artifact_text=artifact_text,
+    )
+    _use_test_repo(monkeypatch, repo)
+    document = _linked_input(golden_input, source)
+    document["market"]["gmp"]["pct"] = pct
+    document["_evidence"]["market.gmp.pct"]["quote"] = quote
+
+    outcome = evaluate(document, config, evaluation_datetime=EVALUATED_AT)
+    message = _link_diagnostic(_a15_document(outcome))["message"]
+    assert f"result={expected_status}" in message
+    if expected_status == "FAILED":
+        assert _a15_document(outcome)["result"]["outcome_resolution"]["reason"]["code"] == "SOURCE_UNQUALIFIED"
+        assert "final_outcome" not in _a15_document(outcome)["result"]
+
+
+@pytest.mark.parametrize(
+    ("case", "expected_reason"),
+    [
+        ("wrong_issuer", "capture title line does not identify the evaluated company"),
+        ("empty_issuer", "company_name is missing or malformed"),
+    ],
+)
+def test_wrong_or_empty_issuer_identity_fails_nonterminally(
+    tmp_path, golden_input, config, case, expected_reason
+):
+    def manifest_mutator(manifest):
+        if case == "wrong_issuer":
+            manifest["publisherIssuePage"]["displayedIssueName"] = "Other Corp"
+
+    repo, _manifest_hash, source = _make_capture_repo(
+        tmp_path,
+        manifest_mutator=manifest_mutator,
+    )
+    document = _linked_input(golden_input, source)
+    if case == "wrong_issuer":
+        document["company_name"] = "Other Corp"
+    else:
+        document["company_name"] = ""
+
+    outcome = evaluate(document, config, evaluation_datetime=EVALUATED_AT)
+    context = capture_gmp_linkage_context(document)
+    assert context is not None
+    verification = verify_gmp_evidence_link(
+        context,
+        outcome.record,
+        evaluation_at=EVALUATED_AT,
+        repo_root=repo,
+    )
+    assert verification.status == "FAILED"
+    assert expected_reason in verification.reason
+
+
+def test_ambiguous_title_marker_fails_even_when_exact_title_quote_is_supplied(
+    tmp_path, monkeypatch, golden_input, config
+):
+    ambiguous_title = "# Acme CorpIPO GMP Today IPO GMP Today"
+    artifact_text = CAPTURE_TEXT.replace("# Acme CorpIPO GMP Today", ambiguous_title)
+    repo, _manifest_hash, source = _make_capture_repo(
+        tmp_path,
+        artifact_text=artifact_text,
+    )
+    _use_test_repo(monkeypatch, repo)
+    document = _linked_input(golden_input, source)
+    document["_evidence"]["company_name"]["quote"] = ambiguous_title
+
+    a15 = _a15_document(evaluate(document, config, evaluation_datetime=EVALUATED_AT))
+    message = _link_diagnostic(a15)["message"]
+    assert "result=FAILED:" in message
+    assert "malformed or has an ambiguous IPO GMP marker" in message
+    assert a15["result"]["outcome_resolution"]["reason"]["code"] == "SOURCE_UNQUALIFIED"
+
+
 def test_linkage_derives_only_the_canonical_default_evidence_ids(
     tmp_path, monkeypatch, golden_input, config
 ):
@@ -311,6 +400,41 @@ def test_linkage_does_not_change_scoring_or_a9_gate(tmp_path, monkeypatch, golde
     assert linked_a15["result"]["outcome_resolution"]["reason"]["code"] == plain_a15["result"]["outcome_resolution"]["reason"]["code"] == "SOURCE_UNQUALIFIED"
     assert _link_diagnostic(linked_a15)["code"] == GMP_LINK_DIAGNOSTIC_CODE
     assert not any(item["code"] == GMP_LINK_DIAGNOSTIC_CODE for item in plain_a15["result"]["diagnostics"])
+
+
+@pytest.mark.parametrize("tampered_field", ["raw_value", "normalized_value"])
+def test_final_assembled_a15_gmp_value_tampering_fails_persistence(
+    tmp_path, monkeypatch, golden_input, config, tampered_field
+):
+    repo, _manifest_hash, source = _make_capture_repo(tmp_path)
+    _use_test_repo(monkeypatch, repo)
+    original_projection_check = evaluation_record_module.verify_gmp_linkage_projection
+
+    def tamper_after_assembly(document, verification):
+        altered = copy.deepcopy(document)
+        field_value = next(
+            item
+            for item in altered["field_values"]
+            if item["field_path"] == "/input/market/gmp/pct"
+        )
+        field_value[tampered_field] = 72.4
+        original_projection_check(altered, verification)
+
+    monkeypatch.setattr(
+        evaluation_record_module,
+        "verify_gmp_linkage_projection",
+        tamper_after_assembly,
+    )
+    with pytest.raises(
+        evaluation_record_module.EvaluationRecordV1Error,
+        match="assembled A15 evaluation document failed GMP-link verification",
+    ):
+        outcome = evaluate(
+            _linked_input(golden_input, source),
+            config,
+            evaluation_datetime=EVALUATED_AT,
+        )
+        outcome.record.artifacts()
 
 
 def test_cutoff_inside_window_is_nonterminal_and_preserves_only_unknown_window(
