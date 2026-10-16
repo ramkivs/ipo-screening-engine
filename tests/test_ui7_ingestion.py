@@ -518,11 +518,11 @@ def test_ingest_incomplete_stub_fails_closed_without_fallbacks(test_env):
 
     assert res.status_code == 422
     body = res.json()
-    assert body["code"] == "PROCESSING_FAILED"
-    # Fail-closed either via the precise undisclosed-issue-terms error or
-    # the schema gate; both reject the incomplete stub without fallbacks.
+    assert body["code"] in ("PROCESSING_FAILED", "AWAITING_ISSUE_TERMS")
+    # Fail-closed either via the awaiting-terms status or the schema gate;
+    # both reject the incomplete stub without fallbacks.
     message = body["message"].lower()
-    assert "does not disclose required issue terms" in message or "schema validation failed" in message
+    assert "awaiting_issue_terms" in message or "schema validation failed" in message
 
 
 VISHAL_RHP_PDF = REPO_ROOT / "handoff" / "reference" / "U01122MH1994PLC185445-vishal nirmiti.pdf"
@@ -547,12 +547,15 @@ def test_ingest_vishal_rhp_undisclosed_issue_terms_fail_precisely(test_env):
 
     assert res.status_code == 422, f"Unexpected ingestion outcome: {res.text}"
     body = res.json()
-    assert body["code"] == "PROCESSING_FAILED"
+    # With no official Price Band Notice available to the runtime resolver,
+    # the undisclosed terms yield an explicit awaiting status (fail-closed).
+    assert body["code"] == "AWAITING_ISSUE_TERMS"
     message = body["message"]
     for field in ("issue.price_band_low", "issue.price_band_high", "issue.lot_size", "issue.ofs"):
         assert field in message
-    assert "Price Band Notice" in message
+    assert "AWAITING_ISSUE_TERMS" in message
     assert "None is not of type" not in message
+    assert body["missing_fields"] == ["price_band_low", "price_band_high", "lot_size", "ofs"]
 
     # Historical evaluation preserved: exactly the baseline record remains,
     # with its original id and golden result hash, and no new record exists.
@@ -561,6 +564,75 @@ def test_ingest_vishal_rhp_undisclosed_issue_terms_fail_precisely(test_env):
     assert store.exists(test_env["vishal_eval_id"])
     detail = client.get(f"/api/v1/evaluations/{test_env['vishal_eval_id']}").json()
     assert detail["result_hash"] == GOLDEN_RESULT_HASH
+
+
+def test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice(tmp_path, golden_input, config):
+    """End-to-end: Vishal RHP + runtime resolver with the retained official
+    Price Band Notice -> assembled, evaluated, persisted, idempotent.
+
+    The notice is the retained real-issuer document in fixtures/notices;
+    its terms enter only through the resolver/enrichment path with
+    provenance, never through fixture defaults.
+    """
+    from ipo_screening.issue_terms import IssueTermsResolver, NoticeSnapshotCache, RetainedNoticeProvider
+
+    store_dir = tmp_path / "evaluations"
+    store = EvaluationStore(store_dir)
+    baseline = evaluate(golden_input, config, mode="final", evaluation_datetime=EVAL_AT, store=store)
+    historical_id = baseline.record.evaluation_id
+
+    notice_dir = tmp_path / "notices"
+    notice_dir.mkdir()
+    (notice_dir / "vishal_price_band_notice.txt").write_text(
+        (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    resolver = IssueTermsResolver(
+        providers=[RetainedNoticeProvider([notice_dir])],
+        cache=NoticeSnapshotCache(tmp_path / "terms-cache"),
+    )
+    cfg = PresentationConfig(store_root=store_dir, config_dir=REPO_ROOT / "config", issue_terms_resolver=resolver)
+    client = TestClient(create_app(PresentationService(cfg)), base_url="http://127.0.0.1:8000", headers={"Origin": "http://127.0.0.1:8000"})
+
+    res = client.post(
+        "/api/v1/ingest/document",
+        files={"file": ("vishal_nirmiti_rhp.pdf", io.BytesIO(VISHAL_RHP_PDF.read_bytes()), "application/pdf")},
+        data={"mode": "final"},
+    )
+    assert res.status_code == 201, f"Auto-resolution ingestion failed: {res.text}"
+    body = res.json()
+    assert body["issue_terms"]["status"] == "RESOLVED"
+    assert sorted(body["issue_terms"]["resolved_fields"]) == ["lot_size", "price_band_high", "price_band_low"]
+
+    record = store.read(body["evaluation_id"])
+    persisted_input = record["input_snapshot"]["input"]
+    issue = persisted_input["issue"]
+    assert issue["price_band_low"] == 208
+    assert issue["price_band_high"] == 220
+    assert issue["lot_size"] == 68
+    assert issue["ofs"] == 3300  # derived: OFS seller shares x cap price
+    evidence_items = record["evidence"]["evidence"]
+    source_ids = {item.get("source_id", "") for item in evidence_items}
+    assert any(str(s).startswith("SRC-PBN-") for s in source_ids), source_ids
+    # Derived OFS (never a direct source claim): the persisted record keeps
+    # the SRC-DERIVED derivation reference produced by enrichment assembly.
+    assert "SRC-DERIVED" in json.dumps(record)
+
+    # Scorecard reopens with the persisted provenance-bearing record.
+    detail = client.get(f"/api/v1/evaluations/{body['evaluation_id']}")
+    assert detail.status_code == 200
+    assert detail.json()["result_hash"] == body["result_hash"]
+
+    # Duplicate upload is idempotent; the historical record is untouched.
+    dup = client.post(
+        "/api/v1/ingest/document",
+        files={"file": ("vishal_nirmiti_rhp.pdf", io.BytesIO(VISHAL_RHP_PDF.read_bytes()), "application/pdf")},
+        data={"mode": "final"},
+    )
+    assert dup.status_code == 200
+    assert dup.json()["is_duplicate"] is True
+    assert dup.json()["evaluation_id"] == body["evaluation_id"]
+    assert store.read(historical_id)["result_hash"] == GOLDEN_RESULT_HASH
 
 
 def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):

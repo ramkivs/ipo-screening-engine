@@ -48,6 +48,7 @@ from ..lifecycle import (
     ProtectedRecordError,
 )
 from .service import (
+    IngestionAwaitingIssueTermsError,
     IngestionError,
     IngestionEvaluationError,
     IngestionExtractionError,
@@ -351,6 +352,17 @@ def create_router(service: PresentationService) -> APIRouter:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"error": "Bad Request", "message": str(exc), "code": "VALIDATION_ERROR"},
+            )
+        except IngestionAwaitingIssueTermsError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "error": "Awaiting Issue Terms",
+                    "message": str(exc),
+                    "code": "AWAITING_ISSUE_TERMS",
+                    "missing_fields": exc.missing_fields,
+                    "resolution": exc.resolution,
+                },
             )
         except (IngestionExtractionError, IngestionEvaluationError) as exc:
             raise HTTPException(

@@ -97,6 +97,20 @@ class IngestionEvaluationError(IngestionError):
     """Deterministic evaluation pipeline failure."""
 
 
+class IngestionAwaitingIssueTermsError(IngestionError):
+    """Required issue terms are not yet available from official sources.
+
+    Raised when an uploaded filing leaves required issue terms
+    undisclosed and the runtime issue-terms resolver cannot supply them
+    from verified official evidence. Nothing is evaluated or persisted.
+    """
+
+    def __init__(self, message: str, *, missing_fields: list, resolution: Optional[dict] = None):
+        super().__init__(message)
+        self.missing_fields = list(missing_fields)
+        self.resolution = resolution or {}
+
+
 
 class PresentationConfig:
     """Configuration paths for PresentationService."""
@@ -108,12 +122,14 @@ class PresentationConfig:
         dataset_path: Optional[str | Path] = "build/dataset/dataset.json",
         analytics_path: Optional[str | Path] = "build/analytics/analytics.json",
         proposal_path: Optional[str | Path] = "config/calibration-proposal.v1.6.0.json",
+        issue_terms_resolver: Optional[Any] = None,
     ) -> None:
         self.store_root = Path(store_root)
         self.config_dir = Path(config_dir)
         self.dataset_path = Path(dataset_path) if dataset_path else None
         self.analytics_path = Path(analytics_path) if analytics_path else None
         self.proposal_path = Path(proposal_path) if proposal_path else None
+        self.issue_terms_resolver = issue_terms_resolver
 
 
 class PresentationService:
@@ -121,6 +137,10 @@ class PresentationService:
 
     def __init__(self, config: Optional[PresentationConfig] = None) -> None:
         self.config = config or PresentationConfig()
+        if self.config.issue_terms_resolver is None:
+            from ..issue_terms import build_resolver_from_env
+
+            self.config.issue_terms_resolver = build_resolver_from_env()
         self.eval_store = EvaluationStore(self.config.store_root)
         self.lifecycle_mgr = LifecycleManager(self.config.store_root, active_config_hash=ACTIVE_RATIFIED_CONFIG_HASH)
 
@@ -915,13 +935,13 @@ class PresentationService:
         finally:
             shutil.rmtree(staging_dir, ignore_errors=True)
 
-        # Fail closed with a precise, actionable error when the filing does
-        # not disclose issue terms the v1.5 input contract requires. RHPs
-        # routinely leave these as [●] placeholders (to be set by the Price
-        # Band Notice); extraction therefore legitimately finds nothing and
-        # the builder carries them as null (unknown, never zero). Naming the
-        # fields here keeps the raw schema gate from surfacing as opaque
-        # "None is not of type ..." violations. No value is invented.
+        # Automatically resolve required issue terms the filing does not
+        # disclose ([●] placeholders pending the Price Band Notice) from
+        # official sources, through the established enrichment assembly.
+        # Fail closed with an AWAITING_ISSUE_TERMS status when no verified
+        # official evidence is available: no value is invented, substituted
+        # or borrowed, and nothing is evaluated or persisted.
+        issue_terms_report: Optional[Dict[str, Any]] = None
         issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
         missing_issue_fields = [
             field
@@ -929,17 +949,59 @@ class PresentationService:
             if issue.get(field) is None
         ]
         if missing_issue_fields:
-            raise IngestionExtractionError(
-                "Filing does not disclose required issue terms: "
-                + ", ".join(f"issue.{field}" for field in missing_issue_fields)
-                + ". These values are absent from the uploaded document "
-                "(an RHP may leave them as undisclosed placeholders pending "
-                "the Price Band Notice), so no evaluation was produced and "
-                "no values were assumed. Upload a filing that discloses the "
-                "price band, minimum bid lot and offer-for-sale amount, or "
-                "assemble the input with the Price Band Notice through the "
-                "enrichment path."
+            from ..enrichment_engine import EnrichmentEngine
+            from ..issue_terms import IssueTermsResolver
+
+            resolver: IssueTermsResolver = self.config.issue_terms_resolver
+            outcome = resolver.resolve(
+                company_name=str(canonical_dict.get("company_name", "")),
+                ipo_id=str(canonical_dict.get("ipo_id", "")),
+                missing_fields=missing_issue_fields,
             )
+            resolution_dict = outcome.to_dict()
+            if outcome.notice is not None:
+                try:
+                    assembled = EnrichmentEngine.assemble(
+                        base_input=canonical_dict,
+                        price_band_notice=outcome.notice,
+                        mode=mode_clean,
+                    )
+                    canonical_dict = assembled.canonical_input
+                except Exception:
+                    pass  # fall through to the awaiting status below
+            elif set(missing_issue_fields) == {"ofs"}:
+                # Terms are disclosed in the filing itself; only the OFS
+                # amount needs the approved enrichment derivation
+                # (seller shares x cap price).
+                try:
+                    assembled = EnrichmentEngine.assemble(
+                        base_input=canonical_dict,
+                        mode=mode_clean,
+                    )
+                    canonical_dict = assembled.canonical_input
+                except Exception:
+                    pass
+
+            issue_after = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+            still_missing = [f for f in missing_issue_fields if issue_after.get(f) is None]
+            if outcome.notice is not None and not still_missing:
+                issue_terms_report = resolution_dict
+            else:
+                unresolved = still_missing or list(missing_issue_fields)
+                reason = {
+                    "CONFLICT": "official sources conflict and no value was arbitrarily selected",
+                    "UNAVAILABLE": "official sources could not be retrieved or verified",
+                    "PARTIAL": "only some required terms could be verified from official sources",
+                }.get(outcome.status, "the terms have not yet been published in the configured official sources")
+                raise IngestionAwaitingIssueTermsError(
+                    "AWAITING_ISSUE_TERMS: required issue terms are unavailable: "
+                    + ", ".join(f"issue.{field}" for field in unresolved)
+                    + f". The uploaded filing does not disclose them and {reason}. "
+                    "No evaluation was produced, no values were assumed, and nothing was persisted. "
+                    "Retry after the official Price Band Notice is published, or upload a filing that discloses these terms.",
+                    missing_fields=unresolved,
+                    resolution=resolution_dict,
+                )
 
         # Execute deterministic pipeline evaluation
         try:
@@ -993,6 +1055,7 @@ class PresentationService:
                 message="Identical evaluation record already exists in immutable store.",
                 evaluation_url=f"/#evaluations/{existing_eval_id}",
                 evaluation=eval_detail,
+                issue_terms=issue_terms_report,
             )
 
         self.eval_store.write(outcome.record)
@@ -1023,6 +1086,7 @@ class PresentationService:
             message="Filing successfully ingested, extracted, and evaluated.",
             evaluation_url=f"/#evaluations/{eval_id_to_return}",
             evaluation=eval_detail,
+            issue_terms=issue_terms_report,
         )
 
     # -------------------------------------------------------------------------

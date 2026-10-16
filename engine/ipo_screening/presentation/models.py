@@ -389,4 +389,5 @@ class IngestionResponse(BaseModel):
     message: str = "Document processed and evaluated successfully."
     evaluation_url: str
     evaluation: Optional[EvaluationDetail] = None
+    issue_terms: Optional[Dict[str, Any]] = None
 
