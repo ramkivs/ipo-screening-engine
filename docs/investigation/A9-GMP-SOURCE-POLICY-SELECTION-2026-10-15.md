@@ -168,9 +168,9 @@ An A9 qualified path would need two things, each requiring its own decision and 
   - §8 PR-4f and PR-5.
 - **D3 covers only the exact "Not quoted yet" and a displayed zero.** Other markers fail closed as malformed, for example InvestorGain's "₹ --" or PapsDigital's "N/A". Well-formed negative amounts keep their existing treatment as values (the input schema allows `pct` down to −1000). D3 does not address them, and no qualification follows.
 
-## 7. Proposal — minimum GMP evidence linkage (2026-10-16)
+## 7. GMP evidence linkage — proposal history and current implementation (2026-10-16)
 
-- **Status:** PROPOSAL — NOT APPROVED. This is Arena analysis for Ramki's decisions L1–L4 (§7.10). Nothing in this section is implemented, and A9 stays fail-closed.
+- **Status (historical at proposal creation; superseded by A18):** This section began as an Arena proposal for L1–L4. Ramki subsequently approved L1 as revised, L2-a, L3-a, and L4-a with no schema/version change, as recorded in [`handoff/decisions/A18-gmp-evidence-linkage-contract.md`](../../handoff/decisions/A18-gmp-evidence-linkage-contract.md). Current implementation and verification status are in §7.12. No individual publisher is approved or A9-qualified.
 - **Baseline:** D1–D3 implementation `805affe`, which is also the authoritative `arena/573e69a4-ipo-screening-engine` tip (verified 2026-10-15T19:00:14Z). First published in `2de60b6`.
 - **Revision (2026-10-16, second pass):** revised in place after the decision-boundary review in §7.11. The superseded wording remains in `2de60b6`. Three changes:
   1. The capture window is never entered as an exact retrieval time.
@@ -179,7 +179,7 @@ An A9 qualified path would need two things, each requiring its own decision and 
 
 ### 7.1 The gap, and a correction to §6.3
 
-`gmp_evidence.py` can verify a retained capture: D1 integrity, D2 availability by cutoff and D3 displayed state. No approved contract says how an evaluation's `market.gmp` value identifies the capture, its digest, its capture time or the displayed text it was transcribed from.
+At proposal time, `gmp_evidence.py` could verify a retained capture's D1 integrity, D2 availability by cutoff and D3 displayed state, but no approved contract linked an evaluation's `market.gmp` value to that capture, digest, window or displayed text. A18 subsequently approved that link contract; §7.12 records its implementation.
 
 The v1.5 input already has generic fields that can carry such a reference:
 - `market.gmp.source_id` → a `_sources[]` entry with `uri`, `content_hash` and `retrieval_timestamp`;
@@ -293,7 +293,7 @@ All of the following must pass; otherwise the result is `FAILED`.
 **Trust limit:**
 - The window is the sandbox clock read before and after the tool call, checked against GitHub's `Date` header. The manifest itself says the window "does not establish when the publisher generated the content or whether the tool served cached content".
 - The pin makes the recorded window tamper-evident from the moment the evaluation input is written. It does not prove the window was true when it was recorded.
-- A contradictory duplicate `_evidence` key cannot be detected. The input loader uses plain `json.load` (`pipeline.py` l.190, l.339), which keeps the last of duplicate JSON keys. Detecting it would need a loader change that affects every input. That is outside L1–L4 and is not proposed here.
+- **Historical proposal note, superseded by A18 and §7.12:** duplicate JSON keys are now rejected by the strict parser at the scoped evaluation-input boundaries and when parsing the pinned manifest bytes. The parser change does not alter permissive configuration or stored-record readers; it is not a global loader change.
 
 ### 7.5 Behaviour
 
@@ -322,10 +322,10 @@ Each case is schema-valid v1.5 input, so failures are recorded rather than rejec
   - L2-b would add one `subject_kind` value, for example `RENDERED_CAPTURE_BYTES`.
   - It would bump `$id` and `RECORD_SCHEMA_VERSION` from 1.1.0 to 1.2.0 and update the schema tests.
   - Existing 1.1.0 records would stay valid, with no migration.
-- **Code (only after approval):**
+- **Code scope proposed before A18:**
   - a linkage verifier in `gmp_evidence.py` that reuses the D1–D3 functions;
   - the §7.3 digest and diagnostic in the A15 builder;
-  - no change to the A9 gate's outcome logic.
+  - no change to the A9 gate's outcome logic. A18 later authorized this bounded scope; §7.12 records the implementation.
 
 ### 7.8 Tests required
 
@@ -374,7 +374,7 @@ A `VERIFIED` link shows only that one evaluated observation meets D1–D3 for th
 - A15 digests do not qualify an A9 input (A15 decision, l.49 and l.60).
 - A9 stays fail-closed until a separately approved qualified path exists.
 
-### 7.10 Decisions requested (none approved)
+### 7.10 Decisions requested (historical; superseded by A18)
 
 | Decision | (a) | (b) |
 |---|---|---|
@@ -383,11 +383,11 @@ A `VERIFIED` link shows only that one evaluated observation meets D1–D3 for th
 | **L3:** stamp and identity binding | Check `as_of` against the quoted stamp in the publisher's format: MarketLiveIPOGMP `h:mm am/pm IST on Ddd, D Mon, YYYY` (ML-T line 84). Check the title line against `company_name` (§7.4 step 5). | Require only `as_of` ≤ window end. A mistranscribed later stamp could then make stale evidence look fresh, and another issue's capture with equal values would pass. |
 | **L4:** failure handling | Record failures as nonterminal diagnostics | Reject structurally malformed references before scoring |
 
-**Recommendation:** L1 as revised, L2-a, L3-a and L4-a, which need no schema or version change. Then implement the verifier and the A15 mapping with the §7.8 tests. A9 stays fail-closed throughout. The authorization review and the single question are in §7.11.
+**Recommendation at proposal time:** L1 as revised, L2-a, L3-a and L4-a, which need no schema or version change. A18 records Ramki's subsequent approval of these choices. The authorization review and question below are retained as historical proposal context; §7.12 records implementation status. A9 stays fail-closed throughout.
 
 ### 7.11 Decision-boundary review (2026-10-16)
 
-Checked at 2026-10-15T19:00:14Z (00:30 IST, 16 Oct) against `805affe`, the authoritative tip. This section records why §7 was revised and what still needs Ramki. It approves nothing.
+Checked at 2026-10-15T19:00:14Z (00:30 IST, 16 Oct) against `805affe`, the authoritative tip. This section records the decision-boundary analysis and the status at that time. A18 later records Ramki's approval and supersedes the authorization-status statements below.
 
 #### 7.11.1 Capture-time semantics
 
@@ -428,17 +428,17 @@ Prior explicit decisions checked:
 | **L3** | Stamp in the publisher's format; title-line identity; `as_of` ≤ window end (§7.4 steps 5 and 7) | None | Evidenced only for MarketLiveIPOGMP: ML-T:84, ML-T:1, ML-HM:1 | Publisher-specific; another publisher needs its own evidence | No. It sets publisher-specific verification semantics (A16 l.32). | Yes |
 | **L4** | Failures are nonterminal diagnostics (§7.5) | No link, so no failure | Matches the existing A9 nonterminal pattern | No input is newly rejected | No. It is part of the same contract. | Yes, with L1 |
 
-None is authorized, so none is implemented. The (a)/(b) alternatives in §7.10 are technical sub-choices, and the recommendation picks one of each. They therefore reduce to one approval question (§7.11.5).
+At the time of this decision-boundary review, none was authorized. That review-time status is superseded by A18 (2026-10-16), which records approval of L1 as revised, L2-a, L3-a, and L4-a with no schema/version change. The (a)/(b) alternatives in §7.10 are technical sub-choices; the later approval resolves them as recorded in A18.
 
 #### 7.11.3 Questions A–G
 
-| | Under the revised proposal | Today (no linkage) |
+| | Under the revised proposal | Status at the review time (no linkage) |
 |---|---|---|
 | **A. Identity** | Manifest, artifact and issue are identified separately:<br>• the manifest pin fixes the manifest;<br>• the manifest's single declaration of the `#` artifact id fixes the artifact's digest and bytes, and D1 rejects an undeclared or duplicated id;<br>• the title quote fixes the issue. | Not established |
 | **B. Hash** | Both digests are recomputed from the bytes read. A mismatch is `FAILED`. This proves integrity only (D1). | Not checked |
 | **C. Value** | `pct` and `as_of` must equal quotes on their lines of the verified text. A substituted capture fails on the pin, the identity line or the values. | Quotes unchecked |
 | **D. Time** | §7.11.1. Neither the window end nor the stamp is ever treated as the capture time. A window ending after E, or an E inside the window, fails D2. | No signal |
-| **E. Failures** | • Missing reference: no link, and the record is unchanged.<br>• `FAILED`: missing manifest or artifact; malformed reference; hash mismatch; missing or malformed window; `pct` or `as_of` mismatch; duplicated or contradictory entries; untied value.<br>• Late capture: `NOT_AVAILABLE_BY_CUTOFF`.<br>• "Not quoted yet": MISSING, with `pct: null`. ₹0: ZERO and `SOURCE_UNQUALIFIED`.<br>• Duplicate `_evidence` JSON keys stay undetectable (§7.4).<br>• A9 stays nonterminal in every case. | Every case is silently unlinked |
+| **E. Failures** | • Missing reference: no link, and the record is unchanged.<br>• `FAILED`: missing manifest or artifact; malformed reference; hash mismatch; missing or malformed window; `pct` or `as_of` mismatch; duplicated or contradictory entries; untied value.<br>• Late capture: `NOT_AVAILABLE_BY_CUTOFF`.<br>• "Not quoted yet": MISSING, with `pct: null`. ₹0: ZERO and `SOURCE_UNQUALIFIED`.<br>• Duplicate JSON keys are rejected at the scoped evaluation-input and manifest boundaries; configuration and stored-record readers remain permissive (§7.12).<br>• A9 stays nonterminal in every case. | Every case is silently unlinked |
 | **F. Reproducibility** | The input plus the pinned manifest and artifact re-derive the result. The A15 record keeps both digests, the window text and the D1 label. If the manifest is later amended, re-verification fails closed, and the pinned bytes stay in history. | Only an opaque pin is recorded |
 | **G. Compatibility** | No schema or version change. Existing inputs and records are unchanged, with no reinterpretation. | — |
 
@@ -447,11 +447,25 @@ None is authorized, so none is implemented. The (a)/(b) alternatives in §7.10 a
 - **D2 wording.** The `gmp_evidence.py` module and `capture_obtained_by` docstrings no longer call the window end "the capture time". They now state that it is the latest possible capture time, used only as an upper bound. Three focused tests were renamed to match. Behaviour is unchanged.
 - **D1 identity.** `load_rendered_capture` now rejects an artifact id declared more than once, instead of taking the first. A new focused test covers it, and a mutation run without the guard fails that test.
 - **Module docstring.** It no longer says that no field could link an evaluation; it now matches §7.1.
-- **Not done:** the linkage verifier, the A15 mapping and any schema change.
+- **Review-time status, superseded by A18:** the linkage verifier and A15 mapping were not yet done when this review was written. The verifier and mapping are now implemented without a schema/version change; see §7.12.
 
 #### 7.11.5 Question for Ramki
 
-**Approve §7, as revised on 2026-10-16, as the GMP evidence-linkage contract (L1 as revised, L2-a, L3-a, L4-a), with no schema or version change?**
-- **Recommended answer:** yes.
-- **If yes:** implement the verifier in `gmp_evidence.py` and the §7.3 mapping in the A15 builder, with the §7.8 tests. A9 stays fail-closed, and MarketLiveIPOGMP stays NOT QUALIFIED (§7.9).
-- **If no:** nothing changes. Evaluations stay unlinked, and A9 stays fail-closed.
+**Historical question:** Approve §7, as revised on 2026-10-16, as the GMP evidence-linkage contract (L1 as revised, L2-a, L3-a, L4-a), with no schema or version change?
+- **Recommendation at that time:** yes.
+- **Decision:** Ramki's direct 2026-10-16 task instruction identifies the contract as approved and directs its correction and verification. A18 records the approval as L1 as revised, L2-a, L3-a, and L4-a with no schema/version change. The implementation and current boundaries are recorded in §7.12.
+
+### 7.12 Approval, implementation, and verification reconciliation (2026-10-16)
+
+**Authority.** A18 is the durable decision record for the direct user approval of L1–L4. The historical recommendation in §7.10 and the review status in §7.11 are not the approval basis.
+
+**Implementation.** Commit `e473f0090916cf6a125447be077316ea694b2675` on `arena/ea6e5bc2-ipo-screening-engine` corrects percentage-token binding and adds focused linkage regressions. The verifier now requires the quote to equal the one complete signed percentage token on its locator line; an omitted sign, substring of a larger number, or multiple percentage tokens fails closed. It parses the token sign before numeric comparison. A repeated `IPO GMP` title marker is rejected as ambiguous. Wrong/empty issuer identity and altered assembled A15 field values are also covered by focused tests. Existing failure diagnostics, replay context, and A9 behavior remain unchanged.
+
+**Verification on the implementation commit:** the pre-correction regression reproduced `-71.4%` / quote `71.4%` / input `71.4` as `VERIFIED`. After correction:
+- `.venv/bin/python -m pytest tests/test_gmp_evidence_linkage.py tests/test_strict_evaluation_json.py tests/test_d1_d3_gmp_source_policy.py -q` — **128 passed**;
+- `.venv/bin/python -m pytest tests/ -q` — **885 passed**, with two Starlette deprecation warnings;
+- `PYTHONPATH=engine .venv/bin/python` calling `verify_frozen_core()` — **PASS** (six pinned files);
+- `.venv/bin/python -m compileall -q engine tests` — **PASS**;
+- `git show --check --oneline e473f0090916cf6a125447be077316ea694b2675` — **PASS**.
+
+**Boundaries.** No frozen-core, scoring, A9, schema, or version change. The retrieval window remains an honest `UNKNOWN` fact, not an exact receipt time. Linkage and manifest write-once checks do not qualify a publisher. MarketLiveIPOGMP remains **NOT QUALIFIED**, R7 remains **UNRESOLVED**, and no R7 capture was taken. The tracker was not edited in this task; it must be reconciled through its authorized process before its historical linkage wording is treated as current.
