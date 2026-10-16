@@ -409,7 +409,7 @@ Resolution, with no invented semantics:
 - **Not an interval in `retrieval_timestamp`.** The builder records any non-instant `retrieval_timestamp` as UNKNOWN `INVALID` (`evaluation_record.py` l.202–204). An interval must not go in that field.
 - **Code wording.** Wording that called the window end "the capture time" was corrected (§7.11.4). The behaviour was already the upper-bound rule.
 
-#### 7.11.2 Authorization of L1–L4
+#### 7.11.2 Historical authorization review of L1–L4 (superseded by A18)
 
 Prior explicit decisions checked:
 - **D1–D3** (§6.1): implementation authority covered only the listed minimum.
@@ -449,7 +449,7 @@ At the time of this decision-boundary review, none was authorized. That review-t
 - **Module docstring.** It no longer says that no field could link an evaluation; it now matches §7.1.
 - **Review-time status, superseded by A18:** the linkage verifier and A15 mapping were not yet done when this review was written. The verifier and mapping are now implemented without a schema/version change; see §7.12.
 
-#### 7.11.5 Question for Ramki
+#### 7.11.5 Historical question for Ramki (resolved by A18)
 
 **Historical question:** Approve §7, as revised on 2026-10-16, as the GMP evidence-linkage contract (L1 as revised, L2-a, L3-a, L4-a), with no schema or version change?
 - **Recommendation at that time:** yes.
@@ -468,6 +468,8 @@ At the time of this decision-boundary review, none was authorized. That review-t
 - `.venv/bin/python -m compileall -q engine tests` — **PASS**;
 - `git show --check --oneline HEAD` and `git diff --check HEAD^ HEAD` — **PASS**.
 
-The above post-documentation test run was on `99759bcad75db3b16451c90e3b74960e04219e11`; the later change to A18 is documentation-only.
+**Latest verification (2026-10-16).** The focused and full suites were rerun on `ca6c9862c5809d72a73d1493ef5f6fe31ec7f34f`: `.venv/bin/python -m pytest tests/test_gmp_evidence_linkage.py tests/test_strict_evaluation_json.py tests/test_d1_d3_gmp_source_policy.py -q` — **128 passed** in 9.64 seconds; `.venv/bin/python -m pytest tests/ -q` — **885 passed** in 316.21 seconds with two Starlette deprecation warnings; compileall **PASS**; `verify_frozen_core()` **PASS**, all six pinned files; `git show --check` and `git diff --check` **PASS**. The current tracker/A18 documentation reconciliation is later and docs-only; no tests are claimed after those current edits. These are self-run results, not independent verification.
 
-**Boundaries.** No frozen-core, scoring, A9, schema, or version change. The retrieval window remains an honest `UNKNOWN` fact, not an exact receipt time. Linkage and manifest write-once checks do not qualify a publisher. MarketLiveIPOGMP remains **NOT QUALIFIED**, R7 remains **UNRESOLVED**, and no R7 capture was taken. The tracker was not edited in this task; it must be reconciled through its authorized process before its historical linkage wording is treated as current.
+**Boundaries.** No frozen-core, scoring, A9, schema, or version change. The retrieval window remains an honest `UNKNOWN` fact, not an exact receipt time. Linkage and manifest write-once checks do not qualify a publisher. MarketLiveIPOGMP and InvestorGain remain **NOT QUALIFIED**; PapsDigital remains a **non-independent alternative**; R7 remains **UNRESOLVED**, R8 history remains open, and the documented new-observation condition for an R7 capture was not met. A9 remains fail-closed. The repository tracker has been reconciled on the session branch only and explicitly distinguishes that push from authoritative publication; the authoritative baseline tracker is unchanged.
+
+**Publication.** The implementation remains remotely published at `ca6c9862c5809d72a73d1493ef5f6fe31ec7f34f` on `arena/ea6e5bc2-ipo-screening-engine`; the remote authoritative branch remains at `805affe10ef387b649717facb31b0378f7b233d7`. The session branch is six commits ahead and includes proposal history. No clean baseline-derived implementation/documentation refs, authoritative merge, or PR exist. This is not an assertion of authoritative publication; clean refs must be created through a workflow permitted to do so.

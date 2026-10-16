@@ -8,9 +8,9 @@
 - **Authorization basis:** Ramki's direct Arena task instruction dated 2026-10-16 refers to L1–L4 as the approved contract and directs correction, regression coverage, and verification. This record is based on that instruction, not on an Arena report or a prior assistant recommendation.
 - **Repository:** `ramkivs/ipo-screening-engine`
 - **Authoritative baseline:** `805affe10ef387b649717facb31b0378f7b233d7`
-- **Implementation baseline:** `3f8a1766e24a4926b6cd0478ae73ad81865d62c0`; signed-token correction `e473f0090916cf6a125447be077316ea694b2675`.
+- **Implementation lineage:** initial implementation baseline `3f8a1766e24a4926b6cd0478ae73ad81865d62c0`; signed-token correction `e473f0090916cf6a125447be077316ea694b2675`; last implementation/documentation-verified session tip `ca6c9862c5809d72a73d1493ef5f6fe31ec7f34f` (before the current tracker-only doc update).
 - **Scope:** Link one evaluation's GMP observation and issue identity to one retained rendered capture using existing v1.5 `_sources` and `_evidence` fields. No publisher is selected or qualified by this decision.
-- **Publication status:** This decision and the implementation remain on the working implementation branch. This record does not authorize a push, merge, PR, or other publication to the authoritative branch.
+- **Publication status (reconciled 2026-10-16):** The implementation is pushed and remotely verified on `arena/ea6e5bc2-ipo-screening-engine` at `ca6c9862c5809d72a73d1493ef5f6fe31ec7f34f`. The authoritative branch remains at `805affe10ef387b649717facb31b0378f7b233d7`; the six-commit session history includes earlier proposal commits and has not been merged or opened as a PR. The user authorized normal publication, but a clean baseline-derived implementation/documentation ref could not be created under this session's fixed-branch constraint. This contract decision is not publisher qualification and does not assert authoritative integration.
 
 ## Approved contract
 
@@ -26,7 +26,7 @@ Strict duplicate-key parsing is scoped to the evaluation-input and manifest boun
 ## Preserved authority and qualification limits
 
 - D1–D3 remain the approved capture-integrity, cutoff-availability, and missing-versus-zero rules; a `VERIFIED` link means only that this evaluation is tied to the specified retained local bytes and text.
-- **MarketLiveIPOGMP remains NOT QUALIFIED.** R7 remains **UNRESOLVED**. No R7 capture was taken, and none is authorized or implied here.
+- **MarketLiveIPOGMP remains NOT QUALIFIED; InvestorGain remains NOT QUALIFIED; PapsDigital remains a non-independent alternative.** R7 remains **UNRESOLVED**; R8 history remains open. No R7 capture was taken in this task because the documented new-observation condition was not met. Linkage does not qualify a publisher.
 - Publisher authenticity, source-native bytes, cached-content status, source revision history, R7, and R8 are not established by a link, local Git write-once checks, or local hashes.
 - The frozen evaluation core, scoring semantics, A9 behavior, existing schemas/versions, and honest `UNKNOWN` capture-window handling are unchanged.
 - Replay preserves raw link declarations so failed/contradictory links remain failed on replay.
@@ -48,10 +48,10 @@ Verification record:
   - `.venv/bin/python -m compileall -q engine tests` — **PASS**;
   - `git show --check --oneline HEAD` and `git diff --check HEAD^ HEAD` — **PASS**.
 
-The implementation change itself is `e473f0090916cf6a125447be077316ea694b2675`; the post-documentation verification was actually run with `HEAD=99759bcad75db3b16451c90e3b74960e04219e11`. The subsequent edit to this record is documentation-only; the final report will distinguish that commit from the test-run commit.
+The latest full verification before this tracker/A18 documentation reconciliation ran at `HEAD=ca6c9862c5809d72a73d1493ef5f6fe31ec7f34f`: focused tests **128 passed** in 9.64 seconds; full suite **885 passed** in 316.21 seconds with the same two Starlette deprecation warnings; compileall **PASS**; `verify_frozen_core()` **PASS** for all six pinned files; and `git show --check` / `git diff --check` **PASS**. Those results are self-run, not independent verification. The current tracker and A18 edits are documentation-only, and tests have not been rerun after them.
 
 ## Dependencies and next steps
 
-1. Keep this decision record separate from the implementation commit for review.
-2. The repository tracker was not edited under the task's explicit scope restriction; its historical GMP/linkage status must be reconciled through the authorized tracker process before treating it as current status.
-3. Prepare any authoritative integration as a new, implementation-only commit based on the authoritative baseline above; do not merge the implementation branch wholesale or import the old proposal history unchanged.
+1. Keep implementation and documentation in separate commits. The existing implementation changes and A18/source-policy documentation already have separate commits on the session branch; the present tracker reconciliation is also documentation-only.
+2. The repository tracker is now reconciled on the working session branch, and explicitly states that the session-branch push is not authoritative publication. The authoritative baseline tracker remains unchanged at `805affe10ef387b649717facb31b0378f7b233d7`.
+3. Clean baseline-derived implementation and documentation refs were not created because this Arena session is fixed to `arena/ea6e5bc2-ipo-screening-engine`. The next publication step, in a workflow permitted to create the requested refs, is to derive the implementation commit from `805affe10ef387b649717facb31b0378f7b233d7` using only the eight scoped implementation/test paths, derive a separate concise documentation commit (A18, a minimal §7 reconciliation, and the tracker update), run the listed checks on those clean commits, then push and verify both normal refs. Do not fast-forward the authoritative branch to the six-commit session branch, import its proposal commits wholesale, or open competing/intermediate PRs.
