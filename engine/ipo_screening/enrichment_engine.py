@@ -370,6 +370,10 @@ class EnrichmentEngine:
             enrichment_dict = pbn.to_enrichment_dict()
             source_ref = enrichment_dict.get("sources", [{}])[0]
             price_band = enrichment_dict.get("price_band", {})
+            fresh_amount = enrichment_dict.get("fresh_issue_amount")
+            if isinstance(fresh_amount, dict):
+                price_band = dict(price_band)
+                price_band["_fresh_issue_amount"] = fresh_amount
             return price_band, source_ref
 
         # Mapping / dict shape
@@ -377,7 +381,12 @@ class EnrichmentEngine:
         if "price_band" in pbn_dict:
             # Phase 5E contract doc shape
             source_ref = pbn_dict.get("sources", [{}])[0] if pbn_dict.get("sources") else None
-            return pbn_dict["price_band"], source_ref
+            price_band = pbn_dict["price_band"]
+            fresh_amount = pbn_dict.get("fresh_issue_amount")
+            if isinstance(fresh_amount, dict):
+                price_band = dict(price_band)
+                price_band["_fresh_issue_amount"] = fresh_amount
+            return price_band, source_ref
         elif "price_band_high" in pbn_dict or "price_band_low" in pbn_dict:
             # Flat dictionary shape
             return pbn_dict, pbn_dict.get("_source_ref")
@@ -401,6 +410,43 @@ class EnrichmentEngine:
     ) -> None:
         issue = canonical.get("issue", {})
         evidence = canonical["_evidence"]
+
+        # 0. Fresh-issue amount: the filing may leave the aggregating
+        # amount undisclosed ([●]) while the verified official document
+        # (final Prospectus cover) states it. Carry the stated amount --
+        # converted from its stated unit into the canonical reporting
+        # unit -- with the document's own provenance. Never derived from
+        # price x shares: only the amount the document establishes.
+        fresh_amount = (pbn_data or {}).get("_fresh_issue_amount")
+        if issue.get("fresh_issue") is None and isinstance(fresh_amount, dict):
+            stated_value = fresh_amount.get("value")
+            stated_unit = str(fresh_amount.get("unit") or "")
+            reporting_unit = (
+                canonical.get("financials", {}).get("reporting_unit", "INR_LAKHS")
+            )
+            stated_multiplier = cls._UNIT_MULTIPLIERS.get(stated_unit)
+            target_multiplier = cls._UNIT_MULTIPLIERS.get(reporting_unit, 100_000)
+            if (
+                isinstance(stated_value, (int, float))
+                and stated_value > 0
+                and stated_multiplier
+            ):
+                converted = float(stated_value) * stated_multiplier / target_multiplier
+                issue["fresh_issue"] = round(converted, 6)
+                evidence["issue.fresh_issue"] = {
+                    "source_id": fresh_amount.get("source_id"),
+                    "locator": fresh_amount.get("locator")
+                    or "Official document — Fresh Issue amount",
+                    "extraction_method": fresh_amount.get(
+                        "extraction_method", ExtractionMethod.DETERMINISTIC_PDF.value
+                    ),
+                    "note": (
+                        "Fresh-issue aggregating amount as stated in the "
+                        f"verified official document ({stated_value} {stated_unit}); "
+                        f"carried in canonical reporting unit {reporting_unit}."
+                    ),
+                }
+                traceability["fresh_issue"] = FieldDisposition.ASSEMBLED.value
 
         # 1. Price Band High (Cap)
         cap_val, cap_ev = cls._resolve_pricing_field("price_band_high", issue, pbn_data, pbn_source_ref, supplemental)

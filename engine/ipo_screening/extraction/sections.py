@@ -150,6 +150,18 @@ class SectionExtractor:
                 if pfx in cname:
                     cname = cname.replace(pfx, "").strip()
             cname = re.sub(r'^(?:100%\s+)?BOOK\s+BUILT\s+ISSUE\s*', '', cname, flags=re.IGNORECASE).strip()
+            if "\n" in cname:
+                # The lazy cover span can swallow preceding cover lines
+                # (document-class titles are stripped above; logos and
+                # other header matter are not names). The issuer name is
+                # the standalone line ending in LIMITED within the span.
+                name_lines = [
+                    ln.strip()
+                    for ln in cname.splitlines()
+                    if ln.strip().upper().endswith("LIMITED") and len(ln.split()) >= 2
+                ]
+                if name_lines:
+                    cname = name_lines[-1]
             extractions.append(
                 RawExtraction(
                     field_path="company_name",
@@ -166,7 +178,7 @@ class SectionExtractor:
 
         # 1b. Issue Dates from Cover/Notice
         m_open = re.search(
-            r'(?:issue|bid(?:\s*/\s*offer)?)\s*opens?\s*(?:on)?\s*(?:\([0-9]+\))?:?\s*([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})',
+            r'(?:issue|bid(?:\s*/\s*offer)?)\s*opens?\s*(?:on)?\s*(?:\([0-9]+\))?:?\s*(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*)?([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})',
             cover_text,
             re.IGNORECASE,
         )
@@ -196,7 +208,7 @@ class SectionExtractor:
                 )
 
         m_close = re.search(
-            r'(?:issue|bid(?:\s*/\s*offer)?)\s*closes?\s*(?:on)?\s*(?:\([0-9]+\))?:?\s*([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})',
+            r'(?:issue|bid(?:\s*/\s*offer)?)\s*closes?\s*(?:on)?\s*(?:\([0-9]+\))?:?\s*(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*)?([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})',
             cover_text,
             re.IGNORECASE,
         )
@@ -401,7 +413,7 @@ class SectionExtractor:
 
         # 3. OFS Seller & shares / NIL detection
         m_ofs_nil = re.search(
-            r'offer for sale(?: size)?[^\n]*?(?:[^\n]*?\n){0,16}?\s*NIL\b',
+            r'offer for sale(?: size)?[^\n]*?(?:[^\n]*?\n){0,16}?\s*(?:NIL|Not\s+Applicable)\b',
             cover_text,
             re.IGNORECASE,
         )

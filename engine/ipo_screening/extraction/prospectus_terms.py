@@ -52,6 +52,13 @@ class ProspectusTermsResult:
     price_band_low: Optional[PriceBandField] = None
     price_band_high: Optional[PriceBandField] = None
     lot_size: Optional[PriceBandField] = None
+    # Fresh-issue aggregating amount as stated on the cover/offer table
+    # (with its stated unit). An RHP may leave this [●] while the final
+    # Prospectus states it; the canonical input requires the amount, so
+    # the verified Prospectus pathway carries it when -- and only when --
+    # the document explicitly establishes it.
+    fresh_issue_amount: Optional[PriceBandField] = None
+    fresh_issue_amount_unit: Optional[str] = None
     open_date: Optional[PriceBandField] = None
     close_date: Optional[PriceBandField] = None
     document_class: str = "OFFICIAL_PROSPECTUS"
@@ -97,13 +104,25 @@ class ProspectusTermsResult:
             or self.source_ref.retrieval_timestamp
             or "2026-10-05T12:00:00Z"
         )
-        return {
+        payload: Dict[str, Any] = {
             "contract_version": "1.0",
             "ipo_id": doc_id,
             "as_of": as_of,
             "sources": sources_payload,
             "price_band": price_band_payload,
         }
+        if self.fresh_issue_amount is not None:
+            payload["fresh_issue_amount"] = {
+                "value": self.fresh_issue_amount.value,
+                "unit": self.fresh_issue_amount_unit,
+                "source_id": source_id,
+                "locator": self.fresh_issue_amount.locator,
+                "page": self.fresh_issue_amount.page,
+                "quote": self.fresh_issue_amount.quote,
+                "extraction_method": self.fresh_issue_amount.extraction_method,
+                "verification": self.fresh_issue_amount.verification,
+            }
+        return payload
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -117,6 +136,8 @@ class ProspectusTermsResult:
             "price_band_low": self.price_band_low.value if self.price_band_low else None,
             "price_band_high": self.price_band_high.value if self.price_band_high else None,
             "lot_size": self.lot_size.value if self.lot_size else None,
+            "fresh_issue_amount": self.fresh_issue_amount.value if self.fresh_issue_amount else None,
+            "fresh_issue_amount_unit": self.fresh_issue_amount_unit,
         }
 
 
@@ -320,7 +341,57 @@ class ProspectusTermsParser:
         result.lot_size = self._extract_term(
             pages, _LOT_PATTERNS, "lot_size", "Final Prospectus — 'Bid Lot' definition", integer=True
         )
+        amount_field, amount_unit = self._extract_fresh_issue_amount(pages)
+        result.fresh_issue_amount = amount_field
+        result.fresh_issue_amount_unit = amount_unit
         return result
+
+    @staticmethod
+    def _extract_fresh_issue_amount(
+        pages: Sequence[Tuple[int, str]],
+    ) -> Tuple[Optional[PriceBandField], Optional[str]]:
+        """The fresh-issue aggregating amount as stated by the document.
+
+        Bounded to the fresh-issue label and an explicit currency amount
+        with a stated unit; an undisclosed ([●]) or unlabelled amount is
+        not established and stays None (fail closed).
+        """
+        pattern = re.compile(
+            r"fresh\s+(?:issue|offer)\b.{0,260}?aggregating\s+(?:up\s+to\s+)?"
+            r"(?:rs\.?|inr|\u20B9)\s*([0-9,]+(?:\.[0-9]+)?)\s*(lakhs?|millions?|crores?)",
+            re.IGNORECASE | re.DOTALL,
+        )
+        unit_map = (
+            ("lakh", "INR_LAKHS"),
+            ("million", "INR_MILLIONS"),
+            ("crore", "INR_CRORES"),
+        )
+        for page_num, text in pages:
+            match = pattern.search(text)
+            if not match:
+                continue
+            value = parse_indian_number(match.group(1))
+            if value is None:
+                continue
+            unit_word = match.group(2).lower()
+            unit = next((u for key, u in unit_map if unit_word.startswith(key)), None)
+            if unit is None:
+                continue
+            return (
+                PriceBandField(
+                    name="fresh_issue_amount",
+                    value=value,
+                    raw_text=match.group(0),
+                    page=page_num,
+                    locator="Final Prospectus — Fresh Issue amount (cover offer table)",
+                    quote=_quote_window(text, match.start(), match.end()),
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    verification=Verification.VERIFIED.value,
+                    confidence=0.95,
+                ),
+                unit,
+            )
+        return None, None
 
     @staticmethod
     def _extract_company_name(text: str) -> Optional[str]:
