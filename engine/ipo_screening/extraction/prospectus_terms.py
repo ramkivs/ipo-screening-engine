@@ -175,8 +175,41 @@ _LOT_PATTERNS: Sequence[re.Pattern[str]] = (
 )
 
 
-def _quote_window(text: str, start: int, end: int, radius: int = 110) -> str:
-    snippet = text[max(0, start - radius): end + radius].replace("\n", " ")
+def _quote_window(text: str, start: int, end: int, radius: int = 170) -> str:
+    """Bounded quotation around a matched definition.
+
+    The result is always an exact substring of the source (modulo the
+    whitespace normalisation already used for PDF text): the left edge
+    snaps forward to just after the nearest preceding sentence or
+    definition boundary, and the right edge snaps to the end of the
+    sentence containing the match, so quotations do not start or end
+    mid-definition when a boundary exists within the window.
+    """
+    lo = max(0, start - radius)
+    hi = min(len(text), end + radius)
+
+    left_segment = text[lo:start]
+    boundary = max(
+        left_segment.rfind(". "),
+        left_segment.rfind("\n"),
+    )
+    if boundary >= 0:
+        lo = lo + boundary + 1
+
+    right_segment = text[end:hi]
+    terminators = [
+        idx
+        for idx in (
+            right_segment.find(". "),
+            right_segment.find(".”"),
+            right_segment.find("\n"),
+        )
+        if idx >= 0
+    ]
+    if terminators:
+        hi = end + min(terminators) + 1
+
+    snippet = text[lo:hi].replace("\n", " ")
     return re.sub(r"\s+", " ", snippet).strip()
 
 

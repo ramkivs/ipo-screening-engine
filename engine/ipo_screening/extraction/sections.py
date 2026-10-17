@@ -11,7 +11,7 @@ Extracts non-table and hybrid sections according to ICDR layout:
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import pypdf
 
@@ -41,6 +41,91 @@ class SectionExtractor:
             self._text_cache[page_1_indexed] = txt
             return txt
         return ""
+
+    @staticmethod
+    def _labelled_quantity_candidates(
+        text: str,
+        label_pattern: str,
+        forbidden_markers: Sequence[str],
+        window: int = 220,
+    ) -> List[Tuple[float, str]]:
+        """Quantities bound to a semantic label within a bounded window.
+
+        A candidate is rejected when another issue component's label
+        (e.g. "offer for sale" for a fresh-issue quantity) intervenes
+        between the label and the number -- the classic cover-page
+        confusion where one regex spans two clauses of the offer
+        structure sentence and assigns the OFS quantity to fresh
+        shares. Generic across issuers and layouts.
+        """
+        candidates: List[Tuple[float, str]] = []
+        for match in re.finditer(label_pattern, text, re.IGNORECASE):
+            segment = text[match.end(): match.end() + window]
+            quantity_match = re.search(
+                r'(?:of\s+)?(?:up\s*to\s*)?([0-9,]+)\s*equity shares',
+                segment,
+                re.IGNORECASE,
+            )
+            if not quantity_match:
+                continue
+            between = segment[: quantity_match.start()].lower()
+            if any(marker in between for marker in forbidden_markers):
+                continue
+            value = parse_indian_number(quantity_match.group(1))
+            if value:
+                candidates.append(
+                    (value, text[match.start(): match.end() + quantity_match.end()])
+                )
+        return candidates
+
+    @staticmethod
+    def _extract_seller_names(text: str) -> List[Tuple[str, str]]:
+        """Selling-shareholder identities anchored on the
+        ("SELLING SHAREHOLDER") marker itself, so sellers listed after
+        commas/"and" (not only after "by") are all enumerated. Returns
+        (name, exact source substring) pairs, de-duplicated in order.
+        """
+        results: List[Tuple[str, str]] = []
+        seen: set = set()
+        for marker in re.finditer(
+            r'\(\s*[“"]SELLING SHAREHOLDER[”"]\s*\)', text, re.IGNORECASE
+        ):
+            segment_start = max(0, marker.start() - 160)
+            segment = text[segment_start: marker.start()]
+            tail = re.split(r',|\bBY\b|\bAND\b', segment.replace("\n", " "))[-1]
+            name_match = re.search(
+                r'([A-Za-z0-9][A-Za-z0-9\s,&\.]*?\bLimited)\s*$',
+                tail.strip(),
+                re.IGNORECASE,
+            )
+            if not name_match:
+                continue
+            name = re.sub(r"\s+", " ", name_match.group(1)).strip()
+            if name and name.upper() not in seen:
+                seen.add(name.upper())
+                first_word = name.split()[0]
+                offset = segment.upper().find(first_word.upper())
+                start = segment_start + (offset if offset >= 0 else 0)
+                results.append((name, text[start: marker.end()]))
+        return results
+
+    @classmethod
+    def _resolve_labelled_quantity(
+        cls,
+        text: str,
+        label_pattern: str,
+        forbidden_markers: Sequence[str],
+    ) -> Tuple[Optional[float], Optional[str]]:
+        """Resolve one labelled quantity, failing closed on ambiguity.
+
+        Distinct surviving values for the same label are contradictory
+        evidence: no value is chosen arbitrarily.
+        """
+        candidates = cls._labelled_quantity_candidates(text, label_pattern, forbidden_markers)
+        values = {value for value, _quote in candidates}
+        if len(values) == 1:
+            return candidates[0]
+        return None, None
 
     def extract_cover_and_offer(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract company name, issue size, price band, quotas, and OFS details."""
@@ -237,37 +322,50 @@ class SectionExtractor:
             )
 
         # 2. Fresh Issue Shares & Amount
-        m_fshares = re.search(
-            r'fresh (?:offer|issue)[^\n]*?(?:of\s+)?(?:up\s*to\s*)?([0-9,]+)\s*equity shares',
+        # The quantity must be bound to the fresh-issue label without an
+        # intervening Offer-for-Sale label: cover sentences routinely
+        # state "... (FRESH OFFER) AND AN OFFER FOR SALE OF UP TO N
+        # EQUITY SHARES", and an unguarded span assigns the OFS quantity
+        # to fresh shares. Ambiguous (contradictory) bindings fail closed.
+        fresh_shares_count, fresh_quote = self._resolve_labelled_quantity(
             cover_text,
-            re.IGNORECASE,
+            r'fresh\s+(?:offer|issue)\b',
+            ("offer for sale", "ofs", "selling shareholder"),
         )
-        fresh_shares_count = None
-        if m_fshares:
-            fresh_shares_count = parse_indian_number(m_fshares.group(1))
-            if fresh_shares_count:
-                extractions.append(
-                    RawExtraction(
-                        field_path="issue.fresh_shares",
-                        candidate_value=int(fresh_shares_count),
-                        raw_text=str(int(fresh_shares_count)),
-                        page=1,
-                        section="Cover",
-                        locator="Cover page, Fresh Issue Shares",
-                        quote=m_fshares.group(0),
-                        extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
-                        extraction_confidence=0.98,
-                    )
+        if fresh_shares_count:
+            extractions.append(
+                RawExtraction(
+                    field_path="issue.fresh_shares",
+                    candidate_value=int(fresh_shares_count),
+                    raw_text=str(int(fresh_shares_count)),
+                    page=1,
+                    section="Cover",
+                    locator="Cover page, Fresh Issue Shares",
+                    quote=fresh_quote,
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.98,
                 )
+            )
 
-        m_fresh = re.search(
-            r'fresh (?:offer|issue)[^\n]*?aggregating up to ₹\s*([0-9,]+(?:\.[0-9]+)?)\s*(lakhs?|crores?|millions?)',
-            cover_text,
-            re.IGNORECASE,
-        )
+        m_fresh = None
+        for _label_match in re.finditer(r'fresh\s+(?:offer|issue)\b', cover_text, re.IGNORECASE):
+            _segment = cover_text[_label_match.end(): _label_match.end() + 220]
+            _amount_match = re.search(
+                r'aggregating(?: up)? to ₹\s*([0-9,]+(?:\.[0-9]+)?)\s*(lakhs?|crores?|millions?)',
+                _segment,
+                re.IGNORECASE,
+            )
+            if not _amount_match:
+                continue
+            _between = _segment[: _amount_match.start()].lower()
+            if "offer for sale" in _between or "selling shareholder" in _between:
+                continue  # amount belongs to the OFS clause, not the fresh issue
+            m_fresh = (_label_match, _amount_match)
+            break
         if m_fresh:
-            raw_val = m_fresh.group(1)
-            unit_val = m_fresh.group(2).upper()
+            _label_match, _amount_match = m_fresh
+            raw_val = _amount_match.group(1)
+            unit_val = _amount_match.group(2).upper()
             num_val = parse_indian_number(raw_val)
             extractions.append(
                 RawExtraction(
@@ -278,7 +376,7 @@ class SectionExtractor:
                     page=1,
                     section="Cover",
                     locator="Cover page, Fresh Offer",
-                    quote=m_fresh.group(0),
+                    quote=cover_text[_label_match.start(): _label_match.end() + _amount_match.end()],
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.98,
                 )
@@ -336,25 +434,24 @@ class SectionExtractor:
                 )
             )
         else:
-            m_ofs_shares = re.search(
-                r'offer for sale[^\n]*?up to\s*([0-9,]+)\s*equity shares',
+            ofs_shares_count, ofs_quote = self._resolve_labelled_quantity(
                 cover_text,
-                re.IGNORECASE,
+                r'offer\s+for\s+sale\b',
+                ("fresh offer", "fresh issue"),
             )
-            ofs_shares_count = None
-            if m_ofs_shares:
-                ofs_shares_count = parse_indian_number(m_ofs_shares.group(1))
 
-            m_seller = re.search(
-                r'by\s+([A-Za-z0-9\s,\.\(\)]+?(?:Private|Public)?\s*Limited)\s*\(\s*[“"]SELLING SHAREHOLDER[”"]\s*\)',
-                cover_text,
-                re.IGNORECASE,
-            )
-            if m_seller:
-                seller_name = m_seller.group(1).strip()
+            seller_entries = self._extract_seller_names(cover_text)
+            seller_names = [name for name, _quote in seller_entries]
+
+            if len(seller_names) == 1:
+                # Sole named selling shareholder: the cover's aggregate
+                # OFS quantity is that seller's quantity. (The v1.5 seller
+                # model requires numeric pre_issue_shares, which the
+                # cover does not independently establish; it carries the
+                # established sold quantity, as in existing records.)
                 ofs_seller_obj = [
                     {
-                        "name": seller_name,
+                        "name": seller_names[0],
                         "type": "promoter_group",
                         "pre_issue_shares": int(ofs_shares_count) if ofs_shares_count else None,
                         "shares_sold": int(ofs_shares_count) if ofs_shares_count else None,
@@ -370,9 +467,33 @@ class SectionExtractor:
                         page=1,
                         section="Cover",
                         locator="Cover page, Details of the Offer for Sale",
-                        quote=m_seller.group(0),
+                        quote=seller_entries[0][1],
                         extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                         extraction_confidence=0.95,
+                    )
+                )
+            elif len(seller_names) > 1:
+                # Multiple selling shareholders with (at most) an
+                # aggregate OFS quantity: the v1.5 seller model cannot
+                # represent an unattributed quantity, and the aggregate
+                # must not be attributed to any individual seller.
+                # Seller identity is preserved in the evidence quotation;
+                # the canonical seller list stays empty so OFS derivation
+                # fails closed instead of guessing.
+                _span_start = cover_text.find(seller_entries[0][1])
+                _span_end = cover_text.find(seller_entries[-1][1]) + len(seller_entries[-1][1])
+                _span = cover_text[_span_start:_span_end]
+                extractions.append(
+                    RawExtraction(
+                        field_path="issue.ofs_sellers",
+                        candidate_value=[],
+                        raw_text="[]",
+                        page=1,
+                        section="Cover",
+                        locator="Cover page, Details of the Offer for Sale",
+                        quote=_span[:600],
+                        extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                        extraction_confidence=0.90,
                     )
                 )
 
