@@ -92,8 +92,12 @@ export class ApiClient {
       }
       const code = errPayload.code || (errPayload.detail && errPayload.detail.code) || `HTTP_${response.status}`;
       const message = errPayload.message || (errPayload.detail && errPayload.detail.message) || (typeof errPayload.detail === 'string' ? errPayload.detail : response.statusText);
-      const details = errPayload.details || (errPayload.detail && errPayload.detail.details) || null;
-      throw new ApiError(response.status, code, message, details);
+      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : {};
+      const details = { ...(detailObj.details || {}), ...(errPayload.details || {}) };
+      if (detailObj.missing_fields) details.missing_fields = detailObj.missing_fields;
+      if (detailObj.resolution) details.resolution = detailObj.resolution;
+      if (detailObj.conflicts) details.conflicts = detailObj.conflicts;
+      throw new ApiError(response.status, code, message, Object.keys(details).length ? details : null);
     }
 
     return await response.json();
@@ -300,5 +304,57 @@ export class ApiClient {
     }
 
     return await response.json();
+  }
+
+  /**
+   * Step 5: ingest with bounded manual issue-term entry.
+   * Manual values (price_band_low / price_band_high / lot_size) are
+   * provenance-labelled MANUAL_ENTRY server-side and never verified.
+   */
+  async ingestManualTerms(file, options = {}) {
+    if (!file) {
+      throw new ApiError(400, 'INVALID_FILE', 'A filing document file is required.');
+    }
+    const formData = new FormData();
+    let blobFile = file;
+    if (typeof Blob !== 'undefined' && !(file instanceof Blob)) {
+      blobFile = new Blob([file], { type: 'application/pdf' });
+    }
+    formData.append('file', blobFile, file.name || 'filing.pdf');
+    if (options.mode) formData.append('mode', options.mode);
+    const terms = options.terms || {};
+    if (terms.price_band_low !== undefined && terms.price_band_low !== null && terms.price_band_low !== '') formData.append('price_band_low', String(terms.price_band_low));
+    if (terms.price_band_high !== undefined && terms.price_band_high !== null && terms.price_band_high !== '') formData.append('price_band_high', String(terms.price_band_high));
+    if (terms.lot_size !== undefined && terms.lot_size !== null && terms.lot_size !== '') formData.append('lot_size', String(terms.lot_size));
+    if (options.explanation) formData.append('explanation', options.explanation);
+    if (options.confirmConflicts) formData.append('confirm_conflicts', 'true');
+
+    const url = new URL(
+      `${this.apiPrefix}/ingest/manual-terms`,
+      typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
+    );
+    let response;
+    try {
+      response = await fetch(url.toString(), { method: 'POST', headers: { Accept: 'application/json' }, body: formData });
+    } catch (networkErr) {
+      throw new ApiError(0, 'NETWORK_ERROR', `Network failure during upload: ${networkErr.message}`);
+    }
+    if (!response.ok) {
+      let errPayload;
+      try {
+        errPayload = await response.json();
+      } catch {
+        throw new ApiError(response.status, 'HTTP_ERROR', `Server error (${response.status})`);
+      }
+      const code = errPayload.code || (errPayload.detail && errPayload.detail.code) || 'INGESTION_ERROR';
+      const message = errPayload.message || (errPayload.detail && errPayload.detail.message) || (typeof errPayload.detail === 'string' ? errPayload.detail : 'Manual-terms ingestion failed');
+      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : {};
+      const details = { ...(detailObj.details || {}), ...(errPayload.details || {}) };
+      if (detailObj.missing_fields) details.missing_fields = detailObj.missing_fields;
+      if (detailObj.resolution) details.resolution = detailObj.resolution;
+      if (detailObj.conflicts) details.conflicts = detailObj.conflicts;
+      throw new ApiError(response.status, code, message, Object.keys(details).length ? details : null);
+    }
+    return response.json();
   }
 }

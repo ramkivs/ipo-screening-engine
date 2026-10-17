@@ -463,8 +463,9 @@ def test_service_ingest_document_signature_has_no_path_parameter():
     assert "reference_base_path" not in param_names
     assert "base_path" not in param_names
     assert "path" not in param_names
-    # Expected signature: self, file_bytes, filename, mode
-    assert param_names == ["self", "file_bytes", "filename", "mode"]
+    # Step 5 extends the signature with bounded manual-entry parameters;
+    # caller-controlled filesystem path parameters remain prohibited.
+    assert param_names == ["self", "file_bytes", "filename", "mode", "manual_terms", "manual_explanation", "confirm_conflicts"]
 
 
 def test_repository_native_internal_extractor_retains_reference_base_path_support():
@@ -672,15 +673,18 @@ def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):
     assert body["ipo_id"] == "R-K-FASHION-ACCESSORIES-LIMITED"
     assert body["evaluation_mode"] == "FINAL"
     assert body["is_duplicate"] is False
-    assert body["final_score"] == pytest.approx(50.0)
+    # Step 4 Area B(i): RK's opinion is not establishable from the filing,
+    # so the auditor criterion is UNKNOWN instead of scored on an
+    # unsupported "unqualified" default (final 50.0 -> 49.0).
+    assert body["final_score"] == pytest.approx(49.0)
     assert body["confidence"] == "Low"
     assert body["verdict"] == "INSUFFICIENT_DATA"
 
     eval_data = body["evaluation"]
-    assert eval_data["score"]["final_score"] == pytest.approx(50.0)
-    assert eval_data["score"]["base_score"] == pytest.approx(53.0)
+    assert eval_data["score"]["final_score"] == pytest.approx(49.0)
+    assert eval_data["score"]["base_score"] == pytest.approx(52.0)
     assert eval_data["score"]["penalties_total"] == pytest.approx(-3.0)
-    assert eval_data["score"]["completeness_pct"] == pytest.approx(75.0)
+    assert eval_data["score"]["completeness_pct"] == pytest.approx(73.0)
 
     # Prove absence of Vishal Nirmiti qualitative defaults
     modules = {m["id"]: m for m in eval_data["score"]["modules"]}

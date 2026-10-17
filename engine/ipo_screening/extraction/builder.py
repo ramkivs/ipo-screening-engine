@@ -271,7 +271,7 @@ class CanonicalInputBuilder:
             return self._get_field(f"governance.{key}", default)
 
         return {
-            "auditor_opinion": _pick_gov("auditor_opinion", "unqualified"),
+            "auditor_opinion": _pick_gov("auditor_opinion", None),
             "auditor_changed_3y": _pick_gov("auditor_changed_3y", None),
             "auditor_reputed": _pick_gov("auditor_reputed", None),
             "repeated_eom": _pick_gov("repeated_eom", None),

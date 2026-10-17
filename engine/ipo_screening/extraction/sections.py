@@ -709,7 +709,12 @@ class SectionExtractor:
         fin_range = page_ranges.get("restated_financials") if page_ranges else None
         p_start, p_end = fin_range or (60, min(80, self.page_count))
 
-        auditor_opinion = "unqualified"
+        # The opinion is established only by positive opinion language in
+        # the examination report. Failure to detect adverse language is NOT
+        # evidence of an unqualified opinion: when no opinion language is
+        # found the field stays unknown (None) and no extraction is emitted
+        # (Step 4 Area B(i), approved 2026-10-17).
+        auditor_opinion = None
         found_opinion_page = p_start
 
         scan_pages = list(range(p_start, min(p_end + 1, self.page_count + 1)))
@@ -718,15 +723,44 @@ class SectionExtractor:
 
         for p in scan_pages:
             txt = self.extract_page_text(p)
-            if "examination report" in txt.lower() or "independent auditor" in txt.lower():
-                if "emphasis of matter" in txt.lower() or "included following matter(s)" in txt.lower():
+            low = txt.lower()
+            if "examination report" in low or "independent auditor" in low:
+                if "emphasis of matter" in low or "included following matter(s)" in low:
                     auditor_opinion = "emphasis_of_matter"
                     found_opinion_page = p
                     break
-                elif "qualified opinion" in txt.lower() or "adverse opinion" in txt.lower():
+                elif "adverse opinion" in low:
+                    auditor_opinion = "adverse"
+                    found_opinion_page = p
+                    break
+                elif "disclaimer of opinion" in low:
+                    auditor_opinion = "disclaimer"
+                    found_opinion_page = p
+                    break
+                elif "unqualified opinion" in low or "unmodified opinion" in low:
+                    auditor_opinion = "unqualified"
+                    found_opinion_page = p
+                    break
+                elif "qualified opinion" in low:
                     auditor_opinion = "qualified"
                     found_opinion_page = p
                     break
+
+        if auditor_opinion is not None:
+            extractions.append(
+                RawExtraction(
+                    field_path="governance.auditor_opinion",
+                    candidate_value=auditor_opinion,
+                    raw_text=auditor_opinion,
+                    page=found_opinion_page,
+                    section="Financial Information",
+                    locator="Auditor Examination Report — Opinion",
+                    quote=f"Auditor opinion classified as {auditor_opinion} from examination-report opinion language",
+                    quote_is_processing=True,
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.90,
+                )
+            )
 
         # 1b. Auditor Details & Standing
         auditor_name = None

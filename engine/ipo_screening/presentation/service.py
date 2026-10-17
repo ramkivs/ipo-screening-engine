@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timezone
 import shutil
 import tempfile
 from pathlib import Path
@@ -111,6 +112,19 @@ class IngestionAwaitingIssueTermsError(IngestionError):
         self.missing_fields = list(missing_fields)
         self.resolution = resolution or {}
 
+
+
+class IngestionIssueTermConflictError(IngestionError):
+    """Manually entered issue terms conflict with existing values.
+
+    Raised before anything is evaluated or persisted; the caller must
+    explicitly confirm the resolution. Confirmation never upgrades
+    manual provenance to verified provenance.
+    """
+
+    def __init__(self, message: str, *, conflicts: list):
+        super().__init__(message)
+        self.conflicts = list(conflicts)
 
 
 class PresentationConfig:
@@ -731,6 +745,7 @@ class PresentationService:
                     value_summary=value_summary,
                     quote_kind=quote_kind,
                     note=note,
+                    extraction_method=item.get("extraction_method"),
                 )
             )
 
@@ -1029,11 +1044,17 @@ class PresentationService:
 
     MAX_INGEST_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB bound
 
+    MANUAL_ISSUE_TERM_FIELDS = ("price_band_low", "price_band_high", "lot_size")
+    MANUAL_ENTRY_SOURCE_ID = "SRC-MANUAL-ENTRY"
+
     def ingest_document(
         self,
         file_bytes: bytes,
         filename: str = "filing.pdf",
         mode: str = "final",
+        manual_terms: Optional[Dict[str, Any]] = None,
+        manual_explanation: Optional[str] = None,
+        confirm_conflicts: bool = False,
     ) -> IngestionResponse:
         """Process an uploaded PDF filing through extraction and evaluation pipelines.
 
@@ -1066,6 +1087,42 @@ class PresentationService:
             raise IngestionValidationError(
                 f"Invalid evaluation mode '{mode}'. Allowed modes are 'final' and 'preliminary'."
             )
+
+        # Step 5 (Step 4 Area C, approved 2026-10-17): bounded manual entry
+        # for price_band_low / price_band_high / lot_size only. Manual values
+        # are provenance-labelled MANUAL_ENTRY and are never source-verified.
+        manual_clean: Dict[str, Any] = {}
+        if manual_terms:
+            unknown_keys = sorted(set(manual_terms) - set(self.MANUAL_ISSUE_TERM_FIELDS))
+            if unknown_keys:
+                raise IngestionValidationError(
+                    "Manual issue-term entry is limited to price_band_low, "
+                    f"price_band_high and lot_size; unsupported field(s): {unknown_keys}."
+                )
+            manual_clean = {k: v for k, v in manual_terms.items() if v is not None}
+            if manual_clean:
+                if not (manual_explanation or "").strip():
+                    raise IngestionValidationError(
+                        "An explanation is required for manually entered issue terms."
+                    )
+                for field_name, value in manual_clean.items():
+                    if isinstance(value, bool) or not isinstance(value, (int, float)):
+                        raise IngestionValidationError(
+                            f"Manually entered issue.{field_name} must be a number."
+                        )
+                    if value <= 0:
+                        raise IngestionValidationError(
+                            f"Manually entered issue.{field_name} must be positive."
+                        )
+                    if field_name == "lot_size" and float(value) != int(value):
+                        raise IngestionValidationError(
+                            "Manually entered issue.lot_size must be a whole number of shares."
+                        )
+                if "price_band_low" in manual_clean and "price_band_high" in manual_clean:
+                    if float(manual_clean["price_band_low"]) > float(manual_clean["price_band_high"]):
+                        raise IngestionValidationError(
+                            "Manually entered price_band_low must not exceed price_band_high."
+                        )
 
         config_path = self.config.config_dir / f"ipo-config.v{V1_5_BASELINE_VERSION}.json"
         if not config_path.is_file():
@@ -1104,6 +1161,7 @@ class PresentationService:
         # official evidence is available: no value is invented, substituted
         # or borrowed, and nothing is evaluated or persisted.
         issue_terms_report: Optional[Dict[str, Any]] = None
+        pending_awaiting: Optional[Tuple[list, dict, str]] = None
         issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
         missing_issue_fields = [
             field
@@ -1168,15 +1226,132 @@ class PresentationService:
                     "PARTIAL": "only some required terms could be verified from official sources",
                     "UNVERIFIED": "an issuer-matched notice exists only as a retained copy whose official provenance is not established (configure the official exchange announcement via IPO_PRICE_BAND_NOTICE_URLS to use it)",
                 }.get(outcome.status, "the terms have not yet been published in the configured official sources")
-                raise IngestionAwaitingIssueTermsError(
-                    "AWAITING_ISSUE_TERMS: required issue terms are unavailable: "
-                    + ", ".join(f"issue.{field}" for field in unresolved)
-                    + f". The uploaded filing does not disclose them and {reason}. "
-                    "No evaluation was produced, no values were assumed, and nothing was persisted. "
-                    "Retry after the official Price Band Notice is published, or upload a filing that discloses these terms.",
-                    missing_fields=unresolved,
-                    resolution=resolution_dict,
+                # Defer the awaiting raise: authorized manual entry (Step 5)
+                # may still resolve the bounded terms below. Without manual
+                # terms the deferred raise fires unchanged before evaluation.
+                pending_awaiting = (unresolved, resolution_dict, reason)
+
+        # --- Step 5: bounded manual issue-term entry ---------------------
+        # Runs after verified-official resolution. Manual values never
+        # upgrade provenance: they are recorded as MANUAL_ENTRY against a
+        # STRUCTURED_INPUT operator source, and a conflicting verified
+        # official value always wins over a manual value.
+        if manual_clean:
+            issue_now = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+            evidence_map = canonical_dict.get("_evidence", {})
+            if not isinstance(evidence_map, dict):
+                evidence_map = {}
+
+            def _origin(field_name: str) -> str:
+                spec = evidence_map.get(f"issue.{field_name}")
+                src = spec.get("source_id", "") if isinstance(spec, dict) else ""
+                return "OFFICIAL_VERIFIED" if str(src).startswith("SRC-PBN-") else "FILING_EXTRACTION"
+
+            conflicts = []
+            for field_name, value in manual_clean.items():
+                existing = issue_now.get(field_name)
+                if existing is not None and float(existing) != float(value):
+                    conflicts.append(
+                        {
+                            "field": f"issue.{field_name}",
+                            "manual_value": value,
+                            "existing_value": existing,
+                            "existing_origin": _origin(field_name),
+                        }
+                    )
+            if conflicts and not confirm_conflicts:
+                raise IngestionIssueTermConflictError(
+                    "Manually entered issue terms conflict with existing "
+                    "values; explicit confirmation is required before "
+                    "proceeding. Nothing was evaluated or persisted.",
+                    conflicts=conflicts,
                 )
+
+            sources = canonical_dict.setdefault("_sources", [])
+            if not any(
+                isinstance(s, dict) and s.get("source_id") == self.MANUAL_ENTRY_SOURCE_ID
+                for s in sources
+            ):
+                sources.append(
+                    {
+                        "source_id": self.MANUAL_ENTRY_SOURCE_ID,
+                        "source_type": "STRUCTURED_INPUT",
+                        "retrieval_timestamp": datetime.now(timezone.utc).strftime(
+                            "%Y-%m-%dT%H:%M:%SZ"
+                        ),
+                    }
+                )
+            manual_applied: List[str] = []
+            overridden_by_verified: List[str] = []
+            for field_name, value in manual_clean.items():
+                existing = issue_now.get(field_name)
+                if (
+                    existing is not None
+                    and float(existing) != float(value)
+                    and _origin(field_name) == "OFFICIAL_VERIFIED"
+                ):
+                    # A verified official value is never displaced by a
+                    # manual entry, even after explicit confirmation.
+                    overridden_by_verified.append(field_name)
+                    continue
+                issue_now[field_name] = int(value) if field_name == "lot_size" else float(value)
+                prev_spec = evidence_map.get(f"issue.{field_name}")
+                new_spec = dict(prev_spec) if isinstance(prev_spec, dict) else {}
+                new_spec.update(
+                    {
+                        "source_id": self.MANUAL_ENTRY_SOURCE_ID,
+                        "extraction_method": "MANUAL_ENTRY",
+                        "section": "Operator Manual Entry",
+                        "locator": "Pre-processing manual issue-term entry (Step 5)",
+                        "note": (
+                            "Manually entered by the operator; NOT source-verified. "
+                            f"Explanation: {(manual_explanation or '').strip()}"
+                        ),
+                    }
+                )
+                new_spec.pop("quote", None)
+                new_spec.pop("quoted_text", None)
+                evidence_map[f"issue.{field_name}"] = new_spec
+                manual_applied.append(field_name)
+            canonical_dict["issue"] = issue_now
+            canonical_dict["_evidence"] = evidence_map
+
+            low_now, high_now = issue_now.get("price_band_low"), issue_now.get("price_band_high")
+            if low_now is not None and high_now is not None and float(low_now) > float(high_now):
+                raise IngestionValidationError(
+                    "price_band_low must not exceed price_band_high after manual entry."
+                )
+
+            if issue_terms_report is None:
+                issue_terms_report = {}
+            issue_terms_report["manual_entry"] = {
+                "fields": manual_applied,
+                "values": {f: manual_clean[f] for f in manual_applied},
+                "explanation": (manual_explanation or "").strip(),
+                "provenance": "MANUAL_ENTRY",
+                "verified": False,
+                "overridden_by_verified": overridden_by_verified,
+            }
+            if pending_awaiting is not None:
+                remaining = [f for f in pending_awaiting[0] if issue_now.get(f) is None]
+                if remaining:
+                    augmented = dict(pending_awaiting[1])
+                    augmented["manual_entry"] = issue_terms_report["manual_entry"]
+                    pending_awaiting = (remaining, augmented, pending_awaiting[2])
+                else:
+                    pending_awaiting = None
+
+        if pending_awaiting is not None:
+            unresolved, resolution_dict, reason = pending_awaiting
+            raise IngestionAwaitingIssueTermsError(
+                "AWAITING_ISSUE_TERMS: required issue terms are unavailable: "
+                + ", ".join(f"issue.{field}" for field in unresolved)
+                + f". The uploaded filing does not disclose them and {reason}. "
+                "No evaluation was produced, no values were assumed, and nothing was persisted. "
+                "Retry after the official Price Band Notice is published, or upload a filing that discloses these terms.",
+                missing_fields=unresolved,
+                resolution=resolution_dict,
+            )
 
         # Execute deterministic pipeline evaluation
         try:

@@ -51,6 +51,7 @@ from .service import (
     IngestionAwaitingIssueTermsError,
     IngestionError,
     IngestionEvaluationError,
+    IngestionIssueTermConflictError,
     IngestionExtractionError,
     IngestionPayloadTooLargeError,
     IngestionValidationError,
@@ -375,6 +376,122 @@ def create_router(service: PresentationService) -> APIRouter:
                 detail={"error": "Internal Error", "message": f"Unexpected ingestion error: {exc}", "code": "INGESTION_INTERNAL_ERROR"},
             )
 
+    @router.post("/ingest/manual-terms", response_model=IngestionResponse, tags=["Ingestion"])
+    async def ingest_document_manual_terms(
+        request: Request,
+        file: UploadFile = File(...),
+        mode: str = Form("final"),
+        price_band_low: Optional[float] = Form(None),
+        price_band_high: Optional[float] = Form(None),
+        lot_size: Optional[float] = Form(None),
+        explanation: Optional[str] = Form(None),
+        confirm_conflicts: bool = Form(False),
+    ) -> Response:
+        """Step 5: filing ingestion with bounded, provenance-labelled manual
+        entry of price_band_low / price_band_high / lot_size (Step 4 Area C).
+
+        Manual values are recorded as MANUAL_ENTRY and are never presented
+        as official-source verification. Conflicts with extracted or
+        verified values block with 409 until explicitly confirmed; a
+        verified official value is never displaced by a manual entry.
+        """
+        form_data = await request.form()
+        forbidden_params = {"reference_base_path", "base_path", "path", "file_path", "allow_fixture_fallbacks", "fallback", "allow_fallbacks"}
+        present_forbidden = forbidden_params.intersection(form_data.keys())
+        if present_forbidden:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "Bad Request",
+                    "message": f"Unauthorized security parameter(s) detected: {sorted(list(present_forbidden))}. Server filesystem paths and fixture fallback controls are strictly prohibited on the public ingestion boundary.",
+                    "code": "SECURITY_VIOLATION_UNAUTHORIZED_PARAMETER",
+                },
+            )
+        if not file or not file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Bad Request", "message": "Filing PDF file is required.", "code": "VALIDATION_ERROR"},
+            )
+        max_size = 50 * 1024 * 1024
+        if file.size and file.size > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail={"error": "Payload Too Large", "message": "File size exceeds 50 MB limit.", "code": "PAYLOAD_TOO_LARGE"},
+            )
+        try:
+            contents = await file.read()
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Bad Request", "message": f"Failed to read uploaded file: {exc}", "code": "FILE_READ_ERROR"},
+            ) from exc
+        if len(contents) > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail={"error": "Payload Too Large", "message": f"File size ({len(contents)} bytes) exceeds 50 MB limit.", "code": "PAYLOAD_TOO_LARGE"},
+            )
+
+        manual_terms = {}
+        if price_band_low is not None:
+            manual_terms["price_band_low"] = price_band_low
+        if price_band_high is not None:
+            manual_terms["price_band_high"] = price_band_high
+        if lot_size is not None:
+            manual_terms["lot_size"] = lot_size
+
+        try:
+            ingest_res = service.ingest_document(
+                file_bytes=contents,
+                filename=file.filename,
+                mode=mode,
+                manual_terms=manual_terms,
+                manual_explanation=explanation,
+                confirm_conflicts=confirm_conflicts,
+            )
+            res_code = status.HTTP_200_OK if ingest_res.is_duplicate else status.HTTP_201_CREATED
+            return JSONResponse(status_code=res_code, content=ingest_res.model_dump())
+        except IngestionPayloadTooLargeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail={"error": "Payload Too Large", "message": str(exc), "code": "PAYLOAD_TOO_LARGE"},
+            ) from exc
+        except IngestionValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "Bad Request", "message": str(exc), "code": "VALIDATION_ERROR"},
+            ) from exc
+        except IngestionIssueTermConflictError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "Issue Term Conflict",
+                    "message": str(exc),
+                    "code": "ISSUE_TERM_CONFLICT",
+                    "conflicts": exc.conflicts,
+                },
+            ) from exc
+        except IngestionAwaitingIssueTermsError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "error": "Awaiting Issue Terms",
+                    "message": str(exc),
+                    "code": "AWAITING_ISSUE_TERMS",
+                    "missing_fields": exc.missing_fields,
+                    "resolution": exc.resolution,
+                },
+            ) from exc
+        except (IngestionExtractionError, IngestionEvaluationError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"error": "Unprocessable Entity", "message": str(exc), "code": "PROCESSING_FAILED"},
+            ) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": "Internal Error", "message": f"Unexpected ingestion error: {exc}", "code": "INGESTION_INTERNAL_ERROR"},
+            ) from exc
+
     # -------------------------------------------------------------------------
     # 6.14 Lifecycle Governance Operations
     # -------------------------------------------------------------------------
@@ -492,7 +609,12 @@ def create_app(service: Optional[PresentationService] = None) -> FastAPI:
         if request.method not in ("GET", "HEAD", "OPTIONS"):
             normalized_path = request.url.path.rstrip("/")
             segments = normalized_path.strip("/").split("/")
-            is_ingest = normalized_path == "/api/v1/ingest/document"
+            is_ingest = normalized_path in (
+                "/api/v1/ingest/document",
+                # Step 5: bounded manual issue-term entry (authorized route,
+                # subject to the same origin/loopback guards below).
+                "/api/v1/ingest/manual-terms",
+            )
             is_lifecycle_action = (
                 len(segments) == 5
                 and segments[:3] == ["api", "v1", "evaluations"]

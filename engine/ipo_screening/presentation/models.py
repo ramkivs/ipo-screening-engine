@@ -256,6 +256,9 @@ class EvidenceDetail(BaseModel):
     # RECORDED (quotation as recorded in the evidence artifact).
     quote_kind: Optional[str] = None
     note: Optional[str] = None
+    # Provenance method as recorded (e.g. MANUAL_ENTRY for operator-entered
+    # issue terms). Presentation-only: manual entry is never verified.
+    extraction_method: Optional[str] = None
 
 
 class EvidenceResponse(BaseModel):
