@@ -457,3 +457,81 @@ def test_vishal_real_filing_manual_entry_fills_only_authorized_terms(tmp_path):
         "lot_size",
     }
     assert service.eval_store.list_evaluations() == []
+
+
+# --------------------------------------------------------------------------
+# Manual entry vs OFFICIAL_VERIFIED (mechanics; mocked transport)
+# --------------------------------------------------------------------------
+
+
+def test_manual_entry_never_displaces_officially_verified_values(tmp_path):
+    """With a verified official resolution available (mocked transport --
+    this proves channel mechanics, NOT live-source authenticity), a
+    conflicting manual entry blocks with OFFICIAL_VERIFIED origin and,
+    even after explicit confirmation, the verified values win and no
+    MANUAL_ENTRY provenance is recorded for them."""
+    from ipo_screening.issue_terms import HttpNoticeProvider
+
+    notice_bytes = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes()
+    resolver = IssueTermsResolver(
+        providers=[
+            HttpNoticeProvider(
+                {"VISHAL-NIRMITI-LIMITED": "https://www.nseindia.com/announcements/vishal-price-band"},
+                fetcher=lambda url: notice_bytes,
+            )
+        ]
+    )
+    cfg = PresentationConfig(
+        store_root=tmp_path / "evaluations",
+        config_dir=REPO_ROOT / "config",
+        issue_terms_resolver=resolver,
+    )
+    service = PresentationService(cfg)
+    client = TestClient(
+        create_app(service),
+        base_url="http://127.0.0.1:8000",
+        headers={"Origin": "http://127.0.0.1:8000"},
+    )
+    pdf_bytes = VISHAL_RHP_PDF.read_bytes()
+
+    conflict = client.post(
+        "/api/v1/ingest/manual-terms",
+        files={"file": ("vishal.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
+        data={
+            "mode": "final",
+            "price_band_low": "200",
+            "explanation": EXPLANATION,
+        },
+    )
+    assert conflict.status_code == 409, conflict.text
+    entry = conflict.json()["conflicts"][0]
+    assert entry["field"] == "issue.price_band_low"
+    assert entry["existing_value"] == 208.0
+    assert entry["existing_origin"] == "OFFICIAL_VERIFIED"
+    assert service.eval_store.list_evaluations() == []
+
+    resolved = client.post(
+        "/api/v1/ingest/manual-terms",
+        files={"file": ("vishal.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
+        data={
+            "mode": "final",
+            "price_band_low": "200",
+            "explanation": EXPLANATION,
+            "confirm_conflicts": "true",
+        },
+    )
+    assert resolved.status_code == 201, resolved.text
+    body = resolved.json()
+    assert body["issue_terms"]["verified"] is True
+    manual = body["issue_terms"]["manual_entry"]
+    assert manual["fields"] == []
+    assert manual["overridden_by_verified"] == ["price_band_low"]
+
+    record = service.eval_store.read(body["evaluation_id"])
+    issue = record["input_snapshot"]["input"]["issue"]
+    assert (issue["price_band_low"], issue["price_band_high"], issue["lot_size"]) == (208, 220, 68)
+    evidence = client.get(f"/api/v1/evaluations/{body['evaluation_id']}/evidence").json()
+    items = {item["field"]: item for item in evidence["items"]}
+    low = items["EV-issue.price_band_low"]
+    assert low["verification"] == "OFFICIAL_VERIFIED"
+    assert low["extraction_method"] != "MANUAL_ENTRY"
