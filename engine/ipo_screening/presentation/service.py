@@ -1199,8 +1199,14 @@ class PresentationService:
                         mode=mode_clean,
                     )
                     canonical_dict = assembled.canonical_input
-                except Exception:
-                    pass  # fall through to the awaiting status below
+                except Exception as exc:
+                    # Diagnosable, not silent: the terms were verified
+                    # but could not be assembled into the canonical
+                    # input (e.g. an identity inconsistency). Surface it
+                    # in the resolution diagnostics; still fail closed.
+                    resolution_dict["assembly_error"] = (
+                        f"{type(exc).__name__}: {exc}"
+                    )
             elif set(missing_issue_fields) == {"ofs"}:
                 # Terms are disclosed in the filing itself; only the OFS
                 # amount needs the approved enrichment derivation
@@ -1211,8 +1217,10 @@ class PresentationService:
                         mode=mode_clean,
                     )
                     canonical_dict = assembled.canonical_input
-                except Exception:
-                    pass
+                except Exception as exc:
+                    resolution_dict["assembly_error"] = (
+                        f"{type(exc).__name__}: {exc}"
+                    )
 
             issue_after = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
             still_missing = [f for f in missing_issue_fields if issue_after.get(f) is None]
@@ -1226,6 +1234,23 @@ class PresentationService:
                     "PARTIAL": "only some required terms could be verified from official sources",
                     "UNVERIFIED": "an issuer-matched notice exists only as a retained copy whose official provenance is not established (configure the official exchange announcement via IPO_PRICE_BAND_NOTICE_URLS to use it)",
                 }.get(outcome.status, "the terms have not yet been published in the configured official sources")
+                if outcome.status == "UNAVAILABLE" and any(
+                    r.outcome == "REJECTED" for r in outcome.provider_reports
+                ):
+                    # Retrieval succeeded but the document failed
+                    # classification/identity/value checks -- a different
+                    # failure from "could not be retrieved", and the
+                    # operator must be able to tell them apart.
+                    reason = (
+                        "official source documents were retrieved but rejected "
+                        "(classification, issuer identity or value checks failed; "
+                        "see the resolution diagnostics)"
+                    )
+                if resolution_dict.get("assembly_error"):
+                    reason = (
+                        "verified official terms could not be assembled into "
+                        "the evaluation input (see the resolution diagnostics)"
+                    )
                 # Defer the awaiting raise: authorized manual entry (Step 5)
                 # may still resolve the bounded terms below. Without manual
                 # terms the deferred raise fires unchanged before evaluation.

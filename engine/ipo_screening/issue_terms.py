@@ -86,6 +86,33 @@ def _norm_name(name: Optional[str]) -> str:
     return "".join(ch for ch in (name or "").upper() if ch.isalnum())
 
 
+def _norm_key(key: Optional[str]) -> str:
+    """Slug-normal form of a configured mapping key / identifier."""
+    slug = "".join(ch if ch.isalnum() else "-" for ch in (key or "").upper())
+    return "-".join(part for part in slug.split("-") if part)
+
+
+def _lookup_configured_url(
+    urls_by_ipo: Mapping[str, str], company_name: str, ipo_id: str
+) -> Optional[str]:
+    """Find the configured official URL for this issuer.
+
+    Exact ``ipo_id`` and exact ``company_name`` matches win; otherwise a
+    slug-normalised comparison applies, so an operator may key the
+    mapping by the runtime IPO ID slug (``ACME-LIMITED``), the spaced
+    company name (``Acme Limited``) or any case/separator variant --
+    all denote the same issuer key, never a different issuer's URL.
+    """
+    for candidate in (ipo_id, company_name):
+        if candidate and urls_by_ipo.get(candidate):
+            return urls_by_ipo[candidate]
+    wanted = {_norm_key(ipo_id), _norm_key(company_name)} - {""}
+    for key, url in urls_by_ipo.items():
+        if _norm_key(key) in wanted:
+            return url
+    return None
+
+
 def _notice_values(result: PriceBandNoticeResult) -> Dict[str, Any]:
     values: Dict[str, Any] = {}
     for field_name in PRICING_TERMS:
@@ -240,7 +267,7 @@ class HttpNoticeProvider:
         urls_by_ipo: Mapping[str, str],
         fetcher: Optional[Callable[[str], bytes]] = None,
         allowed_hosts: Optional[set[str]] = None,
-        timeout_seconds: float = 20.0,
+        timeout_seconds: float = 60.0,
     ):
         self.urls_by_ipo = dict(urls_by_ipo)
         self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(OFFICIAL_HOSTS)
@@ -253,7 +280,7 @@ class HttpNoticeProvider:
         return _default_http_fetch(url, self.timeout_seconds)
 
     def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
-        url = self.urls_by_ipo.get(ipo_id) or self.urls_by_ipo.get(company_name)
+        url = _lookup_configured_url(self.urls_by_ipo, company_name, ipo_id)
         if not url:
             return None, ProviderReport(self.name, "UNAVAILABLE", "no official notice URL configured for this issuer")
         host = (urlparse(url).hostname or "").lower()
@@ -307,7 +334,7 @@ class HttpProspectusProvider:
         urls_by_ipo: Mapping[str, str],
         fetcher: Optional[Callable[[str], bytes]] = None,
         allowed_hosts: Optional[set[str]] = None,
-        timeout_seconds: float = 20.0,
+        timeout_seconds: float = 60.0,
     ):
         self.urls_by_ipo = dict(urls_by_ipo)
         self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(OFFICIAL_HOSTS)
@@ -320,7 +347,7 @@ class HttpProspectusProvider:
         return _default_http_fetch(url, self.timeout_seconds)
 
     def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
-        url = self.urls_by_ipo.get(ipo_id) or self.urls_by_ipo.get(company_name)
+        url = _lookup_configured_url(self.urls_by_ipo, company_name, ipo_id)
         if not url:
             return None, ProviderReport(self.name, "UNAVAILABLE", "no official prospectus URL configured for this issuer")
         host = (urlparse(url).hostname or "").lower()
@@ -538,6 +565,45 @@ class IssueTermsResolver:
         return outcome
 
 
+class ConfigurationDiagnosticProvider:
+    """Reports an unusable URL-mapping configuration as a provider
+    outcome, instead of the provider silently never being registered.
+
+    The detail names the environment variable and the parse problem;
+    it never echoes the configured value (which may contain operator
+    infrastructure details beyond the public official URLs).
+    """
+
+    def __init__(self, name: str, detail: str):
+        self.name = name
+        self.detail = detail
+
+    def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
+        return None, ProviderReport(self.name, "UNAVAILABLE", self.detail)
+
+
+def _url_map_from_env(var_name: str) -> tuple[Dict[str, str], Optional[str]]:
+    """Parse an IPO-ID -> URL JSON env mapping.
+
+    Returns (mapping, problem). ``problem`` is None when the variable is
+    unset/empty or parses to a usable mapping; otherwise it describes
+    why the configuration cannot be used.
+    """
+    raw = os.getenv(var_name, "").strip()
+    if not raw:
+        return {}, None
+    try:
+        parsed = json.loads(raw)
+    except Exception as exc:
+        return {}, f"{var_name} is not valid JSON ({type(exc).__name__}: {exc}); expected a JSON object mapping IPO IDs to official URLs"
+    if not isinstance(parsed, dict):
+        return {}, f"{var_name} must be a JSON object mapping IPO IDs to official URLs, not {type(parsed).__name__}"
+    mapping = {str(k): v for k, v in parsed.items() if isinstance(v, str) and v.strip()}
+    if parsed and not mapping:
+        return {}, f"{var_name} contains no usable IPO-ID -> URL entries"
+    return mapping, None
+
+
 def build_resolver_from_env() -> IssueTermsResolver:
     """Default runtime resolver wired from environment configuration.
 
@@ -558,18 +624,16 @@ def build_resolver_from_env() -> IssueTermsResolver:
     test fixtures, not retrieved official disclosures.
     """
     providers: List[Any] = []
-    urls_raw = os.getenv("IPO_PRICE_BAND_NOTICE_URLS", "").strip()
-    if urls_raw:
-        try:
-            providers.append(HttpNoticeProvider(json.loads(urls_raw)))
-        except Exception:
-            pass
-    prospectus_urls_raw = os.getenv("IPO_PROSPECTUS_URLS", "").strip()
-    if prospectus_urls_raw:
-        try:
-            providers.append(HttpProspectusProvider(json.loads(prospectus_urls_raw)))
-        except Exception:
-            pass
+    notice_urls, notice_problem = _url_map_from_env("IPO_PRICE_BAND_NOTICE_URLS")
+    if notice_problem:
+        providers.append(ConfigurationDiagnosticProvider(HttpNoticeProvider.name, notice_problem))
+    elif notice_urls:
+        providers.append(HttpNoticeProvider(notice_urls))
+    prospectus_urls, prospectus_problem = _url_map_from_env("IPO_PROSPECTUS_URLS")
+    if prospectus_problem:
+        providers.append(ConfigurationDiagnosticProvider(HttpProspectusProvider.name, prospectus_problem))
+    elif prospectus_urls:
+        providers.append(HttpProspectusProvider(prospectus_urls))
     dirs = [d for d in os.getenv("IPO_PRICE_BAND_NOTICE_DIR", "").split(os.pathsep) if d]
     if dirs:
         providers.append(RetainedNoticeProvider(dirs))

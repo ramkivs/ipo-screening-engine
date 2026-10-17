@@ -299,8 +299,16 @@ export class ApiClient {
         errPayload.message ||
         (errPayload.detail && errPayload.detail.message) ||
         (typeof errPayload.detail === 'string' ? errPayload.detail : 'Filing ingestion failed');
-      const details = errPayload.details || (errPayload.detail && errPayload.detail.details) || null;
-      throw new ApiError(response.status, code, message, details);
+      // FastAPI nests the payload under `detail`; preserve the
+      // AWAITING_ISSUE_TERMS diagnostics (missing fields + per-provider
+      // resolution reports) so the UI can show WHY terms are unresolved
+      // instead of only the generic message.
+      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : {};
+      const details = { ...(detailObj.details || {}), ...(errPayload.details || {}) };
+      if (detailObj.missing_fields) details.missing_fields = detailObj.missing_fields;
+      if (detailObj.resolution) details.resolution = detailObj.resolution;
+      if (detailObj.conflicts) details.conflicts = detailObj.conflicts;
+      throw new ApiError(response.status, code, message, Object.keys(details).length ? details : null);
     }
 
     return await response.json();
