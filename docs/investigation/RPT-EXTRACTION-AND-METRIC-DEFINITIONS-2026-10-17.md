@@ -60,37 +60,55 @@ real-PDF canonical governance contains no new key.
 - 136 transaction extractions in total for Vishal, every quote a
   verbatim substring of its source page (asserted in tests).
 
-## Metric semantics — decision still required (scoring NOT wired)
+## Approved metric definitions (Ramki, 2026-10-17) — IMPLEMENTED
 
-The existing definitions are **not complete enough to wire scoring
-without inventing policy**:
+**Module D — RPT exposure (`rpt_pct_revenue`).** Related-party
+sales/services income ÷ total revenue from operations, latest audited
+financial year, %. Eligible numerator categories are revenue-type only:
+sale of goods, sale of services (any `sale_of_*` except sale of PPE),
+and job-work charges received. Purchases, loans, interest paid,
+remuneration, reimbursements and balances are excluded from the
+numerator and retained as extracted evidence. Existing Module D bands
+(<5 → 3, ≤15 → 1, else 0 of 3) unchanged.
 
-- Module D `rpt_pct_revenue` — config label "Related-party transactions
-  (% revenue/costs)", derived formula "related-party transactions /
-  revenue, latest FY, %". Unspecified: which transaction categories form
-  the numerator (revenue-type only — sale of goods/services, job-work,
-  rent/interest received — or all transactions including purchases?);
-  why the label says "revenue/costs"; whether remuneration/balances
-  count.
-- K6 `rpt_pct_of_revenue_growth` — formula "share of revenue growth
-  attributable to related parties, %", trigger > 40%. Unspecified:
-  numerator categories; the growth window (latest FY vs prior FY, or
-  two-year); the denominator (total revenue growth over the same
-  window); behaviour when total revenue growth is zero/negative or RPT
-  revenue declines; stub-period handling.
+**K6 — change in RPT revenue exposure (`rpt_pct_of_revenue_growth`).**
+The share above is computed for the latest two comparable audited
+financial years; the metric is the change between the two annual
+shares, in percentage points (latest − prior). It is consumed by the
+existing K6 rule (`> 40` triggers, config unchanged). A declining share
+is negative and cannot trigger. A zero prior-year share needs no
+division: the change is the latest share minus zero. Both annual
+shares are reproducible from the preserved transaction evidence,
+financial periods and the formulas recorded in
+`CanonicalInputBuilder._derive_rpt_metrics`.
 
-**Decision needed (Ramki):** approve precise numerator/denominator/
-window/sign rules for both metrics. Candidate formulations recorded for
-approval, NOT adopted: (D) revenue-type RPT categories ÷ latest-FY
-revenue; (K6) Δ(revenue-type RPT) ÷ Δ(total revenue), latest vs prior
-FY, undefined (UNKNOWN) when Δ(total revenue) ≤ 0. Until approved,
-`rpt_pct_revenue`/`rpt_pct_of_revenue_growth` remain null on the
-runtime path, Module D `rpt` stays UNKNOWN and K6 stays UNVERIFIED —
-now with the underlying transaction evidence extracted and citable.
+**Edge rules (deterministic, fail-closed).** A year's numerator is
+zero only when eligible categories are disclosed in the note but no
+amount is disclosed for that year (`-` cells); missing revenue,
+non-positive revenue, unknown/unconvertible RPT units, missing
+periods, or the absence of any eligible transaction leave the fields
+null (Module D UNKNOWN / K6 UNVERIFIED). Amounts are converted into
+the filing's reporting unit via INR lakh/crore/million/billion
+factors. Curated/base-supplied values always win; derivation only
+fills nulls, and only when RPT extractions are present (so
+fixture-fallback behaviour and the golden record are unchanged).
+
+**Implementation.** `CanonicalInputBuilder._derive_rpt_metrics`
+(extraction builder — the canonical-mapping layer) computes the two
+existing schema fields from the RPT extractions + financial periods;
+`derived.py` metric formulas were intentionally left byte-identical
+because formula text feeds the golden result hash (verified:
+`e84f8bc0…` preserved). Vishal result: FY2026 share
+(2,260.49 + 1,750.07) / 33,867.73 = **11.8418%**; FY2025
+(3,091.60 + 798.16) / 31,851.62 = **12.2126%**; change **−0.3708 pp**
+(declining) → K6 CLEAR, Module D `rpt` SCORED 1/3 under the existing
+band. New Vishal runtime evaluations therefore differ from before
+(K6 UNVERIFIED → CLEAR; D `rpt` UNKNOWN → SCORED) solely because of
+this approved integration; historical records are not rewritten.
 
 A canonical structured field (e.g. `governance.related_party_transactions`
-as data, not only evidence) likewise requires a schema decision; it is
-not added here.
+as data, not only evidence) would still require a schema decision; it
+is not added here.
 
 ## K5 boundary
 

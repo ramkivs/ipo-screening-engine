@@ -13,12 +13,11 @@ pipeline.  This suite proves the generic fix end to end:
   identically in structure (no issuer-specific production logic);
 * canonical ``governance.related_party_transactions`` receives the
   structured values and matching evidence is registered;
-* the scoring fields ``rpt_pct_revenue`` / ``rpt_pct_of_revenue_growth``
-  remain null: their approved definitions do not yet specify
-  transaction categories, growth window or negative-growth treatment,
-  so Module D ``rpt`` stays UNKNOWN and K6 stays UNVERIFIED until that
-  policy decision is taken (recorded in
-  docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md).
+* the approved metric definitions (Ramki, 2026-10-17) are derived
+  generically: Module D = RPT sales/services income / revenue, latest
+  audited FY; K6 = change in that share between the latest two
+  comparable audited FYs (percentage points), consumed by the existing
+  >40 trigger and Module D bands.  Fail-closed cases stay null.
 """
 
 from __future__ import annotations
@@ -188,9 +187,12 @@ def test_vishal_canonical_mapping_and_scoring_boundary():
     # The runtime canonical schema is closed: no structured RPT field is
     # added to governance, and the snapshot is therefore unchanged.
     assert "related_party_transactions" not in gov
-    # Scoring fields are NOT wired without an approved metric definition.
-    assert gov["rpt_pct_revenue"] is None
-    assert gov["rpt_pct_of_revenue_growth"] is None
+    # Approved definitions (2026-10-17): eligible numerator = sale of
+    # goods + job-work charges received (services income).
+    # FY2026: (2260.49+1750.07)/33867.73 = 11.8418%; FY2025:
+    # (3091.60+798.16)/31851.62 = 12.2126%; change is negative.
+    assert gov["rpt_pct_revenue"] == pytest.approx(11.8418, abs=0.001)
+    assert gov["rpt_pct_of_revenue_growth"] == pytest.approx(-0.3708, abs=0.001)
     # The extracted transactions are registered as evidence instead.
     evidence = canonical["_evidence"]
     rpt_paths = [p for p in evidence if p.startswith("governance.related_party_transactions[")]
@@ -226,3 +228,108 @@ def test_scoring_consumers_unchanged_by_structured_rpt_evidence():
     # establish rpt_pct_of_revenue_growth either.
     assert rpt["state"] == "SCORED" and rpt["value"] == 6.67
     assert result.score["final_score"] == 35.0
+
+
+# ----------------------------------------------------------------------
+# Approved metric derivation (Ramki, 2026-10-17)
+# ----------------------------------------------------------------------
+from ipo_screening.extraction.interfaces import RawExtraction
+
+
+def _txn(category, counterparty, period, amount, unit, idx):
+    return RawExtraction(
+        field_path=f"governance.related_party_transactions[{idx}]",
+        candidate_value={
+            "category": category, "category_label": category.replace("_", " "),
+            "counterparty": counterparty, "period": period,
+            "amount": amount, "unit": unit, "page": 10,
+        },
+        quote=f"{counterparty} {amount}",
+        page=10,
+    )
+
+
+def _builder_gov(periods, txns, reporting_unit="INR_CRORES"):
+    doc = SourceDocument(source_id="RHP-TEST", uri="test.pdf", content_hash="abc")
+    extractions = [
+        RawExtraction(field_path="financials.periods", candidate_value=periods),
+        RawExtraction(field_path="financials.reporting_unit", candidate_value=reporting_unit),
+    ] + txns
+    return CanonicalInputBuilder(doc, extractions, allow_fixture_fallbacks=False).build()["governance"]
+
+
+def test_derivation_sales_services_only_latest_and_change():
+    periods = [
+        {"fy": "FY2024", "revenue": 800.0},
+        {"fy": "FY2025", "revenue": 1000.0},
+    ]
+    txns = [
+        _txn("sale_of_services", "Meridian Advisors LLP", "FY2025", 120.0, "INR_CRORES", 0),
+        _txn("sale_of_services", "Meridian Advisors LLP", "FY2024", 40.0, "INR_CRORES", 1),
+        _txn("purchase_of_goods", "Cobalt Suppliers", "FY2025", 500.0, "INR_CRORES", 2),
+        _txn("interest_paid", "Meridian Advisors LLP", "FY2025", 9.0, "INR_CRORES", 3),
+        _txn("loan_taken", "Promoter A", "FY2025", 300.0, "INR_CRORES", 4),
+    ]
+    gov = _builder_gov(periods, txns)
+    # Purchases/loans/interest excluded: 120/1000 = 12%; prior 40/800 = 5%.
+    assert gov["rpt_pct_revenue"] == pytest.approx(12.0)
+    assert gov["rpt_pct_of_revenue_growth"] == pytest.approx(7.0)
+
+
+def test_derivation_unit_conversion_and_zero_prior():
+    periods = [
+        {"fy": "FY2025", "revenue": 500.0},
+        {"fy": "FY2026", "revenue": 1000.0},
+    ]
+    # Reporting unit INR_CRORES; note amounts in lakhs: 2500L = 25 Cr.
+    txns = [_txn("sale_of_goods", "Example Industries", "FY2026", 2500.0, "INR_LAKHS", 0)]
+    gov = _builder_gov(periods, txns, reporting_unit="INR_CRORES")
+    assert gov["rpt_pct_revenue"] == pytest.approx(2.5)
+    # Prior year: eligible category disclosed, no amounts -> share 0,
+    # so the change equals the latest share (no division by zero).
+    assert gov["rpt_pct_of_revenue_growth"] == pytest.approx(2.5)
+
+
+def test_derivation_fail_closed_cases():
+    periods = [{"fy": "FY2026", "revenue": 1000.0}, {"fy": "FY2025", "revenue": 900.0}]
+    # Unknown unit on an eligible transaction.
+    gov = _builder_gov(periods, [_txn("sale_of_goods", "X Ltd", "FY2026", 10.0, None, 0)])
+    assert gov["rpt_pct_revenue"] is None and gov["rpt_pct_of_revenue_growth"] is None
+    # Missing revenue.
+    gov = _builder_gov([{"fy": "FY2026", "revenue": None}],
+                       [_txn("sale_of_goods", "X Ltd", "FY2026", 10.0, "INR_CRORES", 0)])
+    assert gov["rpt_pct_revenue"] is None
+    # Single comparable year: latest ratio set, change stays unknown.
+    gov = _builder_gov([{"fy": "FY2026", "revenue": 1000.0}],
+                       [_txn("sale_of_goods", "X Ltd", "FY2026", 10.0, "INR_CRORES", 0)])
+    assert gov["rpt_pct_revenue"] == pytest.approx(1.0)
+    assert gov["rpt_pct_of_revenue_growth"] is None
+    # No sales/services categories at all: numerator not established.
+    gov = _builder_gov(periods, [_txn("purchase_of_goods", "X Ltd", "FY2026", 10.0, "INR_CRORES", 0)])
+    assert gov["rpt_pct_revenue"] is None and gov["rpt_pct_of_revenue_growth"] is None
+
+
+def _evaluate_with_rpt(pct_revenue, pct_change):
+    fixture = json.loads(
+        (REPO_ROOT / "fixtures" / "vishal_nirmiti" / "input.json").read_text(encoding="utf-8")
+    )
+    fixture["governance"]["rpt_pct_revenue"] = pct_revenue
+    fixture["governance"]["rpt_pct_of_revenue_growth"] = pct_change
+    return evaluate(fixture, load_config(REPO_ROOT / "config" / "ipo-config.v1.5.0.json"),
+                    evaluation_datetime=EVAL_AT, mode="final").record
+
+
+def test_consumers_declining_share_clears_k6_and_scores_module_d():
+    record = _evaluate_with_rpt(11.8418, -0.3708)  # Vishal-derived values
+    k6 = next(r for r in record.knockouts["results"] if r["rule_id"] == "K6")
+    assert k6["state"] == "CLEAR"
+    module_d = next(m for m in record.score["modules"] if m.get("module_id") == "D")
+    rpt = next(c for c in module_d["criteria"] if c["criterion_id"] == "rpt")
+    assert rpt["state"] == "SCORED" and rpt["value"] == pytest.approx(11.8418)
+    assert rpt["score"] == 1.0  # existing band: <=15 -> 1 of 3
+
+
+def test_consumers_rising_share_above_threshold_triggers_k6():
+    record = _evaluate_with_rpt(55.0, 45.0)
+    k6 = next(r for r in record.knockouts["results"] if r["rule_id"] == "K6")
+    assert k6["state"] == "TRIGGERED"

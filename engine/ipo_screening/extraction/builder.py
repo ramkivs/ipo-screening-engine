@@ -10,6 +10,7 @@ Technical Design v1.5 s3.2, s15:
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -312,7 +313,95 @@ class CanonicalInputBuilder:
             "board_independent_majority": _pick_gov("board_independent_majority", False),
             "kmp_exits_2y": _pick_gov("kmp_exits_2y", 0),
         }
+        self._derive_rpt_metrics(gov)
         return gov
+
+    # Approved RPT metric definitions (Ramki, 2026-10-17; see
+    # docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md):
+    # * Module D ``rpt_pct_revenue`` = related-party sales/services income
+    #   / revenue from operations, latest audited FY, %.
+    # * K6 ``rpt_pct_of_revenue_growth`` = change in that share between
+    #   the latest two comparable audited FYs, in percentage points
+    #   (latest share - prior share); a declining share is negative and
+    #   therefore cannot satisfy the existing >40 trigger.
+    # Eligible numerator categories are revenue-type only: sale of
+    # goods/services (excluding sale of PPE) and job-work charges
+    # received.  Purchases, financing, interest paid, remuneration and
+    # balances are excluded (retained as evidence only).  Fail closed:
+    # missing periods/revenue, non-positive revenue, unknown or
+    # unconvertible units, or a missing numerator leave the fields null.
+    _RPT_SALES_SERVICES_CATEGORIES = frozenset(
+        {"sale_of_goods", "sale_of_services", "job_work_charges_received"}
+    )
+    _RPT_UNIT_TO_RUPEES = {
+        "INR_LAKHS": 1e5,
+        "INR_CRORES": 1e7,
+        "INR_MILLIONS": 1e6,
+        "INR_BILLIONS": 1e9,
+    }
+
+    @classmethod
+    def _rpt_is_sales_services(cls, category: str) -> bool:
+        if category in cls._RPT_SALES_SERVICES_CATEGORIES:
+            return True
+        return category.startswith("sale_of_") and category != "sale_of_ppe"
+
+    def _derive_rpt_metrics(self, gov: Dict[str, Any]) -> None:
+        if gov.get("rpt_pct_revenue") is not None and gov.get("rpt_pct_of_revenue_growth") is not None:
+            return
+        txns = [
+            ex.candidate_value
+            for ex in self.extractions
+            if ex.field_path.startswith("governance.related_party_transactions[")
+            and isinstance(ex.candidate_value, dict)
+        ]
+        if not txns:
+            return
+        financials = self._build_financials()
+        reporting_unit = financials.get("reporting_unit")
+        if reporting_unit not in self._RPT_UNIT_TO_RUPEES:
+            return
+        periods: Dict[int, float] = {}
+        for period in financials.get("periods") or []:
+            if not isinstance(period, dict):
+                continue
+            m = re.match(r"FY(20\d{2})$", str(period.get("fy") or ""))
+            revenue = period.get("revenue")
+            if m and isinstance(revenue, (int, float)) and revenue > 0:
+                periods[int(m.group(1))] = float(revenue)
+        if not periods:
+            return
+        eligible = [t for t in txns if self._rpt_is_sales_services(str(t.get("category") or ""))]
+        if not eligible:
+            return
+        sums: Dict[int, float] = {}
+        for txn in eligible:
+            unit = txn.get("unit")
+            m = re.match(r"FY(20\d{2})$", str(txn.get("period") or ""))
+            amount = txn.get("amount")
+            if unit not in self._RPT_UNIT_TO_RUPEES or not m or not isinstance(amount, (int, float)):
+                return  # unconvertible/insufficient evidence: fail closed
+            year = int(m.group(1))
+            converted = amount * self._RPT_UNIT_TO_RUPEES[unit] / self._RPT_UNIT_TO_RUPEES[reporting_unit]
+            sums[year] = sums.get(year, 0.0) + converted
+        shares: Dict[int, float] = {}
+        for year, revenue in periods.items():
+            if year in sums:
+                numerator = sums[year]
+            else:
+                # Eligible categories are disclosed in the note but no
+                # amount was disclosed for this year ("-" cells): the
+                # disclosed numerator is zero, not missing.
+                numerator = 0.0
+            shares[year] = numerator / revenue * 100.0
+        latest = max(shares)
+        if gov.get("rpt_pct_revenue") is None:
+            gov["rpt_pct_revenue"] = round(shares[latest], 4)
+        if gov.get("rpt_pct_of_revenue_growth") is None:
+            prior_years = [y for y in shares if y < latest]
+            if prior_years:
+                prior = max(prior_years)
+                gov["rpt_pct_of_revenue_growth"] = round(shares[latest] - shares[prior], 4)
 
     def _build_business(self) -> Dict[str, Any]:
         biz_base = self.base.get("business", {})
