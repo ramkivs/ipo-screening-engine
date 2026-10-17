@@ -598,21 +598,35 @@ class PresentationService:
         canonical_input = snapshot.get("input") if isinstance(snapshot.get("input"), dict) else snapshot
         reporting_unit = snapshot.get("reporting_unit") or canonical_input.get("reporting_unit")
 
-        def _canonical_value(path: str):
+        def _resolve_path(path: str):
+            """Resolve a canonical path, including list indices written
+            as ``field[0]`` (e.g. ``issue.ofs_sellers[0].shares_sold``),
+            against the persisted input snapshot. Read-only."""
             node: Any = canonical_input
             for part in path.split("."):
-                if not isinstance(node, dict) or part not in node:
+                bracket = part.find("[")
+                key = part if bracket < 0 else part[:bracket]
+                if not isinstance(node, dict) or key not in node:
                     return None
-                node = node[part]
+                node = node[key]
+                rest = part[bracket:] if bracket >= 0 else ""
+                while rest.startswith("["):
+                    close = rest.find("]")
+                    if close < 0 or not rest[1:close].isdigit():
+                        return None
+                    index = int(rest[1:close])
+                    if not isinstance(node, list) or index >= len(node):
+                        return None
+                    node = node[index]
+                    rest = rest[close + 1:]
+            return node
+
+        def _canonical_value(path: str):
+            node = _resolve_path(path)
             return node if isinstance(node, (int, float, str)) and not isinstance(node, bool) else None
 
         def _canonical_node(path: str):
-            node: Any = canonical_input
-            for part in path.split("."):
-                if not isinstance(node, dict) or part not in node:
-                    return None
-                node = node[part]
-            return node
+            return _resolve_path(path)
 
         def _value_summary(path: str, node: Any) -> Optional[str]:
             """Read-only rendering of a non-scalar canonical value from
@@ -645,6 +659,13 @@ class PresentationService:
                 return "equity shares"
             if leaf in ("ofs", "fresh_issue", "issue_size") and reporting_unit:
                 return f"INR {reporting_unit}"
+            if leaf in (
+                "fresh_shares",
+                "post_issue_shares",
+                "pre_issue_shares",
+                "shares_sold",
+            ):
+                return "equity shares"
             return None
 
         items: List[EvidenceDetail] = []

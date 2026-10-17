@@ -323,6 +323,26 @@ class EnrichmentEngine:
         # ------------------------------------------------------------------
         cls._complete_traceability_matrix(canonical, traceability)
 
+        # Derived-evidence source registration: derivations above write
+        # evidence specifications under SRC-DERIVED. That source must be
+        # declared in the canonical _sources manifest, or the evidence
+        # registry (canonical_input.build_registry) rightly skips those
+        # specifications as referencing an unregistered source and the
+        # derived values lose their persisted evidence records.
+        evidence_map = canonical.get("_evidence", {})
+        if any(
+            isinstance(spec, Mapping) and spec.get("source_id") == "SRC-DERIVED"
+            for spec in evidence_map.values()
+        ) and "SRC-DERIVED" not in existing_source_ids:
+            canonical["_sources"].append(
+                {
+                    "source_id": "SRC-DERIVED",
+                    "source_type": SourceType.DERIVED.value,
+                    "uri": "DERIVED: formula-bound computation; see the formula recorded on each derived evidence record",
+                }
+            )
+            existing_source_ids.add("SRC-DERIVED")
+
         has_errors = any(f.severity == SEVERITY_ERROR for f in findings)
         return EnrichmentResult(
             canonical_input=canonical,

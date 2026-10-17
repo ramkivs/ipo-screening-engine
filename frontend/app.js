@@ -1243,7 +1243,16 @@ export class App {
       provenanceStatusLabel = 'UNVERIFIED RETAINED SOURCE (official provenance not established)';
     } else if (item.verification === 'OFFICIAL_VERIFIED' && isExtractedPresent) {
       provenanceStatusLabel = 'SOURCE EVIDENCE (Verified Official Source)';
-    } else if (!isExtractedPresent) {
+    } else if (isQuotePresent && (item.verification === 'FILING' || item.verification === 'OFFICIAL_VERIFIED')) {
+      // A recorded quotation backed by a filing/official source is source
+      // evidence even when the structured value is non-scalar (e.g. a
+      // seller list) and therefore carries no scalar extracted_value.
+      // Provenance describes the evidence's origin; it must not be
+      // reported as UNKNOWN merely because the value is a list.
+      provenanceStatusLabel = item.verification === 'OFFICIAL_VERIFIED'
+        ? 'SOURCE EVIDENCE (Verified Official Source)'
+        : 'SOURCE EVIDENCE (Extracted from Filing)';
+    } else if (!isExtractedPresent && !isQuotePresent) {
       provenanceStatusLabel = 'UNKNOWN / UNVERIFIED (Missing or Incomplete Data)';
     } else if (!isQuotePresent) {
       provenanceStatusLabel = 'DERIVED VALUE (Engine-Computed Metric)';
