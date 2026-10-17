@@ -295,6 +295,7 @@ class SectionExtractor:
                     section="Cover",
                     locator="Cover page, Derived Fresh Offer Size at Cap",
                     quote=f"Fresh shares {fresh_shares_count} @ ₹{pb_high} = ₹{derived_fresh_lakhs} Lakhs",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -415,6 +416,7 @@ class SectionExtractor:
                     section="Offer Structure",
                     locator="Offer Quotas Allocation",
                     quote=f"QIB: {quota_qib}%, Retail: {quota_retail}%, NII: {quota_nii}%",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.90,
                 )
@@ -492,6 +494,7 @@ class SectionExtractor:
                     section="Capital Structure",
                     locator="Shareholding of our Promoters and Promoter Group",
                     quote=f"Total Promoter & Promoter Group pre-issue shareholding: {pre_pct}%",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.98,
                 )
@@ -531,6 +534,7 @@ class SectionExtractor:
                     section="Capital Structure",
                     locator="Shareholding of our Promoters and Promoter Group",
                     quote=f"Post-issue promoter holding: {post_pct}%",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.90,
                 )
@@ -556,6 +560,7 @@ class SectionExtractor:
                                 section="Capital Structure",
                                 locator="Pre-issue Share Capital",
                                 quote=f"Pre-issue Equity Shares: {pre_shares}",
+                                quote_is_processing=True,
                                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                                 extraction_confidence=0.95,
                             )
@@ -576,6 +581,7 @@ class SectionExtractor:
                                 section="Capital Structure",
                                 locator="Post-issue Share Capital",
                                 quote=f"Post-issue Equity Shares: {post_shares}",
+                                quote_is_processing=True,
                                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                                 extraction_confidence=0.95,
                             )
@@ -687,6 +693,7 @@ class SectionExtractor:
                     section="Objects of the Offer",
                     locator="Schedule of Implementation and Deployment",
                     quote=f"Use of proceeds categories: {[u['category'] for u in use_of_proceeds]}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.98,
                 )
@@ -781,6 +788,7 @@ class SectionExtractor:
                     section="Financial Information",
                     locator="Auditor Tenure and Examination Report",
                     quote=f"Auditor {auditor_name} unchanged across audited fiscal years",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -794,6 +802,7 @@ class SectionExtractor:
                     section="Financial Information",
                     locator="Auditor Standing",
                     quote=f"Auditor: {auditor_name}, reputed network: {is_reputed}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -852,6 +861,7 @@ class SectionExtractor:
                 section="Outstanding Litigation",
                 locator="Outstanding Litigation and Material Developments",
                 quote=f"Litigation bucket classified as: {lit_bucket}",
+                quote_is_processing=True,
                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                 extraction_confidence=0.95,
             )
@@ -901,6 +911,7 @@ class SectionExtractor:
                 section="Our Management",
                 locator="Board of Directors Composition",
                 quote=f"Board independent majority: {independent_majority}",
+                quote_is_processing=True,
                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                 extraction_confidence=0.90,
             )
@@ -934,6 +945,7 @@ class SectionExtractor:
                     section="Related Party Transactions",
                     locator="Summary of Related Party Transactions",
                     quote=f"Related party transactions as % of revenue: {rpt_pct}%",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -998,6 +1010,7 @@ class SectionExtractor:
                     section="Risk Factors",
                     locator="Customer concentration table",
                     quote=f"Top 5 customers accounted for {top5_cust}% of revenue",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.98,
                 )
@@ -1069,6 +1082,7 @@ class SectionExtractor:
                     section="Risk Factors",
                     locator="Supplier concentration table",
                     quote=f"Top 5 suppliers accounted for {top5_supp}% of purchases",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.98,
                 )
@@ -1226,6 +1240,7 @@ class SectionExtractor:
                     section="Industry Overview",
                     locator="Industry Scope",
                     quote=f"Scope: {cagr_scope}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -1239,6 +1254,7 @@ class SectionExtractor:
                     section="Industry Overview",
                     locator="Industry Forecast Period",
                     quote=f"Forecast period: {cagr_period}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -1252,6 +1268,7 @@ class SectionExtractor:
                     section="Industry Overview",
                     locator="Industry Source",
                     quote=f"Source: {cagr_source}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -1338,6 +1355,7 @@ class SectionExtractor:
                     section="Basis for Offer Price",
                     locator="Comparison of Accounting Ratios with Listed Industry Peers",
                     quote=f"Identified {len(peers)} listed peers: {[p['name'] for p in peers]}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )

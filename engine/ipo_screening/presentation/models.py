@@ -233,6 +233,13 @@ class EvidenceDetail(BaseModel):
     unit: Optional[str] = None
     # OFFICIAL_VERIFIED | FILING | DERIVED | RETAINED_UNVERIFIED | UNVERIFIED
     verification: Optional[str] = None
+    # Read-only presentation of a non-scalar canonical value (e.g. the
+    # financial-period list), derived from the persisted input snapshot.
+    value_summary: Optional[str] = None
+    # PROCESSING (extractor-generated summary, not source text) |
+    # RECORDED (quotation as recorded in the evidence artifact).
+    quote_kind: Optional[str] = None
+    note: Optional[str] = None
 
 
 class EvidenceResponse(BaseModel):

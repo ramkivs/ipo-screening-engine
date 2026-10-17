@@ -269,3 +269,16 @@ test('UI-3 App - Unverified retained source is never presented as verified', () 
   assert.ok(appJs.includes('UNVERIFIED RETAINED SOURCE (official provenance not established)'));
   assert.ok(appJs.includes('SOURCE EVIDENCE (Verified Official Source)'));
 });
+
+test('UI-3 App - Processing summaries and non-scalar value summaries are not shown as quotations', () => {
+  const appJs = fs.readFileSync(path.resolve(__dirname, '../app.js'), 'utf8');
+
+  // Extractor-generated processing information must be labelled as such,
+  // never as a verbatim quotation; non-scalar canonical values are shown
+  // through the read-only summary, not as UNKNOWN.
+  assert.ok(appJs.includes("item.quote_kind === 'PROCESSING'"));
+  assert.ok(appJs.includes('PROCESSING SUMMARY (Extractor-Generated, Not Source Text)'));
+  assert.ok(appJs.includes('Extractor processing information — not a quotation from the source document.'));
+  assert.ok(appJs.includes('item.value_summary'));
+  assert.ok(appJs.includes('Recorded Quotation (as recorded in evidence)'));
+});

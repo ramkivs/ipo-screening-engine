@@ -64,6 +64,11 @@ class RawExtraction:
     extraction_confidence: float = 1.0
     is_unknown: bool = False
     notes: Optional[str] = None
+    # True when `quote` was synthesized by the extractor (a processing
+    # summary of extracted values), not copied from source text. Such
+    # messages are carried in the existing evidence `note` property so
+    # they are never presented as verbatim quotations.
+    quote_is_processing: bool = False
 
     def to_evidence_dict(self, source_id: str) -> Dict[str, Any]:
         """Convert to an `_evidence` block entry in canonical JSON."""
@@ -80,12 +85,17 @@ class RawExtraction:
             out["page"] = self.page
         if self.section is not None:
             out["section"] = self.section
-        if self.quote is not None:
+        note_parts: List[str] = []
+        if self.quote is not None and self.quote_is_processing:
+            note_parts.append(f"PROCESSING_SUMMARY: {self.quote}")
+        elif self.quote is not None:
             out["quote"] = self.quote
-        elif self.raw_text is not None:
+        elif self.raw_text is not None and not self.quote_is_processing:
             out["quote"] = self.raw_text[:200]
         if self.notes is not None:
-            out["note"] = self.notes
+            note_parts.append(self.notes)
+        if note_parts:
+            out["note"] = " | ".join(note_parts)
         return out
 
 

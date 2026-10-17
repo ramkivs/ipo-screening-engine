@@ -578,6 +578,37 @@ class PresentationService:
                 node = node[part]
             return node if isinstance(node, (int, float, str)) and not isinstance(node, bool) else None
 
+        def _canonical_node(path: str):
+            node: Any = canonical_input
+            for part in path.split("."):
+                if not isinstance(node, dict) or part not in node:
+                    return None
+                node = node[part]
+            return node
+
+        def _value_summary(path: str, node: Any) -> Optional[str]:
+            """Read-only rendering of a non-scalar canonical value from
+            the persisted snapshot. Never parses the quotation and never
+            substitutes a count for the actual structured value."""
+            if isinstance(node, list):
+                if not node:
+                    return "No entries recorded"
+                labels: List[str] = []
+                for entry in node[:8]:
+                    if isinstance(entry, dict):
+                        label = entry.get("fy") or entry.get("label") or entry.get("name") or entry.get("category")
+                        labels.append(str(label) if label is not None else "entry")
+                    else:
+                        labels.append(str(entry))
+                suffix = ", ".join(labels)
+                if path.endswith("financials.periods") or path == "financials.periods":
+                    return f"{len(node)} reporting periods: {suffix}"
+                return f"{len(node)} entries: {suffix}"
+            if isinstance(node, dict):
+                keys = ", ".join(list(node.keys())[:6])
+                return f"Structured value with {len(node)} fields: {keys}"
+            return None
+
         def _unit_for(path: str) -> Optional[str]:
             leaf = path.rsplit(".", 1)[-1]
             if leaf in ("price_band_low", "price_band_high"):
@@ -597,6 +628,7 @@ class PresentationService:
 
             extracted_value = item.get("extracted_value")
             unit = item.get("unit")
+            value_summary = item.get("value_summary")
             candidate_paths = []
             if isinstance(field_path, str) and "." in field_path:
                 candidate_paths.append(field_path)
@@ -613,12 +645,42 @@ class PresentationService:
                         if unit is None:
                             unit = _unit_for(candidate)
                         break
+                if extracted_value is None and value_summary is None:
+                    for candidate in candidate_paths:
+                        node = _canonical_node(candidate)
+                        if isinstance(node, (list, dict)):
+                            value_summary = _value_summary(candidate, node)
+                            break
 
+            # Document identity comes from the source manifest only:
+            # the display name is the final path segment of a recorded
+            # document URI. Descriptive text (not a document reference)
+            # stays honestly unresolved; only the basename is exposed,
+            # never a local directory path.
             document = item.get("document")
             if not document:
                 uri = source_entry.get("uri")
-                if isinstance(uri, str) and uri and " " not in uri and ("/" in uri or "\\" in uri):
-                    document = uri.replace("\\", "/").rsplit("/", 1)[-1] or None
+                if isinstance(uri, str) and uri:
+                    cleaned = uri.strip()
+                    if "/" in cleaned or "\\" in cleaned:
+                        candidate = cleaned.replace("\\", "/").rsplit("/", 1)[-1]
+                        # Accept a path/URL final segment only when it
+                        # plausibly names a document (file extension, or
+                        # a URL reference); descriptive manifest text
+                        # stays unresolved.
+                        if candidate and ("." in candidate or "://" in cleaned):
+                            document = candidate
+                    elif "." in cleaned and " " not in cleaned:
+                        document = cleaned
+
+            note = item.get("note")
+            quote_text_value = item.get("quoted_text") or item.get("quote")
+            if isinstance(note, str) and note.startswith("PROCESSING_SUMMARY:"):
+                quote_kind = "PROCESSING"
+            elif quote_text_value:
+                quote_kind = "RECORDED"
+            else:
+                quote_kind = None
 
             source_type = source_entry.get("source_type")
             uri = source_entry.get("uri") or ""
@@ -652,6 +714,9 @@ class PresentationService:
                     extracted_value=extracted_value,
                     unit=unit,
                     verification=verification,
+                    value_summary=value_summary,
+                    quote_kind=quote_kind,
+                    note=note,
                 )
             )
 
