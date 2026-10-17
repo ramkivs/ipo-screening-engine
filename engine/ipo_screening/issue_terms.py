@@ -56,6 +56,28 @@ OFFICIAL_HOSTS = {
 }
 
 
+def _default_http_fetch(url: str, timeout_seconds: float) -> bytes:
+    """Default retrieval for official documents.
+
+    Exchange/SEBI document servers commonly reject bare library user
+    agents; a browser-compatible header set keeps retrieval behaviour
+    consistent with how the documents are published for public access.
+    The host allowlist -- not the headers -- is the security boundary.
+    """
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+            ),
+            "Accept": "application/pdf,text/plain;q=0.9,*/*;q=0.8",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=timeout_seconds) as response:  # noqa: S310 (allow-listed hosts only)
+        return response.read()
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -228,9 +250,7 @@ class HttpNoticeProvider:
     def _fetch(self, url: str) -> bytes:
         if self._fetcher is not None:
             return self._fetcher(url)
-        request = urllib.request.Request(url, headers={"User-Agent": "ipo-screening-engine/1.5"})
-        with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:  # noqa: S310 (allow-listed hosts only)
-            return response.read()
+        return _default_http_fetch(url, self.timeout_seconds)
 
     def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
         url = self.urls_by_ipo.get(ipo_id) or self.urls_by_ipo.get(company_name)
@@ -297,9 +317,7 @@ class HttpProspectusProvider:
     def _fetch(self, url: str) -> bytes:
         if self._fetcher is not None:
             return self._fetcher(url)
-        request = urllib.request.Request(url, headers={"User-Agent": "ipo-screening-engine/1.5"})
-        with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:  # noqa: S310 (allow-listed hosts only)
-            return response.read()
+        return _default_http_fetch(url, self.timeout_seconds)
 
     def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
         url = self.urls_by_ipo.get(ipo_id) or self.urls_by_ipo.get(company_name)

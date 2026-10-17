@@ -3727,6 +3727,13 @@ export class App {
     const LABELS = { price_band_low: 'Price-Band Floor (₹)', price_band_high: 'Price-Band Cap (₹)', lot_size: 'Lot Size (shares)', ofs: 'Offer For Sale (₹ lakh)' };
     let missing = (err && err.details && err.details.missing_fields) || [];
     let awaitingMessage = err ? err.message : '';
+    const providerReports = (err && err.details && err.details.resolution && err.details.resolution.providers) || [];
+    const providerDiagnostics = providerReports.length
+      ? `<div style="margin-bottom: 12px;">
+           <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Official-source resolution diagnostics</div>
+           <ul style="margin: 0; padding-left: 18px; font-size: 0.85rem;">${providerReports.map((r) => `<li><code>${this.escape(r.provider || '')}</code> — ${this.escape(r.outcome || '')}: ${this.escape(r.detail || '')}</li>`).join('')}</ul>
+         </div>`
+      : '';
     container.style.display = 'block';
 
     const renderMissing = () => missing.map((f) => {
@@ -3747,6 +3754,7 @@ export class App {
           <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Missing / unresolved terms</div>
           <ul id="mt-missing-list" style="margin: 0; padding-left: 18px; font-size: 0.85rem;">${renderMissing()}</ul>
         </div>
+        ${providerDiagnostics}
         <div class="alert" style="margin-bottom: 12px; font-size: 0.85rem;">
           <strong>Manual entry is not official-source verification.</strong> Entered values are recorded as
           <code>MANUAL_ENTRY</code> provenance, remain unverified, and never displace a verified official value.

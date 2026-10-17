@@ -124,6 +124,17 @@ _CIN_PATTERN = re.compile(r"\b[LU][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}\b")
 _PROSPECTUS_DATED = re.compile(
     r"Prospectus\s*\n?\s*Dated\s*:\s*[A-Z][a-z]+\s*\d{1,2},\s*\d{4}", re.IGNORECASE
 )
+# The document title immediately preceding the "Dated:" line distinguishes
+# a final Prospectus ("Prospectus") from an RHP/DRHP ("Red Herring
+# Prospectus" / "Draft Red Herring Prospectus"). A final Prospectus
+# routinely *references* the Red Herring Prospectus in its opening pages
+# (e.g. the LISTING section), so a blanket "red herring" text search
+# falsely rejects genuine final prospectuses -- the dated title is the
+# discriminating evidence.
+_DATED_TITLE = re.compile(
+    r"((?:Draft\s+)?(?:Red\s+Herring\s+)?Prospectus)\s*\n?\s*Dated\s*:",
+    re.IGNORECASE,
+)
 _COMPANY_PATTERN = re.compile(r"\b([A-Z][A-Za-z0-9\s,\.\-&]+?\s+(?:LIMITED|LTD\.?))\b")
 
 _FLOOR_PATTERNS: Sequence[re.Pattern[str]] = (
@@ -233,7 +244,8 @@ class ProspectusTermsParser:
         cover_text = "\n".join(text for _, text in list(pages)[:2])
 
         # --- Classification: final Prospectus, not a notice, not an RHP ---
-        if "red herring" in cover_text.lower():
+        title_match = _DATED_TITLE.search(full_text)
+        if title_match and "red herring" in title_match.group(1).lower():
             raise ProspectusClassificationError(
                 "document is a Red Herring Prospectus / DRHP, not a final Prospectus"
             )

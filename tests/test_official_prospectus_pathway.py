@@ -286,3 +286,102 @@ def test_env_configuration_wires_prospectus_provider(monkeypatch):
     )
     resolver = build_resolver_from_env()
     assert any(p.name == "official-prospectus" for p in resolver.providers)
+
+
+# ---------------------------------------------------------------------------
+# Regression: live-failure root cause (2026-10-17)
+#
+# The real final Prospectus references the "Red Herring Prospectus" in its
+# opening LISTING section. The original classification rejected any
+# document whose first pages mentioned "red herring", so the genuine
+# SEBI-filed Prospectus was REJECTED, the resolver reported UNAVAILABLE,
+# and ingestion returned AWAITING_ISSUE_TERMS for all four terms.
+# Classification now turns on the dated document title.
+# ---------------------------------------------------------------------------
+
+REALISTIC_FINAL_PROSPECTUS = """Prospectus
+Dated: October 05, 2026
+100% Book Built Offer
+VISHAL NIRMITI LIMITED
+CORPORATE IDENTITY NUMBER: U01122MH1994PLC185445
+LISTING
+The Equity Shares issued through the Red Herring Prospectus and this Prospectus are proposed to be
+listed on the National Stock Exchange of India Limited and BSE Limited.
+"Price Band" Price band of a minimum price of ₹ 208 per Equity Share (i.e., the Floor Price) and the
+maximum price of ₹ 220 per Equity Share (i.e., the Cap Price), including any revisions thereof.
+"Bid Lot" 68 Equity Shares and in multiples of 68 Equity Shares thereafter.
+"""
+
+
+def test_final_prospectus_referencing_rhp_in_body_is_accepted():
+    result = ProspectusTermsParser().parse_from_text(REALISTIC_FINAL_PROSPECTUS)
+    assert result.is_classified_prospectus is True
+    assert (result.price_band_low.value, result.price_band_high.value, result.lot_size.value) == (208, 220, 68)
+
+
+def test_red_herring_titles_are_rejected_by_title():
+    rhp = REALISTIC_FINAL_PROSPECTUS.replace("Prospectus\nDated:", "Red Herring Prospectus\nDated:")
+    with pytest.raises(ProspectusClassificationError):
+        ProspectusTermsParser().parse_from_text(rhp)
+    drhp = REALISTIC_FINAL_PROSPECTUS.replace("Prospectus\nDated:", "Draft Red Herring Prospectus\nDated:")
+    with pytest.raises(ProspectusClassificationError):
+        ProspectusTermsParser().parse_from_text(drhp)
+
+
+def test_default_fetcher_uses_browser_compatible_headers(monkeypatch):
+    import urllib.request
+
+    from ipo_screening import issue_terms as issue_terms_module
+
+    captured = {}
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return PROSPECTUS_TEXT.encode("utf-8")
+
+    def fake_urlopen(request, timeout=None):
+        captured["headers"] = dict(request.header_items())
+        captured["timeout"] = timeout
+        return _Response()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    provider = HttpProspectusProvider({IPO_ID: SEBI_PROSPECTUS_URL})  # no injected fetcher
+    candidate, report = provider.find(COMPANY, IPO_ID)
+    assert candidate is not None and candidate.verified is True
+    assert "Mozilla/5.0" in captured["headers"].get("User-agent", "")
+
+
+def test_prospectus_ingest_derives_ofs_from_seller_shares(tmp_path, monkeypatch, golden_input):
+    """OFS is not independently blocked: once the Prospectus establishes
+    the cap, the established assembly derivation (seller shares x cap)
+    supplies OFS, exactly as on the notice pathway."""
+    doc = copy.deepcopy(golden_input)
+    for field_name in ("price_band_low", "price_band_high", "lot_size", "ofs"):
+        doc["issue"][field_name] = None
+    assert doc["issue"]["ofs_sellers"]  # RHP-established seller shares
+    monkeypatch.setattr(
+        DocumentExtractor,
+        "extract_from_pdf",
+        lambda self, pdf_path=None, allow_fixture_fallbacks=False: (copy.deepcopy(doc), {}),
+    )
+    cfg = PresentationConfig(
+        store_root=tmp_path / "evaluations",
+        config_dir=REPO_ROOT / "config",
+        issue_terms_resolver=IssueTermsResolver(providers=[_provider()]),
+    )
+    service = PresentationService(cfg)
+    client = TestClient(
+        create_app(service),
+        base_url="http://127.0.0.1:8000",
+        headers={"Origin": "http://127.0.0.1:8000"},
+    )
+    res = _upload(client, "/api/v1/ingest/document")
+    assert res.status_code == 201, res.text
+    record = service.eval_store.read(res.json()["evaluation_id"])
+    assert record["input_snapshot"]["input"]["issue"]["ofs"] == 3300.0

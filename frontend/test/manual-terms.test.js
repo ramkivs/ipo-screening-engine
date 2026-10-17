@@ -174,3 +174,25 @@ test('Step5 App - manual panel requires values and an explanation before submitt
   assert.equal(called, 0);
   assert.ok(container.querySelector('#mt-status').innerHTML.includes('explanation is required'));
 });
+
+test('Step5 App - awaiting panel surfaces official-source resolution diagnostics', () => {
+  const app = new App();
+  app.selectedIngestFile = new Blob(['%PDF-1.4']);
+  const container = makePanelContainer();
+  app.renderManualTermsPanel(container, {
+    code: 'AWAITING_ISSUE_TERMS',
+    message: 'awaiting',
+    details: {
+      missing_fields: ['price_band_low', 'ofs'],
+      resolution: {
+        providers: [
+          { provider: 'official-prospectus', outcome: 'REJECTED', detail: 'retrieved document is not an established final Prospectus: no CIN' },
+          { provider: 'official-url', outcome: 'UNAVAILABLE', detail: 'no official notice URL configured for this issuer' },
+        ],
+      },
+    },
+  }, 'final');
+  assert.ok(container.innerHTML.includes('Official-source resolution diagnostics'));
+  assert.ok(container.innerHTML.includes('official-prospectus'));
+  assert.ok(container.innerHTML.includes('REJECTED'));
+});
