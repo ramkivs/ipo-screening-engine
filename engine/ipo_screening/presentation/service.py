@@ -43,6 +43,7 @@ from ..post_listing.v16_implementation import (
     verify_frozen_core,
 )
 from .models import (
+    MarketBlockState,
     ApiMeta,
     BacktestAnalyticsResponse,
     BacktestDatasetListResponse,
@@ -506,6 +507,18 @@ class PresentationService:
         supersedes = lc.supersedes if lc else None
         lc_dict = lc.to_dict() if lc else None
 
+        market_blocks = [
+            MarketBlockState(
+                block=str(b.get("block", "")),
+                status=str(b.get("status", "MISSING")),
+                as_of=b.get("as_of"),
+                source_id=b.get("source_id"),
+                reason=b.get("reason"),
+            )
+            for b in (rec.get("market_snapshot") or {}).get("blocks", [])
+            if isinstance(b, dict)
+        ]
+
         return EvaluationDetail(
             evaluation_id=eval_id,
             ipo_id=rec.get("ipo_id", ""),
@@ -520,6 +533,7 @@ class PresentationService:
             source_manifest_hash=rec.get("source_manifest_hash", ""),
             market_snapshot_hash=rec.get("market_snapshot_hash"),
             peer_snapshot_hash=rec.get("peer_snapshot_hash"),
+            market_blocks=market_blocks,
             result_hash=rec.get("result_hash", ""),
             score=score_detail,
             knockouts=KnockoutSummary(status=ko_raw.get("status", "UNVERIFIED"), rules=ko_rules),

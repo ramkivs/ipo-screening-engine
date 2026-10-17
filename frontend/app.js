@@ -939,6 +939,31 @@ export class App {
         </div>
       </div>
 
+      <!-- Market Data State Panel -->
+      <div class="provenance-panel" role="region" aria-label="Market Data State">
+        <div class="provenance-panel-header">
+          <div class="provenance-panel-title">Market Data State (as recorded at evaluation)</div>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
+          Market criteria marked UNKNOWN mean the data was unavailable, stale, or not supplied — <strong>not</strong> that a market signal was observed and found negative. Freshness describes the recorded data's currency; it is not a qualification of the source.
+        </div>
+        <div class="provenance-grid">
+          ${(evaluation.market_blocks || []).map(b => `
+            <div class="provenance-item">
+              <span class="provenance-item-label">${this.escape(String(b.block || '').toUpperCase())}</span>
+              <div>
+                ${b.status === 'FRESH' ? '<span class="badge badge-source-evidence">SUPPLIED (FRESH)</span>' : b.status === 'STALE' ? '<span class="badge badge-unknown-evidence">STALE — NOT USED</span>' : '<span class="badge badge-unknown">NOT SUPPLIED — NO SIGNAL OBSERVED</span>'}
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                ${b.as_of ? `As of: ${this.escape(b.as_of)}` : 'No timestamp recorded'}
+                ${b.source_id ? ` &bull; Source: ${this.escape(b.source_id)}` : ''}
+                ${b.reason ? `<br>${this.escape(b.reason)}` : ''}
+              </div>
+            </div>
+          `).join('') || '<div style="font-size: 0.8rem; color: var(--text-muted);">No market snapshot recorded for this evaluation.</div>'}
+        </div>
+      </div>
+
       <!-- Contract Guidance Note -->
       <div class="contract-guidance-note">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;" aria-hidden="true">

@@ -171,6 +171,21 @@ class EvaluationScoreDetail(BaseModel):
     modules: List[ModuleScore] = Field(default_factory=list)
 
 
+class MarketBlockState(BaseModel):
+    """One persisted market-data block state, projected read-only from
+    the evaluation record's market snapshot. Status values are the
+    existing snapshot states (FRESH | STALE | MISSING); freshness is a
+    statement about the recorded data's currency, not source
+    qualification."""
+
+    model_config = ConfigDict(extra="ignore")
+    block: str
+    status: str
+    as_of: Optional[str] = None
+    source_id: Optional[str] = None
+    reason: Optional[str] = None
+
+
 class EvaluationDetail(BaseModel):
     model_config = ConfigDict(extra="ignore")
     evaluation_id: str
@@ -186,6 +201,7 @@ class EvaluationDetail(BaseModel):
     source_manifest_hash: str
     market_snapshot_hash: Optional[str] = None
     peer_snapshot_hash: Optional[str] = None
+    market_blocks: List[MarketBlockState] = Field(default_factory=list)
     result_hash: str
     score: EvaluationScoreDetail
     knockouts: KnockoutSummary

@@ -282,3 +282,16 @@ test('UI-3 App - Processing summaries and non-scalar value summaries are not sho
   assert.ok(appJs.includes('item.value_summary'));
   assert.ok(appJs.includes('Recorded Quotation (as recorded in evidence)'));
 });
+
+test('Market Data State panel distinguishes missing/stale from an observed negative signal', () => {
+  const appJs = fs.readFileSync(path.resolve(__dirname, '../app.js'), 'utf8');
+
+  // The scorecard must surface the persisted market block states and
+  // must never present unavailable data as a checked-and-negative signal.
+  assert.ok(appJs.includes('Market Data State (as recorded at evaluation)'));
+  assert.ok(appJs.includes('NOT SUPPLIED — NO SIGNAL OBSERVED'));
+  assert.ok(appJs.includes('STALE — NOT USED'));
+  assert.ok(appJs.includes('SUPPLIED (FRESH)'));
+  assert.ok(appJs.includes('not</strong> that a market signal was observed and found negative'));
+  assert.ok(appJs.includes('evaluation.market_blocks'));
+});
