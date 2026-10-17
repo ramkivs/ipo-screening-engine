@@ -38,6 +38,7 @@ from .extraction.price_band_notice import (
     PriceBandNoticeParser,
     PriceBandNoticeResult,
 )
+from .extraction.prospectus_terms import ProspectusTermsParser
 
 PRICING_TERMS = ("price_band_low", "price_band_high", "lot_size")
 REQUIRED_ISSUE_TERMS = PRICING_TERMS + ("ofs",)
@@ -133,6 +134,10 @@ class ResolutionOutcome:
     verified: bool = False
     provider: Optional[str] = None
     retrieved_at: Optional[str] = None
+    # PRICE_BAND_NOTICE | OFFICIAL_PROSPECTUS -- the document class is
+    # carried truthfully into reports; a Prospectus is never labelled a
+    # Price Band Notice.
+    document_class: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -145,6 +150,7 @@ class ResolutionOutcome:
             "source_uri": self.source_uri,
             "provider": self.provider,
             "retrieved_at": self.retrieved_at,
+            "document_class": self.document_class,
             "providers": [
                 {"provider": r.provider, "outcome": r.outcome, "detail": r.detail}
                 for r in self.provider_reports
@@ -260,6 +266,77 @@ class HttpNoticeProvider:
                 verified=True,
             ),
             ProviderReport(self.name, "FOUND", f"notice retrieved from {url}"),
+        )
+
+
+class HttpProspectusProvider:
+    """Retrieves a final Prospectus from an official URL (narrow pathway,
+    authorized 2026-10-17).
+
+    A Prospectus is a distinct official document class from a Price Band
+    Notice: candidates carry ``SRC-PROSPECTUS-…`` identity and
+    ``OFFICIAL_PROSPECTUS`` classification, and only terms the document
+    explicitly establishes are extracted. The same allow-listed official
+    hosts (NSE/BSE/SEBI) qualify; the host allowlist is not broadened.
+    """
+
+    name = "official-prospectus"
+
+    def __init__(
+        self,
+        urls_by_ipo: Mapping[str, str],
+        fetcher: Optional[Callable[[str], bytes]] = None,
+        allowed_hosts: Optional[set[str]] = None,
+        timeout_seconds: float = 20.0,
+    ):
+        self.urls_by_ipo = dict(urls_by_ipo)
+        self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(OFFICIAL_HOSTS)
+        self.timeout_seconds = timeout_seconds
+        self._fetcher = fetcher
+
+    def _fetch(self, url: str) -> bytes:
+        if self._fetcher is not None:
+            return self._fetcher(url)
+        request = urllib.request.Request(url, headers={"User-Agent": "ipo-screening-engine/1.5"})
+        with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:  # noqa: S310 (allow-listed hosts only)
+            return response.read()
+
+    def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
+        url = self.urls_by_ipo.get(ipo_id) or self.urls_by_ipo.get(company_name)
+        if not url:
+            return None, ProviderReport(self.name, "UNAVAILABLE", "no official prospectus URL configured for this issuer")
+        host = (urlparse(url).hostname or "").lower()
+        if host not in self.allowed_hosts:
+            return None, ProviderReport(self.name, "REJECTED", f"host {host or '?'} is not an official source host")
+        try:
+            raw = self._fetch(url)
+        except Exception as exc:
+            return None, ProviderReport(self.name, "UNAVAILABLE", f"official source retrieval failed: {exc}")
+        suffix = ".pdf" if raw.startswith(b"%PDF-") else ".txt"
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as handle:
+                handle.write(raw)
+                temp_path = Path(handle.name)
+            try:
+                result = ProspectusTermsParser().parse_from_file(temp_path)
+            finally:
+                temp_path.unlink(missing_ok=True)
+        except Exception as exc:
+            return None, ProviderReport(self.name, "REJECTED", f"retrieved document is not an established final Prospectus: {exc}")
+        if not result.is_classified_prospectus:
+            return None, ProviderReport(self.name, "REJECTED", "document is not classified as a final Prospectus")
+        if _norm_name(result.company_name) != _norm_name(company_name):
+            return None, ProviderReport(self.name, "REJECTED", "retrieved prospectus names a different issuer")
+        return (
+            NoticeCandidate(
+                result=result,
+                provider=self.name,
+                uri=url,
+                retrieved_at=_utcnow().isoformat().replace("+00:00", "Z"),
+                raw_bytes=raw,
+                verified=True,
+            ),
+            ProviderReport(self.name, "FOUND", f"final Prospectus retrieved from {url}"),
         )
 
 
@@ -422,6 +499,7 @@ class IssueTermsResolver:
         outcome.resolved_fields = resolved
         outcome.unresolved_fields = [f for f in missing_fields if f not in resolved and f != "ofs"]
         outcome.notice = chosen.result
+        outcome.document_class = getattr(chosen.result, "document_class", "PRICE_BAND_NOTICE")
         outcome.from_cache = from_cache
         outcome.source_uri = chosen.uri
         outcome.verified = True
@@ -429,7 +507,15 @@ class IssueTermsResolver:
         outcome.retrieved_at = chosen.retrieved_at
         outcome.status = "RESOLVED" if len(resolved) == len(missing) else "PARTIAL"
 
-        if self.cache is not None and not from_cache and chosen.verified and chosen.raw_bytes is not None:
+        if (
+            self.cache is not None
+            and not from_cache
+            and chosen.verified
+            and chosen.raw_bytes is not None
+            and outcome.document_class == "PRICE_BAND_NOTICE"
+        ):
+            # The snapshot cache re-parses with the notice parser; only
+            # notice-class documents are cached.
             self.cache.put(ipo_id, chosen)
         return outcome
 
@@ -440,6 +526,10 @@ def build_resolver_from_env() -> IssueTermsResolver:
     - ``IPO_PRICE_BAND_NOTICE_URLS``: JSON map of ipo_id -> official URL
       (allow-listed NSE/BSE/SEBI hosts). Documents retrieved this way are
       the only verified notice source.
+    - ``IPO_PROSPECTUS_URLS``: JSON map of ipo_id -> official final-
+      Prospectus URL (same allow-listed hosts). A Prospectus is a
+      distinct document class from a Price Band Notice and is labelled
+      ``OFFICIAL_PROSPECTUS`` / ``SRC-PROSPECTUS-…``, never as a notice.
     - ``IPO_PRICE_BAND_NOTICE_DIR``: operator-retained notice directories
       (os.pathsep-separated). Retained copies are searched and reported,
       but classified UNVERIFIED and never used to resolve terms.
@@ -454,6 +544,12 @@ def build_resolver_from_env() -> IssueTermsResolver:
     if urls_raw:
         try:
             providers.append(HttpNoticeProvider(json.loads(urls_raw)))
+        except Exception:
+            pass
+    prospectus_urls_raw = os.getenv("IPO_PROSPECTUS_URLS", "").strip()
+    if prospectus_urls_raw:
+        try:
+            providers.append(HttpProspectusProvider(json.loads(prospectus_urls_raw)))
         except Exception:
             pass
     dirs = [d for d in os.getenv("IPO_PRICE_BAND_NOTICE_DIR", "").split(os.pathsep) if d]

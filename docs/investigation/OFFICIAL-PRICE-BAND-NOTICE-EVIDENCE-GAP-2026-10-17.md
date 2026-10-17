@@ -28,3 +28,19 @@ The official Prospectus therefore *corroborates* 208/220/68. Corroboration is no
 ## Bottom line
 
 `OFFICIAL_VERIFIED` resolution of the real filing is **not yet demonstrated against a live authentic notice**, for two independent, precisely identified reasons: the genuine notice document has not been located on an allow-listed host (only the final Prospectus has, raising a document-class decision), and this environment cannot retrieve exchange/SEBI documents at all. Manual entry (Step 5) remains the authorized interim path and stays `UNVERIFIED`.
+
+---
+
+## Addendum — Prospectus pathway implemented (2026-10-17, user-authorized)
+
+Blocker (1) is resolved in code, without mislabelling: a narrowly scoped **official Prospectus pathway** now exists alongside the notice pathway.
+
+- **Parser/provider:** `extraction/prospectus_terms.py` (`ProspectusTermsParser`) + `HttpProspectusProvider` in `issue_terms.py`, configured via `IPO_PROSPECTUS_URLS` (JSON map of ipo_id → official URL), same allow-listed hosts (allowlist **not** broadened; the NSE-archives subdomain remains outside it and is rejected).
+- **Truthful classification:** source identity `SRC-PROSPECTUS-<content-hash>`, enrichment note `OFFICIAL_PROSPECTUS`, evidence locators "Final Prospectus — 'Floor Price'/'Cap Price'/'Bid Lot' definition", issue-terms report `document_class: OFFICIAL_PROSPECTUS`. Nothing in this pathway uses `SRC-PBN-…` or notice labelling. Presentation verification is `OFFICIAL_VERIFIED` (official host + issuer match), with the document class visible in source identity and locator.
+- **Classification gates:** `Prospectus Dated:` title marker + CIN + issuer name; Red Herring documents rejected; a Price Band Notice is rejected by this parser and a Prospectus is never fed to the notice parser by this pathway. Only explicitly established terms are extracted (`[●]`/missing → `None` → resolver PARTIAL/UNAVAILABLE → ingestion stays `AWAITING_ISSUE_TERMS`).
+- **Protection:** verified Prospectus values outrank manual entries exactly like verified notice values (conflict blocks as `OFFICIAL_VERIFIED`; confirmation never displaces them). Coverage: `tests/test_official_prospectus_pathway.py` (11 tests, mocked transport = mechanics only). Full suite 962 passed.
+- **Blocker (2) remains environmental:** live retrieval of the SEBI Prospectus (`https://www.sebi.gov.in/sebi_data/attachdocs/oct-2026/1791286596126.pdf`) from this sandbox fails (restricted egress, TLS EOF); the document's identity/terms at that URL were corroborated through search-index excerpts of the SEBI/NSE filings (Prospectus dated 5 Oct 2026, CIN U01122MH1994PLC185445, ₹208/₹220, Bid Lot 68). Live acceptance must run where the application can reach SEBI:
+
+  1. Set `IPO_PROSPECTUS_URLS={"VISHAL-NIRMITI-LIMITED":"https://www.sebi.gov.in/sebi_data/attachdocs/oct-2026/1791286596126.pdf"}` in the application environment and restart the app.
+  2. Upload the Vishal Nirmiti RHP at `http://127.0.0.1:8000/ui/` (mode: final).
+  3. Expect a 201 evaluation without manual entry; on the scorecard/evidence view, `issue.price_band_low/high/lot_size` show `OFFICIAL_VERIFIED` with source `SRC-PROSPECTUS-…` and "Final Prospectus" locators; the issue-terms report shows `document_class: OFFICIAL_PROSPECTUS`, provider `official-prospectus`.

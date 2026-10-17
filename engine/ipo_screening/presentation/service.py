@@ -1245,7 +1245,7 @@ class PresentationService:
             def _origin(field_name: str) -> str:
                 spec = evidence_map.get(f"issue.{field_name}")
                 src = spec.get("source_id", "") if isinstance(spec, dict) else ""
-                return "OFFICIAL_VERIFIED" if str(src).startswith("SRC-PBN-") else "FILING_EXTRACTION"
+                return "OFFICIAL_VERIFIED" if str(src).startswith(("SRC-PBN-", "SRC-PROSPECTUS-")) else "FILING_EXTRACTION"
 
             conflicts = []
             for field_name, value in manual_clean.items():
