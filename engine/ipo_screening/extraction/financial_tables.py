@@ -80,6 +80,7 @@ class FinancialTableExtractor:
                     section="Basis for Offer Price",
                     locator="KPI Table Header",
                     quote=f"Detected currency unit: {unit}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -94,6 +95,7 @@ class FinancialTableExtractor:
                     section="Basis for Offer Price / Summary Financial Information",
                     locator="Financial KPI and Restated Cash Flow Tables",
                     quote=f"Parsed {len(periods_data)} financial periods from KPI and financial summary tables",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -156,6 +158,7 @@ class FinancialTableExtractor:
                 section="Financial Information",
                 locator="Restated Statement Header",
                 quote=f"Detected currency unit: {unit}",
+                quote_is_processing=True,
                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                 extraction_confidence=1.0 if (pl_page or bs_page) else 0.5,
             )
@@ -234,6 +237,7 @@ class FinancialTableExtractor:
                     section="Notes to Restated Financials",
                     locator="Contingent Liabilities and Commitments",
                     quote=f"Total Contingent Liabilities: {cl_amount}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -331,6 +335,7 @@ class FinancialTableExtractor:
                 section="Restated Financial Statements",
                 locator="P&L, Balance Sheet, Cash Flow Annexures",
                 quote=f"Parsed {len(periods_data)} financial periods from restated statements",
+                quote_is_processing=True,
                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                 extraction_confidence=0.95,
             )

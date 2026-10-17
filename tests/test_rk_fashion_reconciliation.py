@@ -6,7 +6,8 @@ Forensic reconciliation asserting:
 3. Repair of DEFECT-1: top-5 supplier concentration (34.10% -> criterion score 1/3).
 4. Repair of DEFECT-2: domestic Indian costume jewellery CAGR (4.45% -> criterion score 1/5).
 5. Repair of DEFECT-3: statutory operating cash flow after tax (-26.10, 3.09, -67.79 -> criterion score 0/5).
-6. Total repaired score: 50.0 / 100 (Base 53.0, Penalties -3.0).
+6. Total repaired score: 49.0 / 100 (Base 52.0, Penalties -3.0); the auditor-opinion
+   criterion is UNKNOWN under Step 4 Area B(i) -- the filing establishes no opinion.
 7. Bit-for-bit preservation of Vishal Nirmiti golden evaluation.
 """
 
@@ -122,7 +123,10 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     assert canonical["capital_structure"]["promoter_pledge_pct"] == 0.0
     assert canonical["capital_structure"]["promoter_lockin_in_place"] is True
 
-    assert canonical["governance"]["auditor_opinion"] == "unqualified"
+    # Step 4 Area B(i) (approved 2026-10-17): the filing's extracted text
+    # contains no establishable opinion language, so the opinion is honestly
+    # unknown -- the previous "unqualified" value was an unsupported default.
+    assert canonical["governance"]["auditor_opinion"] is None
     assert canonical["governance"]["auditor_changed_3y"] is False
     assert canonical["governance"]["auditor_reputed"] is False
     assert canonical["governance"]["litigation_bucket"] == "clean"
@@ -145,13 +149,13 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     outcome = evaluate(canonical, config, mode="final", evaluation_datetime=eval_at)
 
     assert outcome.record.validation["ok"] is True
-    assert outcome.record.score["final_score"] == 50.0  # 55.0 - 2 (supplier) - 2 (cagr) - 1 (cfo)
-    assert outcome.record.score["base_score"] == 53.0
+    assert outcome.record.score["final_score"] == 49.0  # 55.0 - 2 (supplier) - 2 (cagr) - 1 (cfo) - 1 (auditor opinion unknown, B(i))
+    assert outcome.record.score["base_score"] == 52.0
     assert outcome.record.score["penalties_total"] == -3.0
     assert outcome.record.confidence["level"] == "Low"
-    assert outcome.record.confidence["completeness_pct"] == 75.0
-    assert outcome.record.score["lower_bound"] == 37.0
-    assert outcome.record.score["upper_bound"] == 75.0
+    assert outcome.record.confidence["completeness_pct"] == 73.0
+    assert outcome.record.score["lower_bound"] == 36.0
+    assert outcome.record.score["upper_bound"] == 76.0
     assert outcome.record.verdict["verdict"] == "INSUFFICIENT_DATA"
 
     # Module assertions
@@ -181,15 +185,15 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     assert prom_ofs_crit["state"] == "SCORED"
     assert prom_ofs_crit["score"] == 2.0
 
-    # Module D: 11 / 15, 0 unknown
-    assert modules["D"]["score"] == 11.0
-    assert modules["D"]["unknown_points"] == 0
+    # Module D: 10 / 15, auditor criterion (2 pts) unknown (opinion not established, B(i))
+    assert modules["D"]["score"] == 10.0
+    assert modules["D"]["unknown_points"] == 2.0
     prom_post_crit = next(c for c in modules["D"]["criteria"] if c["criterion_id"] == "promoter_post_holding")
     assert prom_post_crit["state"] == "SCORED"
     assert prom_post_crit["score"] == 4.0
     aud_crit = next(c for c in modules["D"]["criteria"] if c["criterion_id"] == "auditor")
-    assert aud_crit["state"] == "SCORED"
-    assert aud_crit["score"] == 1.0
+    assert aud_crit["state"] == "UNKNOWN"
+    assert aud_crit.get("value") is None
 
     # Module E: 2 / 8, 7 unknown points (moat 5 pts, visibility 2 pts unextracted)
     assert modules["E"]["score"] == 2.0

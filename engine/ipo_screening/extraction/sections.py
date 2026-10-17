@@ -11,7 +11,7 @@ Extracts non-table and hybrid sections according to ICDR layout:
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import pypdf
 
@@ -42,6 +42,91 @@ class SectionExtractor:
             return txt
         return ""
 
+    @staticmethod
+    def _labelled_quantity_candidates(
+        text: str,
+        label_pattern: str,
+        forbidden_markers: Sequence[str],
+        window: int = 220,
+    ) -> List[Tuple[float, str]]:
+        """Quantities bound to a semantic label within a bounded window.
+
+        A candidate is rejected when another issue component's label
+        (e.g. "offer for sale" for a fresh-issue quantity) intervenes
+        between the label and the number -- the classic cover-page
+        confusion where one regex spans two clauses of the offer
+        structure sentence and assigns the OFS quantity to fresh
+        shares. Generic across issuers and layouts.
+        """
+        candidates: List[Tuple[float, str]] = []
+        for match in re.finditer(label_pattern, text, re.IGNORECASE):
+            segment = text[match.end(): match.end() + window]
+            quantity_match = re.search(
+                r'(?:of\s+)?(?:up\s*to\s*)?([0-9,]+)\s*equity shares',
+                segment,
+                re.IGNORECASE,
+            )
+            if not quantity_match:
+                continue
+            between = segment[: quantity_match.start()].lower()
+            if any(marker in between for marker in forbidden_markers):
+                continue
+            value = parse_indian_number(quantity_match.group(1))
+            if value:
+                candidates.append(
+                    (value, text[match.start(): match.end() + quantity_match.end()])
+                )
+        return candidates
+
+    @staticmethod
+    def _extract_seller_names(text: str) -> List[Tuple[str, str]]:
+        """Selling-shareholder identities anchored on the
+        ("SELLING SHAREHOLDER") marker itself, so sellers listed after
+        commas/"and" (not only after "by") are all enumerated. Returns
+        (name, exact source substring) pairs, de-duplicated in order.
+        """
+        results: List[Tuple[str, str]] = []
+        seen: set = set()
+        for marker in re.finditer(
+            r'\(\s*[“"]SELLING SHAREHOLDER[”"]\s*\)', text, re.IGNORECASE
+        ):
+            segment_start = max(0, marker.start() - 160)
+            segment = text[segment_start: marker.start()]
+            tail = re.split(r',|\bBY\b|\bAND\b', segment.replace("\n", " "))[-1]
+            name_match = re.search(
+                r'([A-Za-z0-9][A-Za-z0-9\s,&\.]*?\bLimited)\s*$',
+                tail.strip(),
+                re.IGNORECASE,
+            )
+            if not name_match:
+                continue
+            name = re.sub(r"\s+", " ", name_match.group(1)).strip()
+            if name and name.upper() not in seen:
+                seen.add(name.upper())
+                first_word = name.split()[0]
+                offset = segment.upper().find(first_word.upper())
+                start = segment_start + (offset if offset >= 0 else 0)
+                results.append((name, text[start: marker.end()]))
+        return results
+
+    @classmethod
+    def _resolve_labelled_quantity(
+        cls,
+        text: str,
+        label_pattern: str,
+        forbidden_markers: Sequence[str],
+    ) -> Tuple[Optional[float], Optional[str]]:
+        """Resolve one labelled quantity, failing closed on ambiguity.
+
+        Distinct surviving values for the same label are contradictory
+        evidence: no value is chosen arbitrarily.
+        """
+        candidates = cls._labelled_quantity_candidates(text, label_pattern, forbidden_markers)
+        values = {value for value, _quote in candidates}
+        if len(values) == 1:
+            return candidates[0]
+        return None, None
+
     def extract_cover_and_offer(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract company name, issue size, price band, quotas, and OFS details."""
         extractions: List[RawExtraction] = []
@@ -65,6 +150,18 @@ class SectionExtractor:
                 if pfx in cname:
                     cname = cname.replace(pfx, "").strip()
             cname = re.sub(r'^(?:100%\s+)?BOOK\s+BUILT\s+ISSUE\s*', '', cname, flags=re.IGNORECASE).strip()
+            if "\n" in cname:
+                # The lazy cover span can swallow preceding cover lines
+                # (document-class titles are stripped above; logos and
+                # other header matter are not names). The issuer name is
+                # the standalone line ending in LIMITED within the span.
+                name_lines = [
+                    ln.strip()
+                    for ln in cname.splitlines()
+                    if ln.strip().upper().endswith("LIMITED") and len(ln.split()) >= 2
+                ]
+                if name_lines:
+                    cname = name_lines[-1]
             extractions.append(
                 RawExtraction(
                     field_path="company_name",
@@ -81,7 +178,7 @@ class SectionExtractor:
 
         # 1b. Issue Dates from Cover/Notice
         m_open = re.search(
-            r'(?:issue|bid(?:\s*/\s*offer)?)\s*opens?\s*(?:on)?\s*(?:\([0-9]+\))?:?\s*([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})',
+            r'(?:issue|bid(?:\s*/\s*offer)?)\s*opens?\s*(?:on)?\s*(?:\([0-9]+\))?:?\s*(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*)?([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})',
             cover_text,
             re.IGNORECASE,
         )
@@ -111,7 +208,7 @@ class SectionExtractor:
                 )
 
         m_close = re.search(
-            r'(?:issue|bid(?:\s*/\s*offer)?)\s*closes?\s*(?:on)?\s*(?:\([0-9]+\))?:?\s*([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})',
+            r'(?:issue|bid(?:\s*/\s*offer)?)\s*closes?\s*(?:on)?\s*(?:\([0-9]+\))?:?\s*(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*)?([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})',
             cover_text,
             re.IGNORECASE,
         )
@@ -237,37 +334,50 @@ class SectionExtractor:
             )
 
         # 2. Fresh Issue Shares & Amount
-        m_fshares = re.search(
-            r'fresh (?:offer|issue)[^\n]*?(?:of\s+)?(?:up\s*to\s*)?([0-9,]+)\s*equity shares',
+        # The quantity must be bound to the fresh-issue label without an
+        # intervening Offer-for-Sale label: cover sentences routinely
+        # state "... (FRESH OFFER) AND AN OFFER FOR SALE OF UP TO N
+        # EQUITY SHARES", and an unguarded span assigns the OFS quantity
+        # to fresh shares. Ambiguous (contradictory) bindings fail closed.
+        fresh_shares_count, fresh_quote = self._resolve_labelled_quantity(
             cover_text,
-            re.IGNORECASE,
+            r'fresh\s+(?:offer|issue)\b',
+            ("offer for sale", "ofs", "selling shareholder"),
         )
-        fresh_shares_count = None
-        if m_fshares:
-            fresh_shares_count = parse_indian_number(m_fshares.group(1))
-            if fresh_shares_count:
-                extractions.append(
-                    RawExtraction(
-                        field_path="issue.fresh_shares",
-                        candidate_value=int(fresh_shares_count),
-                        raw_text=str(int(fresh_shares_count)),
-                        page=1,
-                        section="Cover",
-                        locator="Cover page, Fresh Issue Shares",
-                        quote=m_fshares.group(0),
-                        extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
-                        extraction_confidence=0.98,
-                    )
+        if fresh_shares_count:
+            extractions.append(
+                RawExtraction(
+                    field_path="issue.fresh_shares",
+                    candidate_value=int(fresh_shares_count),
+                    raw_text=str(int(fresh_shares_count)),
+                    page=1,
+                    section="Cover",
+                    locator="Cover page, Fresh Issue Shares",
+                    quote=fresh_quote,
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.98,
                 )
+            )
 
-        m_fresh = re.search(
-            r'fresh (?:offer|issue)[^\n]*?aggregating up to ₹\s*([0-9,]+(?:\.[0-9]+)?)\s*(lakhs?|crores?|millions?)',
-            cover_text,
-            re.IGNORECASE,
-        )
+        m_fresh = None
+        for _label_match in re.finditer(r'fresh\s+(?:offer|issue)\b', cover_text, re.IGNORECASE):
+            _segment = cover_text[_label_match.end(): _label_match.end() + 220]
+            _amount_match = re.search(
+                r'aggregating(?: up)? to ₹\s*([0-9,]+(?:\.[0-9]+)?)\s*(lakhs?|crores?|millions?)',
+                _segment,
+                re.IGNORECASE,
+            )
+            if not _amount_match:
+                continue
+            _between = _segment[: _amount_match.start()].lower()
+            if "offer for sale" in _between or "selling shareholder" in _between:
+                continue  # amount belongs to the OFS clause, not the fresh issue
+            m_fresh = (_label_match, _amount_match)
+            break
         if m_fresh:
-            raw_val = m_fresh.group(1)
-            unit_val = m_fresh.group(2).upper()
+            _label_match, _amount_match = m_fresh
+            raw_val = _amount_match.group(1)
+            unit_val = _amount_match.group(2).upper()
             num_val = parse_indian_number(raw_val)
             extractions.append(
                 RawExtraction(
@@ -278,7 +388,7 @@ class SectionExtractor:
                     page=1,
                     section="Cover",
                     locator="Cover page, Fresh Offer",
-                    quote=m_fresh.group(0),
+                    quote=cover_text[_label_match.start(): _label_match.end() + _amount_match.end()],
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.98,
                 )
@@ -295,6 +405,7 @@ class SectionExtractor:
                     section="Cover",
                     locator="Cover page, Derived Fresh Offer Size at Cap",
                     quote=f"Fresh shares {fresh_shares_count} @ ₹{pb_high} = ₹{derived_fresh_lakhs} Lakhs",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -302,7 +413,7 @@ class SectionExtractor:
 
         # 3. OFS Seller & shares / NIL detection
         m_ofs_nil = re.search(
-            r'offer for sale(?: size)?[^\n]*?(?:[^\n]*?\n){0,16}?\s*NIL\b',
+            r'offer for sale(?: size)?[^\n]*?(?:[^\n]*?\n){0,16}?\s*(?:NIL|Not\s+Applicable)\b',
             cover_text,
             re.IGNORECASE,
         )
@@ -335,25 +446,24 @@ class SectionExtractor:
                 )
             )
         else:
-            m_ofs_shares = re.search(
-                r'offer for sale[^\n]*?up to\s*([0-9,]+)\s*equity shares',
+            ofs_shares_count, ofs_quote = self._resolve_labelled_quantity(
                 cover_text,
-                re.IGNORECASE,
+                r'offer\s+for\s+sale\b',
+                ("fresh offer", "fresh issue"),
             )
-            ofs_shares_count = None
-            if m_ofs_shares:
-                ofs_shares_count = parse_indian_number(m_ofs_shares.group(1))
 
-            m_seller = re.search(
-                r'by\s+([A-Za-z0-9\s,\.\(\)]+?(?:Private|Public)?\s*Limited)\s*\(\s*[“"]SELLING SHAREHOLDER[”"]\s*\)',
-                cover_text,
-                re.IGNORECASE,
-            )
-            if m_seller:
-                seller_name = m_seller.group(1).strip()
+            seller_entries = self._extract_seller_names(cover_text)
+            seller_names = [name for name, _quote in seller_entries]
+
+            if len(seller_names) == 1:
+                # Sole named selling shareholder: the cover's aggregate
+                # OFS quantity is that seller's quantity. (The v1.5 seller
+                # model requires numeric pre_issue_shares, which the
+                # cover does not independently establish; it carries the
+                # established sold quantity, as in existing records.)
                 ofs_seller_obj = [
                     {
-                        "name": seller_name,
+                        "name": seller_names[0],
                         "type": "promoter_group",
                         "pre_issue_shares": int(ofs_shares_count) if ofs_shares_count else None,
                         "shares_sold": int(ofs_shares_count) if ofs_shares_count else None,
@@ -369,9 +479,33 @@ class SectionExtractor:
                         page=1,
                         section="Cover",
                         locator="Cover page, Details of the Offer for Sale",
-                        quote=m_seller.group(0),
+                        quote=seller_entries[0][1],
                         extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                         extraction_confidence=0.95,
+                    )
+                )
+            elif len(seller_names) > 1:
+                # Multiple selling shareholders with (at most) an
+                # aggregate OFS quantity: the v1.5 seller model cannot
+                # represent an unattributed quantity, and the aggregate
+                # must not be attributed to any individual seller.
+                # Seller identity is preserved in the evidence quotation;
+                # the canonical seller list stays empty so OFS derivation
+                # fails closed instead of guessing.
+                _span_start = cover_text.find(seller_entries[0][1])
+                _span_end = cover_text.find(seller_entries[-1][1]) + len(seller_entries[-1][1])
+                _span = cover_text[_span_start:_span_end]
+                extractions.append(
+                    RawExtraction(
+                        field_path="issue.ofs_sellers",
+                        candidate_value=[],
+                        raw_text="[]",
+                        page=1,
+                        section="Cover",
+                        locator="Cover page, Details of the Offer for Sale",
+                        quote=_span[:600],
+                        extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                        extraction_confidence=0.90,
                     )
                 )
 
@@ -415,6 +549,7 @@ class SectionExtractor:
                     section="Offer Structure",
                     locator="Offer Quotas Allocation",
                     quote=f"QIB: {quota_qib}%, Retail: {quota_retail}%, NII: {quota_nii}%",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.90,
                 )
@@ -492,6 +627,7 @@ class SectionExtractor:
                     section="Capital Structure",
                     locator="Shareholding of our Promoters and Promoter Group",
                     quote=f"Total Promoter & Promoter Group pre-issue shareholding: {pre_pct}%",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.98,
                 )
@@ -531,6 +667,7 @@ class SectionExtractor:
                     section="Capital Structure",
                     locator="Shareholding of our Promoters and Promoter Group",
                     quote=f"Post-issue promoter holding: {post_pct}%",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.90,
                 )
@@ -556,6 +693,7 @@ class SectionExtractor:
                                 section="Capital Structure",
                                 locator="Pre-issue Share Capital",
                                 quote=f"Pre-issue Equity Shares: {pre_shares}",
+                                quote_is_processing=True,
                                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                                 extraction_confidence=0.95,
                             )
@@ -576,6 +714,7 @@ class SectionExtractor:
                                 section="Capital Structure",
                                 locator="Post-issue Share Capital",
                                 quote=f"Post-issue Equity Shares: {post_shares}",
+                                quote_is_processing=True,
                                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                                 extraction_confidence=0.95,
                             )
@@ -687,6 +826,7 @@ class SectionExtractor:
                     section="Objects of the Offer",
                     locator="Schedule of Implementation and Deployment",
                     quote=f"Use of proceeds categories: {[u['category'] for u in use_of_proceeds]}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.98,
                 )
@@ -702,7 +842,12 @@ class SectionExtractor:
         fin_range = page_ranges.get("restated_financials") if page_ranges else None
         p_start, p_end = fin_range or (60, min(80, self.page_count))
 
-        auditor_opinion = "unqualified"
+        # The opinion is established only by positive opinion language in
+        # the examination report. Failure to detect adverse language is NOT
+        # evidence of an unqualified opinion: when no opinion language is
+        # found the field stays unknown (None) and no extraction is emitted
+        # (Step 4 Area B(i), approved 2026-10-17).
+        auditor_opinion = None
         found_opinion_page = p_start
 
         scan_pages = list(range(p_start, min(p_end + 1, self.page_count + 1)))
@@ -711,15 +856,44 @@ class SectionExtractor:
 
         for p in scan_pages:
             txt = self.extract_page_text(p)
-            if "examination report" in txt.lower() or "independent auditor" in txt.lower():
-                if "emphasis of matter" in txt.lower() or "included following matter(s)" in txt.lower():
+            low = txt.lower()
+            if "examination report" in low or "independent auditor" in low:
+                if "emphasis of matter" in low or "included following matter(s)" in low:
                     auditor_opinion = "emphasis_of_matter"
                     found_opinion_page = p
                     break
-                elif "qualified opinion" in txt.lower() or "adverse opinion" in txt.lower():
+                elif "adverse opinion" in low:
+                    auditor_opinion = "adverse"
+                    found_opinion_page = p
+                    break
+                elif "disclaimer of opinion" in low:
+                    auditor_opinion = "disclaimer"
+                    found_opinion_page = p
+                    break
+                elif "unqualified opinion" in low or "unmodified opinion" in low:
+                    auditor_opinion = "unqualified"
+                    found_opinion_page = p
+                    break
+                elif "qualified opinion" in low:
                     auditor_opinion = "qualified"
                     found_opinion_page = p
                     break
+
+        if auditor_opinion is not None:
+            extractions.append(
+                RawExtraction(
+                    field_path="governance.auditor_opinion",
+                    candidate_value=auditor_opinion,
+                    raw_text=auditor_opinion,
+                    page=found_opinion_page,
+                    section="Financial Information",
+                    locator="Auditor Examination Report — Opinion",
+                    quote=f"Auditor opinion classified as {auditor_opinion} from examination-report opinion language",
+                    quote_is_processing=True,
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.90,
+                )
+            )
 
         # 1b. Auditor Details & Standing
         auditor_name = None
@@ -781,6 +955,7 @@ class SectionExtractor:
                     section="Financial Information",
                     locator="Auditor Tenure and Examination Report",
                     quote=f"Auditor {auditor_name} unchanged across audited fiscal years",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -794,6 +969,7 @@ class SectionExtractor:
                     section="Financial Information",
                     locator="Auditor Standing",
                     quote=f"Auditor: {auditor_name}, reputed network: {is_reputed}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -852,6 +1028,7 @@ class SectionExtractor:
                 section="Outstanding Litigation",
                 locator="Outstanding Litigation and Material Developments",
                 quote=f"Litigation bucket classified as: {lit_bucket}",
+                quote_is_processing=True,
                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                 extraction_confidence=0.95,
             )
@@ -901,6 +1078,7 @@ class SectionExtractor:
                 section="Our Management",
                 locator="Board of Directors Composition",
                 quote=f"Board independent majority: {independent_majority}",
+                quote_is_processing=True,
                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                 extraction_confidence=0.90,
             )
@@ -934,6 +1112,7 @@ class SectionExtractor:
                     section="Related Party Transactions",
                     locator="Summary of Related Party Transactions",
                     quote=f"Related party transactions as % of revenue: {rpt_pct}%",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -998,6 +1177,7 @@ class SectionExtractor:
                     section="Risk Factors",
                     locator="Customer concentration table",
                     quote=f"Top 5 customers accounted for {top5_cust}% of revenue",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.98,
                 )
@@ -1069,6 +1249,7 @@ class SectionExtractor:
                     section="Risk Factors",
                     locator="Supplier concentration table",
                     quote=f"Top 5 suppliers accounted for {top5_supp}% of purchases",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.98,
                 )
@@ -1226,6 +1407,7 @@ class SectionExtractor:
                     section="Industry Overview",
                     locator="Industry Scope",
                     quote=f"Scope: {cagr_scope}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -1239,6 +1421,7 @@ class SectionExtractor:
                     section="Industry Overview",
                     locator="Industry Forecast Period",
                     quote=f"Forecast period: {cagr_period}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -1252,6 +1435,7 @@ class SectionExtractor:
                     section="Industry Overview",
                     locator="Industry Source",
                     quote=f"Source: {cagr_source}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -1338,6 +1522,7 @@ class SectionExtractor:
                     section="Basis for Offer Price",
                     locator="Comparison of Accounting Ratios with Listed Industry Peers",
                     quote=f"Identified {len(peers)} listed peers: {[p['name'] for p in peers]}",
+                    quote_is_processing=True,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )

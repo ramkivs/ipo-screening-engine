@@ -327,3 +327,44 @@ test('UI-7 App - Zero client-side scoring / calculation invariant', () => {
   assert.equal(appJs.includes('API_KEY'), false);
   assert.equal(appJs.includes('AWS_SECRET'), false);
 });
+
+test('UI-7 ApiClient - ingestDocument preserves AWAITING_ISSUE_TERMS diagnostics from FastAPI detail', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => ({
+      ok: false,
+      status: 422,
+      json: async () => ({
+        detail: {
+          error: 'Awaiting Issue Terms',
+          code: 'AWAITING_ISSUE_TERMS',
+          message: 'AWAITING_ISSUE_TERMS: required issue terms are unavailable',
+          missing_fields: ['price_band_low', 'price_band_high', 'lot_size', 'ofs'],
+          resolution: {
+            status: 'UNAVAILABLE',
+            providers: [
+              { provider: 'official-prospectus', outcome: 'UNAVAILABLE', detail: 'official source retrieval failed: TLS handshake failed' },
+            ],
+          },
+        },
+      }),
+    });
+    const client = new ApiClient();
+    await assert.rejects(
+      async () => client.ingestDocument({ name: 'filing.pdf' }),
+      (err) => {
+        assert.ok(err instanceof ApiError);
+        assert.equal(err.code, 'AWAITING_ISSUE_TERMS');
+        // Diagnostics must survive to the UI (previously dropped, so the
+        // operator saw only the generic message and could not tell a
+        // retrieval failure from a rejection or a configuration error).
+        assert.deepEqual(err.details.missing_fields, ['price_band_low', 'price_band_high', 'lot_size', 'ofs']);
+        assert.equal(err.details.resolution.providers[0].provider, 'official-prospectus');
+        assert.ok(err.details.resolution.providers[0].detail.includes('retrieval failed'));
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

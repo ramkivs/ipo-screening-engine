@@ -463,8 +463,9 @@ def test_service_ingest_document_signature_has_no_path_parameter():
     assert "reference_base_path" not in param_names
     assert "base_path" not in param_names
     assert "path" not in param_names
-    # Expected signature: self, file_bytes, filename, mode
-    assert param_names == ["self", "file_bytes", "filename", "mode"]
+    # Step 5 extends the signature with bounded manual-entry parameters;
+    # caller-controlled filesystem path parameters remain prohibited.
+    assert param_names == ["self", "file_bytes", "filename", "mode", "manual_terms", "manual_explanation", "confirm_conflicts"]
 
 
 def test_repository_native_internal_extractor_retains_reference_base_path_support():
@@ -518,8 +519,139 @@ def test_ingest_incomplete_stub_fails_closed_without_fallbacks(test_env):
 
     assert res.status_code == 422
     body = res.json()
-    assert body["code"] == "PROCESSING_FAILED"
-    assert "schema validation failed" in body["message"].lower()
+    assert body["code"] in ("PROCESSING_FAILED", "AWAITING_ISSUE_TERMS")
+    # Fail-closed either via the awaiting-terms status or the schema gate;
+    # both reject the incomplete stub without fallbacks.
+    message = body["message"].lower()
+    assert "awaiting_issue_terms" in message or "schema validation failed" in message
+
+
+VISHAL_RHP_PDF = REPO_ROOT / "handoff" / "reference" / "U01122MH1994PLC185445-vishal nirmiti.pdf"
+
+
+def test_ingest_vishal_rhp_undisclosed_issue_terms_fail_precisely(test_env):
+    """Regression (Windows UI PROCESSING_FAILED): the Vishal Nirmiti RHP
+    leaves price band, minimum bid lot and OFS amount as [●] placeholders.
+    Re-uploading it must fail closed with a precise, actionable error
+    naming the undisclosed fields -- not four opaque schema violations --
+    and must leave the pre-existing historical evaluation untouched.
+
+    This test injects a provider-less resolver: it exercises the
+    genuinely-unavailable path. Under the DEFAULT runtime configuration
+    the retained notice is discovered automatically instead (covered by
+    tests/test_vishal_default_notice_wiring.py).
+    """
+    from ipo_screening.issue_terms import IssueTermsResolver
+
+    store = test_env["store"]
+    cfg = PresentationConfig(
+        store_root=test_env["store_dir"],
+        config_dir=REPO_ROOT / "config",
+        issue_terms_resolver=IssueTermsResolver(providers=[]),
+    )
+    client = TestClient(
+        create_app(PresentationService(cfg)),
+        base_url="http://127.0.0.1:8000",
+        headers={"Origin": "http://127.0.0.1:8000"},
+    )
+    assert VISHAL_RHP_PDF.is_file(), f"Real filing missing at {VISHAL_RHP_PDF}"
+
+    res = client.post(
+        "/api/v1/ingest/document",
+        files={"file": ("vishal_nirmiti_rhp.pdf", io.BytesIO(VISHAL_RHP_PDF.read_bytes()), "application/pdf")},
+        data={"mode": "final"},
+    )
+
+    assert res.status_code == 422, f"Unexpected ingestion outcome: {res.text}"
+    body = res.json()
+    # With no official Price Band Notice available to the runtime resolver,
+    # the undisclosed terms yield an explicit awaiting status (fail-closed).
+    assert body["code"] == "AWAITING_ISSUE_TERMS"
+    message = body["message"]
+    for field in ("issue.price_band_low", "issue.price_band_high", "issue.lot_size", "issue.ofs"):
+        assert field in message
+    assert "AWAITING_ISSUE_TERMS" in message
+    assert "None is not of type" not in message
+    assert body["missing_fields"] == ["price_band_low", "price_band_high", "lot_size", "ofs"]
+
+    # Historical evaluation preserved: exactly the baseline record remains,
+    # with its original id and golden result hash, and no new record exists.
+    ipos = client.get("/api/v1/ipos").json()["items"]
+    assert len(ipos) == 1
+    assert store.exists(test_env["vishal_eval_id"])
+    detail = client.get(f"/api/v1/evaluations/{test_env['vishal_eval_id']}").json()
+    assert detail["result_hash"] == GOLDEN_RESULT_HASH
+
+
+def test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice(tmp_path, golden_input, config):
+    """End-to-end: Vishal RHP + runtime resolver -> assembled, evaluated,
+    persisted, idempotent.
+
+    MOCKED verified channel: an HttpNoticeProvider with an injected
+    fetcher serves the retained notice text from an official-host URL.
+    This proves the verified-retrieval mechanics; it is not live
+    retrieval, and the served text remains the repository-retained
+    fixture text (see tests/test_cross_ipo_issue_term_provenance.py).
+    """
+    from ipo_screening.issue_terms import HttpNoticeProvider, IssueTermsResolver, NoticeSnapshotCache
+
+    store_dir = tmp_path / "evaluations"
+    store = EvaluationStore(store_dir)
+    baseline = evaluate(golden_input, config, mode="final", evaluation_datetime=EVAL_AT, store=store)
+    historical_id = baseline.record.evaluation_id
+
+    notice_bytes = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes()
+    resolver = IssueTermsResolver(
+        providers=[
+            HttpNoticeProvider(
+                {"VISHAL-NIRMITI-LIMITED": "https://www.nseindia.com/announcements/vishal-price-band"},
+                fetcher=lambda url: notice_bytes,
+            )
+        ],
+        cache=NoticeSnapshotCache(tmp_path / "terms-cache"),
+    )
+    cfg = PresentationConfig(store_root=store_dir, config_dir=REPO_ROOT / "config", issue_terms_resolver=resolver)
+    client = TestClient(create_app(PresentationService(cfg)), base_url="http://127.0.0.1:8000", headers={"Origin": "http://127.0.0.1:8000"})
+
+    res = client.post(
+        "/api/v1/ingest/document",
+        files={"file": ("vishal_nirmiti_rhp.pdf", io.BytesIO(VISHAL_RHP_PDF.read_bytes()), "application/pdf")},
+        data={"mode": "final"},
+    )
+    assert res.status_code == 201, f"Auto-resolution ingestion failed: {res.text}"
+    body = res.json()
+    assert body["issue_terms"]["status"] == "RESOLVED"
+    assert sorted(body["issue_terms"]["resolved_fields"]) == ["lot_size", "price_band_high", "price_band_low"]
+
+    record = store.read(body["evaluation_id"])
+    persisted_input = record["input_snapshot"]["input"]
+    issue = persisted_input["issue"]
+    assert issue["price_band_low"] == 208
+    assert issue["price_band_high"] == 220
+    assert issue["lot_size"] == 68
+    assert issue["ofs"] == 3300  # derived: OFS seller shares x cap price
+    evidence_items = record["evidence"]["evidence"]
+    source_ids = {item.get("source_id", "") for item in evidence_items}
+    assert any(str(s).startswith("SRC-PBN-") for s in source_ids), source_ids
+    # Derived OFS (never a direct source claim): the persisted record keeps
+    # the SRC-DERIVED derivation reference produced by enrichment assembly.
+    assert "SRC-DERIVED" in json.dumps(record)
+
+    # Scorecard reopens with the persisted provenance-bearing record.
+    detail = client.get(f"/api/v1/evaluations/{body['evaluation_id']}")
+    assert detail.status_code == 200
+    assert detail.json()["result_hash"] == body["result_hash"]
+
+    # Duplicate upload is idempotent; the historical record is untouched.
+    dup = client.post(
+        "/api/v1/ingest/document",
+        files={"file": ("vishal_nirmiti_rhp.pdf", io.BytesIO(VISHAL_RHP_PDF.read_bytes()), "application/pdf")},
+        data={"mode": "final"},
+    )
+    assert dup.status_code == 200
+    assert dup.json()["is_duplicate"] is True
+    assert dup.json()["evaluation_id"] == body["evaluation_id"]
+    assert store.read(historical_id)["result_hash"] == GOLDEN_RESULT_HASH
 
 
 def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):
@@ -541,15 +673,18 @@ def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):
     assert body["ipo_id"] == "R-K-FASHION-ACCESSORIES-LIMITED"
     assert body["evaluation_mode"] == "FINAL"
     assert body["is_duplicate"] is False
-    assert body["final_score"] == pytest.approx(50.0)
+    # Step 4 Area B(i): RK's opinion is not establishable from the filing,
+    # so the auditor criterion is UNKNOWN instead of scored on an
+    # unsupported "unqualified" default (final 50.0 -> 49.0).
+    assert body["final_score"] == pytest.approx(49.0)
     assert body["confidence"] == "Low"
     assert body["verdict"] == "INSUFFICIENT_DATA"
 
     eval_data = body["evaluation"]
-    assert eval_data["score"]["final_score"] == pytest.approx(50.0)
-    assert eval_data["score"]["base_score"] == pytest.approx(53.0)
+    assert eval_data["score"]["final_score"] == pytest.approx(49.0)
+    assert eval_data["score"]["base_score"] == pytest.approx(52.0)
     assert eval_data["score"]["penalties_total"] == pytest.approx(-3.0)
-    assert eval_data["score"]["completeness_pct"] == pytest.approx(75.0)
+    assert eval_data["score"]["completeness_pct"] == pytest.approx(73.0)
 
     # Prove absence of Vishal Nirmiti qualitative defaults
     modules = {m["id"]: m for m in eval_data["score"]["modules"]}

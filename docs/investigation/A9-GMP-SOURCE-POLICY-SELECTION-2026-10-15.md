@@ -100,7 +100,7 @@ PR-4f and PR-5 remain unadopted.
   - D2 governs qualification evidence. It does not alter A17 scoring eligibility, which still compares the source timestamp only. A17-2 (24 h) and A17-3 (publisher labels only) are untouched.
 - **Rendered-capture precedent.** D1 departs, for GMP only, from the tracker precedent that rendered captures leave source-native qualification open (tracker l.30, l.107). It accepts a rendered capture only as a publisher-reported observation. It does not make one source-native.
 
-### 6.3 Implementation (minimum necessary)
+### 6.3 D1–D3 implementation (2026-10-15 snapshot)
 
 The artifact and hash follow the existing evidence convention. `capture-manifest.json` declares, for each retained file:
 - the file itself, with its byte count and uppercase SHA-256 of the exact file bytes;
@@ -121,7 +121,7 @@ The artifact and hash follow the existing evidence convention. `capture-manifest
 - **A9 gate.** It has no qualified path. It does not accept a generic market-snapshot digest or a connector `content_hash`; A15 already records the latter as `LEGACY_UNRESOLVED` / `LEGACY_UNSPECIFIED`.
 - **A15.** It records a retrieval time as known only when it carries an explicit offset; otherwise the time is `TIMEZONE_UNRESOLVED`.
 
-**Deliberately not changed:**
+**Deliberately not changed in the D1–D3 implementation (2026-10-15):**
 - the A9 gate and its messages;
 - the input and A15 schemas;
 - configuration, scoring formulas and weights;
@@ -130,17 +130,7 @@ The artifact and hash follow the existing evidence convention. `capture-manifest
 
 No retrieval-time or hash field was added.
 
-**Precise limitation: D1 and D2 cannot be established while an evaluation runs, so A9 keeps failing closed.** Nothing in the v1.5 contracts links an evaluation's `market.gmp` to a retained capture:
-- `market.gmp` is closed, with only `as_of`, `pct`, `trend` and `source_id`.
-- The closed `_sources[]` entry carries one optional `retrieval_timestamp`. It is a single instant, not a window, and is not tied to a declared artifact.
-- That entry's `content_hash` has no declared subject or representation.
-- `source_type` has no class for a publisher-reported rendered capture.
-- The A15 digest vocabulary has no rendered-capture subject. Its `RAW_ARTIFACT_BYTES` would describe the capture as raw, which D1 forbids.
-
-An A9 qualified path would need two things, each requiring its own decision and a schema change:
-1. a persisted, per-evaluation GMP evidence reference — the capture manifest and artifact, or equivalent — carrying the file hash, its publisher-reported rendered class and the capture window;
-2. a matching A15 digest subject and label.
-
+**Historical limitation (as of 2026-10-15; superseded by A18 in §7).** When D1–D3 were implemented, the v1.5 input and A15 implementation did not link an evaluation's `market.gmp` to a retained capture. A18 later approved a bounded link through existing v1.5 `_sources`/`_evidence` fields and the existing A15 raw-byte digest representation. The approved link requires no schema or version change. It does not create an A9 qualified path; A9 remains fail-closed.
 ### 6.4 Evidence and tests
 
 - **Focused tests:** `tests/test_d1_d3_gmp_source_policy.py` (84 tests). Coverage:
@@ -160,7 +150,42 @@ An A9 qualified path would need two things, each requiring its own decision and 
 
 - **No publisher qualifies.** For MarketLiveIPOGMP, R7 still needs source evidence. See the qualification record §16.
 - **Still open:**
-  - the A9 qualified path and its representation (§6.3);
+  - A9 publisher qualification remains unresolved; the evidence link in §7 is not a qualification path;
   - R7, and R8's history before capture;
   - §8 PR-4f and PR-5.
 - **D3 covers only the exact "Not quoted yet" and a displayed zero.** Other markers fail closed as malformed, for example InvestorGain's "₹ --" or PapsDigital's "N/A". Well-formed negative amounts keep their existing treatment as values (the input schema allows `pct` down to −1000). D3 does not address them, and no qualification follows.
+
+## 7. GMP evidence linkage — A18-approved contract and status snapshot (2026-10-16)
+
+This is the intended §7 reference used by `engine/ipo_screening/gmp_evidence.py`; §6 records D1–D3 and this section records the later linkage decision. The durable decision record is [`handoff/decisions/A18-gmp-evidence-linkage-contract.md`](../../handoff/decisions/A18-gmp-evidence-linkage-contract.md).
+
+### 7.1 Approval and contract summary
+
+**Status:** Ramki approved L1 as revised, L2-a, L3-a, and L4-a on 2026-10-16. The approval is recorded in A18. It permits the narrow linkage correction and regressions; it does not select or qualify a publisher.
+
+The link uses existing v1.5 `_sources` and `_evidence` fields. It pins a single capture manifest, binds the evaluated issuer/title and GMP value/timestamp quotes, recomputes local SHA-256 digests for the manifest and artifact, and preserves a bracketing capture window honestly as an `UNKNOWN` retrieval fact. The complete signed percentage token must exactly match the quoted value; ambiguous or partial token matches fail closed. A link failure is a diagnostic, not a structural rejection or scoring change. No schema, version, or frozen-core change is authorized.
+
+### 7.2 Duplicate-key handling and boundaries
+
+Duplicate JSON keys are rejected at the scoped evaluation-input and pinned capture-manifest boundaries. Configuration and stored-evaluation readers retain their existing JSON behavior; this is not a global parser change.
+
+`VERIFIED` establishes only a link between one evaluation and specified retained local rendered bytes/text. It does not establish publisher authenticity, source-native evidence, or a qualified GMP source. A9 remains fail-closed for Final.
+
+### 7.3 Implementation and publication snapshot
+
+The code/test source is `ca6c9862c5809d72a73d1493ef5f6fe31ec7f34f`, present unchanged in the eight scoped paths at session ref `bbe445a34196b93c98e9fa018888eb1536151f02`. The authoritative ref was `805affe10ef387b649717facb31b0378f7b233d7`. The session branch contains proposal history; no clean baseline-derived implementation/documentation ref or PR existed at this verification snapshot. The session branch must not be fast-forwarded to authoritative.
+
+### 7.4 Qualification status
+
+- MarketLiveIPOGMP: **NOT QUALIFIED**.
+- InvestorGain: **NOT QUALIFIED**.
+- PapsDigital: **non-independent alternative**.
+- R7: **UNRESOLVED**; R8 history remains open.
+- No R7 capture was taken because the documented new-observation condition was not met.
+- No publisher is qualified by linkage. A9 remains fail-closed; missing GMP is `MISSING`, present GMP is `SOURCE_UNQUALIFIED`, and Final has no terminal `final_outcome`.
+
+### 7.5 Verification evidence and post-publication update
+
+Previously reported verification on a temporary baseline-plus-patch tree: focused tests **128 passed**; full suite **885 passed** with two Starlette deprecation warnings; compileall, frozen-core (6/6), golden-result, and v1.6 integrity checks passed. These results are not a substitute for rerunning checks on the Windows-created final implementation commit.
+
+After Windows creates and remotely verifies the two clean refs, update the tracker in a documentation-only follow-up with the exact implementation/doc ref SHAs, ancestry, changed paths, and final test evidence. Do not record a publication claim before fetching and verifying the corresponding remote ref.

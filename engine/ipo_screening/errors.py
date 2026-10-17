@@ -58,7 +58,10 @@ class ValidationError(EngineError):
         self.gate = gate
         self.findings = list(findings)
         errors = [f for f in self.findings if f.severity == SEVERITY_ERROR]
-        preview = "; ".join(f"{f.code}: {f.message}" for f in errors[:5])
+        preview = "; ".join(
+            f"{f.code} at {f.location}: {f.message}" if f.location else f"{f.code}: {f.message}"
+            for f in errors[:5]
+        )
         if len(errors) > 5:
             preview += f"; ... ({len(errors) - 5} more)"
         super().__init__(f"{gate} validation failed: {preview}")

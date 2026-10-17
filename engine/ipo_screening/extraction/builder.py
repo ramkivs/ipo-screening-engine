@@ -47,13 +47,15 @@ class CanonicalInputBuilder:
         sector_profile = self.base.get("sector_profile") or self._detect_sector_profile()
         sector = self.base.get("sector") or self._detect_sector()
 
+        # D-PEER-1: no synthetic peer fallback. When neither the reference
+        # input nor extraction supplies genuine peers, the honest
+        # representation is an empty list (permitted by the input
+        # contract); peer-relative metrics then resolve UNKNOWN.
         peers_list = self.base.get("peers")
         if not peers_list:
             peers_list = self._get_field("peers")
         if not peers_list:
-            peers_list = [
-                {"name": "Generic Listed Peer Ltd", "listed_years": 5, "business_match": "partial"}
-            ]
+            peers_list = []
 
         output: Dict[str, Any] = {
             "ipo_id": self.base.get("ipo_id") or self._slugify(company_name or "UNKNOWN-IPO"),
@@ -146,6 +148,34 @@ class CanonicalInputBuilder:
         evidence_dict: Dict[str, Dict[str, Any]] = {}
         for ex in self.extractions:
             evidence_dict[ex.field_path] = ex.to_evidence_dict(self.doc.source_id)
+
+        # Seller-specific OFS quantities: the cover extraction records the
+        # (single, list-valued) ofs_sellers result; without subfield
+        # evidence the Explorer can show the seller's identity but never
+        # the quantity attributed to that seller. Emit one evidence spec
+        # per seller for shares_sold, bound to the same filing source,
+        # page and locator as the seller list itself. The identity
+        # quotation remains on issue.ofs_sellers; these specs record the
+        # quantity linkage established by the Offer-for-Sale clause.
+        for ex in self.extractions:
+            if ex.field_path != "issue.ofs_sellers":
+                continue
+            if not isinstance(ex.candidate_value, list):
+                continue
+            base_spec = evidence_dict.get("issue.ofs_sellers") or ex.to_evidence_dict(self.doc.source_id)
+            for idx, seller in enumerate(ex.candidate_value):
+                if not isinstance(seller, dict) or seller.get("shares_sold") is None:
+                    continue
+                sub_path = f"issue.ofs_sellers[{idx}].shares_sold"
+                spec = dict(base_spec)
+                spec["evidence_id"] = f"EV-{sub_path}"
+                spec["note"] = (
+                    "Seller-specific Offer-for-Sale quantity attributed to the "
+                    "named selling shareholder from the cover Offer-for-Sale "
+                    "clause; seller identity quotation is recorded on "
+                    "issue.ofs_sellers."
+                )
+                evidence_dict[sub_path] = spec
         # Carry over any pre-existing base evidence if not overridden
         for k, v in self.base.get("_evidence", {}).items():
             if k not in evidence_dict:
@@ -269,7 +299,7 @@ class CanonicalInputBuilder:
             return self._get_field(f"governance.{key}", default)
 
         return {
-            "auditor_opinion": _pick_gov("auditor_opinion", "unqualified"),
+            "auditor_opinion": _pick_gov("auditor_opinion", None),
             "auditor_changed_3y": _pick_gov("auditor_changed_3y", None),
             "auditor_reputed": _pick_gov("auditor_reputed", None),
             "repeated_eom": _pick_gov("repeated_eom", None),
