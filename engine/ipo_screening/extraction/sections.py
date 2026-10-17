@@ -834,6 +834,231 @@ class SectionExtractor:
 
         return extractions
 
+    # ------------------------------------------------------------------
+    # Related-party transactions (generic, issuer-neutral)
+    # ------------------------------------------------------------------
+    _RPT_CATEGORY_PHRASES: Tuple[Tuple[str, str], ...] = (
+        ("sale of goods", "sale_of_goods"),
+        ("sales of goods", "sale_of_goods"),
+        ("sale of services", "sale_of_services"),
+        ("purchase of goods", "purchase_of_goods"),
+        ("purchases of goods", "purchase_of_goods"),
+        ("sale of property, plant and equipment", "sale_of_ppe"),
+        ("sale of property plant and equipment", "sale_of_ppe"),
+        ("purchase of property, plant and equipment", "purchase_of_ppe"),
+        ("purchase of property plant and equipment", "purchase_of_ppe"),
+        ("reimbursement of expenses paid", "reimbursement_expenses_paid"),
+        ("reimbursement of expenses received", "reimbursement_expenses_received"),
+        ("hiring/transport charges paid", "hiring_transport_charges_paid"),
+        ("transport charges paid", "transport_charges_paid"),
+        ("job work charges received", "job_work_charges_received"),
+        ("job work charges paid", "job_work_charges_paid"),
+        ("interest paid", "interest_paid"),
+        ("interest received", "interest_received"),
+        ("rent paid", "rent_paid"),
+        ("rent received", "rent_received"),
+        ("loan taken", "loan_taken"),
+        ("loans taken", "loan_taken"),
+        ("loan repaid", "loan_repaid"),
+        ("loans repaid", "loan_repaid"),
+        ("share of profit paid", "share_of_profit_paid"),
+        ("managerial remuneration", "remuneration"),
+        ("remuneration", "remuneration"),
+        ("salary", "salary"),
+    )
+
+    @staticmethod
+    def _rpt_norm(text: str) -> str:
+        return re.sub(r"\s+", " ", text.strip().lower()).strip(" .")
+
+    def _rpt_category_match(self, normalized: str) -> Optional[Tuple[str, str, int]]:
+        """Return (key, label, chars_consumed) if text starts with a category."""
+        for phrase, key in self._RPT_CATEGORY_PHRASES:
+            if normalized == phrase:
+                return key, phrase, len(phrase)
+            if normalized.startswith(phrase + " "):
+                return key, phrase, len(phrase)
+        return None
+
+    def extract_related_party_transactions(
+        self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None
+    ) -> List[RawExtraction]:
+        """Extract the related-party *transactions* table from the filing.
+
+        Generic and deterministic: locates the "Transactions with related
+        parties" table inside the related-party note of the restated
+        financial information, reads counterparty rows under transaction
+        category headers across the disclosed financial-year columns, and
+        emits one extraction per (category, counterparty, period) with a
+        verbatim row quote.  Outstanding-balance tables are excluded.
+        Amounts stay in the unit disclosed by the note; "-" cells are
+        treated as undisclosed (never zero).  Rows whose amount count does
+        not match the disclosed period columns are skipped (ambiguous).
+
+        The extractions are registered as evidence under
+        ``governance.related_party_transactions[i]`` paths.  The runtime
+        canonical schema is closed, so no structured canonical field is
+        added; the values live in the evidence registry with verbatim
+        quotes.  They deliberately do NOT populate the scoring fields
+        ``rpt_pct_revenue`` / ``rpt_pct_of_revenue_growth``:
+        the approved metric definitions do not yet specify transaction
+        categories, growth window or negative-growth treatment (see
+        docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md).
+        """
+        fin_range = page_ranges.get("restated_financials") if page_ranges else None
+        scan = range(fin_range[0], fin_range[1] + 1) if fin_range else range(1, self.page_count + 1)
+        anchor_page: Optional[int] = None
+        for p in scan:
+            if p > self.page_count:
+                break
+            if "transactions with related parties" in self.extract_page_text(p).lower():
+                anchor_page = p
+                break
+        if anchor_page is None and fin_range:
+            # The TOC range for the financial section may end before the
+            # related-party note; fall back to a full-document search.
+            for p in range(1, self.page_count + 1):
+                if "transactions with related parties" in self.extract_page_text(p).lower():
+                    anchor_page = p
+                    break
+        if anchor_page is None:
+            return []
+
+        # Gather lines from the anchor page onwards (same note), stopping
+        # at the outstanding-balances table or after a bounded window.
+        lines: List[Tuple[int, str]] = []
+        stop = False
+        for p in range(anchor_page, min(anchor_page + 6, self.page_count + 1)):
+            for raw_line in self.extract_page_text(p).splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
+                if "outstanding balances" in line.lower():
+                    stop = True
+                    break
+                lines.append((p, line))
+            if stop:
+                break
+        if not lines:
+            return []
+
+        # Period columns from the table header ("year ended 31 March YYYY").
+        years: List[int] = []
+        for _, line in lines[:14]:
+            for m in re.finditer(r"31\s*March\s+(20\d{2})", line):
+                y = int(m.group(1))
+                if y not in years:
+                    years.append(y)
+        if len(years) < 2:
+            return []
+        years = years[:3]
+
+        unit = None
+        note_text = " ".join(line for _, line in lines)
+        # The note may inherit the unit declared at the head of the
+        # restated financial statements (e.g. "(Amount in Lakhs, unless
+        # otherwise stated)"); search a bounded window before the note.
+        unit_window = note_text
+        for p in range(max(1, anchor_page - 60), anchor_page):
+            unit_window += " " + self.extract_page_text(p)[:400]
+        if re.search(r"in\s+lakhs?\b", unit_window, re.IGNORECASE):
+            unit = "INR_LAKHS"
+        elif re.search(r"in\s+crores?\b", unit_window, re.IGNORECASE):
+            unit = "INR_CRORES"
+        elif re.search(r"in\s+millions?\b", unit_window, re.IGNORECASE):
+            unit = "INR_MILLIONS"
+
+        amount_token = re.compile(r"^(?:-|\d[\d,]*\.\d+|\d[\d,]*)$")
+        transactions: List[Dict[str, Any]] = []
+        seen = set()
+        current_category: Optional[Tuple[str, str]] = None
+        pending_name = ""
+        started = False
+        for page, line in lines:
+            low = line.lower()
+            if "transactions with related parties" in low:
+                started = True
+                continue
+            if not started:
+                continue
+            if low.startswith("total"):
+                pending_name = ""
+                continue
+            tokens = line.split()
+            amounts: List[str] = []
+            while tokens and amount_token.match(tokens[-1]) and len(amounts) < len(years):
+                amounts.insert(0, tokens.pop())
+            name_part = " ".join(tokens).strip()
+            if len(amounts) == len(years) and (name_part or pending_name):
+                display = " ".join(f"{pending_name} {name_part}".split())
+                pending_name = ""
+                match = self._rpt_category_match(self._rpt_norm(display))
+                counterparty = display
+                if match is not None:
+                    key, label, consumed = match
+                    current_category = (key, label)
+                    counterparty = display[consumed:].strip(" .")
+                if current_category is None or not counterparty:
+                    continue
+                counterparty_clean = " ".join(counterparty.split()).strip("* ").strip().rstrip(".")
+                for year, token in zip(years, amounts):
+                    if token == "-":
+                        continue  # undisclosed / nil marker: not zero
+                    try:
+                        amount = float(token.replace(",", ""))
+                    except ValueError:
+                        continue
+                    dedupe = (current_category[0], counterparty_clean.lower(), year)
+                    if dedupe in seen:
+                        continue
+                    seen.add(dedupe)
+                    transactions.append(
+                        {
+                            "category": current_category[0],
+                            "category_label": current_category[1],
+                            "counterparty": counterparty_clean,
+                            "period": f"FY{year}",
+                            "amount": amount,
+                            "unit": unit,
+                            "page": page,
+                            "_quote": line,
+                        }
+                    )
+                continue
+            if amounts:
+                # Partial amount row: ambiguous layout; fail closed.
+                pending_name = ""
+                continue
+            # Non-amount line: category header or wrapped counterparty name.
+            normalized = self._rpt_norm(f"{pending_name} {line}" if pending_name else line)
+            match = self._rpt_category_match(normalized)
+            if match is not None and normalized == match[1]:
+                current_category = (match[0], match[1])
+                pending_name = ""
+            elif match is not None and not pending_name and self._rpt_category_match(self._rpt_norm(line)) and normalized == self._rpt_norm(line):
+                current_category = (match[0], match[1])
+                pending_name = ""
+            else:
+                pending_name = f"{pending_name} {line}".strip()
+
+        extractions: List[RawExtraction] = []
+        for idx, txn in enumerate(transactions):
+            quote = txn.pop("_quote")
+            extractions.append(
+                RawExtraction(
+                    field_path=f"governance.related_party_transactions[{idx}]",
+                    candidate_value=txn,
+                    raw_text=quote,
+                    page=txn["page"],
+                    section="Restated Financial Information",
+                    locator=f"Related Party Transactions — {txn['category_label']} — {txn['counterparty']} — {txn['period']}",
+                    quote=quote,
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.9,
+                )
+            )
+        return extractions
+
     def extract_governance(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract auditor opinion, litigation bucket, SEBI action, and board independence."""
         extractions: List[RawExtraction] = []

@@ -64,6 +64,9 @@ class DocumentExtractor:
         gov_extractions = section_extractor.extract_governance(page_ranges)
         extractions.extend(gov_extractions)
 
+        rpt_extractions = section_extractor.extract_related_party_transactions(page_ranges)
+        extractions.extend(rpt_extractions)
+
         biz_extractions = section_extractor.extract_business(page_ranges)
         extractions.extend(biz_extractions)
 

@@ -298,7 +298,7 @@ class CanonicalInputBuilder:
                 return gov_base[key]
             return self._get_field(f"governance.{key}", default)
 
-        return {
+        gov = {
             "auditor_opinion": _pick_gov("auditor_opinion", None),
             "auditor_changed_3y": _pick_gov("auditor_changed_3y", None),
             "auditor_reputed": _pick_gov("auditor_reputed", None),
@@ -312,6 +312,7 @@ class CanonicalInputBuilder:
             "board_independent_majority": _pick_gov("board_independent_majority", False),
             "kmp_exits_2y": _pick_gov("kmp_exits_2y", 0),
         }
+        return gov
 
     def _build_business(self) -> Dict[str, Any]:
         biz_base = self.base.get("business", {})
