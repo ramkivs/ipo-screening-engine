@@ -129,3 +129,66 @@ def test_seller_specific_ofs_quantity_evidence(tmp_path):
     assert aggregate.extracted_value == 3300.0
     assert aggregate.verification == "DERIVED"  # derived aggregate, not quoted
     assert aggregate.source == "SRC-DERIVED"
+
+
+def test_reupload_after_evidence_fix_creates_new_evaluation_not_stale_duplicate(
+    tmp_path, monkeypatch
+):
+    """Demonstrated Windows divergence: a store holding a pre-fix record
+    (derived evidence dropped at registration) returned that stale record
+    for a fresh upload, because duplicate identity covered only the
+    scored snapshot + config. Scored content is unchanged by the fix, so
+    the old record must NOT be treated as a duplicate -- a new
+    evaluation with the corrected artifact is created, and the old
+    record is preserved untouched.
+    """
+    import copy as _copy
+
+    import ipo_screening.canonical_input as canonical_input
+
+    original_build_registry = canonical_input.build_registry
+
+    def legacy_build_registry(raw):
+        """Emulate the pre-fix registry outcome: SRC-DERIVED specs and
+        per-seller quantity specs never reach the registry."""
+        raw = _copy.deepcopy(dict(raw))
+        evidence = dict(raw.get("_evidence") or {})
+        raw["_evidence"] = {
+            key: spec
+            for key, spec in evidence.items()
+            if not (
+                isinstance(spec, dict) and spec.get("source_id") == "SRC-DERIVED"
+            )
+            and not key.startswith("issue.ofs_sellers[")
+        }
+        return original_build_registry(raw)
+
+    monkeypatch.setattr(canonical_input, "build_registry", legacy_build_registry)
+    service, legacy_resp = _ingest(tmp_path)
+    legacy_items, _ = _items(service, legacy_resp.evaluation_id)
+    assert "EV-issue.ofs" not in legacy_items  # the stale, pre-fix artifact
+    assert legacy_resp.is_duplicate is False
+
+    monkeypatch.undo()
+    service2, fresh_resp = _ingest_fresh_store(service, tmp_path)
+    assert fresh_resp.is_duplicate is False
+    assert fresh_resp.evaluation_id != legacy_resp.evaluation_id
+    fresh_items, _ = _items(service2, fresh_resp.evaluation_id)
+    assert fresh_items["EV-issue.ofs"].extracted_value == 3300.0
+    assert fresh_items["EV-issue.ofs_sellers[0].shares_sold"].extracted_value == 1500000
+
+    # History preserved: the legacy record still lacks the cards.
+    legacy_items_after, _ = _items(service2, legacy_resp.evaluation_id)
+    assert "EV-issue.ofs" not in legacy_items_after
+
+    # A truly identical re-upload remains idempotent.
+    service3, dup_resp = _ingest_fresh_store(service2, tmp_path)
+    assert dup_resp.is_duplicate is True
+    assert dup_resp.evaluation_id == fresh_resp.evaluation_id
+
+
+def _ingest_fresh_store(service, tmp_path):
+    """Re-run ingestion against the same store/resolver as ``service``."""
+    return service, service.ingest_document(
+        file_bytes=VISHAL_RHP_PDF.read_bytes(), filename=VISHAL_RHP_PDF.name, mode="final"
+    )

@@ -1411,7 +1411,30 @@ class PresentationService:
                 f"Evaluation pipeline failed: {exc}"
             ) from exc
 
-        # Check duplicate / idempotency against immutable EvaluationStore
+        # Check duplicate / idempotency against immutable EvaluationStore.
+        # Duplicate identity covers the scored input, the configuration
+        # AND the evidence content (ids/sources/methods -- deliberately
+        # excluding volatile retrieval timestamps). Two evaluations with
+        # identical scored inputs but materially different evidence
+        # registries are not interchangeable: returning the older record
+        # would permanently hide corrected evidence registration behind
+        # idempotency (the record itself is never rewritten). A new
+        # evaluation is created instead; history is preserved.
+        def _evidence_fingerprint(evidence_payload: Any) -> frozenset:
+            items: Any = []
+            if isinstance(evidence_payload, dict):
+                items = evidence_payload.get("evidence") or []
+            return frozenset(
+                (
+                    str(item.get("evidence_id")),
+                    str(item.get("source_id")),
+                    str(item.get("extraction_method")),
+                )
+                for item in items
+                if isinstance(item, dict)
+            )
+
+        new_evidence_fingerprint = _evidence_fingerprint(outcome.record.evidence)
         existing_eval_id: Optional[str] = None
         if self.eval_store.exists(outcome.record.evaluation_id):
             existing_eval_id = outcome.record.evaluation_id
@@ -1420,6 +1443,8 @@ class PresentationService:
                 try:
                     rec = self.eval_store.read(eid)
                     if rec.get("evaluation_mode", "").upper() == outcome.record.evaluation_mode.upper():
+                        if _evidence_fingerprint(rec.get("evidence")) != new_evidence_fingerprint:
+                            continue
                         if rec.get("result_hash") == outcome.record.result_hash:
                             existing_eval_id = eid
                             break
