@@ -376,8 +376,10 @@ export class ApiClient {
 
   /**
    * Step 5: ingest with bounded manual issue-term entry.
-   * Manual values (price_band_low / price_band_high / lot_size) are
+   * Manual values (price_band_low / price_band_high / lot_size / ofs) are
    * provenance-labelled MANUAL_ENTRY server-side and never verified.
+   * issue.ofs is the Offer-for-Sale monetary amount in the filing's
+   * reporting unit; an explicit 0 is preserved as submitted.
    */
   async ingestManualTerms(file, options = {}) {
     if (!file) {
@@ -394,6 +396,7 @@ export class ApiClient {
     if (terms.price_band_low !== undefined && terms.price_band_low !== null && terms.price_band_low !== '') formData.append('price_band_low', String(terms.price_band_low));
     if (terms.price_band_high !== undefined && terms.price_band_high !== null && terms.price_band_high !== '') formData.append('price_band_high', String(terms.price_band_high));
     if (terms.lot_size !== undefined && terms.lot_size !== null && terms.lot_size !== '') formData.append('lot_size', String(terms.lot_size));
+    if (terms.ofs !== undefined && terms.ofs !== null && terms.ofs !== '') formData.append('ofs', String(terms.ofs));
     if (options.explanation) formData.append('explanation', options.explanation);
     if (options.confirmConflicts) formData.append('confirm_conflicts', 'true');
 

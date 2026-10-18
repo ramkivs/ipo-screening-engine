@@ -385,14 +385,18 @@ def create_router(service: PresentationService) -> APIRouter:
         price_band_low: Optional[float] = Form(None),
         price_band_high: Optional[float] = Form(None),
         lot_size: Optional[float] = Form(None),
+        ofs: Optional[float] = Form(None),
         explanation: Optional[str] = Form(None),
         confirm_conflicts: bool = Form(False),
     ) -> Response:
         """Step 5: filing ingestion with bounded, provenance-labelled manual
-        entry of price_band_low / price_band_high / lot_size (Step 4 Area C).
+        entry of the four required issue terms (price_band_low /
+        price_band_high / lot_size / ofs).
 
-        Manual values are recorded as MANUAL_ENTRY and are never presented
-        as official-source verification. Conflicts with extracted or
+        issue.ofs is the Offer-for-Sale monetary amount in the filing's
+        reporting unit (v1.5 contract: number, minimum 0). Manual values
+        are recorded as MANUAL_ENTRY and are never presented as
+        official-source verification. Conflicts with extracted or
         verified values block with 409 until explicitly confirmed; a
         verified official value is never displaced by a manual entry.
         """
@@ -439,6 +443,10 @@ def create_router(service: PresentationService) -> APIRouter:
             manual_terms["price_band_high"] = price_band_high
         if lot_size is not None:
             manual_terms["lot_size"] = lot_size
+        if ofs is not None:
+            # Explicit 0 is an operator statement of "no offer for sale"
+            # and is preserved exactly; only an absent field is omitted.
+            manual_terms["ofs"] = ofs
 
         try:
             ingest_res = service.ingest_document(

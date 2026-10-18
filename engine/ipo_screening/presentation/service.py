@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from datetime import datetime, timezone
 import shutil
 import tempfile
@@ -603,7 +604,11 @@ class PresentationService:
         # floor/cap (or any pair sharing one quote) cannot be swapped.
         snapshot = rec.get("input_snapshot") or {}
         canonical_input = snapshot.get("input") if isinstance(snapshot.get("input"), dict) else snapshot
-        reporting_unit = snapshot.get("reporting_unit") or canonical_input.get("reporting_unit")
+        reporting_unit = (
+            snapshot.get("reporting_unit")
+            or canonical_input.get("reporting_unit")
+            or (canonical_input.get("financials") or {}).get("reporting_unit")
+        )
 
         def _resolve_path(path: str):
             """Resolve a canonical path, including list indices written
@@ -665,7 +670,13 @@ class PresentationService:
             if leaf == "lot_size":
                 return "equity shares"
             if leaf in ("ofs", "fresh_issue", "issue_size") and reporting_unit:
-                return f"INR {reporting_unit}"
+                # Canonical monetary fields are stated in the document's
+                # reporting unit (v1.5: financials.reporting_unit).
+                pretty = {
+                    "INR_LAKHS": "INR lakh",
+                    "INR_CRORES": "INR crore",
+                }.get(str(reporting_unit), f"INR {reporting_unit}")
+                return pretty
             if leaf in (
                 "fresh_shares",
                 "post_issue_shares",
@@ -1072,7 +1083,18 @@ class PresentationService:
 
     MAX_INGEST_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB bound
 
-    MANUAL_ISSUE_TERM_FIELDS = ("price_band_low", "price_band_high", "lot_size")
+    # The four required issue terms, all manually enterable (Step 4 Area C
+    # bounded entry, 2026-10-17; four-field scope directed 2026-10-18 so
+    # initial screening never waits for official-source retrieval).
+    # issue.ofs is the Offer-for-Sale MONETARY amount in the filing's
+    # financials.reporting_unit (v1.5 input contract: number, minimum 0,
+    # "in reporting_unit") -- never a share count and never assumed zero.
+    MANUAL_ISSUE_TERM_FIELDS = (
+        "price_band_low",
+        "price_band_high",
+        "lot_size",
+        "ofs",
+    )
     MANUAL_ENTRY_SOURCE_ID = "SRC-MANUAL-ENTRY"
 
     def ingest_document(
@@ -1251,16 +1273,22 @@ class PresentationService:
                 f"Invalid evaluation mode '{mode}'. Allowed modes are 'final' and 'preliminary'."
             )
 
-        # Step 5 (Step 4 Area C, approved 2026-10-17): bounded manual entry
-        # for price_band_low / price_band_high / lot_size only. Manual values
-        # are provenance-labelled MANUAL_ENTRY and are never source-verified.
+        # Step 5 (Step 4 Area C, approved 2026-10-17; four-field scope
+        # directed 2026-10-18): manual entry for the four required issue
+        # terms price_band_low / price_band_high / lot_size / ofs. Manual
+        # values are provenance-labelled MANUAL_ENTRY and are never
+        # source-verified. issue.ofs is the Offer-for-Sale monetary amount
+        # in the filing's financials.reporting_unit (v1.5 contract:
+        # number, minimum 0): an explicit 0 is an operator statement of
+        # "no offer for sale", never a default for an unknown value.
         manual_clean: Dict[str, Any] = {}
         if manual_terms:
             unknown_keys = sorted(set(manual_terms) - set(self.MANUAL_ISSUE_TERM_FIELDS))
             if unknown_keys:
                 raise IngestionValidationError(
                     "Manual issue-term entry is limited to price_band_low, "
-                    f"price_band_high and lot_size; unsupported field(s): {unknown_keys}."
+                    "price_band_high, lot_size and ofs; "
+                    f"unsupported field(s): {unknown_keys}."
                 )
             manual_clean = {k: v for k, v in manual_terms.items() if v is not None}
             if manual_clean:
@@ -1273,14 +1301,26 @@ class PresentationService:
                         raise IngestionValidationError(
                             f"Manually entered issue.{field_name} must be a number."
                         )
-                    if value <= 0:
+                    if not math.isfinite(float(value)):
                         raise IngestionValidationError(
-                            f"Manually entered issue.{field_name} must be positive."
+                            f"Manually entered issue.{field_name} must be a finite number."
                         )
-                    if field_name == "lot_size" and float(value) != int(value):
-                        raise IngestionValidationError(
-                            "Manually entered issue.lot_size must be a whole number of shares."
-                        )
+                    if field_name == "ofs":
+                        if float(value) < 0:
+                            raise IngestionValidationError(
+                                "Manually entered issue.ofs must be zero or a positive "
+                                "amount in the filing's reporting unit."
+                            )
+                    elif field_name == "lot_size":
+                        if float(value) != int(value) or int(value) <= 0:
+                            raise IngestionValidationError(
+                                "Manually entered issue.lot_size must be a whole number of shares."
+                            )
+                    else:
+                        if value <= 0:
+                            raise IngestionValidationError(
+                                f"Manually entered issue.{field_name} must be positive."
+                            )
                 if "price_band_low" in manual_clean and "price_band_high" in manual_clean:
                     if float(manual_clean["price_band_low"]) > float(manual_clean["price_band_high"]):
                         raise IngestionValidationError(
@@ -1347,6 +1387,7 @@ class PresentationService:
         # official evidence is available: no value is invented, substituted
         # or borrowed, and nothing is evaluated or persisted.
         issue_terms_report: Optional[Dict[str, Any]] = None
+        resolution_dict: Optional[Dict[str, Any]] = None
         pending_awaiting: Optional[Tuple[list, dict, str]] = None
         issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
         missing_issue_fields = [
@@ -1609,7 +1650,15 @@ class PresentationService:
                 )
 
             if issue_terms_report is None:
-                issue_terms_report = {}
+                # Preserve the official-discovery outcome alongside the
+                # manual completion: a manual term set is a separate input
+                # source and never evidence that an official source
+                # published or verified anything (stays UNAVAILABLE etc.).
+                issue_terms_report = dict(resolution_dict) if resolution_dict else {}
+            reporting_unit = str(
+                (canonical_dict.get("financials") or {}).get("reporting_unit")
+                or "INR_LAKHS"
+            )
             issue_terms_report["manual_entry"] = {
                 "fields": manual_applied,
                 "values": {f: manual_clean[f] for f in manual_applied},
@@ -1617,12 +1666,14 @@ class PresentationService:
                 "provenance": "MANUAL_ENTRY",
                 "verified": False,
                 "overridden_by_verified": overridden_by_verified,
+                "reporting_unit": reporting_unit,
             }
             _emit("term_resolution", "manual_entry", "SUCCEEDED",
                   "Operator manual issue-term entry applied (MANUAL_ENTRY; not source-verified).",
                   details={"fields": [f"issue.{f}" for f in manual_applied],
                            "overridden_by_verified": overridden_by_verified,
-                           "provenance": "MANUAL_ENTRY"})
+                           "provenance": "MANUAL_ENTRY",
+                           "reporting_unit": reporting_unit})
             if pending_awaiting is not None:
                 remaining = [f for f in pending_awaiting[0] if issue_now.get(f) is None]
                 if remaining:
@@ -1631,6 +1682,22 @@ class PresentationService:
                     pending_awaiting = (remaining, augmented, pending_awaiting[2])
                 else:
                     pending_awaiting = None
+
+        if pending_awaiting is None:
+            # The four required issue terms are complete, but the canonical
+            # input also requires the stated fresh-issue amount. It is not
+            # one of the four manually enterable terms and is never
+            # invented; fail closed with that precise field rather than a
+            # schema failure (same posture as the official-resolution path).
+            issue_gate = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+            if issue_gate.get("fresh_issue") is None:
+                pending_awaiting = (
+                    ["fresh_issue"],
+                    dict(issue_terms_report) if issue_terms_report else {},
+                    "the stated fresh-issue amount is established by the filing or "
+                    "the final Prospectus, and remains undisclosed (it is not one "
+                    "of the four manually enterable issue terms)",
+                )
 
         if pending_awaiting is not None:
             unresolved, resolution_dict, reason = pending_awaiting
@@ -1643,14 +1710,27 @@ class PresentationService:
                   "Evaluation was not run; nothing was persisted.")
             _emit("persistence", "not_attempted", "SKIPPED",
                   "No evaluation artifact was persisted.")
+            resolution_payload = dict(resolution_dict or {})
+            # Carry the canonical monetary unit so a manual entry for
+            # issue.ofs can be labelled and validated against the unit the
+            # engine will actually evaluate (v1.5: "in reporting_unit").
+            resolution_payload.setdefault(
+                "reporting_unit",
+                str(
+                    (canonical_dict.get("financials") or {}).get("reporting_unit")
+                    or "INR_LAKHS"
+                ),
+            )
             raise IngestionAwaitingIssueTermsError(
                 "AWAITING_ISSUE_TERMS: required issue terms are unavailable: "
                 + ", ".join(f"issue.{field}" for field in unresolved)
                 + f". The uploaded filing does not disclose them and {reason}. "
                 "No evaluation was produced, no values were assumed, and nothing was persisted. "
-                "Retry after the official Price Band Notice is published, or upload a filing that discloses these terms.",
+                "Retry after the official Price Band Notice is published, upload a filing that "
+                "discloses these terms, or supply every required term through the bounded "
+                "manual issue-term entry (recorded as MANUAL_ENTRY and never source-verified).",
                 missing_fields=unresolved,
-                resolution=resolution_dict,
+                resolution=resolution_payload,
             )
 
         _emit("evaluation_eligibility", "passed", "SUCCEEDED",

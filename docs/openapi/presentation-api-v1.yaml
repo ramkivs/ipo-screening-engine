@@ -463,6 +463,98 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+  /ingest/manual-terms:
+    post:
+      summary: Ingest a filing with bounded manual issue-term entry
+      description: |
+        Step 5 pathway for initial screening without waiting for official
+        source retrieval. Uploads the PDF filing and optionally supplies any
+        of the four required issue terms manually (as read from the broker
+        platform): price-band floor, price-band cap, lot size, and the
+        Offer-for-Sale amount. issue.ofs is the OFS monetary amount in the
+        filing's financials.reporting_unit (v1.5 contract: number, minimum 0;
+        an explicit 0 states "no offer for sale"). Every applied value is
+        recorded with MANUAL_ENTRY provenance against SRC-MANUAL-ENTRY and is
+        presented UNVERIFIED - manual entry never establishes official-source
+        verification and never displaces a verified official value. An
+        explanation is mandatory. Conflicting existing values block with 409
+        until explicitly confirmed. Invalid or incomplete term sets are
+        rejected; nothing is evaluated or persisted while a required term is
+        unresolved. A complete valid four-field set proceeds through the
+        existing scoring pipeline and persistence pathway.
+      operationId: ingestDocumentManualTerms
+      tags: [Ingestion]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF filing document (DRHP/RHP)
+                mode:
+                  type: string
+                  enum: [final, preliminary]
+                  default: final
+                  description: Evaluation mode
+                price_band_low:
+                  type: number
+                  exclusiveMinimum: 0
+                  description: issue.price_band_low, INR per equity share
+                price_band_high:
+                  type: number
+                  exclusiveMinimum: 0
+                  description: issue.price_band_high, INR per equity share (must be >= price_band_low)
+                lot_size:
+                  type: number
+                  description: issue.lot_size, whole number of equity shares (> 0)
+                ofs:
+                  type: number
+                  minimum: 0
+                  description: issue.ofs, Offer-for-Sale monetary amount in the filing's reporting unit (explicit 0 = no OFS)
+                explanation:
+                  type: string
+                  description: Mandatory source note for any manually entered value (e.g. broker platform page)
+                confirm_conflicts:
+                  type: boolean
+                  default: false
+                  description: Explicit confirmation to resolve 409 conflicts (never upgrades provenance)
+      responses:
+        '200':
+          description: Evaluation already exists (duplicate idempotent return)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionResponse'
+        '201':
+          description: Evaluation created with MANUAL_ENTRY provenance on the supplied terms
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionResponse'
+        '400':
+          description: Validation error (invalid value, missing explanation, band inconsistency)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Manual values conflict with existing values; explicit confirmation required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: AWAITING_ISSUE_TERMS (a required term remains unresolved), extraction, or evaluation failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
   /evaluations/{evaluation_id}/archive:
     post:
       summary: Archive a historical evaluation execution

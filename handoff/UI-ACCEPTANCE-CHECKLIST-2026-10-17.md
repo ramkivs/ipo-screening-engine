@@ -47,10 +47,10 @@ UI routes used below (same-origin, hash routing): `#ingest` (upload), `#evaluati
 - **Action:** upload the same Vishal RHP a second time.
 - **Pass criteria:** returns the A1 evaluation as duplicate (same ID, `is_duplicate`), no new record; history unchanged.
 
-### A4 — Manual issue-term entry (Step 5, R-12) — **user-exercised; re-confirm boundaries**
+### A4 — Manual issue-term entry (Step 5, R-12; four-field scope 2026-10-18) — **user-exercised; re-confirm boundaries**
 - **Prerequisites:** server *without* the prospectus URL configured (separate run) to force the unresolved path, or use Jio (Section C).
-- **Action:** upload a terms-placeholder RHP → in the AWAITING panel enter floor/cap/lot + explanation → submit.
-- **Pass criteria:** values are labelled `MANUAL_ENTRY` (never verified), conflicts with verified values block until confirmed and never displace them, OFS still blocks for the Vishal RHP (`missing: issue.ofs` only), nothing persisted on any AWAITING outcome.
+- **Action:** upload a terms-placeholder RHP → in the AWAITING panel enter **all four terms** (price-band floor/cap, lot size, **OFS amount in the filing's reporting unit** — ₹ lakh for the Vishal RHP) + explanation → submit. Also try submitting only three terms first.
+- **Pass criteria:** all four inputs are offered; a three-term submission still blocks on `missing: issue.ofs` (nothing defaulted); a complete four-field submission is evaluated and persisted with every value labelled `MANUAL_ENTRY` (never verified) and the exact values shown in the result panel; conflicts with existing/verified values block until confirmed and never displace verified official values; nothing persisted on any AWAITING outcome. Manual completion preserves the official-discovery outcome (stays UNAVAILABLE) — manual input is not official verification.
 
 ### A5 — Filing-disclosed terms without resolver (RK precedent)
 - **Data:** `handoff/reference/U18109WB2010PLC144256-R.K Fashion accessories.pdf`.

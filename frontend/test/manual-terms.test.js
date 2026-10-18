@@ -43,7 +43,7 @@ test('Step5 ApiClient - ingestManualTerms posts terms/explanation to the manual-
     const client = new ApiClient();
     const res = await client.ingestManualTerms(new Blob(['%PDF-1.4']), {
       mode: 'final',
-      terms: { price_band_low: 208, price_band_high: 220, lot_size: 68 },
+      terms: { price_band_low: 208, price_band_high: 220, lot_size: 68, ofs: 3300 },
       explanation: 'exchange announcement dated 2026-10-10',
       confirmConflicts: false,
     });
@@ -53,11 +53,47 @@ test('Step5 ApiClient - ingestManualTerms posts terms/explanation to the manual-
     assert.equal(body.get('price_band_low'), '208');
     assert.equal(body.get('price_band_high'), '220');
     assert.equal(body.get('lot_size'), '68');
+    assert.equal(body.get('ofs'), '3300');
     assert.equal(body.get('explanation'), 'exchange announcement dated 2026-10-10');
     assert.equal(body.get('confirm_conflicts'), null);
     // No hidden route around validation: no path/fallback parameters exist.
     assert.equal(body.get('reference_base_path'), null);
     assert.equal(body.get('allow_fixture_fallbacks'), null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Step5 ApiClient - an explicit OFS of 0 is preserved and absent fields are never fabricated', async () => {
+  const originalFetch = globalThis.fetch;
+  let captured = null;
+  try {
+    globalThis.fetch = async (url, options) => {
+      captured = { url, options };
+      return { ok: true, status: 201, json: async () => ({ evaluation_id: 'E2' }) };
+    };
+    const client = new ApiClient();
+    await client.ingestManualTerms(new Blob(['%PDF-1.4']), {
+      mode: 'final',
+      terms: { price_band_low: 208, price_band_high: 220, lot_size: 68, ofs: 0 },
+      explanation: 'broker platform page shows no offer for sale',
+    });
+    const body = captured.options.body;
+    // Explicit zero is an operator statement of "no OFS", preserved as-is.
+    assert.equal(body.get('ofs'), '0');
+    // A field the operator did not supply is simply absent: no defaults.
+    const captured2 = { body: null };
+    globalThis.fetch = async (url, options) => {
+      captured2.body = options.body;
+      return { ok: true, status: 201, json: async () => ({ evaluation_id: 'E3' }) };
+    };
+    await client.ingestManualTerms(new Blob(['%PDF-1.4']), {
+      mode: 'final',
+      terms: { price_band_low: 208, price_band_high: 220, lot_size: 68 },
+      explanation: 'broker platform page',
+    });
+    assert.equal(captured2.body.get('ofs'), null);
+    assert.equal(captured2.body.get('price_band_low'), '208');
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -92,19 +128,107 @@ test('Step5 ApiClient - conflict and awaiting payloads surface structured detail
   }
 });
 
-test('Step5 App - manual panel lists missing terms and marks non-enterable blockers', () => {
+test('Step5 App - manual panel offers all four required terms and marks non-enterable blockers', () => {
   const app = new App();
   app.selectedIngestFile = new Blob(['%PDF-1.4']);
   const container = makePanelContainer();
   app.renderManualTermsPanel(container, {
     code: 'AWAITING_ISSUE_TERMS',
     message: 'awaiting',
-    details: { missing_fields: ['price_band_low', 'lot_size', 'ofs'] },
+    details: {
+      missing_fields: ['price_band_low', 'price_band_high', 'lot_size', 'ofs', 'fresh_issue'],
+      resolution: { reporting_unit: 'INR_LAKHS' },
+    },
   }, 'final');
-  assert.ok(container.innerHTML.includes('AWAITING ISSUE TERMS'));
-  assert.ok(container.innerHTML.includes('Manual entry is not official-source verification'));
-  assert.ok(container.innerHTML.includes('cannot be entered manually'));
-  assert.ok(container.innerHTML.includes('mt-explanation'));
+  const html = container.innerHTML;
+  assert.ok(html.includes('AWAITING ISSUE TERMS'));
+  assert.ok(html.includes('Manual entry is not official-source verification'));
+  // All four issue terms are enterable, including issue.ofs.
+  assert.ok(html.includes('may be entered manually below'));
+  assert.ok(html.includes('id="mt-price-band-low"'));
+  assert.ok(html.includes('id="mt-price-band-high"'));
+  assert.ok(html.includes('id="mt-lot-size"'));
+  assert.ok(html.includes('id="mt-ofs"'));
+  assert.ok(html.includes('Offer For Sale (OFS)'));
+  // The OFS field states the canonical unit taken from the engine payload.
+  assert.ok(html.includes('amount in ₹ lakh'));
+  // Terms outside the manual contract (e.g. the fresh-issue amount) stay blockers.
+  assert.ok(html.includes('cannot be entered manually'));
+  assert.ok(html.includes('issue.fresh_issue'));
+  // The workflow contract is stated: all four required, broker platform
+  // source of values, unverified status, invalid/incomplete blocked.
+  assert.ok(html.includes('All four issue terms above are required'));
+  assert.ok(html.includes('broker platform'));
+  assert.ok(html.includes('MANUAL_ENTRY'));
+  assert.ok(html.includes('Invalid or incomplete values prevent evaluation'));
+  assert.ok(html.includes('mt-explanation'));
+});
+
+test('Step5 App - OFS unit label follows the reporting unit from the awaiting payload', () => {
+  const app = new App();
+  app.selectedIngestFile = new Blob(['%PDF-1.4']);
+  const crores = makePanelContainer();
+  app.renderManualTermsPanel(crores, {
+    code: 'AWAITING_ISSUE_TERMS',
+    message: 'awaiting',
+    details: { missing_fields: ['ofs'], resolution: { reporting_unit: 'INR_CRORES' } },
+  }, 'final');
+  assert.ok(crores.innerHTML.includes('amount in ₹ crore'));
+  const fallback = makePanelContainer();
+  app.renderManualTermsPanel(fallback, {
+    code: 'AWAITING_ISSUE_TERMS',
+    message: 'awaiting',
+    details: { missing_fields: ['ofs'] },
+  }, 'final');
+  assert.ok(fallback.innerHTML.includes('reporting unit'));
+});
+
+test('Step5 App - four-field submission posts every supplied term including OFS', async () => {
+  const app = new App();
+  app.selectedIngestFile = new Blob(['%PDF-1.4']);
+  const calls = [];
+  app.api = {
+    ingestManualTerms: async (file, options) => {
+      calls.push(options);
+      return {
+        evaluation_id: 'EVAL-4', company_name: 'Acme', ipo_id: 'ACME', evaluation_mode: 'FINAL',
+        final_score: 61.2, verdict: 'CONSIDER', is_duplicate: false,
+        issue_terms: {
+          status: 'UNAVAILABLE',
+          manual_entry: {
+            fields: ['price_band_low', 'price_band_high', 'lot_size', 'ofs'],
+            values: { price_band_low: 208, price_band_high: 220, lot_size: 68, ofs: 3300 },
+            explanation: 'broker platform IPO page, 2026-10-18',
+            provenance: 'MANUAL_ENTRY',
+            verified: false,
+            reporting_unit: 'INR_LAKHS',
+          },
+        },
+      };
+    },
+  };
+  const container = makePanelContainer();
+  app.renderManualTermsPanel(container, {
+    code: 'AWAITING_ISSUE_TERMS', message: 'awaiting',
+    details: { missing_fields: ['price_band_low', 'price_band_high', 'lot_size', 'ofs'] },
+  }, 'final');
+  container.querySelector('#mt-price-band-low').value = '208';
+  container.querySelector('#mt-price-band-high').value = '220';
+  container.querySelector('#mt-lot-size').value = '68';
+  container.querySelector('#mt-ofs').value = '3300';
+  container.querySelector('#mt-explanation').value = 'broker platform IPO page, 2026-10-18';
+  await container.querySelector('#mt-submit-btn').listeners.click();
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].terms, { price_band_low: 208, price_band_high: 220, lot_size: 68, ofs: 3300 });
+  // The result surface shows the exact evaluated values with manual provenance.
+  const html = container.innerHTML;
+  assert.ok(html.includes('MANUALLY ENTERED (Not Source-Verified)'));
+  assert.ok(html.includes('issue.ofs'));
+  assert.ok(html.includes('3300'));
+  assert.ok(html.includes('208'));
+  assert.ok(html.includes('MANUAL_ENTRY'));
+  assert.ok(html.includes('broker platform IPO page, 2026-10-18'));
 });
 
 test('Step5 App - conflict blocks until explicitly confirmed, then proceeds unpromoted', async () => {
@@ -122,7 +246,7 @@ test('Step5 App - conflict blocks until explicitly confirmed, then proceeds unpr
       return {
         evaluation_id: 'EVAL-1', company_name: 'Acme', ipo_id: 'ACME', evaluation_mode: 'FINAL',
         final_score: 40, verdict: 'INSUFFICIENT_DATA', is_duplicate: false,
-        issue_terms: { manual_entry: { fields: ['price_band_low'] } },
+        issue_terms: { manual_entry: { fields: ['price_band_low'], values: { price_band_low: 200 }, explanation: 'operator note' } },
       };
     },
   };
@@ -152,7 +276,9 @@ test('Step5 App - conflict blocks until explicitly confirmed, then proceeds unpr
   await submit.listeners.click();
   assert.equal(calls.length, 2);
   assert.equal(calls[1].confirmConflicts, true);
-  assert.ok(container.innerHTML.includes('Manually entered (unverified)'));
+  assert.ok(container.innerHTML.includes('MANUALLY ENTERED (Not Source-Verified)'));
+  assert.ok(container.innerHTML.includes('issue.price_band_low'));
+  assert.ok(container.innerHTML.includes('200'));
   assert.ok(container.innerHTML.includes('Open Full Evaluation Scorecard'));
 });
 

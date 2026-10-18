@@ -3859,16 +3859,29 @@ export class App {
 
   /**
    * Step 5 pre-processing workflow: when required issue terms are
-   * unresolved (AWAITING_ISSUE_TERMS), let the operator enter the three
-   * authorized terms (price-band floor/cap, lot size) with a mandatory
-   * explanation. Manual entry is visibly NOT source verification;
-   * conflicts block until explicitly confirmed; non-enterable terms
-   * remain blockers.
+   * unresolved (AWAITING_ISSUE_TERMS), let the operator enter the four
+   * required terms (price-band floor/cap, lot size, OFS amount) with a
+   * mandatory explanation. All four are required to complete initial
+   * screening manually and may be read off the broker platform. Manual
+   * entry is visibly NOT source verification (MANUAL_ENTRY provenance,
+   * unverified); conflicts block until explicitly confirmed. Invalid or
+   * incomplete values prevent evaluation.
    */
   renderManualTermsPanel(container, err, mode) {
     if (!container) return;
-    const ENTERABLE = ['price_band_low', 'price_band_high', 'lot_size'];
-    const LABELS = { price_band_low: 'Price-Band Floor (₹)', price_band_high: 'Price-Band Cap (₹)', lot_size: 'Lot Size (shares)', ofs: 'Offer For Sale (₹ lakh)' };
+    const ENTERABLE = ['price_band_low', 'price_band_high', 'lot_size', 'ofs'];
+    const reportingUnit = (err && err.details && err.details.resolution && err.details.resolution.reporting_unit) || '';
+    const ofsUnit = reportingUnit === 'INR_CRORES'
+      ? 'amount in ₹ crore'
+      : reportingUnit === 'INR_LAKHS'
+        ? 'amount in ₹ lakh'
+        : 'monetary amount in the filing\u2019s reporting unit (₹ lakh or ₹ crore)';
+    const LABELS = {
+      price_band_low: 'Price-Band Floor (₹ per share)',
+      price_band_high: 'Price-Band Cap (₹ per share)',
+      lot_size: 'Lot Size (shares)',
+      ofs: `Offer For Sale (OFS) \u2014 ${ofsUnit}`,
+    };
     let missing = (err && err.details && err.details.missing_fields) || [];
     let awaitingMessage = err ? err.message : '';
     const providerReports = (err && err.details && err.details.resolution && err.details.resolution.providers) || [];
@@ -3910,8 +3923,11 @@ export class App {
         </div>
         ${providerDiagnostics}
         <div class="alert" style="margin-bottom: 12px; font-size: 0.85rem;">
-          <strong>Manual entry is not official-source verification.</strong> Entered values are recorded as
-          <code>MANUAL_ENTRY</code> provenance, remain unverified, and never displace a verified official value.
+          <strong>All four issue terms above are required to complete initial screening manually</strong>
+          and may be supplied from the broker platform&rsquo;s IPO page.
+          <strong>Manual entry is not official-source verification:</strong> entered values are recorded as
+          <code>MANUAL_ENTRY</code> provenance, remain unverified, are flagged as manually supplied on the
+          evaluation, and never displace a verified official value. Invalid or incomplete values prevent evaluation.
         </div>
         <div class="ingest-grid" style="gap: 12px;">
           <div class="form-group"><label class="form-label" for="mt-price-band-low">${LABELS.price_band_low}</label>
@@ -3920,6 +3936,8 @@ export class App {
             <input type="number" step="any" min="0" class="form-select" id="mt-price-band-high" placeholder="e.g. 220" /></div>
           <div class="form-group"><label class="form-label" for="mt-lot-size">${LABELS.lot_size}</label>
             <input type="number" step="1" min="0" class="form-select" id="mt-lot-size" placeholder="e.g. 68" /></div>
+          <div class="form-group"><label class="form-label" for="mt-ofs">${LABELS.ofs}</label>
+            <input type="number" step="any" min="0" class="form-select" id="mt-ofs" placeholder="e.g. 3300 (0 = no offer for sale)" /></div>
         </div>
         <div class="form-group" style="margin-top: 12px;">
           <label class="form-label" for="mt-explanation">Explanation (required for any manual entry)</label>
@@ -3944,9 +3962,11 @@ export class App {
       const low = container.querySelector('#mt-price-band-low').value;
       const high = container.querySelector('#mt-price-band-high').value;
       const lot = container.querySelector('#mt-lot-size').value;
+      const ofsInput = container.querySelector('#mt-ofs').value;
       if (low !== '') terms.price_band_low = Number(low);
       if (high !== '') terms.price_band_high = Number(high);
       if (lot !== '') terms.lot_size = Number(lot);
+      if (ofsInput !== '') terms.ofs = Number(ofsInput);
       const explanation = container.querySelector('#mt-explanation').value.trim();
 
       if (Object.keys(terms).length === 0) {
@@ -3970,9 +3990,23 @@ export class App {
         const result = await this.api.ingestManualTerms(this.selectedIngestFile, {
           mode, terms, explanation, confirmConflicts: conflictPending,
         });
-        const manualNote = result.issue_terms && result.issue_terms.manual_entry
-          ? `<div style="font-size: 0.85rem; margin-bottom: 12px;">Manually entered (unverified): <code>${this.escape((result.issue_terms.manual_entry.fields || []).join(', '))}</code></div>`
-          : '';
+        const manualEntry = result.issue_terms && result.issue_terms.manual_entry;
+        let manualNote = '';
+        if (manualEntry) {
+          const unit = manualEntry.reporting_unit ? ` (${this.escape(String(manualEntry.reporting_unit))})` : '';
+          const rows = (manualEntry.fields || []).map((f) => {
+            const value = manualEntry.values ? manualEntry.values[f] : '';
+            const unitCell = f === 'ofs' ? unit : (f === 'lot_size' ? ' (shares)' : ' (₹/share)');
+            return `<tr><td><code>issue.${this.escape(f)}</code></td><td><strong>${this.escape(String(value))}</strong>${unitCell}</td></tr>`;
+          }).join('');
+          manualNote = `
+            <div style="font-size: 0.85rem; margin-bottom: 12px;">
+              <div style="margin-bottom: 4px;"><span class="badge badge-unknown-evidence" title="Entered manually by the operator; not verified against an official source">MANUALLY ENTERED (Not Source-Verified)</span></div>
+              <div style="margin-bottom: 4px;">The engine evaluated these manually supplied values, recorded as <code>MANUAL_ENTRY</code> provenance and still unverified:</div>
+              <table style="width: 100%; font-size: 0.82rem; border-collapse: collapse;">${rows}</table>
+              ${manualEntry.explanation ? `<div style="margin-top: 4px; color: var(--text-muted);">Explanation: ${this.escape(manualEntry.explanation)}</div>` : ''}
+            </div>`;
+        }
         container.innerHTML = `
           <div class="ingest-result-overview" role="region" aria-label="Manual Terms Ingestion Result">
             <div class="ingest-result-header">
