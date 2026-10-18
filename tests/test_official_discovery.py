@@ -46,7 +46,14 @@ LISTING_WITH_PROSPECTUS = """<html><body>
 <a href="/sebi_data/attachdocs/oct-2026/acme-prospectus.pdf">ACME FORGE LIMITED Prospectus</a>
 </body></html>"""
 
-LISTING_EMPTY = "<html><body><p>No matching issues.</p></body></html>"
+LISTING_EMPTY = """<html><body><h1>Public Issues</h1>
+<table><tr><th>Security Name</th><th>Issue Status</th></tr>
+<tr><td>OTHER ISSUER LIMITED</td><td>Forthcoming</td></tr></table>
+<p>No matching issues for this search.</p></body></html>"""
+
+# A page with no recognizable listing content at all: unusable as a
+# listing, never a searched listing.
+LISTING_NO_MARKERS = "<html><body><p>Welcome.</p></body></html>"
 
 
 def _fetcher(mapping):
@@ -370,3 +377,56 @@ def test_issue_page_returning_homepage_reports_wrong_page_reason():
     # the terms are unpublished.
     assert report.outcome == "NOT_FOUND"
     assert "homepage" in report.detail
+
+
+# ----------------------------------------------------------------------
+# Outcome classification (Windows trace ing-eacd8815051f4222):
+# shells/homepages/marker-less pages are NOT searched listings, so the
+# outcome is UNAVAILABLE -- never NOT_FOUND and never UNPUBLISHED.
+# ----------------------------------------------------------------------
+def test_all_shell_listings_are_unavailable_never_unpublished():
+    fetcher = _fetcher({u: BSE_JS_SHELL.encode() for u in OfficialDiscoveryProvider.LISTING_URLS})
+    provider = OfficialDiscoveryProvider(fetcher=fetcher)
+    candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert candidate is None and report.outcome == "UNAVAILABLE"
+    assert "shell" in report.detail
+    outcome = IssueTermsResolver(providers=[provider]).resolve(
+        company_name="Jio Platforms Limited", ipo_id="JIO-PLATFORMS-LIMITED",
+        missing_fields=["price_band_low", "price_band_high", "lot_size", "ofs"],
+    )
+    assert outcome.status == "UNAVAILABLE"  # not UNPUBLISHED
+
+
+def test_markerless_pages_are_unavailable_not_searched():
+    fetcher = _fetcher({u: LISTING_NO_MARKERS.encode() for u in OfficialDiscoveryProvider.LISTING_URLS})
+    provider = OfficialDiscoveryProvider(fetcher=fetcher)
+    candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert candidate is None and report.outcome == "UNAVAILABLE"
+    assert "no recognizable listing content" in report.detail
+
+
+def test_valid_listing_searched_no_match_is_not_found_then_unpublished():
+    # The only route to UNPUBLISHED: a valid listing was actually
+    # searched and no issuer-matched document exists in it.
+    fetcher = _fetcher({u: LISTING_EMPTY.encode() for u in OfficialDiscoveryProvider.LISTING_URLS})
+    provider = OfficialDiscoveryProvider(fetcher=fetcher)
+    candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert candidate is None and report.outcome == "NOT_FOUND"
+    outcome = IssueTermsResolver(providers=[provider]).resolve(
+        company_name="Jio Platforms Limited", ipo_id="JIO-PLATFORMS-LIMITED",
+        missing_fields=["price_band_low"],
+    )
+    assert outcome.status == "UNPUBLISHED"
+
+
+def test_shell_on_relevant_listing_plus_valid_unmatched_listing_keeps_notes():
+    # One valid listing searched (no match) -> NOT_FOUND, but the
+    # shell failure on another listing stays visible in the detail.
+    classic_url = "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P"
+    mapping = {u: LISTING_NO_MARKERS.encode() for u in OfficialDiscoveryProvider.LISTING_URLS}
+    mapping[OfficialDiscoveryProvider.LISTING_URLS[0]] = LISTING_EMPTY.encode()
+    mapping[classic_url] = BSE_JS_SHELL.encode()
+    provider = OfficialDiscoveryProvider(fetcher=_fetcher(mapping))
+    candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert candidate is None and report.outcome == "NOT_FOUND"
+    assert "shell" in report.detail

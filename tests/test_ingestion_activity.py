@@ -223,3 +223,42 @@ def test_async_start_streams_live_trace_to_terminal(tmp_path, monkeypatch, golde
     assert record is not None and record["status"] == "BLOCKED"
     assert record["evaluation_run"] is False and record["persisted"] is False
     assert any("homepage" in e["message"] for e in record["events"])
+
+
+# ----------------------------------------------------------------------
+# Windows trace ing-eacd8815051f4222 consistency: BSE listings returned
+# JavaScript shells (never searched) and SEBI failed, yet the outcome
+# was reported UNPUBLISHED.  Shells must surface as UNAVAILABLE at every
+# layer -- provider, resolver, activity events -- while the ingestion
+# itself stays BLOCKED with no evaluation and no persistence.
+# ----------------------------------------------------------------------
+BSE_JS_SHELL = (
+    "<html><head><title>Public Issues</title></head>"
+    "<body><app-root></app-root><script src='main.js'></script></body></html>"
+)
+
+
+def test_shell_listings_surface_unavailable_in_activity_trace(tmp_path, monkeypatch, golden_input):
+    fetcher = lambda url: BSE_JS_SHELL.encode()  # noqa: E731
+    service = _service(tmp_path, None, [OfficialDiscoveryProvider(fetcher=fetcher)])
+    _patch_extractor(monkeypatch, _jio_doc(golden_input))
+    with pytest.raises(IngestionAwaitingIssueTermsError) as excinfo:
+        service.ingest_document(
+            file_bytes=b"%PDF-1.4 test",
+            filename="U72900GJ2019PLC110816_JIO.pdf",
+            mode="final",
+        )
+    # Resolver layer: UNAVAILABLE, not UNPUBLISHED.
+    assert excinfo.value.resolution["status"] == "UNAVAILABLE"
+    record = service.get_ingestion_activity(excinfo.value.ingestion_id)
+    assert record is not None and record["status"] == "BLOCKED"
+    assert record["evaluation_run"] is False and record["persisted"] is False
+    messages = [e["message"] for e in record["events"]]
+    assert any("Official discovery outcome: UNAVAILABLE" in m for m in messages)
+    assert any("shell" in m for m in messages)
+    assert not any("UNPUBLISHED" in m for m in messages)
+    stages = [(e["stage"], e["status"]) for e in record["events"]]
+    assert ("evaluation", "SKIPPED") in stages
+    assert not (tmp_path / "evaluations").exists() or not any(
+        (tmp_path / "evaluations").iterdir()
+    )

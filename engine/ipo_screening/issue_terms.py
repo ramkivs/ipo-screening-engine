@@ -496,9 +496,12 @@ class OfficialDiscoveryProvider:
     hosts and linked from official listing pages are considered, and a
     candidate counts only after it parses and issuer-matches.
 
-    Outcomes: FOUND (verified candidate), NOT_FOUND (listings reached,
-    no issuer-matched document published yet), UNAVAILABLE (listings
-    unreachable -- transient; never evidence of non-publication).
+    Outcomes: FOUND (verified candidate); NOT_FOUND (at least one
+    valid listing was actually searched and no issuer-matched document
+    was found -- the only outcome the resolver may map to UNPUBLISHED);
+    UNAVAILABLE (no valid listing could be retrieved or searched --
+    transport failures and homepage/JavaScript-shell/no-content
+    responses included; never evidence of non-publication).
     """
 
     name = "official-discovery"
@@ -732,6 +735,16 @@ class OfficialDiscoveryProvider:
                     "issue rows in the served HTML (a listing was not searched)"
                 )
                 continue
+            if kind != "ok":
+                # A page with no recognizable listing content cannot be
+                # counted as a searched listing: treating it as one
+                # turned unusable responses into a false NOT_FOUND /
+                # UNPUBLISHED conclusion (Windows trace, 2026-10-18).
+                note(
+                    f"{listing_url}: returned a page with no recognizable listing "
+                    "content (a listing was not searched)"
+                )
+                continue
             reached = True
             collected: List[NoticeCandidate] = []
             for link in self._candidate_links(raw, listing_url, company_name):
@@ -759,8 +772,9 @@ class OfficialDiscoveryProvider:
                 )
         if reached:
             detail = (
-                "official listings searched; no issuer-matched official document "
-                "was found (this does not by itself establish non-publication)"
+                "valid official listings searched; no issuer-matched official "
+                "document was found (this does not by itself establish "
+                "non-publication)"
             )
             if notes:
                 detail += "; " + "; ".join(notes)

@@ -281,3 +281,76 @@ searched); valid classic listing, `&amp;` decoding and full
 query-parameter preservation unchanged; cookie persistence pinned
 over loopback. OFS handling is untouched by this correction
 (fresh-only filing establishment remains the only zero source).
+
+## Addendum 2026-10-18 (3): Windows activity trace — classification defect repaired; BSE retrieval remains unavailable
+
+**Primary evidence (user's Windows trace `ing-eacd8815051f4222`, at
+`ea437f3`, 76.2s):** both BSE listing URLs returned JavaScript
+application shells (classified as shells — a listing was *not*
+searched), the SEBI listing failed with HTTPError, yet the provider
+reported NOT_FOUND and the resolver reported **UNPUBLISHED**. No
+evaluation ran; nothing persisted.
+
+**Root cause of the misclassification (code-path traced):** in
+`OfficialDiscoveryProvider.find`, any fetched listing that was not a
+homepage/shell counted as "reached" — including marker-less `empty`
+responses (the NSE listing response on Windows). One such response
+flipped the outcome to NOT_FOUND, and `IssueTermsResolver.resolve`
+maps any NOT_FOUND provider report to UNPUBLISHED. The conclusion
+"unpublished" was therefore unsupported by the very diagnostics
+attached to it.
+
+**Corrected semantics (implemented):** a listing counts as *searched*
+only when it classifies `ok` (genuine listing content markers:
+issue-detail links, Public Issues/Security Name structure,
+attachdocs, price-band content). Homepage, shell, and marker-less
+responses are unusable and never searched; transport failures
+likewise. NOT_FOUND requires at least one valid listing actually
+searched; otherwise UNAVAILABLE with every per-URL reason retained.
+UNPUBLISHED now arises only from a genuine NOT_FOUND (a valid listing
+searched, no issuer-matched document) or a genuinely searched
+retained-document set — per the existing resolver rule, unchanged.
+CONFLICT semantics unchanged. The activity trace now shows
+"Official discovery outcome: UNAVAILABLE" for this scenario, and the
+ingestion terminal remains BLOCKED (AWAITING_ISSUE_TERMS) with
+evaluation/persistence explicitly not run.
+
+**Why the cookie-session fix did not resolve Windows discovery:**
+the trace was produced with the session-aware fetcher (`589159a`)
+already live, and BSE still returned the application shell for both
+listing URLs. BSE's protection evidently requires JavaScript-executed
+session state (the investigator's rendering fetcher receives the real
+server-rendered/pages content; raw HTTP clients — PowerShell,
+urllib with or without cookie warm-up — receive the homepage or the
+shell). Cookie persistence is proven only as a mechanism (loopback);
+it does not make BSE accept the request, and no further header/cookie
+variation is evidence-supported. **BSE retrieval status: still
+unavailable to this application on the Windows runtime; not fixed,
+and not claimed fixed.** A headless-browser retrieval mechanism
+would be a new runtime dependency and architecture decision requiring
+separate authorization and its own evidence; until then the correct
+terminal behaviour is UNAVAILABLE with precise per-URL reasons —
+never UNPUBLISHED.
+
+**Jio official-prospectus configuration (investigated):**
+issuer-specific official URLs are operator configuration via
+environment JSON maps (`IPO_PRICE_BAND_NOTICE_URLS`,
+`IPO_PROSPECTUS_URLS` in `build_resolver_from_env`). The Windows
+environment evidently has a prospectus map (the provider ran and
+reported no URL *for this issuer*); it contains no Jio entry, and
+none may be invented or copied from another issuer's configuration.
+Automatic discovery remains the intended configuration-free path; it
+is currently blocked at the BSE/SEBI retrieval stage above, not at
+configuration. No Jio URL or term values were hardcoded.
+
+**Regression tests:** all-shell listings → UNAVAILABLE (resolver
+explicitly not UNPUBLISHED); marker-less pages → UNAVAILABLE with
+reason; valid listing searched with no match → NOT_FOUND →
+UNPUBLISHED (the genuine rule); shell-on-one-listing + valid
+unmatched listing → NOT_FOUND with the shell reason retained;
+service/activity consistency test reproducing the Windows trace
+(resolution status UNAVAILABLE, "Official discovery outcome:
+UNAVAILABLE", no UNPUBLISHED anywhere in the trace, BLOCKED terminal,
+evaluation SKIPPED, nothing persisted). The `LISTING_EMPTY` fixture
+now models a valid searched listing with no matching issuer, which
+is what NOT_FOUND means under the corrected semantics.
