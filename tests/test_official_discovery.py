@@ -10,6 +10,8 @@ never live retrieval.
 
 from __future__ import annotations
 
+import urllib.error
+
 import pytest
 
 from conftest import REPO_ROOT
@@ -46,9 +48,16 @@ LISTING_WITH_PROSPECTUS = """<html><body>
 <a href="/sebi_data/attachdocs/oct-2026/acme-prospectus.pdf">ACME FORGE LIMITED Prospectus</a>
 </body></html>"""
 
+# A genuine listing of issues that does NOT contain the searched
+# issuer.  The row shape is the one BSE's server-rendered classic
+# listing publishes (Security Name | Exchange Platform | Start Date |
+# End Date | Offer Price | Face Value | Type of Issue | Issue Status,
+# with the issuer's DisplayIPO link), captured live 2026-10-18: the
+# listing really was read, and the issuer really is absent from it.
 LISTING_EMPTY = """<html><body><h1>Public Issues</h1>
-<table><tr><th>Security Name</th><th>Issue Status</th></tr>
-<tr><td>OTHER ISSUER LIMITED</td><td>Forthcoming</td></tr></table>
+<table><tr><th>Security Name</th><th>Exchange Platform</th><th>Start Date</th><th>End Date</th><th>Offer Price</th><th>Face Value</th><th>Type of Issue</th><th>Issue Status</th></tr>
+<tr><td><a href="https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4887&amp;type=IPO&amp;idtype=1&amp;status=L&amp;IPONo=8040&amp;startdt=15/10/2026">Tonbo Imaging India Limited</a></td><td>MainBoard</td><td>15-10-2026</td><td>19-10-2026</td><td>665.00 - 700.00</td><td>2.00</td><td>IPO</td><td>Live</td></tr>
+</table>
 <p>No matching issues for this search.</p></body></html>"""
 
 # A page with no recognizable listing content at all: unusable as a
@@ -430,3 +439,123 @@ def test_shell_on_relevant_listing_plus_valid_unmatched_listing_keeps_notes():
     candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
     assert candidate is None and report.outcome == "NOT_FOUND"
     assert "shell" in report.detail
+
+
+# ----------------------------------------------------------------------
+# The Windows acceptance failure (ingestion ing-5aa6dd92cd7640a8, run
+# at 3fea259): BSE's classic listing AND publicissue.html both returned
+# a JavaScript application shell, the SEBI listing failed with an
+# HTTPError -- and the provider nevertheless reported NOT_FOUND, which
+# the resolver mapped to UNPUBLISHED.
+#
+# The reason was the NSE response, which the Windows trace does not
+# list as a failure: the page repeats its own path in navigation and
+# canonical links, so the served HTML carries the marker
+# "all-upcoming-issues" while its listing table has a header row and
+# NO issue row at all (the rows are filled client-side).  Modelled on
+# the live NSE page and on its archived raw response (2026-10-18).
+# ----------------------------------------------------------------------
+NSE_MARKER_ONLY_LISTING = """<html><head><title>IPO - Latest IPO, Upcoming IPO, Recent IPO News, IPO Issue Price, Listing Details- NSE India</title>
+<link rel="canonical" href="https://www.nseindia.com/market-data/all-upcoming-issues-ipo"></head>
+<body>
+<nav><ul>
+<li><a href="https://www.nseindia.com/market-data/all-upcoming-issues-ipo">IPO</a></li>
+<li><a href="https://www.nseindia.com/market-data/new-stock-exchange-listings-today">Listings</a></li>
+<li><a href="https://www.nseindia.com/resources/exchange-communication-circulars">Circulars</a></li>
+</ul></nav>
+<h1>Market Watch</h1>
+<table><tr><th>Company Name</th><th>Security type</th><th>Issue Start Date</th><th>Issue End Date</th><th>Status</th><th>NSE Bid Details</th></tr>
+<tr><th>offered/ reserved</th><th>Bids</th><th>Subscription (No. of times)</th></tr></table>
+<div>Fetching...</div>
+</body></html>"""
+
+
+def _windows_trace_fetcher():
+    """The exact response pattern of the Windows acceptance failure.
+
+    NSE: HTTP 200 with page chrome only (no issue entry).  BSE classic
+    listing and BSE publicissue.html: JavaScript application shells.
+    SEBI listing: HTTPError.
+    """
+    def fetch(url):
+        if url == OfficialDiscoveryProvider.LISTING_URLS[0]:
+            return NSE_MARKER_ONLY_LISTING.encode()
+        if url in (
+            "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
+            "https://www.bseindia.com/publicissue.html",
+        ):
+            return BSE_JS_SHELL.encode()
+        if url.startswith("https://www.sebi.gov.in/"):
+            raise urllib.error.HTTPError(url, 500, "Internal Server Error", {}, None)
+        raise OSError(f"unreachable: {url}")
+    return fetch
+
+
+def test_chrome_marker_only_response_is_not_a_searched_listing():
+    """A response that merely repeats the listing page's own path (or
+    any navigation/canonical marker) is page chrome, not listing
+    content: without an issue entry it was never a searched listing.
+    """
+    assert OfficialDiscoveryProvider._classify_listing(
+        NSE_MARKER_ONLY_LISTING.encode()
+    ) != "ok"
+    assert OfficialDiscoveryProvider._classify_listing(BSE_JS_SHELL.encode()) == "shell"
+    assert OfficialDiscoveryProvider._classify_listing(BSE_HOMEPAGE.encode()) == "homepage"
+    assert OfficialDiscoveryProvider._classify_listing(LISTING_NO_MARKERS.encode()) == "empty"
+    # A genuine listing (issue rows, and the live BSE row shape) stays
+    # a searched listing: the repair must not over-reject.
+    assert OfficialDiscoveryProvider._classify_listing(LISTING_EMPTY.encode()) == "ok"
+    assert OfficialDiscoveryProvider._classify_listing(BSE_CLASSIC_LISTING.encode()) == "ok"
+
+
+def test_windows_trace_pattern_is_unavailable_never_not_found():
+    """The exact Windows response pattern (NSE chrome-only page, both
+    BSE listings as JavaScript shells, SEBI HTTPError) yields
+    UNAVAILABLE at the provider and resolver layers -- never NOT_FOUND
+    and never UNPUBLISHED.
+    """
+    provider = OfficialDiscoveryProvider(fetcher=_windows_trace_fetcher())
+    candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert candidate is None
+    assert report.outcome == "UNAVAILABLE"  # never NOT_FOUND
+    assert report.listing_searched is False
+    # every unusable response is named with its own reason
+    assert "no issue entries" in report.detail
+    assert "shell" in report.detail
+    assert "HTTPError" in report.detail
+    outcome = IssueTermsResolver(providers=[provider]).resolve(
+        company_name="Jio Platforms Limited", ipo_id="JIO-PLATFORMS-LIMITED",
+        missing_fields=["price_band_low", "price_band_high", "lot_size", "ofs"],
+    )
+    assert outcome.status == "UNAVAILABLE"  # not UNPUBLISHED
+    assert outcome.unresolved_fields == [
+        "price_band_low", "price_band_high", "lot_size", "ofs",
+    ]
+
+
+# ----------------------------------------------------------------------
+# The genuine BSE listing shape (captured live 2026-10-18) must still
+# be recognised as a searched listing and must still yield the
+# issuer's terms: the repair narrows the predicate, it does not
+# disable discovery.
+# ----------------------------------------------------------------------
+LIVE_BSE_LISTING = """<html><head><title>IPOs Listing|New Live Public Issues on BSE</title></head><body>
+<table>
+<tr><th>Security Name</th><th>Exchange Platform</th><th>Start Date</th><th>End Date</th><th>Offer Price</th><th>Face Value</th><th>Type of Issue</th><th>Issue Status</th></tr>
+<tr><td><a href="https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4894&amp;type=IPO&amp;idtype=1&amp;status=F&amp;IPONo=8047&amp;startdt=21%2F10%2F2026">Jio Platforms Limited</a></td><td>MainBoard</td><td>21-10-2026</td><td>23-10-2026</td><td>1065.00 - 1119.00</td><td>10.00</td><td>IPO</td><td>Forthcoming</td></tr>
+<tr><td><a href="https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4895&amp;type=IPO&amp;idtype=1&amp;status=F&amp;IPONo=8048&amp;startdt=21%2F10%2F2026">Paras Healthcare Limited</a></td><td>MainBoard</td><td>21-10-2026</td><td>23-10-2026</td><td>660.00 - 693.00</td><td>1.00</td><td>IPO</td><td>Forthcoming</td></tr>
+</table></body></html>"""
+
+
+def test_live_bse_listing_shape_is_still_a_searched_listing():
+    fetcher = _fetcher({
+        OfficialDiscoveryProvider.LISTING_URLS[1]: LIVE_BSE_LISTING.encode(),
+        JIO_DISPLAY_URL_FULL: BSE_ISSUE_PAGE.encode(),
+    })
+    provider = OfficialDiscoveryProvider(fetcher=fetcher)
+    candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert report.outcome == "FOUND"
+    assert candidate is not None and candidate.verified is True
+    assert candidate.values["price_band_low"] == 1065.0
+    assert candidate.values["price_band_high"] == 1119.0
+    assert candidate.values["lot_size"] == 12

@@ -196,3 +196,31 @@ test('Step5 App - awaiting panel surfaces official-source resolution diagnostics
   assert.ok(container.innerHTML.includes('official-prospectus'));
   assert.ok(container.innerHTML.includes('REJECTED'));
 });
+
+test('Step5 App - official-source diagnostics show UNAVAILABLE for the Windows failure pattern', () => {
+  const app = new App();
+  app.selectedIngestFile = new Blob(['%PDF-1.4']);
+  const container = makePanelContainer();
+  app.renderManualTermsPanel(container, {
+    code: 'AWAITING_ISSUE_TERMS',
+    message: 'AWAITING_ISSUE_TERMS: required issue terms are unavailable.',
+    details: {
+      missing_fields: ['price_band_low', 'ofs'],
+      resolution: {
+        status: 'UNAVAILABLE',
+        providers: [
+          {
+            provider: 'official-discovery',
+            outcome: 'UNAVAILABLE',
+            detail: 'no valid official listing could be retrieved: no issue entries in the served HTML; JavaScript application shell; listing retrieval failed (HTTPError)',
+            listing_searched: false,
+          },
+        ],
+      },
+    },
+  }, 'final');
+  assert.ok(container.innerHTML.includes('Official-source resolution diagnostics'));
+  assert.ok(container.innerHTML.includes('official-discovery'));
+  assert.ok(container.innerHTML.includes('UNAVAILABLE'));
+  assert.ok(!container.innerHTML.includes('UNPUBLISHED'));
+});

@@ -99,3 +99,70 @@ test('Activity App - untrusted diagnostic text is escaped, never raw HTML', () =
   assert.ok(!html.includes('<img src=x onerror=alert(1)>'));
   assert.ok(html.includes('&lt;'));
 });
+
+// The Windows acceptance failure (ingestion ing-5aa6dd92cd7640a8, at
+// 3fea259): both BSE listings returned JavaScript shells, SEBI failed
+// with an HTTPError and the NSE response carried only page chrome.
+// The backend verdict is UNAVAILABLE -- the panel must say so, and
+// must never present the unsubstantiated UNPUBLISHED conclusion.
+const WINDOWS_PATTERN_EVENTS = [
+  { sequence: 1, stage: 'upload', event_type: 'received', status: 'SUCCEEDED', message: 'Upload received.', details: {} },
+  {
+    sequence: 2, stage: 'official_discovery', event_type: 'source_attempt', status: 'FAILED',
+    message: 'official-discovery: UNAVAILABLE -- no valid official listing could be retrieved',
+    details: { provider: 'official-discovery', outcome: 'UNAVAILABLE', listing_searched: false },
+  },
+  {
+    sequence: 3, stage: 'official_discovery', event_type: 'source_attempt', status: 'FAILED',
+    message: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo: returned a page with no recognizable listing content and no issue entries in the served HTML (the listing table may be populated by JavaScript; a listing was not searched)',
+    details: { provider: 'official-discovery', outcome: 'UNAVAILABLE' },
+  },
+  {
+    sequence: 4, stage: 'official_discovery', event_type: 'source_attempt', status: 'FAILED',
+    message: 'https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P: returned a JavaScript application shell with no issue rows in the served HTML (a listing was not searched)',
+    details: { provider: 'official-discovery', outcome: 'UNAVAILABLE' },
+  },
+  {
+    sequence: 5, stage: 'official_discovery', event_type: 'source_attempt', status: 'FAILED',
+    message: 'https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0: listing retrieval failed (HTTPError)',
+    details: { provider: 'official-discovery', outcome: 'UNAVAILABLE' },
+  },
+  {
+    sequence: 6, stage: 'official_discovery', event_type: 'completed', status: 'BLOCKED',
+    message: 'Official discovery outcome: UNAVAILABLE.',
+    details: { status: 'UNAVAILABLE' },
+  },
+  { sequence: 7, stage: 'evaluation', event_type: 'not_run', status: 'SKIPPED', message: 'Evaluation was not run; nothing was persisted.', details: {} },
+  { sequence: 8, stage: 'persistence', event_type: 'not_attempted', status: 'SKIPPED', message: 'No evaluation artifact was persisted.', details: {} },
+];
+
+test('Activity App - the Windows failure pattern renders UNAVAILABLE and never UNPUBLISHED', () => {
+  const app = new App();
+  const container = mockContainer();
+  app.renderIngestionActivity(container, {
+    ingestion_id: 'ing-5aa6dd92cd7640a8',
+    filename: 'U72900GJ2019PLC110816_JIO.pdf',
+    mode: 'final',
+    status: 'BLOCKED',
+    started_at: '2026-10-18T00:00:00Z',
+    finished_at: '2026-10-18T00:00:41Z',
+    evaluation_run: false,
+    persisted: false,
+    evaluation_id: null,
+    missing_fields: ['issue.price_band_low', 'issue.price_band_high', 'issue.lot_size', 'issue.ofs'],
+    error_code: 'AWAITING_ISSUE_TERMS',
+    error_message: 'AWAITING_ISSUE_TERMS: required issue terms are unavailable.',
+    events: WINDOWS_PATTERN_EVENTS,
+  });
+  const html = container.panel.innerHTML;
+  assert.ok(html.includes('Official discovery outcome: UNAVAILABLE'));
+  assert.ok(!html.includes('UNPUBLISHED'), 'the unsubstantiated unpublished conclusion must never be shown');
+  // every unusable source is visible with its own reason
+  assert.ok(html.includes('no issue entries'), 'the chrome-only NSE response is reported');
+  assert.ok(html.includes('shell'), 'the JavaScript shell listings are reported');
+  assert.ok(html.includes('HTTPError'), 'the SEBI retrieval failure is reported');
+  // the safeguards hold: nothing evaluated, nothing persisted
+  assert.ok(html.includes('Evaluation run: <strong>no</strong>'));
+  assert.ok(html.includes('Persisted: <strong>no</strong>'));
+  assert.ok(html.includes('issue.price_band_low'));
+});

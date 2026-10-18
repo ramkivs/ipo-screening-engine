@@ -354,3 +354,33 @@ UNAVAILABLE", no UNPUBLISHED anywhere in the trace, BLOCKED terminal,
 evaluation SKIPPED, nothing persisted). The `LISTING_EMPTY` fixture
 now models a valid searched listing with no matching issuer, which
 is what NOT_FOUND means under the corrected semantics.
+
+## Addendum 2026-10-18 (4): the `3fea259` correction did not hold — marker-only recognition, root-caused and repaired
+
+**Windows acceptance failure (`ing-5aa6dd92cd7640a8`, at `3fea259`):**
+both BSE listing URLs returned JavaScript shells, the SEBI listing
+failed with an HTTPError — and the provider again reported NOT_FOUND
+and the resolver UNPUBLISHED. The `3fea259` acceptance criterion
+(unusable listings ⇒ UNAVAILABLE) failed.
+
+**Why it failed (established, not inferred):** `3fea259` excluded
+*marker-less* responses, but the response that flipped the outcome was
+not marker-less. The NSE listing page repeats its own path
+(`…/market-data/all-upcoming-issues-ipo`) in navigation and canonical
+links, and `_LISTING_MARKERS` — a substring test over the whole
+served HTML — included that chrome marker, so the page classified as
+`ok`. Its listing table has a header row and **no issue row** (the
+rows are client-side). Every non-`ok` classification emits a per-URL
+note; the trace lists three unusable sources and one NOT_FOUND, so the
+un-noted NSE URL was the searched listing. The predicate, not the
+transport, was the defect.
+
+**Correction:** a listing is recognised by its issue entries (a dated
+row of an issue-listing table, or a per-issue link), never by a marker
+substring; an HTTP 200 that is neither a homepage nor a shell is not a
+searched listing. A NOT_FOUND report must additionally be substantiated
+(`listing_searched`) before the resolver may map it to UNPUBLISHED, so
+an unverified retained-corpus search cannot produce UNPUBLISHED
+either. Full evidence, the repaired predicate, the fact/hypothesis
+split on BSE retrieval and the new regressions are recorded in
+`docs/investigation/WINDOWS-DISCOVERY-UNAVAILABLE-REPAIR-2026-10-18.md`.

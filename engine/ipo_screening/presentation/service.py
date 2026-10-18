@@ -1373,8 +1373,19 @@ class PresentationService:
                       "SUCCEEDED" if _rep.outcome == "FOUND" else ("BLOCKED" if _rep.outcome in ("NOT_FOUND",) else "FAILED"),
                       f"{_rep.provider}: {_rep.outcome} -- {_rep.detail}",
                       details={"provider": _rep.provider, "outcome": _rep.outcome,
-                               "detail": _rep.detail},
+                               "detail": _rep.detail,
+                               "listing_searched": bool(_rep.listing_searched),
+                               "notes": list(_rep.notes)},
                       source_reference=outcome.source_uri)
+                # One event per unusable source, so every per-URL
+                # reason survives the bounded event message and is
+                # visible on its own in the activity trace.
+                for _note in _rep.notes:
+                    _emit("official_discovery", "source_attempt", "FAILED",
+                          _note,
+                          details={"provider": _rep.provider, "outcome": _rep.outcome,
+                                   "source_unusable": True},
+                          source_reference=outcome.source_uri)
             _emit("official_discovery", "completed",
                   "SUCCEEDED" if outcome.notice is not None else "BLOCKED",
                   f"Official discovery outcome: {outcome.status}.",
@@ -1451,7 +1462,7 @@ class PresentationService:
                 unresolved = still_missing or list(missing_issue_fields)
                 reason = {
                     "CONFLICT": "official sources conflict and no value was arbitrarily selected",
-                    "UNAVAILABLE": "official sources could not be retrieved or verified",
+                    "UNAVAILABLE": "no usable official listing was searched: official sources could not be retrieved, or returned unusable content (this is not evidence that the terms are unpublished)",
                     "PARTIAL": "only some required terms could be verified from official sources",
                     "UNVERIFIED": "an issuer-matched notice exists only as a retained copy whose official provenance is not established (configure the official exchange announcement via IPO_PRICE_BAND_NOTICE_URLS to use it)",
                 }.get(outcome.status, "no issuer-matched official document was found by automatic discovery or the configured official sources (this does not by itself establish that the terms are unpublished)")

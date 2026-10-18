@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import copy
 import io
+import json
 import time
+import urllib.error
 
 import pytest
 from fastapi.testclient import TestClient
@@ -259,6 +261,124 @@ def test_shell_listings_surface_unavailable_in_activity_trace(tmp_path, monkeypa
     assert not any("UNPUBLISHED" in m for m in messages)
     stages = [(e["stage"], e["status"]) for e in record["events"]]
     assert ("evaluation", "SKIPPED") in stages
+    assert not (tmp_path / "evaluations").exists() or not any(
+        (tmp_path / "evaluations").iterdir()
+    )
+
+
+# ----------------------------------------------------------------------
+# The Windows acceptance failure, end to end (ingestion
+# ing-5aa6dd92cd7640a8, at 3fea259): the BSE classic listing and
+# BSE publicissue.html returned JavaScript application shells, the SEBI
+# listing failed with an HTTPError, and the NSE response carried only
+# page chrome (its own path in navigation/canonical links) with no
+# issue row at all.  The provider still reported NOT_FOUND, the
+# resolver UNPUBLISHED, and the activity completion said UNPUBLISHED.
+#
+# The whole pattern must now be UNAVAILABLE at every layer: provider,
+# resolver, activity trace and API -- with the ingestion still BLOCKED,
+# no evaluation run and nothing persisted.
+# ----------------------------------------------------------------------
+NSE_MARKER_ONLY_LISTING = (
+    "<html><head><title>IPO - Latest IPO, Upcoming IPO, NSE India</title>"
+    '<link rel="canonical" href="https://www.nseindia.com/market-data/all-upcoming-issues-ipo">'
+    "</head><body><nav>"
+    '<a href="https://www.nseindia.com/market-data/all-upcoming-issues-ipo">IPO</a>'
+    '<a href="https://www.nseindia.com/resources/exchange-communication-circulars">Circulars</a>'
+    "</nav><h1>Market Watch</h1>"
+    "<table><tr><th>Company Name</th><th>Security type</th><th>Issue Start Date</th>"
+    "<th>Issue End Date</th><th>Status</th></tr>"
+    "<tr><th>offered/ reserved</th><th>Bids</th><th>Subscription (No. of times)</th></tr></table>"
+    "<div>Fetching...</div></body></html>"
+)
+
+BSE_JS_SHELL = (
+    "<html><head><title>Public Issues</title></head>"
+    "<body><app-root></app-root><script src='main.js'></script></body></html>"
+)
+
+
+def _windows_trace_fetcher():
+    def fetch(url):
+        if url == OfficialDiscoveryProvider.LISTING_URLS[0]:
+            return NSE_MARKER_ONLY_LISTING.encode()
+        if url in (
+            "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
+            "https://www.bseindia.com/publicissue.html",
+        ):
+            return BSE_JS_SHELL.encode()
+        if url.startswith("https://www.sebi.gov.in/"):
+            raise urllib.error.HTTPError(url, 500, "Internal Server Error", {}, None)
+        raise OSError(f"unreachable: {url}")
+    return fetch
+
+
+def test_windows_trace_pattern_is_unavailable_end_to_end(tmp_path, monkeypatch, golden_input):
+    service = _service(
+        tmp_path, None, [OfficialDiscoveryProvider(fetcher=_windows_trace_fetcher())]
+    )
+    _patch_extractor(monkeypatch, _jio_doc(golden_input))
+    with pytest.raises(IngestionAwaitingIssueTermsError) as excinfo:
+        service.ingest_document(
+            file_bytes=b"%PDF-1.4 test",
+            filename="U72900GJ2019PLC110816_JIO.pdf",
+            mode="final",
+        )
+    # Resolver layer: UNAVAILABLE, never UNPUBLISHED.
+    resolution = excinfo.value.resolution
+    assert resolution["status"] == "UNAVAILABLE"
+    assert resolution["providers"][0]["provider"] == "official-discovery"
+    assert resolution["providers"][0]["outcome"] == "UNAVAILABLE"
+    assert resolution["providers"][0]["listing_searched"] is False
+    # Every unusable source is reported with its own reason -- all
+    # four listing URLs, including the NSE response that produced no
+    # note at all before the repair (it was silently counted as a
+    # searched listing).
+    notes = resolution["providers"][0]["notes"]
+    assert len(notes) == 4
+    assert any("nseindia.com" in n and "no issue entries" in n for n in notes)
+    assert sum("shell" in n for n in notes) == 2
+    assert any("sebi.gov.in" in n and "HTTPError" in n for n in notes)
+    # Activity layer: the same verdict, with every unusable response
+    # named, and no UNPUBLISHED anywhere in the trace.
+    record = service.get_ingestion_activity(excinfo.value.ingestion_id)
+    assert record is not None and record["status"] == "BLOCKED"
+    assert record["evaluation_run"] is False and record["persisted"] is False
+    messages = [e["message"] for e in record["events"]]
+    assert any("Official discovery outcome: UNAVAILABLE" in m for m in messages)
+    assert any("no issue entries" in m for m in messages)
+    assert any("shell" in m for m in messages)
+    assert any("HTTPError" in m for m in messages)
+    assert not any("UNPUBLISHED" in m for m in messages)
+    stages = [(e["stage"], e["status"]) for e in record["events"]]
+    assert ("evaluation", "SKIPPED") in stages
+    assert ("persistence", "SKIPPED") in stages
+    assert not (tmp_path / "evaluations").exists() or not any(
+        (tmp_path / "evaluations").iterdir()
+    )
+
+
+def test_windows_trace_pattern_is_unavailable_through_the_api(tmp_path, monkeypatch, golden_input):
+    service = _service(
+        tmp_path, None, [OfficialDiscoveryProvider(fetcher=_windows_trace_fetcher())]
+    )
+    _patch_extractor(monkeypatch, _jio_doc(golden_input))
+    client = _client(service)
+    resp = client.post(
+        "/api/v1/ingest/document",
+        files={"file": ("U72900GJ2019PLC110816_JIO.pdf", io.BytesIO(b"%PDF-1.4 test"), "application/pdf")},
+        data={"mode": "final"},
+    )
+    assert resp.status_code == 422
+    detail = resp.json()
+    assert detail["code"] == "AWAITING_ISSUE_TERMS"
+    assert detail["resolution"]["status"] == "UNAVAILABLE"
+    assert detail["resolution"]["providers"][0]["outcome"] == "UNAVAILABLE"
+    assert "UNPUBLISHED" not in json.dumps(detail)
+    # the ingestion stays blocked and nothing was evaluated or persisted
+    hist = client.get(f"/api/v1/ingestions/{detail['ingestion_id']}").json()
+    assert hist["status"] == "BLOCKED"
+    assert hist["evaluation_run"] is False and hist["persisted"] is False
     assert not (tmp_path / "evaluations").exists() or not any(
         (tmp_path / "evaluations").iterdir()
     )

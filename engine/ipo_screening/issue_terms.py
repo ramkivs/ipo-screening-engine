@@ -264,6 +264,16 @@ class ProviderReport:
     provider: str
     outcome: str  # FOUND | NOT_FOUND | UNAVAILABLE | REJECTED
     detail: str = ""
+    # True only when the provider actually searched a genuine, usable
+    # official listing for this issuer.  A NOT_FOUND report that is
+    # not backed by such a listing search (a search of a retained
+    # local corpus, which is unverified and is not a listing) is not
+    # evidence of non-publication and never maps to UNPUBLISHED.
+    listing_searched: bool = False
+    # Per-source reasons (one per listing URL that could not be
+    # searched), kept structured so no reason is lost when the
+    # single-line detail is bounded for display.
+    notes: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -297,7 +307,13 @@ class ResolutionOutcome:
             "retrieved_at": self.retrieved_at,
             "document_class": self.document_class,
             "providers": [
-                {"provider": r.provider, "outcome": r.outcome, "detail": r.detail}
+                {
+                    "provider": r.provider,
+                    "outcome": r.outcome,
+                    "detail": r.detail,
+                    "listing_searched": r.listing_searched,
+                    "notes": list(r.notes),
+                }
                 for r in self.provider_reports
             ],
         }
@@ -343,7 +359,13 @@ class RetainedNoticeProvider:
                     ProviderReport(self.name, "FOUND", f"issuer-matched notice at {path}"),
                 )
         if searched:
-            return None, ProviderReport(self.name, "NOT_FOUND", f"no issuer-matched notice in retained documents ({searched} parsed/searched)")
+            return None, ProviderReport(
+                self.name,
+                "NOT_FOUND",
+                f"no issuer-matched notice in retained documents ({searched} parsed/searched); "
+                "the retained corpus is unverified and is not an official listing, so this "
+                "is not evidence of non-publication",
+            )
         return None, ProviderReport(self.name, "UNAVAILABLE", "no retained notice documents available to search")
 
 
@@ -524,38 +546,109 @@ class OfficialDiscoveryProvider:
     # to session-less requests, and its newer public-issues page is a
     # JavaScript shell.  Neither may count as a searched listing, and
     # neither is evidence that an issuer's terms are unpublished.
-    _LISTING_MARKERS = (
-        "displayipo", "issue-information", "issue_information",
-        "public issues", "public issue", "security name", "attachdocs",
-        "all-upcoming-issues", "price band",
-    )
+    #
+    # A listing is recognised by its ISSUE ENTRIES -- never by a
+    # marker substring.  Marker-only recognition was the defect
+    # repaired on 2026-10-18: an exchange page echoes its own path in
+    # navigation and canonical links ("public issues",
+    # "all-upcoming-issues"), so the NSE response received on the
+    # Windows runtime was classified as a genuine listing although its
+    # served HTML carries no issue row at all (the listing table is
+    # filled client-side).  That single response produced a false
+    # NOT_FOUND and therefore a false UNPUBLISHED conclusion, which
+    # contradicted its own diagnostics (Windows trace
+    # ing-5aa6dd92cd7640a8, at 3fea259).
     _HOMEPAGE_MARKERS = ("bse sensex", "live stock/share market", "formerly bombay stock exchange")
     _SHELL_MARKERS = ("<app-root", "app-root>", "enable javascript to run this app", "you need to enable javascript")
+
+    # Column headers that identify a table of issue records.  Two or
+    # more of them in a table's header row make the table a listing of
+    # issues; a single generic column does not.
+    _ISSUE_TABLE_COLUMNS = (
+        "security name", "company name", "issue start date", "issue open date",
+        "open date", "close date", "start date", "end date", "issue end date",
+        "issue status", "offer price", "price band", "market lot", "issue size",
+        "no. of shares", "bid lot", "issue period", "issue name", "issue type",
+    )
+    # References to ONE issue: the exchange issue-information pages and
+    # the issuer's own official documents (price band notice, SEBI
+    # attachment documents).  These are exactly the links discovery
+    # follows, so their presence in the served HTML is evidence that
+    # the listing itself was readable.
+    _PER_ISSUE_LINK_MARKERS = (
+        "displayipo", "acqdisp", "attachdocs", "issue-information",
+        "issue_information", "price-band", "price_band",
+    )
+    # An issue date as published by the exchanges ("21-10-2026",
+    # "21/10/2026", "21 Oct 2026", "October 2026").
+    _ISSUE_DATE_PATTERN = re.compile(
+        r"\b\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b"
+        r"|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b"
+        r"|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{4}\b"
+    )
+
+    @classmethod
+    def _per_issue_links(cls, text: str) -> List[str]:
+        """The served page's links to ONE issue (exchange issue page or
+        the issuer's own official document).
+
+        Only real ``href`` targets count: a page that merely mentions
+        an issue in prose is not a listing.
+        """
+        return [
+            href
+            for href in re.findall(r"href\s*=\s*[\"']([^\"']*)[\"']", text, re.IGNORECASE)
+            if any(marker in href for marker in cls._PER_ISSUE_LINK_MARKERS)
+        ]
+
+    @classmethod
+    def _has_issue_entries(cls, text: str) -> bool:
+        """True only when the served HTML actually carries issue entries.
+
+        An issue entry is either a data row of an issue-listing table
+        that carries an issue date (or a per-issue link), or a
+        per-issue link.  A page whose listing table is filled
+        client-side carries neither: it was never a searched listing,
+        however many navigation/canonical links it repeats.
+        """
+        if cls._per_issue_links(text):
+            return True
+        for table in re.findall(r"<table\b.*?</table>", text, re.DOTALL):
+            rows = re.findall(r"<tr\b.*?</tr>", table, re.DOTALL)
+            if len(rows) < 2:
+                continue
+            columns = sum(1 for marker in cls._ISSUE_TABLE_COLUMNS if marker in rows[0])
+            if columns < 2:
+                continue  # not a table of issue records
+            for row in rows[1:]:
+                if "<td" not in row:
+                    continue
+                if cls._ISSUE_DATE_PATTERN.search(row) or cls._per_issue_links(row):
+                    return True
+        return False
 
     @classmethod
     def _classify_listing(cls, raw: bytes) -> str:
         """Classify a fetched listing response: ok | empty | homepage | shell.
 
+        ``ok`` means the response carried the listing's issue entries --
+        the only response that may count as a searched listing.  A
+        homepage, a JavaScript application shell and a page without
+        issue entries are unusable: none of them is evidence that an
+        issuer's terms are unpublished.
+
         BSE pages share the homepage masthead in their chrome, so the
-        homepage verdict requires the masthead AND the absence of any
-        genuine issue content (issue-detail links, Price Band, Market
-        Lot, Issue Period): a real DisplayIPO page carries the masthead
-        title but is not the homepage.
+        homepage verdict requires the masthead AND the absence of issue
+        entries: a real DisplayIPO page carries the masthead title but
+        is not the homepage.
         """
         text = raw.decode("utf-8", errors="ignore").lower()
         if any(marker in text for marker in cls._SHELL_MARKERS):
             return "shell"
-        has_issue_links = any(
-            marker in text
-            for marker in ("displayipo", "issue-information", "issue_information")
-        )
-        has_issue_content = has_issue_links or any(
-            marker in text for marker in ("price band", "market lot", "issue period")
-        )
-        if not has_issue_content and sum(marker in text for marker in cls._HOMEPAGE_MARKERS) >= 2:
-            return "homepage"
-        if has_issue_content or any(marker in text for marker in cls._LISTING_MARKERS):
+        if cls._has_issue_entries(text):
             return "ok"
+        if sum(marker in text for marker in cls._HOMEPAGE_MARKERS) >= 2:
+            return "homepage"
         return "empty"
 
     def __init__(
@@ -736,13 +829,18 @@ class OfficialDiscoveryProvider:
                 )
                 continue
             if kind != "ok":
-                # A page with no recognizable listing content cannot be
-                # counted as a searched listing: treating it as one
-                # turned unusable responses into a false NOT_FOUND /
-                # UNPUBLISHED conclusion (Windows trace, 2026-10-18).
+                # A page with no recognizable listing content and no
+                # issue entries cannot be counted as a searched
+                # listing: treating it as one turned unusable
+                # responses into a false NOT_FOUND / UNPUBLISHED
+                # conclusion (Windows traces ing-eacd8815051f4222 at
+                # ea437f3 and ing-5aa6dd92cd7640a8 at 3fea259,
+                # 2026-10-18).
                 note(
                     f"{listing_url}: returned a page with no recognizable listing "
-                    "content (a listing was not searched)"
+                    "content and no issue entries in the served HTML (the listing "
+                    "table may be populated by JavaScript; a listing was not "
+                    "searched)"
                 )
                 continue
             reached = True
@@ -778,11 +876,18 @@ class OfficialDiscoveryProvider:
             )
             if notes:
                 detail += "; " + "; ".join(notes)
-            return None, ProviderReport(self.name, "NOT_FOUND", detail)
+            # ``listing_searched=True`` is the substantiation the
+            # resolver requires before a NOT_FOUND may become
+            # UNPUBLISHED: at least one genuine, usable listing really
+            # was searched for this issuer.
+            return None, ProviderReport(
+                self.name, "NOT_FOUND", detail, listing_searched=True, notes=list(notes)
+            )
         return None, ProviderReport(
             self.name, "UNAVAILABLE",
             "no valid official listing could be retrieved: "
             + ("; ".join(notes) if notes else "no listing sources configured"),
+            notes=list(notes),
         )
 
 
@@ -898,7 +1003,19 @@ class IssueTermsResolver:
                     candidates.append(candidate)
 
         if not candidates:
-            searched = any(r.outcome == "NOT_FOUND" for r in outcome.provider_reports)
+            # A NOT_FOUND provider report becomes UNPUBLISHED only when
+            # it is substantiated by a search of a genuine, usable
+            # official listing (``listing_searched``).  A provider that
+            # could not search anything -- transport failure, exchange
+            # homepage, JavaScript application shell, a page whose
+            # served HTML carries no issue entries -- reports
+            # UNAVAILABLE and can never contribute an UNPUBLISHED
+            # conclusion; nor can a search of the retained local
+            # corpus, which is unverified and is not a listing.
+            searched = any(
+                r.outcome == "NOT_FOUND" and r.listing_searched
+                for r in outcome.provider_reports
+            )
             outcome.status = "UNPUBLISHED" if searched else "UNAVAILABLE"
             return outcome
 
