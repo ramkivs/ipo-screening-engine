@@ -1375,12 +1375,41 @@ class PresentationService:
                       details={"provider": _rep.provider, "outcome": _rep.outcome,
                                "detail": _rep.detail,
                                "listing_searched": bool(_rep.listing_searched),
-                               "notes": list(_rep.notes)},
+                               "searched_listings": list(_rep.searched_listings),
+                               "notes": list(_rep.notes),
+                               "sources": [
+                                   {"url": s.url, "classification": s.classification,
+                                    "searched": bool(s.searched), "issue_entries": s.issue_entries,
+                                    "detail": s.detail}
+                                   for s in _rep.sources
+                               ]},
                       source_reference=outcome.source_uri)
-                # One event per unusable source, so every per-URL
-                # reason survives the bounded event message and is
-                # visible on its own in the activity trace.
+                # One event per configured source, whatever it
+                # yielded: a source that was searched and a source
+                # that could not be used must both be visible, so
+                # no source can contribute to the aggregate outcome
+                # without a trace of its own.
+                for _attempt in _rep.sources:
+                    _emit("official_discovery", "source_attempt",
+                          "SUCCEEDED" if _attempt.searched else "FAILED",
+                          f"{_attempt.url}: {_attempt.detail}",
+                          details={"provider": _rep.provider, "outcome": _rep.outcome,
+                                   "url": _attempt.url,
+                                   "classification": _attempt.classification,
+                                   "searched": bool(_attempt.searched),
+                                   "issue_entries": _attempt.issue_entries,
+                                   "source_unusable": not _attempt.searched},
+                          source_reference=outcome.source_uri)
+                # One event per remaining reason (a candidate
+                # document that could not be used), so every reason
+                # survives the bounded event message and is visible
+                # on its own in the activity trace.  Reasons that
+                # already have their own source event are not
+                # repeated.
+                _covered = {f"{s.url}: {s.detail}" for s in _rep.sources}
                 for _note in _rep.notes:
+                    if _note in _covered:
+                        continue
                     _emit("official_discovery", "source_attempt", "FAILED",
                           _note,
                           details={"provider": _rep.provider, "outcome": _rep.outcome,

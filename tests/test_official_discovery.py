@@ -10,6 +10,7 @@ never live retrieval.
 
 from __future__ import annotations
 
+import re
 import urllib.error
 
 import pytest
@@ -39,13 +40,30 @@ maximum price of Rs 120 per Equity Share (i.e., the Cap Price), including any re
 "Bid Lot" 50 Equity Shares and in multiples of 50 Equity Shares thereafter.
 """
 
+# A listing that links the issuer's own official documents.  The
+# shape is the one a real listing serves: the issue records live in
+# the listing table's rows.  (An earlier revision of this fixture
+# used bare anchors outside any table -- a shape no exchange serves,
+# and one a client-side listing shell can imitate.)
 LISTING_WITH_NOTICE = """<html><body>
-<a href="https://www.nseindia.com/content/ipo/acme-price-band.pdf">ACME FORGE LIMITED - Price Band Advertisement</a>
-<a href="https://www.nseindia.com/content/ipo/other-issuer.pdf">OTHER ISSUER LIMITED - Prospectus</a>
+<h1>Public Issues</h1>
+<table>
+<tr><th>Security Name</th><th>Start Date</th><th>End Date</th><th>Offer Price</th><th>Issue Status</th><th>Documents</th></tr>
+<tr><td>ACME FORGE LIMITED</td><td>21-10-2026</td><td>23-10-2026</td><td>100.00 - 110.00</td><td>Forthcoming</td>
+<td><a href="https://www.nseindia.com/content/ipo/acme-price-band.pdf">ACME FORGE LIMITED - Price Band Advertisement</a></td></tr>
+<tr><td>OTHER ISSUER LIMITED</td><td>21-10-2026</td><td>23-10-2026</td><td>200.00 - 210.00</td><td>Forthcoming</td>
+<td><a href="https://www.nseindia.com/content/ipo/other-issuer.pdf">OTHER ISSUER LIMITED - Prospectus</a></td></tr>
+</table>
 </body></html>"""
 
+# A regulator's announcement listing: the same principle, a table
+# whose rows carry the issuer's document.
 LISTING_WITH_PROSPECTUS = """<html><body>
-<a href="/sebi_data/attachdocs/oct-2026/acme-prospectus.pdf">ACME FORGE LIMITED Prospectus</a>
+<table>
+<tr><th>Sr. No.</th><th>Date</th><th>Description</th><th>Documents</th></tr>
+<tr><td>1</td><td>21-10-2026</td><td>ACME FORGE LIMITED - Prospectus</td>
+<td><a href="/sebi_data/attachdocs/oct-2026/acme-prospectus.pdf">Prospectus</a></td></tr>
+</table>
 </body></html>"""
 
 # A genuine listing of issues that does NOT contain the searched
@@ -163,8 +181,11 @@ def test_jio_ingestion_attempts_discovery_and_fails_closed_unpublished(tmp_path)
 # 2026-10-18: official exchange pages publish Price Band + Market Lot)
 # ----------------------------------------------------------------------
 BSE_LISTING = """<html><body>
-<a href="https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4894&type=IPO&status=F">Jio Platforms Limited</a>
-<a href="https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4895&type=IPO&status=F">Paras Healthcare Limited</a>
+<table>
+<tr><th>Security Name</th><th>Exchange Platform</th><th>Start Date</th><th>End Date</th><th>Offer Price</th><th>Face Value</th><th>Type of Issue</th><th>Issue Status</th></tr>
+<tr><td><a href="https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4894&type=IPO&status=F">Jio Platforms Limited</a></td><td>MainBoard</td><td>21-10-2026</td><td>23-10-2026</td><td>1065.00 - 1119.00</td><td>10.00</td><td>IPO</td><td>Forthcoming</td></tr>
+<tr><td><a href="https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4895&type=IPO&status=F">Paras Healthcare Limited</a></td><td>MainBoard</td><td>21-10-2026</td><td>23-10-2026</td><td>660.00 - 693.00</td><td>1.00</td><td>IPO</td><td>Forthcoming</td></tr>
+</table>
 </body></html>"""
 
 BSE_ISSUE_PAGE = """<html><body><table>
@@ -214,8 +235,11 @@ def test_exchange_page_conflict_with_notice_is_not_merged():
 # Jio service-level acceptance (normal ingestion entry point)
 # ----------------------------------------------------------------------
 JIO_LISTING_WITH_PROSPECTUS = """<html><body>
-<a href="https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4894&type=IPO&status=F">Jio Platforms Limited</a>
-<a href="https://www.sebi.gov.in/sebi_data/attachdocs/oct-2026/jio-prospectus.pdf">Jio Platforms Limited - Prospectus</a>
+<table>
+<tr><th>Security Name</th><th>Start Date</th><th>End Date</th><th>Issue Status</th><th>Documents</th></tr>
+<tr><td><a href="https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4894&type=IPO&status=F">Jio Platforms Limited</a></td><td>21-10-2026</td><td>23-10-2026</td><td>Forthcoming</td>
+<td><a href="https://www.sebi.gov.in/sebi_data/attachdocs/oct-2026/jio-prospectus.pdf">Jio Platforms Limited - Prospectus</a></td></tr>
+</table>
 </body></html>"""
 
 # Synthetic final-Prospectus mechanics fixture carrying the terms the
@@ -559,3 +583,209 @@ def test_live_bse_listing_shape_is_still_a_searched_listing():
     assert candidate.values["price_band_low"] == 1065.0
     assert candidate.values["price_band_high"] == 1119.0
     assert candidate.values["lot_size"] == 12
+
+
+# ----------------------------------------------------------------------
+# The SECOND Windows acceptance failure (ing-32ddf313bbe247b0, branch
+# head 0dda109, 2026-10-18) and its root cause.
+#
+# At 0dda109 a response counted as a searched listing when ANY href in
+# the document carried a per-issue token.  NSE repeats "Price Bands &
+# Surveillance Actions" in its site-wide menu and canonical/alternate
+# links to "/market-data/issue-information?series=EQ&symbol=..." on
+# every page it serves, so the real NSE response matched -- although
+# its listing table is filled client-side and carries NO issue row at
+# all.  That single response produced a false NOT_FOUND, hence a false
+# UNPUBLISHED conclusion, and it emitted no note of its own: the
+# Windows trace showed three per-source failures (BSE classic, BSE
+# publicissue.html, SEBI) and nothing at all about NSE.
+#
+# The regression below uses the retained REAL NSE response
+# (evidence/ipo-subscription/vnl-20261011, captured 2026-10-11), not
+# a hand-written approximation of it.
+# ----------------------------------------------------------------------
+NSE_REAL_CAPTURE = (
+    REPO_ROOT / "evidence" / "ipo-subscription" / "vnl-20261011" / "vnl-issue-information.html"
+)
+
+
+def _real_nse_response() -> bytes:
+    """The retained real NSE response, byte for byte."""
+    return NSE_REAL_CAPTURE.read_bytes()
+
+
+def _real_nse_header_chrome() -> str:
+    """The site-wide header the real NSE response carries."""
+    raw = _real_nse_response().decode("utf-8", errors="ignore")
+    start = raw.find("<header")
+    end = raw.find("</header>", start)
+    assert start != -1 and end != -1, "retained NSE capture has no header block"
+    return raw[start:end]
+
+
+def _0dda109_classify(text: str) -> str:
+    """The rule used at 0dda109, kept to document the defect it
+    caused: ANY href carrying a per-issue token, anywhere in the
+    document, made the response a "searched listing"."""
+    hrefs = re.findall(r"href\s*=\s*[\"']([^\"']*)[\"']", text, re.IGNORECASE)
+    markers = (
+        "displayipo", "acqdisp", "attachdocs", "issue-information",
+        "issue_information", "price-band", "price_band",
+    )
+    if any(any(marker in href for marker in markers) for href in hrefs):
+        return "ok"
+    return "not-a-listing"
+
+
+# The listing table NSE serves for /market-data/all-upcoming-issues-ipo:
+# the header columns are present, the issue rows are not (they are
+# filled client-side).
+NSE_LISTING_TABLE = """<table>
+<tr><th>Company Name</th><th>Security type</th><th>Issue Start Date</th><th>Issue End Date</th><th>Status</th><th>NSE Bid Details</th></tr>
+<tr><th>offered/ reserved</th><th>Bids</th><th>Subscription (No. of times)</th></tr></table>
+<div>Fetching...</div>"""
+
+
+def _nse_listing_response_with_real_chrome() -> bytes:
+    """The NSE listing response as a plain HTTP client receives it:
+    the real site-wide header (menu item and canonical/alternate
+    links) plus the client-side listing table with no issue row."""
+    return (
+        "<html><head><title>IPO - Latest IPO, Upcoming IPO, Recent IPO News, IPO Issue Price, "
+        "Listing Details- NSE India</title>"
+        '<link rel="canonical" href="https://www.nseindia.com/market-data/all-upcoming-issues-ipo">'
+        "</head><body>"
+        + _real_nse_header_chrome()
+        + NSE_LISTING_TABLE
+        + "</body></html>"
+    ).encode()
+
+
+def test_real_nse_response_is_not_a_searched_listing():
+    """The real NSE response carries the site-wide chrome, and no
+    issue record: it is not a searched listing, whatever links it
+    repeats."""
+    real = _real_nse_response()
+    # the chrome that broke the 0dda109 predicate is really there
+    assert b"price-bands-surveillance-actions" in real
+    assert b"issue-information" in real
+    # ... and the response carries no issue record at all
+    assert OfficialDiscoveryProvider._classify_listing(real) != "ok"
+    assert OfficialDiscoveryProvider._issue_records(
+        OfficialDiscoveryProvider._page_text(real)
+    ) == []
+    # the rule used at 0dda109 called that very response a searched
+    # listing -- the defect this regression pins down
+    assert _0dda109_classify(real.decode("utf-8", errors="ignore")) == "ok"
+    # the listing page is served by the same header component, so its
+    # response trips the same chrome and was mis-classified the same
+    # way
+    listing = _nse_listing_response_with_real_chrome()
+    assert b"price-bands-surveillance-actions" in listing
+    assert _0dda109_classify(listing.decode("utf-8", errors="ignore")) == "ok"
+    assert OfficialDiscoveryProvider._classify_listing(listing) != "ok"
+
+
+def _windows_trace_fetcher_with_real_nse():
+    """The exact second-Windows-failure response pattern, with the
+    real NSE response: NSE = page chrome only, both BSE listings =
+    JavaScript application shells, SEBI = HTTPError."""
+    def fetch(url):
+        if url == OfficialDiscoveryProvider.LISTING_URLS[0]:
+            return _nse_listing_response_with_real_chrome()
+        if url in (
+            "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
+            "https://www.bseindia.com/publicissue.html",
+        ):
+            return BSE_JS_SHELL.encode()
+        if url.startswith("https://www.sebi.gov.in/"):
+            raise urllib.error.HTTPError(url, 500, "Internal Server Error", {}, None)
+        raise OSError(f"unreachable: {url}")
+    return fetch
+
+
+def test_windows_trace_pattern_with_real_nse_response_is_unavailable():
+    """The second Windows acceptance failure, reproduced: no genuine
+    listing was searched, so the outcome is UNAVAILABLE -- never
+    NOT_FOUND, never UNPUBLISHED."""
+    provider = OfficialDiscoveryProvider(fetcher=_windows_trace_fetcher_with_real_nse())
+    candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert candidate is None
+    assert report.outcome == "UNAVAILABLE"  # never NOT_FOUND
+    assert report.listing_searched is False
+    assert report.searched_listings == []
+    # every configured source is accounted for, including the NSE one
+    # that used to contribute to the aggregate without a note
+    assert [a.url for a in report.sources] == list(OfficialDiscoveryProvider.LISTING_URLS)
+    assert all(a.searched is False for a in report.sources)
+    assert {a.classification for a in report.sources} == {"empty", "shell", "failed"}
+    outcome = IssueTermsResolver(providers=[provider]).resolve(
+        company_name="Jio Platforms Limited", ipo_id="JIO-PLATFORMS-LIMITED",
+        missing_fields=["price_band_low", "price_band_high", "lot_size", "ofs"],
+    )
+    assert outcome.status == "UNAVAILABLE"  # not UNPUBLISHED
+
+
+def test_every_configured_source_produces_a_visible_attempt():
+    """No configured source may contribute to the aggregate outcome
+    without a visible record: the source that failed and the source
+    that was really read both appear in the report."""
+    def fetch(url):
+        if url == OfficialDiscoveryProvider.LISTING_URLS[1]:
+            return LIVE_BSE_LISTING.encode()
+        if url == JIO_DISPLAY_URL_FULL:
+            return BSE_ISSUE_PAGE.encode()
+        raise OSError(f"unreachable: {url}")
+
+    provider = OfficialDiscoveryProvider(fetcher=fetch)
+    _candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert report.outcome == "FOUND"
+    assert [a.url for a in report.sources] == [
+        OfficialDiscoveryProvider.LISTING_URLS[0], OfficialDiscoveryProvider.LISTING_URLS[1],
+    ]
+    assert report.sources[0].classification == "failed"
+    assert report.sources[0].searched is False
+    assert report.sources[1].classification == "ok"
+    assert report.sources[1].searched is True
+    assert report.sources[1].issue_entries == 2
+    assert report.searched_listings == [OfficialDiscoveryProvider.LISTING_URLS[1]]
+
+
+def test_not_found_without_a_named_searched_listing_is_never_unpublished():
+    """A NOT_FOUND report is evidence of non-publication only when it
+    names a listing that was really read: the flag alone is not
+    enough (Windows acceptance ing-32ddf313bbe247b0)."""
+    class _Unsubstantiated:
+        name = "unsubstantiated"
+
+        def find(self, company_name, ipo_id):
+            from ipo_screening.issue_terms import ProviderReport
+            return None, ProviderReport(
+                self.name, "NOT_FOUND", "nothing found", listing_searched=True,
+            )
+
+    outcome = IssueTermsResolver(providers=[_Unsubstantiated()]).resolve(
+        company_name="Jio Platforms Limited", ipo_id="JIO-PLATFORMS-LIMITED",
+        missing_fields=["price_band_low", "price_band_high", "lot_size", "ofs"],
+    )
+    assert outcome.status == "UNAVAILABLE"  # not UNPUBLISHED
+    assert outcome.unresolved_fields == [
+        "price_band_low", "price_band_high", "lot_size", "ofs",
+    ]
+
+
+def test_genuine_listing_searched_is_named_in_the_report():
+    """The positive case is retained: a genuine listing really read,
+    with no matching issuer, is NOT_FOUND and names the listing."""
+    fetcher = _fetcher({u: LISTING_EMPTY.encode() for u in OfficialDiscoveryProvider.LISTING_URLS})
+    provider = OfficialDiscoveryProvider(fetcher=fetcher)
+    _candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert report.outcome == "NOT_FOUND"
+    assert report.listing_searched is True
+    assert report.searched_listings == list(OfficialDiscoveryProvider.LISTING_URLS)
+    assert all(a.searched and a.issue_entries == 1 for a in report.sources)
+    outcome = IssueTermsResolver(providers=[provider]).resolve(
+        company_name="Jio Platforms Limited", ipo_id="JIO-PLATFORMS-LIMITED",
+        missing_fields=["price_band_low", "price_band_high", "lot_size", "ofs"],
+    )
+    assert outcome.status == "UNPUBLISHED"

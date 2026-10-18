@@ -224,3 +224,42 @@ test('Step5 App - official-source diagnostics show UNAVAILABLE for the Windows f
   assert.ok(container.innerHTML.includes('UNAVAILABLE'));
   assert.ok(!container.innerHTML.includes('UNPUBLISHED'));
 });
+
+test('Step5 App - every official source is shown with whether its listing was really searched', () => {
+  const app = new App();
+  app.selectedIngestFile = new Blob(['%PDF-1.4']);
+  const container = makePanelContainer();
+  app.renderManualTermsPanel(container, {
+    code: 'AWAITING_ISSUE_TERMS',
+    message: 'AWAITING_ISSUE_TERMS: required issue terms are unavailable.',
+    details: {
+      missing_fields: ['price_band_low', 'ofs'],
+      resolution: {
+        status: 'UNAVAILABLE',
+        providers: [
+          {
+            provider: 'official-discovery',
+            outcome: 'UNAVAILABLE',
+            detail: 'no valid official listing could be retrieved',
+            listing_searched: false,
+            searched_listings: [],
+            sources: [
+              { url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo', classification: 'empty', searched: false, issue_entries: 0, detail: 'no issue entries in the served HTML' },
+              { url: 'https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P', classification: 'shell', searched: false, issue_entries: 0, detail: 'JavaScript application shell' },
+              { url: 'https://www.bseindia.com/publicissue.html', classification: 'shell', searched: false, issue_entries: 0, detail: 'JavaScript application shell' },
+              { url: 'https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes', classification: 'failed', searched: false, issue_entries: 0, detail: 'listing retrieval failed (HTTPError)' },
+            ],
+          },
+        ],
+      },
+    },
+  }, 'final');
+  const html = container.innerHTML;
+  assert.ok(html.includes('https://www.nseindia.com/market-data/all-upcoming-issues-ipo'));
+  assert.ok(html.includes('https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&amp;Type=P'));
+  assert.ok(html.includes('https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes'));
+  assert.ok(html.includes('listing not searched'));
+  assert.ok(!html.includes('listing searched ('));
+  assert.ok(html.includes('UNAVAILABLE'));
+  assert.ok(!html.includes('UNPUBLISHED'));
+});

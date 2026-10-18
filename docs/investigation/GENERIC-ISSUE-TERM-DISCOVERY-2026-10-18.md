@@ -384,3 +384,53 @@ an unverified retained-corpus search cannot produce UNPUBLISHED
 either. Full evidence, the repaired predicate, the fact/hypothesis
 split on BSE retrieval and the new regressions are recorded in
 `docs/investigation/WINDOWS-DISCOVERY-UNAVAILABLE-REPAIR-2026-10-18.md`.
+
+## Addendum 2026-10-18 (5): the `0dda109` correction did not hold either — href-chrome read as issue entries, root-caused and repaired
+
+**Windows acceptance failure (`ing-32ddf313bbe247b0`, at `0dda109`):**
+the same contradiction again — both BSE listing URLs returned
+JavaScript shells, the SEBI listing failed with an HTTPError, the
+aggregate official-discovery outcome was NOT_FOUND and the activity
+completion was UNPUBLISHED, with exactly three per-source failure
+events. The `0dda109` acceptance criterion (unusable listings ⇒
+UNAVAILABLE) failed.
+
+**Why it failed (proved against the exact `0dda109` code, not
+inferred):** the round-1 repair moved the predicate from "marker
+substring anywhere in the document" to "per-issue **href** anywhere in
+the document" — `if cls._per_issue_links(text): return True`, with
+`_per_issue_links()` matching any `href=` attribute, including
+`<link rel="canonical">`/`<link rel="alternate">`. NSE repeats the
+same chrome on every page it serves: the site-wide market-data menu
+item `href="/market-data/price-bands-surveillance-actions"` and the
+canonical/alternate links to
+`…/market-data/issue-information?series=EQ&symbol=VNL`. Running the
+`0dda109` engine over the retained real NSE response
+(`evidence/ipo-subscription/vnl-20261011/vnl-issue-information.html`,
+313,038 bytes) classifies it **`ok`** — 17 matched hrefs, **0 `<td>`
+cells**, no issue record at all. The NSE listing response built from
+that same real header is classified `ok` on the strength of the single
+menu link. Since only an `ok` response sets `reached = True`, the
+NSE listing — the one configured source that emitted no note — was the
+source that set `listing_searched = true` and produced the false
+NOT_FOUND/UNPUBLISHED. The round-1 regression fixture modelled the
+NSE response **without** that chrome, which is why it could not
+reproduce the real response: the fixture, not the code path alone, was
+the gap.
+
+**Correction:** a response counts as a searched listing only when it
+carries an **issue record** — a table data row (`<tr>` with `<td>`
+cells) that links to one issue or one official document (matched on
+anchor elements only, so canonical/alternate metadata cannot count),
+or a data row of an issue-listing table (header naming ≥2
+issue-listing columns) that carries an issue date. Chrome is never
+inside a data row. A NOT_FOUND report must be substantiated *and* name
+the listings it read (`listing_searched` **and** `searched_listings`)
+before the resolver may map it to UNPUBLISHED. Every configured source
+now produces a visible attempt (provider report, activity event, API
+payload and UI diagnostics), so no source can contribute to the
+aggregate outcome without a trace of its own. The full evidence,
+including the reproduction against the `0dda109` code and the fact /
+hypothesis split on BSE retrieval, is recorded in
+`docs/investigation/WINDOWS-DISCOVERY-UNAVAILABLE-REPAIR-2026-10-18.md`
+§0.

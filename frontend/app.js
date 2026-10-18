@@ -3875,7 +3875,17 @@ export class App {
     const providerDiagnostics = providerReports.length
       ? `<div style="margin-bottom: 12px;">
            <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Official-source resolution diagnostics</div>
-           <ul style="margin: 0; padding-left: 18px; font-size: 0.85rem;">${providerReports.map((r) => `<li><code>${this.escape(r.provider || '')}</code> — ${this.escape(r.outcome || '')}: ${this.escape(r.detail || '')}</li>`).join('')}</ul>
+           <ul style="margin: 0; padding-left: 18px; font-size: 0.85rem;">${providerReports.map((r) => {
+             const sources = Array.isArray(r.sources) ? r.sources : [];
+             const sourceList = sources.length
+               ? `<ul style="margin: 4px 0 0; padding-left: 16px; font-size: 0.8rem;">${sources.map((s) => {
+                   const state = s.searched ? 'listing searched' : 'listing not searched';
+                   const entries = s.issue_entries ? `; ${s.issue_entries} issue entr${s.issue_entries === 1 ? 'y' : 'ies'} read` : '';
+                   return `<li><code>${this.escape(s.url || '')}</code> — ${this.escape(s.classification || '')} (${state}${entries})</li>`;
+                 }).join('')}</ul>`
+               : '';
+             return `<li><code>${this.escape(r.provider || '')}</code> — ${this.escape(r.outcome || '')}: ${this.escape(r.detail || '')}${sourceList}</li>`;
+           }).join('')}</ul>
          </div>`
       : '';
     container.style.display = 'block';

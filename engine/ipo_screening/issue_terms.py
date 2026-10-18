@@ -260,6 +260,23 @@ class NoticeCandidate:
 
 
 @dataclass
+class ListingAttempt:
+    """What one configured listing source actually yielded.
+
+    Every configured listing URL produces exactly one attempt, so a
+    source can never contribute to the aggregate outcome without a
+    visible record of what it returned.  ``searched`` is true only
+    when the served response really carried issue records, i.e. when
+    the listing was genuinely read.
+    """
+    url: str
+    classification: str  # ok | empty | homepage | shell | failed
+    searched: bool = False
+    issue_entries: int = 0
+    detail: str = ""
+
+
+@dataclass
 class ProviderReport:
     provider: str
     outcome: str  # FOUND | NOT_FOUND | UNAVAILABLE | REJECTED
@@ -274,6 +291,18 @@ class ProviderReport:
     # searched), kept structured so no reason is lost when the
     # single-line detail is bounded for display.
     notes: List[str] = field(default_factory=list)
+    # One attempt per configured listing source, searched or not.
+    sources: List[ListingAttempt] = field(default_factory=list)
+
+    @property
+    def searched_listings(self) -> List[str]:
+        """The listings that were genuinely searched, by URL.
+
+        This is the evidence a NOT_FOUND report must carry before the
+        resolver may conclude UNPUBLISHED: a bare flag is not enough,
+        the report has to name a listing that really was read.
+        """
+        return [attempt.url for attempt in self.sources if attempt.searched]
 
 
 @dataclass
@@ -312,7 +341,18 @@ class ResolutionOutcome:
                     "outcome": r.outcome,
                     "detail": r.detail,
                     "listing_searched": r.listing_searched,
+                    "searched_listings": list(r.searched_listings),
                     "notes": list(r.notes),
+                    "sources": [
+                        {
+                            "url": s.url,
+                            "classification": s.classification,
+                            "searched": bool(s.searched),
+                            "issue_entries": s.issue_entries,
+                            "detail": s.detail,
+                        }
+                        for s in r.sources
+                    ],
                 }
                 for r in self.provider_reports
             ],
@@ -592,40 +632,72 @@ class OfficialDiscoveryProvider:
         """The served page's links to ONE issue (exchange issue page or
         the issuer's own official document).
 
-        Only real ``href`` targets count: a page that merely mentions
-        an issue in prose is not a listing.
+        Only real anchor targets count: a page that merely mentions
+        an issue in prose is not a listing, and a ``<link>`` element
+        (canonical/alternate metadata) is page chrome, not a link to
+        an issue.
         """
         return [
             href
-            for href in re.findall(r"href\s*=\s*[\"']([^\"']*)[\"']", text, re.IGNORECASE)
+            for href in re.findall(r"<a\b[^>]*href\s*=\s*[\"']([^\"']*)[\"']", text, re.IGNORECASE)
             if any(marker in href for marker in cls._PER_ISSUE_LINK_MARKERS)
         ]
+
+    @classmethod
+    def _issue_records(cls, text: str) -> List[str]:
+        """The issue records the served HTML actually carries.
+
+        A record is a TABLE DATA ROW that identifies one issue: a row
+        that links to an issue page or to an official document, or a
+        row of an issue-listing table that carries an issue date.
+
+        Page chrome can never be a record.  An exchange repeats its
+        own navigation and metadata links on every page -- NSE serves
+        "Price Bands & Surveillance Actions" in the site-wide menu
+        and canonical/alternate links to "/market-data/issue-
+        information?series=EQ&symbol=..." on every page it renders --
+        so a scan of the whole document (the rule used before
+        2026-10-18) classified the client-side NSE listing shell as a
+        genuine listing and produced a false NOT_FOUND, hence a false
+        UNPUBLISHED conclusion (Windows acceptance trace
+        ing-32ddf313bbe247b0 at 0dda109, 2026-10-18).
+        """
+        records: List[str] = []
+        for table in re.findall(r"<table\b.*?</table>", text, re.DOTALL):
+            rows = re.findall(r"<tr\b.*?</tr>", table, re.DOTALL)
+            if not rows:
+                continue
+            header = rows[0]
+            # A header row names the listing's columns; a table whose
+            # first row is already a data row (the shape BSE's
+            # classic listing serves) has no header at all.
+            is_issue_table = (
+                "<td" not in header
+                and sum(1 for marker in cls._ISSUE_TABLE_COLUMNS if marker in header) >= 2
+            )
+            for row in rows:
+                if "<td" not in row:
+                    continue  # a header row, not a record
+                if cls._per_issue_links(row) or (
+                    is_issue_table and cls._ISSUE_DATE_PATTERN.search(row)
+                ):
+                    records.append(row)
+        return records
 
     @classmethod
     def _has_issue_entries(cls, text: str) -> bool:
         """True only when the served HTML actually carries issue entries.
 
-        An issue entry is either a data row of an issue-listing table
-        that carries an issue date (or a per-issue link), or a
-        per-issue link.  A page whose listing table is filled
-        client-side carries neither: it was never a searched listing,
-        however many navigation/canonical links it repeats.
+        A page whose listing table is filled client-side carries no
+        issue record at all: it was never a searched listing, however
+        many navigation, canonical or menu links it repeats.
         """
-        if cls._per_issue_links(text):
-            return True
-        for table in re.findall(r"<table\b.*?</table>", text, re.DOTALL):
-            rows = re.findall(r"<tr\b.*?</tr>", table, re.DOTALL)
-            if len(rows) < 2:
-                continue
-            columns = sum(1 for marker in cls._ISSUE_TABLE_COLUMNS if marker in rows[0])
-            if columns < 2:
-                continue  # not a table of issue records
-            for row in rows[1:]:
-                if "<td" not in row:
-                    continue
-                if cls._ISSUE_DATE_PATTERN.search(row) or cls._per_issue_links(row):
-                    return True
-        return False
+        return bool(cls._issue_records(text))
+
+    @staticmethod
+    def _page_text(raw: bytes) -> str:
+        """The served page as lower-case text (classification input)."""
+        return raw.decode("utf-8", errors="ignore").lower()
 
     @classmethod
     def _classify_listing(cls, raw: bytes) -> str:
@@ -642,7 +714,7 @@ class OfficialDiscoveryProvider:
         entries: a real DisplayIPO page carries the masthead title but
         is not the homepage.
         """
-        text = raw.decode("utf-8", errors="ignore").lower()
+        text = cls._page_text(raw)
         if any(marker in text for marker in cls._SHELL_MARKERS):
             return "shell"
         if cls._has_issue_entries(text):
@@ -804,6 +876,7 @@ class OfficialDiscoveryProvider:
     def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
         reached = False
         notes: List[str] = []
+        attempts: List[ListingAttempt] = []
 
         def note(text: str) -> None:
             if text and text not in notes and len(notes) < 6:
@@ -813,20 +886,26 @@ class OfficialDiscoveryProvider:
             try:
                 raw = self._fetch(listing_url)
             except Exception as exc:
-                note(f"{listing_url}: listing retrieval failed ({type(exc).__name__})")
+                detail = f"listing retrieval failed ({type(exc).__name__})"
+                note(f"{listing_url}: {detail}")
+                attempts.append(ListingAttempt(listing_url, "failed", False, 0, detail))
                 continue
             kind = self._classify_listing(raw)
             if kind == "homepage":
-                note(
-                    f"{listing_url}: returned the exchange homepage, not an issue "
-                    "listing (HTTP 200 wrong-page response; a listing was not searched)"
+                detail = (
+                    "returned the exchange homepage, not an issue listing "
+                    "(HTTP 200 wrong-page response; a listing was not searched)"
                 )
+                note(f"{listing_url}: {detail}")
+                attempts.append(ListingAttempt(listing_url, "homepage", False, 0, detail))
                 continue
             if kind == "shell":
-                note(
-                    f"{listing_url}: returned a JavaScript application shell with no "
-                    "issue rows in the served HTML (a listing was not searched)"
+                detail = (
+                    "returned a JavaScript application shell with no issue rows "
+                    "in the served HTML (a listing was not searched)"
                 )
+                note(f"{listing_url}: {detail}")
+                attempts.append(ListingAttempt(listing_url, "shell", False, 0, detail))
                 continue
             if kind != "ok":
                 # A page with no recognizable listing content and no
@@ -834,16 +913,24 @@ class OfficialDiscoveryProvider:
                 # listing: treating it as one turned unusable
                 # responses into a false NOT_FOUND / UNPUBLISHED
                 # conclusion (Windows traces ing-eacd8815051f4222 at
-                # ea437f3 and ing-5aa6dd92cd7640a8 at 3fea259,
-                # 2026-10-18).
-                note(
-                    f"{listing_url}: returned a page with no recognizable listing "
-                    "content and no issue entries in the served HTML (the listing "
-                    "table may be populated by JavaScript; a listing was not "
-                    "searched)"
+                # ea437f3, ing-5aa6dd92cd7640a8 at 3fea259 and
+                # ing-32ddf313bbe247b0 at 0dda109, 2026-10-18).
+                detail = (
+                    "returned a page with no recognizable listing content and no "
+                    "issue entries in the served HTML (the listing table may be "
+                    "populated by JavaScript; a listing was not searched)"
                 )
+                note(f"{listing_url}: {detail}")
+                attempts.append(ListingAttempt(listing_url, "empty", False, 0, detail))
                 continue
             reached = True
+            records = self._issue_records(self._page_text(raw))
+            attempt = ListingAttempt(
+                listing_url, "ok", True, len(records),
+                f"listing searched: {len(records)} issue "
+                f"{'entry' if len(records) == 1 else 'entries'} read from the served HTML",
+            )
+            attempts.append(attempt)
             collected: List[NoticeCandidate] = []
             for link in self._candidate_links(raw, listing_url, company_name):
                 low = link.lower()
@@ -856,38 +943,51 @@ class OfficialDiscoveryProvider:
                     continue
                 for provider_cls in (HttpNoticeProvider, HttpProspectusProvider):
                     provider = provider_cls({ipo_id: link}, fetcher=self._fetcher, allowed_hosts=self.allowed_hosts, timeout_seconds=self.timeout_seconds)
-                    candidate, _report = provider.find(company_name, ipo_id)
+                    candidate, sub_report = provider.find(company_name, ipo_id)
                     if candidate is not None:
                         collected.append(candidate)
                         break
+                else:
+                    # A candidate document that could not be used must
+                    # not vanish silently: record why.
+                    note(f"{link}: {sub_report.detail}")
             if collected:
+                attempt.detail += "; issuer-matched official document found"
                 try:
                     merged = self._merge_candidates(collected)
                 except ValueError as exc:
-                    return None, ProviderReport(self.name, "REJECTED", str(exc))
+                    return None, ProviderReport(
+                        self.name, "REJECTED", str(exc), sources=list(attempts)
+                    )
                 return merged, ProviderReport(
-                    self.name, "FOUND", f"discovered official document via {listing_url}: {merged.uri}"
+                    self.name, "FOUND", f"discovered official document via {listing_url}: {merged.uri}",
+                    sources=list(attempts),
                 )
+            attempt.detail += "; no issuer-matched official document found in it"
         if reached:
+            searched = [a.url for a in attempts if a.searched]
             detail = (
-                "valid official listings searched; no issuer-matched official "
-                "document was found (this does not by itself establish "
-                "non-publication)"
+                "valid official listings searched ("
+                + ", ".join(searched)
+                + "); no issuer-matched official document was found (this does "
+                "not by itself establish non-publication)"
             )
             if notes:
                 detail += "; " + "; ".join(notes)
             # ``listing_searched=True`` is the substantiation the
             # resolver requires before a NOT_FOUND may become
             # UNPUBLISHED: at least one genuine, usable listing really
-            # was searched for this issuer.
+            # was searched for this issuer.  The searched listings are
+            # named in ``sources`` so the claim is checkable.
             return None, ProviderReport(
-                self.name, "NOT_FOUND", detail, listing_searched=True, notes=list(notes)
+                self.name, "NOT_FOUND", detail, listing_searched=True,
+                notes=list(notes), sources=list(attempts),
             )
         return None, ProviderReport(
             self.name, "UNAVAILABLE",
             "no valid official listing could be retrieved: "
             + ("; ".join(notes) if notes else "no listing sources configured"),
-            notes=list(notes),
+            notes=list(notes), sources=list(attempts),
         )
 
 
@@ -1005,15 +1105,20 @@ class IssueTermsResolver:
         if not candidates:
             # A NOT_FOUND provider report becomes UNPUBLISHED only when
             # it is substantiated by a search of a genuine, usable
-            # official listing (``listing_searched``).  A provider that
-            # could not search anything -- transport failure, exchange
-            # homepage, JavaScript application shell, a page whose
-            # served HTML carries no issue entries -- reports
-            # UNAVAILABLE and can never contribute an UNPUBLISHED
-            # conclusion; nor can a search of the retained local
-            # corpus, which is unverified and is not a listing.
+            # official listing (``listing_searched``) AND it names the
+            # listings that were really read (``searched_listings``).
+            # A provider that could not search anything -- transport
+            # failure, exchange homepage, JavaScript application shell,
+            # a page whose served HTML carries no issue entries --
+            # reports UNAVAILABLE and can never contribute an
+            # UNPUBLISHED conclusion; nor can a search of the retained
+            # local corpus, which is unverified and is not a listing.
+            # The flag alone is not evidence: a report that claims a
+            # search but names no listing is treated as unsubstantiated
+            # (Windows acceptance trace ing-32ddf313bbe247b0 at
+            # 0dda109, 2026-10-18).
             searched = any(
-                r.outcome == "NOT_FOUND" and r.listing_searched
+                r.outcome == "NOT_FOUND" and r.listing_searched and r.searched_listings
                 for r in outcome.provider_reports
             )
             outcome.status = "UNPUBLISHED" if searched else "UNAVAILABLE"

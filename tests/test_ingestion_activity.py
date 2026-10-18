@@ -297,11 +297,44 @@ BSE_JS_SHELL = (
     "<body><app-root></app-root><script src='main.js'></script></body></html>"
 )
 
+# The REAL NSE response (retained capture, 2026-10-11).  Its
+# site-wide header carries the market-data menu item "Price Bands &
+# Surveillance Actions" and canonical/alternate links to
+# "/market-data/issue-information?series=EQ&symbol=..."; the rule
+# used at 0dda109 read those page-chrome links as issue entries and
+# called the response a searched listing, although the listing table
+# is filled client-side and carries no issue row at all.  That single
+# response produced the false NOT_FOUND / UNPUBLISHED of the second
+# Windows acceptance (ing-32ddf313bbe247b0) while emitting no note
+# of its own.
+NSE_REAL_CAPTURE = (
+    REPO_ROOT / "evidence" / "ipo-subscription" / "vnl-20261011" / "vnl-issue-information.html"
+)
+
+
+def _nse_listing_response_with_real_chrome() -> bytes:
+    """The NSE listing response as a plain HTTP client receives it:
+    the real site-wide header plus the client-side listing table."""
+    raw = NSE_REAL_CAPTURE.read_bytes().decode("utf-8", errors="ignore")
+    start = raw.find("<header")
+    end = raw.find("</header>", start)
+    assert start != -1 and end != -1, "retained NSE capture has no header block"
+    return (
+        "<html><head><title>IPO - Latest IPO, Upcoming IPO, NSE India</title>"
+        '<link rel="canonical" href="https://www.nseindia.com/market-data/all-upcoming-issues-ipo">'
+        "</head><body>" + raw[start:end]
+        + "<h1>Market Watch</h1>"
+        "<table><tr><th>Company Name</th><th>Security type</th><th>Issue Start Date</th>"
+        "<th>Issue End Date</th><th>Status</th></tr>"
+        "<tr><th>offered/ reserved</th><th>Bids</th><th>Subscription (No. of times)</th></tr></table>"
+        "<div>Fetching...</div></body></html>"
+    ).encode()
+
 
 def _windows_trace_fetcher():
     def fetch(url):
         if url == OfficialDiscoveryProvider.LISTING_URLS[0]:
-            return NSE_MARKER_ONLY_LISTING.encode()
+            return _nse_listing_response_with_real_chrome()
         if url in (
             "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
             "https://www.bseindia.com/publicissue.html",
@@ -330,6 +363,8 @@ def test_windows_trace_pattern_is_unavailable_end_to_end(tmp_path, monkeypatch, 
     assert resolution["providers"][0]["provider"] == "official-discovery"
     assert resolution["providers"][0]["outcome"] == "UNAVAILABLE"
     assert resolution["providers"][0]["listing_searched"] is False
+    # No listing was really read, so none may be claimed as searched.
+    assert resolution["providers"][0]["searched_listings"] == []
     # Every unusable source is reported with its own reason -- all
     # four listing URLs, including the NSE response that produced no
     # note at all before the repair (it was silently counted as a
@@ -339,6 +374,12 @@ def test_windows_trace_pattern_is_unavailable_end_to_end(tmp_path, monkeypatch, 
     assert any("nseindia.com" in n and "no issue entries" in n for n in notes)
     assert sum("shell" in n for n in notes) == 2
     assert any("sebi.gov.in" in n and "HTTPError" in n for n in notes)
+    # Every configured source has its own attempt: no source may
+    # contribute to the aggregate outcome without a visible record.
+    sources = resolution["providers"][0]["sources"]
+    assert [s["url"] for s in sources] == list(OfficialDiscoveryProvider.LISTING_URLS)
+    assert all(s["searched"] is False for s in sources)
+    assert {s["classification"] for s in sources} == {"empty", "shell", "failed"}
     # Activity layer: the same verdict, with every unusable response
     # named, and no UNPUBLISHED anywhere in the trace.
     record = service.get_ingestion_activity(excinfo.value.ingestion_id)
@@ -350,6 +391,16 @@ def test_windows_trace_pattern_is_unavailable_end_to_end(tmp_path, monkeypatch, 
     assert any("shell" in m for m in messages)
     assert any("HTTPError" in m for m in messages)
     assert not any("UNPUBLISHED" in m for m in messages)
+    # One visible event per configured source -- including the NSE
+    # response that used to contribute to the aggregate silently.
+    source_events = [
+        e for e in record["events"]
+        if e["stage"] == "official_discovery"
+        and e["message"].startswith(tuple(OfficialDiscoveryProvider.LISTING_URLS))
+    ]
+    assert len(source_events) == 4
+    for url in OfficialDiscoveryProvider.LISTING_URLS:
+        assert len([e for e in source_events if e["message"].startswith(url)]) == 1, url
     stages = [(e["stage"], e["status"]) for e in record["events"]]
     assert ("evaluation", "SKIPPED") in stages
     assert ("persistence", "SKIPPED") in stages
@@ -374,6 +425,9 @@ def test_windows_trace_pattern_is_unavailable_through_the_api(tmp_path, monkeypa
     assert detail["code"] == "AWAITING_ISSUE_TERMS"
     assert detail["resolution"]["status"] == "UNAVAILABLE"
     assert detail["resolution"]["providers"][0]["outcome"] == "UNAVAILABLE"
+    assert detail["resolution"]["providers"][0]["listing_searched"] is False
+    assert detail["resolution"]["providers"][0]["searched_listings"] == []
+    assert len(detail["resolution"]["providers"][0]["sources"]) == 4
     assert "UNPUBLISHED" not in json.dumps(detail)
     # the ingestion stays blocked and nothing was evaluated or persisted
     hist = client.get(f"/api/v1/ingestions/{detail['ingestion_id']}").json()
