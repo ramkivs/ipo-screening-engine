@@ -485,3 +485,10 @@ Reconciled against the remote repository (`ramkivs/ipo-screening-engine`), all b
 - **Vishal:** FY2026 share 11.8418%, FY2025 12.2126%, change −0.3708pp → K6 CLEAR, Module D `rpt` SCORED 1/3 in new runtime evaluations (approved-integration difference; historical records/golden fixture untouched, golden hash `e84f8bc0…` preserved).
 - **Tests:** focused RPT file 11 passed (derivation, unit conversion, zero-prior, fail-closed, consumers incl. rising-share K6 TRIGGERED); full Python suite **1006 passed**. No frontend change (not rerun; 68 at baseline).
 - **Status:** A/B/C/D via PR #6 (commit below); E/F/G not claimed. K5 policy untouched.
+
+### Live-path AWAITING_ISSUE_TERMS recurrence — Windows root cause fixed — 2026-10-17
+
+- **Root cause (demonstrated):** temp-file `unlink` in a `finally` block after pypdf parsing — Windows refuses to unlink a file the reader still holds open (WinError 32), destroying successful parses and misreporting them as document rejections; invisible on POSIX. All three sites fixed with best-effort cleanup. Secondary: single-attempt fetcher now retries transient failures (3 attempts, 429/5xx/reset/timeout), HTML interstitials classified distinctly.
+- **Source fact:** the configured SEBI URL is Vishal's genuine final Prospectus (05 Oct 2026; fresh ₹14,500L, OFS ₹3,300L) — terms ARE published; sandbox application retrieval to SEBI remains egress-blocked (TLS EOF, environmental). Record: `docs/investigation/WINDOWS-LIVE-RETRIEVAL-WINERROR32-2026-10-17.md`.
+- **Tests:** `tests/test_issue_terms_windows_retrieval.py` 7 passed (Windows-unlink simulation x3, HTML classification, loopback 503-retry over a real socket, 404 no-retry, genuine-PDF-bytes control); focused neighbour suites 37 passed combined. Full suite: 1013 passed.
+- **Status:** A/B/C/D via PR #6 (commit below); live Windows completion (F) still requires one fresh upload on the updated checkout — the 422 provider detail will identify any remaining stage precisely. Not a claim of live acceptance.

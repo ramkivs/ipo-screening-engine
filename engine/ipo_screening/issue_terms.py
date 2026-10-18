@@ -27,6 +27,7 @@ import hashlib
 import json
 import os
 import tempfile
+import time
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -72,10 +73,43 @@ def _default_http_fetch(url: str, timeout_seconds: float) -> bytes:
                 "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
             ),
             "Accept": "application/pdf,text/plain;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-IN,en;q=0.9",
         },
     )
-    with urllib.request.urlopen(request, timeout=timeout_seconds) as response:  # noqa: S310 (allow-listed hosts only)
-        return response.read()
+    # Bounded retries for transient retrieval failures (connection
+    # resets, timeouts, HTTP 429/5xx): official document servers are
+    # intermittently unavailable, and a single attempt turned a
+    # transient failure into a permanent AWAITING_ISSUE_TERMS.
+    last_exc: Optional[Exception] = None
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:  # noqa: S310 (allow-listed hosts only)
+                return response.read()
+        except urllib.error.HTTPError as exc:
+            last_exc = exc
+            if exc.code not in (429, 500, 502, 503, 504):
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            last_exc = exc
+        if attempt < 2:
+            time.sleep(0.5 * (attempt + 1))
+    assert last_exc is not None
+    raise last_exc
+
+
+def _best_effort_unlink(path: Path) -> None:
+    """Remove a temp file without ever failing the caller.
+
+    On Windows a file still held open by the PDF reader cannot be
+    unlinked (WinError 32); letting that exception escape from a
+    ``finally`` block destroyed otherwise-successful parses and was
+    misreported as a document rejection.  Cleanup is best-effort: the
+    OS temp directory reclaims leftovers.
+    """
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _utcnow() -> datetime:
@@ -290,6 +324,8 @@ class HttpNoticeProvider:
             raw = self._fetch(url)
         except Exception as exc:
             return None, ProviderReport(self.name, "UNAVAILABLE", f"official source retrieval failed: {exc}")
+        if raw.lstrip()[:15].lower().startswith((b"<!doctype", b"<html")):
+            return None, ProviderReport(self.name, "REJECTED", "official host returned an HTML page instead of a document (possible interstitial or anti-bot response)")
         suffix = ".pdf" if raw.startswith(b"%PDF-") else ".txt"
         try:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as handle:
@@ -298,7 +334,7 @@ class HttpNoticeProvider:
             try:
                 result = PriceBandNoticeParser().parse_from_file(temp_path)
             finally:
-                temp_path.unlink(missing_ok=True)
+                _best_effort_unlink(temp_path)
         except Exception as exc:
             return None, ProviderReport(self.name, "REJECTED", f"retrieved document is not a parseable Price Band Notice: {exc}")
         if _norm_name(result.company_name) != _norm_name(company_name):
@@ -357,6 +393,8 @@ class HttpProspectusProvider:
             raw = self._fetch(url)
         except Exception as exc:
             return None, ProviderReport(self.name, "UNAVAILABLE", f"official source retrieval failed: {exc}")
+        if raw.lstrip()[:15].lower().startswith((b"<!doctype", b"<html")):
+            return None, ProviderReport(self.name, "REJECTED", "official host returned an HTML page instead of a document (possible interstitial or anti-bot response)")
         suffix = ".pdf" if raw.startswith(b"%PDF-") else ".txt"
         try:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as handle:
@@ -365,7 +403,7 @@ class HttpProspectusProvider:
             try:
                 result = ProspectusTermsParser().parse_from_file(temp_path)
             finally:
-                temp_path.unlink(missing_ok=True)
+                _best_effort_unlink(temp_path)
         except Exception as exc:
             return None, ProviderReport(self.name, "REJECTED", f"retrieved document is not an established final Prospectus: {exc}")
         if not result.is_classified_prospectus:
@@ -420,7 +458,7 @@ class NoticeSnapshotCache:
             try:
                 result = PriceBandNoticeParser().parse_from_file(temp_path)
             finally:
-                temp_path.unlink(missing_ok=True)
+                _best_effort_unlink(temp_path)
         except Exception:
             return None, False
         return (
