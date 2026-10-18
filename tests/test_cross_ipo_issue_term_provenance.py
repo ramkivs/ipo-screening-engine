@@ -147,8 +147,20 @@ def test_default_runtime_has_no_packaged_fixture_source(monkeypatch):
         monkeypatch.delenv(var, raising=False)
     packaged = REPO_ROOT / "engine" / "ipo_screening" / "resources" / "notices" / "vishal_nirmiti_price_band_notice.txt"
     assert not packaged.exists()
+    # No packaged/fixture source exists by default; the only default
+    # provider is generic official-source discovery (no per-issuer
+    # configuration, no shipped documents).  Network is stubbed out so
+    # the test proves configuration shape, not live retrieval.
+    import ipo_screening.issue_terms as issue_terms_module
+
+    def _offline(url, timeout):
+        raise OSError("network disabled in test")
+
+    monkeypatch.setattr(issue_terms_module, "_default_http_fetch", _offline)
+    monkeypatch.delenv("IPO_PROSPECTUS_URLS", raising=False)
+    monkeypatch.delenv("IPO_OFFICIAL_DISCOVERY", raising=False)
     resolver = build_resolver_from_env()
-    assert resolver.providers == []
+    assert [type(p).__name__ for p in resolver.providers] == ["OfficialDiscoveryProvider"]
     outcome = resolver.resolve(
         company_name="VISHAL NIRMITI LIMITED",
         ipo_id="VISHAL-NIRMITI-LIMITED",

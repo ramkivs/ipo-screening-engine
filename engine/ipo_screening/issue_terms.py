@@ -26,6 +26,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tempfile
 import time
 import urllib.request
@@ -423,6 +424,116 @@ class HttpProspectusProvider:
         )
 
 
+class OfficialDiscoveryProvider:
+    """Discovers official issue-term documents without per-issuer config.
+
+    Searches the official listing pages of the exchanges/SEBI for
+    documents linked for this issuer, then runs each candidate through
+    the same allow-list, issuer-matching and classification pipeline as
+    the configured-URL providers.  Nothing is scraped from search
+    engines or snippets: only documents hosted on allow-listed official
+    hosts and linked from official listing pages are considered, and a
+    candidate counts only after it parses and issuer-matches.
+
+    Outcomes: FOUND (verified candidate), NOT_FOUND (listings reached,
+    no issuer-matched document published yet), UNAVAILABLE (listings
+    unreachable -- transient; never evidence of non-publication).
+    """
+
+    name = "official-discovery"
+
+    LISTING_URLS = (
+        "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+        "https://www.bseindia.com/publicissue.html",
+        "https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0",
+    )
+    _GENERIC_TOKENS = {"LIMITED", "INDIA", "PRIVATE", "COMPANY", "INDUSTRIES", "INDUSTRY", "GLOBAL", "INTERNATIONAL"}
+
+    def __init__(
+        self,
+        fetcher: Optional[Callable[[str], bytes]] = None,
+        allowed_hosts: Optional[set[str]] = None,
+        listing_urls: Optional[Sequence[str]] = None,
+        max_candidates: int = 6,
+        timeout_seconds: float = 60.0,
+    ):
+        self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(OFFICIAL_HOSTS)
+        self.listing_urls = list(listing_urls) if listing_urls is not None else list(self.LISTING_URLS)
+        self.max_candidates = max_candidates
+        self.timeout_seconds = timeout_seconds
+        self._fetcher = fetcher
+
+    def _fetch(self, url: str) -> bytes:
+        if self._fetcher is not None:
+            return self._fetcher(url)
+        return _default_http_fetch(url, self.timeout_seconds)
+
+    def _candidate_links(self, listing_bytes: bytes, base_url: str, company_name: str) -> List[str]:
+        text = listing_bytes.decode("utf-8", errors="ignore")
+        tokens = [
+            tok
+            for tok in re.split(r"[^A-Za-z0-9]+", (company_name or "").upper())
+            if len(tok) >= 3 and tok not in self._GENERIC_TOKENS
+        ]
+        slug = "".join(re.split(r"[^A-Za-z0-9]+", (company_name or "").upper()))
+        found: List[Tuple[int, str]] = []
+        pairs: List[Tuple[str, str]] = []
+        for match in re.finditer(r'href\s*=\s*"([^"]+)"[^>]*>(.*?)</a>', text, re.IGNORECASE | re.DOTALL):
+            pairs.append((match.group(1), re.sub(r"<[^>]+>", " ", match.group(2))))
+        for match in re.finditer(r"https?://[^\s\"<>]+?\.pdf\b", text, re.IGNORECASE):
+            pairs.append((match.group(0), ""))
+        seen = set()
+        for href, anchor in pairs:
+            url = urllib.parse.urljoin(base_url, href.strip())
+            host = (urllib.parse.urlparse(url).hostname or "").lower()
+            if host not in self.allowed_hosts:
+                continue
+            haystack = f"{url} {anchor}".upper()
+            if slug and slug in haystack.replace("-", "").replace("_", "").replace(" ", ""):
+                relevant = True
+            else:
+                relevant = any(tok in haystack for tok in tokens)
+            if not relevant:
+                continue
+            low = url.lower()
+            if not (low.endswith(".pdf") or ".pdf" in low or "attachdocs" in low or "prospectus" in low or "price-band" in low or "price_band" in low):
+                continue
+            if url in seen:
+                continue
+            seen.add(url)
+            priority = 0 if ("price-band" in low or "price_band" in low or "price band" in anchor.lower()) else (1 if "prospectus" in low else 2)
+            found.append((priority, url))
+        found.sort(key=lambda item: item[0])
+        return [url for _prio, url in found[: self.max_candidates]]
+
+    def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
+        reached = False
+        errors: List[str] = []
+        for listing_url in self.listing_urls:
+            try:
+                raw = self._fetch(listing_url)
+            except Exception as exc:
+                errors.append(f"{listing_url}: {type(exc).__name__}")
+                continue
+            reached = True
+            for link in self._candidate_links(raw, listing_url, company_name):
+                for provider_cls in (HttpNoticeProvider, HttpProspectusProvider):
+                    provider = provider_cls({ipo_id: link}, fetcher=self._fetcher, allowed_hosts=self.allowed_hosts, timeout_seconds=self.timeout_seconds)
+                    candidate, _report = provider.find(company_name, ipo_id)
+                    if candidate is not None:
+                        return candidate, ProviderReport(
+                            self.name, "FOUND", f"discovered official document via {listing_url}: {link}"
+                        )
+        if reached:
+            return None, ProviderReport(
+                self.name, "NOT_FOUND",
+                "official NSE/BSE/SEBI listings searched; no issuer-matched price-band or prospectus document is published yet",
+            )
+        return None, ProviderReport(
+            self.name, "UNAVAILABLE", f"official listing discovery unreachable ({'; '.join(errors) or 'no listing sources'})"
+        )
+
+
 class NoticeSnapshotCache:
     """Content-addressed snapshot cache for retrieved notices.
 
@@ -672,6 +783,8 @@ def build_resolver_from_env() -> IssueTermsResolver:
         providers.append(ConfigurationDiagnosticProvider(HttpProspectusProvider.name, prospectus_problem))
     elif prospectus_urls:
         providers.append(HttpProspectusProvider(prospectus_urls))
+    if os.getenv("IPO_OFFICIAL_DISCOVERY", "1").strip().lower() not in ("0", "false", "no"):
+        providers.append(OfficialDiscoveryProvider())
     dirs = [d for d in os.getenv("IPO_PRICE_BAND_NOTICE_DIR", "").split(os.pathsep) if d]
     if dirs:
         providers.append(RetainedNoticeProvider(dirs))
