@@ -84,3 +84,62 @@ retries, Windows temp files and issuer isolation remain in their
 established suites and pass unchanged (one configuration-shape test
 updated: the default resolver now contains exactly the discovery
 provider and no packaged fixture source).
+
+## Addendum — 2026-10-18 (Windows failure + broker evidence)
+
+The user reported the Windows runtime still returning
+`AWAITING_ISSUE_TERMS` (all four fields) after the discovery commit,
+and supplied broker-displayed Jio terms (band ₹1,065–₹1,119, lot 12,
+Oct 21–23). Re-investigation established:
+
+1. **The terms are now officially published.** BSE's official
+   public-issues page lists "Jio Platforms Limited, 21-10-2026 –
+   23-10-2026, Offer Price 1065.00 - 1119.00, Forthcoming", and the
+   official BSE issue-information page (`DisplayIPO?id=4894`)
+   publishes Price Band 1065.00-1119.00, **Market Lot 12**, Issue
+   Period 21–23 Oct 2026 and 27,00,00,000 shares (fetched and read
+   directly in this investigation). The earlier "unpublished"
+   conclusion was correct only until the price-band announcement;
+   the broker values agree with the official exchange page.
+2. **First failing stage: discovery coverage.** The three listing
+   pages scanned by `OfficialDiscoveryProvider` do not expose
+   document links for the issuer in fetchable HTML (exchange listing
+   apps are JS-driven; BSE links its *issue-information page*, which
+   the document-only link filter discarded). Retrieval, parsing,
+   mapping and assembly downstream were never reached.
+3. **OFS discrepancy:** at the current HEAD, extraction of the
+   committed Jio RHP yields `issue.ofs = 0.0` (filing, "Not
+   Applicable") in this environment, so a Windows run listing
+   `issue.ofs` as missing implies its uploaded copy's cover layout
+   defeats the bounded NIL pattern (or a stale process) — the NIL
+   window was widened generically (16 → 32 lines). This cannot be
+   verified against the user's file from here.
+4. **Message defect:** the UNPUBLISHED reason text asserted
+   non-publication from a NOT_FOUND outcome. It now states that no
+   issuer-matched document was found by discovery/configured sources
+   and that this does not by itself establish non-publication.
+
+**Correction implemented:** discovery now follows issuer-matched
+official exchange issue-information pages (`DisplayIPO`,
+`issue-information`) and parses them with
+`ExchangeIssuePageParser` (`document_class = EXCHANGE_ISSUE_PAGE`,
+`EXCHANGE_DATA` extraction, verified official-host provenance;
+Market Lot only — never minimum bid quantity/investment);
+complementary verified candidates are field-merged with a hard
+conflict check (disagreement → REJECTED, never silently preferred);
+a final Prospectus remains the richest primary when also discovered.
+The fresh-issue aggregating-amount pattern now accepts the genuine
+"aggregating to ₹…" phrasing (as in Vishal's real Prospectus).
+Service: when the four terms resolve but the stated fresh-issue
+amount is still unestablished, ingestion fails closed naming
+`issue.fresh_issue` precisely instead of a schema error.
+
+**Jio acceptance (automated, normal entry point):** with BSE-shaped
+official pages, pricing resolves from the exchange page and only
+`issue.fresh_issue` awaits; with a final Prospectus also discovered,
+the Jio evaluation **completes and persists** (1065/1119/12,
+`ofs 0.0` filing). These fixtures are deterministic mechanics
+evidence (modelled on the recorded official BSE pages), not a claim
+of live retrieval from this sandbox, whose egress still cannot reach
+the exchanges. Live completion on the user's Windows runtime remains
+theirs to confirm with one fresh upload.

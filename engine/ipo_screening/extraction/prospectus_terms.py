@@ -357,7 +357,7 @@ class ProspectusTermsParser:
         not established and stays None (fail closed).
         """
         pattern = re.compile(
-            r"fresh\s+(?:issue|offer)\b.{0,260}?aggregating\s+(?:up\s+to\s+)?"
+            r"fresh\s+(?:issue|offer)\b.{0,260}?aggregating\s+(?:up\s+to\s+|to\s+)?"
             r"(?:rs\.?|inr|\u20B9)\s*([0-9,]+(?:\.[0-9]+)?)\s*(lakhs?|millions?|crores?)",
             re.IGNORECASE | re.DOTALL,
         )

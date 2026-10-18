@@ -413,7 +413,7 @@ class SectionExtractor:
 
         # 3. OFS Seller & shares / NIL detection
         m_ofs_nil = re.search(
-            r'offer for sale(?: size)?[^\n]*?(?:[^\n]*?\n){0,16}?\s*(?:NIL|Not\s+Applicable)\b',
+            r'offer for sale(?: size)?[^\n]*?(?:[^\n]*?\n){0,32}?\s*(?:NIL|Not\s+Applicable)\b',
             cover_text,
             re.IGNORECASE,
         )

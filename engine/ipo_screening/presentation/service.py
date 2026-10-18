@@ -1245,6 +1245,12 @@ class PresentationService:
 
             issue_after = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
             still_missing = [f for f in missing_issue_fields if issue_after.get(f) is None]
+            if not still_missing and issue_after.get("fresh_issue") is None:
+                # The four issue terms resolved, but the stated
+                # fresh-issue amount (a canonical requirement) is only
+                # established by the final Prospectus; fail closed with
+                # that precise field rather than a schema failure.
+                still_missing = ["fresh_issue"]
             if outcome.notice is not None and not still_missing:
                 issue_terms_report = resolution_dict
             else:
@@ -1254,7 +1260,7 @@ class PresentationService:
                     "UNAVAILABLE": "official sources could not be retrieved or verified",
                     "PARTIAL": "only some required terms could be verified from official sources",
                     "UNVERIFIED": "an issuer-matched notice exists only as a retained copy whose official provenance is not established (configure the official exchange announcement via IPO_PRICE_BAND_NOTICE_URLS to use it)",
-                }.get(outcome.status, "the terms have not yet been published in the configured official sources")
+                }.get(outcome.status, "no issuer-matched official document was found by automatic discovery or the configured official sources (this does not by itself establish that the terms are unpublished)")
                 if outcome.status == "UNAVAILABLE" and any(
                     r.outcome == "REJECTED" for r in outcome.provider_reports
                 ):

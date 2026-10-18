@@ -496,15 +496,96 @@ class OfficialDiscoveryProvider:
             if not relevant:
                 continue
             low = url.lower()
-            if not (low.endswith(".pdf") or ".pdf" in low or "attachdocs" in low or "prospectus" in low or "price-band" in low or "price_band" in low):
+            is_document = low.endswith(".pdf") or ".pdf" in low or "attachdocs" in low or "prospectus" in low or "price-band" in low or "price_band" in low
+            is_issue_page = "displayipo" in low or "issue-information" in low or "issue_information" in low
+            if not (is_document or is_issue_page):
                 continue
             if url in seen:
                 continue
             seen.add(url)
-            priority = 0 if ("price-band" in low or "price_band" in low or "price band" in anchor.lower()) else (1 if "prospectus" in low else 2)
+            if is_issue_page:
+                priority = 0
+            elif "price-band" in low or "price_band" in low or "price band" in anchor.lower():
+                priority = 1
+            elif "prospectus" in low:
+                priority = 2
+            else:
+                priority = 3
             found.append((priority, url))
         found.sort(key=lambda item: item[0])
         return [url for _prio, url in found[: self.max_candidates]]
+
+
+    def _from_issue_page(self, url: str, company_name: str) -> Optional[NoticeCandidate]:
+        """Fetch and parse an official exchange issue-information page."""
+        from .extraction.exchange_issue_page import ExchangeIssuePageParser
+
+        host = (urllib.parse.urlparse(url).hostname or "").lower()
+        if host not in self.allowed_hosts:
+            return None
+        try:
+            raw = self._fetch(url)
+        except Exception:
+            return None
+        if not raw.lstrip()[:15].lower().startswith((b"<!doctype", b"<html", b"<")):
+            return None
+        try:
+            result = ExchangeIssuePageParser().parse(raw, url=url)
+        except Exception:
+            return None
+        if _norm_name(result.company_name) != _norm_name(company_name):
+            return None
+        if result.price_band_low is None and result.lot_size is None:
+            return None
+        return NoticeCandidate(
+            result=result,
+            provider=self.name,
+            uri=url,
+            retrieved_at=_utcnow().isoformat().replace("+00:00", "Z"),
+            raw_bytes=None,
+            verified=True,
+        )
+
+    @staticmethod
+    def _merge_candidates(candidates: List[NoticeCandidate]) -> NoticeCandidate:
+        """Fill missing pricing fields of the primary candidate from
+        other verified, issuer-matched candidates (the resolver's
+        conflict check still rejects disagreements).  Field objects
+        keep their own quotes/locators; sources are recorded."""
+        if len(candidates) == 1:
+            return candidates[0]
+        # A final Prospectus is the richest primary (it can also carry
+        # the stated fresh-issue amount); otherwise first discovered.
+        primary = next(
+            (c for c in candidates if getattr(c.result, "document_class", "") == "OFFICIAL_PROSPECTUS"),
+            candidates[0],
+        )
+        # Never merge disagreeing disclosures: surface the conflict
+        # instead of arbitrarily preferring one source.
+        for other in candidates[1:]:
+            for field_name in ("price_band_low", "price_band_high", "lot_size"):
+                left = getattr(primary.result, field_name, None)
+                right = getattr(other.result, field_name, None)
+                if left is not None and right is not None and float(left.value) != float(right.value):
+                    raise ValueError(
+                        f"conflicting official values for {field_name}: {left.value} ({primary.uri}) vs {right.value} ({other.uri})"
+                    )
+        merged_from = [primary.uri]
+        for other in (c for c in candidates if c is not primary):
+            filled = False
+            for field_name in ("price_band_low", "price_band_high", "lot_size", "open_date", "close_date"):
+                if getattr(primary.result, field_name, None) is None and getattr(other.result, field_name, None) is not None:
+                    setattr(primary.result, field_name, getattr(other.result, field_name))
+                    filled = True
+            # A final Prospectus additionally carries the stated
+            # fresh-issue amount; keep it reachable for enrichment.
+            if getattr(other.result, "fresh_issue_amount", None) is not None and getattr(primary.result, "fresh_issue_amount", None) is None:
+                primary.result.fresh_issue_amount = other.result.fresh_issue_amount  # type: ignore[attr-defined]
+            if filled:
+                merged_from.append(other.uri)
+        if len(merged_from) > 1 and hasattr(primary.result, "metadata"):
+            primary.result.metadata["merged_from"] = merged_from
+        return primary
 
     def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
         reached = False
@@ -516,14 +597,28 @@ class OfficialDiscoveryProvider:
                 errors.append(f"{listing_url}: {type(exc).__name__}")
                 continue
             reached = True
+            collected: List[NoticeCandidate] = []
             for link in self._candidate_links(raw, listing_url, company_name):
+                low = link.lower()
+                if "displayipo" in low or "issue-information" in low or "issue_information" in low:
+                    page_candidate = self._from_issue_page(link, company_name)
+                    if page_candidate is not None:
+                        collected.append(page_candidate)
+                    continue
                 for provider_cls in (HttpNoticeProvider, HttpProspectusProvider):
                     provider = provider_cls({ipo_id: link}, fetcher=self._fetcher, allowed_hosts=self.allowed_hosts, timeout_seconds=self.timeout_seconds)
                     candidate, _report = provider.find(company_name, ipo_id)
                     if candidate is not None:
-                        return candidate, ProviderReport(
-                            self.name, "FOUND", f"discovered official document via {listing_url}: {link}"
-                        )
+                        collected.append(candidate)
+                        break
+            if collected:
+                try:
+                    merged = self._merge_candidates(collected)
+                except ValueError as exc:
+                    return None, ProviderReport(self.name, "REJECTED", str(exc))
+                return merged, ProviderReport(
+                    self.name, "FOUND", f"discovered official document via {listing_url}: {merged.uri}"
+                )
         if reached:
             return None, ProviderReport(
                 self.name, "NOT_FOUND",
