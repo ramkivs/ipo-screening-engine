@@ -10,6 +10,7 @@ Technical Design v1.5 s3.2, s15:
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -47,13 +48,15 @@ class CanonicalInputBuilder:
         sector_profile = self.base.get("sector_profile") or self._detect_sector_profile()
         sector = self.base.get("sector") or self._detect_sector()
 
+        # D-PEER-1: no synthetic peer fallback. When neither the reference
+        # input nor extraction supplies genuine peers, the honest
+        # representation is an empty list (permitted by the input
+        # contract); peer-relative metrics then resolve UNKNOWN.
         peers_list = self.base.get("peers")
         if not peers_list:
             peers_list = self._get_field("peers")
         if not peers_list:
-            peers_list = [
-                {"name": "Generic Listed Peer Ltd", "listed_years": 5, "business_match": "partial"}
-            ]
+            peers_list = []
 
         output: Dict[str, Any] = {
             "ipo_id": self.base.get("ipo_id") or self._slugify(company_name or "UNKNOWN-IPO"),
@@ -146,6 +149,34 @@ class CanonicalInputBuilder:
         evidence_dict: Dict[str, Dict[str, Any]] = {}
         for ex in self.extractions:
             evidence_dict[ex.field_path] = ex.to_evidence_dict(self.doc.source_id)
+
+        # Seller-specific OFS quantities: the cover extraction records the
+        # (single, list-valued) ofs_sellers result; without subfield
+        # evidence the Explorer can show the seller's identity but never
+        # the quantity attributed to that seller. Emit one evidence spec
+        # per seller for shares_sold, bound to the same filing source,
+        # page and locator as the seller list itself. The identity
+        # quotation remains on issue.ofs_sellers; these specs record the
+        # quantity linkage established by the Offer-for-Sale clause.
+        for ex in self.extractions:
+            if ex.field_path != "issue.ofs_sellers":
+                continue
+            if not isinstance(ex.candidate_value, list):
+                continue
+            base_spec = evidence_dict.get("issue.ofs_sellers") or ex.to_evidence_dict(self.doc.source_id)
+            for idx, seller in enumerate(ex.candidate_value):
+                if not isinstance(seller, dict) or seller.get("shares_sold") is None:
+                    continue
+                sub_path = f"issue.ofs_sellers[{idx}].shares_sold"
+                spec = dict(base_spec)
+                spec["evidence_id"] = f"EV-{sub_path}"
+                spec["note"] = (
+                    "Seller-specific Offer-for-Sale quantity attributed to the "
+                    "named selling shareholder from the cover Offer-for-Sale "
+                    "clause; seller identity quotation is recorded on "
+                    "issue.ofs_sellers."
+                )
+                evidence_dict[sub_path] = spec
         # Carry over any pre-existing base evidence if not overridden
         for k, v in self.base.get("_evidence", {}).items():
             if k not in evidence_dict:
@@ -268,8 +299,8 @@ class CanonicalInputBuilder:
                 return gov_base[key]
             return self._get_field(f"governance.{key}", default)
 
-        return {
-            "auditor_opinion": _pick_gov("auditor_opinion", "unqualified"),
+        gov = {
+            "auditor_opinion": _pick_gov("auditor_opinion", None),
             "auditor_changed_3y": _pick_gov("auditor_changed_3y", None),
             "auditor_reputed": _pick_gov("auditor_reputed", None),
             "repeated_eom": _pick_gov("repeated_eom", None),
@@ -282,6 +313,95 @@ class CanonicalInputBuilder:
             "board_independent_majority": _pick_gov("board_independent_majority", False),
             "kmp_exits_2y": _pick_gov("kmp_exits_2y", 0),
         }
+        self._derive_rpt_metrics(gov)
+        return gov
+
+    # Approved RPT metric definitions (Ramki, 2026-10-17; see
+    # docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md):
+    # * Module D ``rpt_pct_revenue`` = related-party sales/services income
+    #   / revenue from operations, latest audited FY, %.
+    # * K6 ``rpt_pct_of_revenue_growth`` = change in that share between
+    #   the latest two comparable audited FYs, in percentage points
+    #   (latest share - prior share); a declining share is negative and
+    #   therefore cannot satisfy the existing >40 trigger.
+    # Eligible numerator categories are revenue-type only: sale of
+    # goods/services (excluding sale of PPE) and job-work charges
+    # received.  Purchases, financing, interest paid, remuneration and
+    # balances are excluded (retained as evidence only).  Fail closed:
+    # missing periods/revenue, non-positive revenue, unknown or
+    # unconvertible units, or a missing numerator leave the fields null.
+    _RPT_SALES_SERVICES_CATEGORIES = frozenset(
+        {"sale_of_goods", "sale_of_services", "job_work_charges_received"}
+    )
+    _RPT_UNIT_TO_RUPEES = {
+        "INR_LAKHS": 1e5,
+        "INR_CRORES": 1e7,
+        "INR_MILLIONS": 1e6,
+        "INR_BILLIONS": 1e9,
+    }
+
+    @classmethod
+    def _rpt_is_sales_services(cls, category: str) -> bool:
+        if category in cls._RPT_SALES_SERVICES_CATEGORIES:
+            return True
+        return category.startswith("sale_of_") and category != "sale_of_ppe"
+
+    def _derive_rpt_metrics(self, gov: Dict[str, Any]) -> None:
+        if gov.get("rpt_pct_revenue") is not None and gov.get("rpt_pct_of_revenue_growth") is not None:
+            return
+        txns = [
+            ex.candidate_value
+            for ex in self.extractions
+            if ex.field_path.startswith("governance.related_party_transactions[")
+            and isinstance(ex.candidate_value, dict)
+        ]
+        if not txns:
+            return
+        financials = self._build_financials()
+        reporting_unit = financials.get("reporting_unit")
+        if reporting_unit not in self._RPT_UNIT_TO_RUPEES:
+            return
+        periods: Dict[int, float] = {}
+        for period in financials.get("periods") or []:
+            if not isinstance(period, dict):
+                continue
+            m = re.match(r"FY(20\d{2})$", str(period.get("fy") or ""))
+            revenue = period.get("revenue")
+            if m and isinstance(revenue, (int, float)) and revenue > 0:
+                periods[int(m.group(1))] = float(revenue)
+        if not periods:
+            return
+        eligible = [t for t in txns if self._rpt_is_sales_services(str(t.get("category") or ""))]
+        if not eligible:
+            return
+        sums: Dict[int, float] = {}
+        for txn in eligible:
+            unit = txn.get("unit")
+            m = re.match(r"FY(20\d{2})$", str(txn.get("period") or ""))
+            amount = txn.get("amount")
+            if unit not in self._RPT_UNIT_TO_RUPEES or not m or not isinstance(amount, (int, float)):
+                return  # unconvertible/insufficient evidence: fail closed
+            year = int(m.group(1))
+            converted = amount * self._RPT_UNIT_TO_RUPEES[unit] / self._RPT_UNIT_TO_RUPEES[reporting_unit]
+            sums[year] = sums.get(year, 0.0) + converted
+        shares: Dict[int, float] = {}
+        for year, revenue in periods.items():
+            if year in sums:
+                numerator = sums[year]
+            else:
+                # Eligible categories are disclosed in the note but no
+                # amount was disclosed for this year ("-" cells): the
+                # disclosed numerator is zero, not missing.
+                numerator = 0.0
+            shares[year] = numerator / revenue * 100.0
+        latest = max(shares)
+        if gov.get("rpt_pct_revenue") is None:
+            gov["rpt_pct_revenue"] = round(shares[latest], 4)
+        if gov.get("rpt_pct_of_revenue_growth") is None:
+            prior_years = [y for y in shares if y < latest]
+            if prior_years:
+                prior = max(prior_years)
+                gov["rpt_pct_of_revenue_growth"] = round(shares[latest] - shares[prior], 4)
 
     def _build_business(self) -> Dict[str, Any]:
         biz_base = self.base.get("business", {})

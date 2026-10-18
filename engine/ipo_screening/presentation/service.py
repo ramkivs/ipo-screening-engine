@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timezone
 import shutil
 import tempfile
 from pathlib import Path
@@ -42,7 +43,9 @@ from ..post_listing.v16_implementation import (
     V1_6_CONFIG_VERSION,
     verify_frozen_core,
 )
+from .ingestion_activity import IngestionActivityStore, IngestionRecorder
 from .models import (
+    MarketBlockState,
     ApiMeta,
     BacktestAnalyticsResponse,
     BacktestDatasetListResponse,
@@ -97,6 +100,33 @@ class IngestionEvaluationError(IngestionError):
     """Deterministic evaluation pipeline failure."""
 
 
+class IngestionAwaitingIssueTermsError(IngestionError):
+    """Required issue terms are not yet available from official sources.
+
+    Raised when an uploaded filing leaves required issue terms
+    undisclosed and the runtime issue-terms resolver cannot supply them
+    from verified official evidence. Nothing is evaluated or persisted.
+    """
+
+    def __init__(self, message: str, *, missing_fields: list, resolution: Optional[dict] = None):
+        super().__init__(message)
+        self.missing_fields = list(missing_fields)
+        self.resolution = resolution or {}
+
+
+
+class IngestionIssueTermConflictError(IngestionError):
+    """Manually entered issue terms conflict with existing values.
+
+    Raised before anything is evaluated or persisted; the caller must
+    explicitly confirm the resolution. Confirmation never upgrades
+    manual provenance to verified provenance.
+    """
+
+    def __init__(self, message: str, *, conflicts: list):
+        super().__init__(message)
+        self.conflicts = list(conflicts)
+
 
 class PresentationConfig:
     """Configuration paths for PresentationService."""
@@ -108,12 +138,14 @@ class PresentationConfig:
         dataset_path: Optional[str | Path] = "build/dataset/dataset.json",
         analytics_path: Optional[str | Path] = "build/analytics/analytics.json",
         proposal_path: Optional[str | Path] = "config/calibration-proposal.v1.6.0.json",
+        issue_terms_resolver: Optional[Any] = None,
     ) -> None:
         self.store_root = Path(store_root)
         self.config_dir = Path(config_dir)
         self.dataset_path = Path(dataset_path) if dataset_path else None
         self.analytics_path = Path(analytics_path) if analytics_path else None
         self.proposal_path = Path(proposal_path) if proposal_path else None
+        self.issue_terms_resolver = issue_terms_resolver
 
 
 class PresentationService:
@@ -121,8 +153,18 @@ class PresentationService:
 
     def __init__(self, config: Optional[PresentationConfig] = None) -> None:
         self.config = config or PresentationConfig()
+        if self.config.issue_terms_resolver is None:
+            from ..issue_terms import build_resolver_from_env
+
+            self.config.issue_terms_resolver = build_resolver_from_env()
         self.eval_store = EvaluationStore(self.config.store_root)
         self.lifecycle_mgr = LifecycleManager(self.config.store_root, active_config_hash=ACTIVE_RATIFIED_CONFIG_HASH)
+        # Ingestion diagnostics live beside (never inside) the immutable
+        # evaluation store: a failed ingestion has a durable activity
+        # trace without producing an evaluation artifact.
+        self.activity_store = IngestionActivityStore(
+            Path(self.config.store_root).parent / "ingestion-activity"
+        )
 
     # -------------------------------------------------------------------------
     # System Metadata
@@ -486,6 +528,18 @@ class PresentationService:
         supersedes = lc.supersedes if lc else None
         lc_dict = lc.to_dict() if lc else None
 
+        market_blocks = [
+            MarketBlockState(
+                block=str(b.get("block", "")),
+                status=str(b.get("status", "MISSING")),
+                as_of=b.get("as_of"),
+                source_id=b.get("source_id"),
+                reason=b.get("reason"),
+            )
+            for b in (rec.get("market_snapshot") or {}).get("blocks", [])
+            if isinstance(b, dict)
+        ]
+
         return EvaluationDetail(
             evaluation_id=eval_id,
             ipo_id=rec.get("ipo_id", ""),
@@ -500,6 +554,7 @@ class PresentationService:
             source_manifest_hash=rec.get("source_manifest_hash", ""),
             market_snapshot_hash=rec.get("market_snapshot_hash"),
             peer_snapshot_hash=rec.get("peer_snapshot_hash"),
+            market_blocks=market_blocks,
             result_hash=rec.get("result_hash", ""),
             score=score_detail,
             knockouts=KnockoutSummary(status=ko_raw.get("status", "UNVERIFIED"), rules=ko_rules),
@@ -534,21 +589,191 @@ class PresentationService:
         evidence_payload = ev_artifact.get("evidence") or {}
         raw_items = evidence_payload.get("evidence") or []
         sources = list(evidence_payload.get("sources") or [])
+        sources_by_id = {
+            s.get("source_id"): s for s in sources if isinstance(s, dict) and s.get("source_id")
+        }
+
+        # The persisted evidence artifact is a citation registry (quote,
+        # locator, source); canonical values live in the persisted input
+        # snapshot. Join them here -- read-only, without mutating stored
+        # records -- so the Explorer shows the value each citation
+        # supports, its unit, the source document identity, and an honest
+        # verification classification. Values are taken from the
+        # canonical field itself, never parsed out of the quotation, so
+        # floor/cap (or any pair sharing one quote) cannot be swapped.
+        snapshot = rec.get("input_snapshot") or {}
+        canonical_input = snapshot.get("input") if isinstance(snapshot.get("input"), dict) else snapshot
+        reporting_unit = snapshot.get("reporting_unit") or canonical_input.get("reporting_unit")
+
+        def _resolve_path(path: str):
+            """Resolve a canonical path, including list indices written
+            as ``field[0]`` (e.g. ``issue.ofs_sellers[0].shares_sold``),
+            against the persisted input snapshot. Read-only."""
+            node: Any = canonical_input
+            for part in path.split("."):
+                bracket = part.find("[")
+                key = part if bracket < 0 else part[:bracket]
+                if not isinstance(node, dict) or key not in node:
+                    return None
+                node = node[key]
+                rest = part[bracket:] if bracket >= 0 else ""
+                while rest.startswith("["):
+                    close = rest.find("]")
+                    if close < 0 or not rest[1:close].isdigit():
+                        return None
+                    index = int(rest[1:close])
+                    if not isinstance(node, list) or index >= len(node):
+                        return None
+                    node = node[index]
+                    rest = rest[close + 1:]
+            return node
+
+        def _canonical_value(path: str):
+            node = _resolve_path(path)
+            return node if isinstance(node, (int, float, str)) and not isinstance(node, bool) else None
+
+        def _canonical_node(path: str):
+            return _resolve_path(path)
+
+        def _value_summary(path: str, node: Any) -> Optional[str]:
+            """Read-only rendering of a non-scalar canonical value from
+            the persisted snapshot. Never parses the quotation and never
+            substitutes a count for the actual structured value."""
+            if isinstance(node, list):
+                if not node:
+                    return "No entries recorded"
+                labels: List[str] = []
+                for entry in node[:8]:
+                    if isinstance(entry, dict):
+                        label = entry.get("fy") or entry.get("label") or entry.get("name") or entry.get("category")
+                        labels.append(str(label) if label is not None else "entry")
+                    else:
+                        labels.append(str(entry))
+                suffix = ", ".join(labels)
+                if path.endswith("financials.periods") or path == "financials.periods":
+                    return f"{len(node)} reporting periods: {suffix}"
+                return f"{len(node)} entries: {suffix}"
+            if isinstance(node, dict):
+                keys = ", ".join(list(node.keys())[:6])
+                return f"Structured value with {len(node)} fields: {keys}"
+            return None
+
+        def _unit_for(path: str) -> Optional[str]:
+            leaf = path.rsplit(".", 1)[-1]
+            if leaf in ("price_band_low", "price_band_high"):
+                return "INR per equity share"
+            if leaf == "lot_size":
+                return "equity shares"
+            if leaf in ("ofs", "fresh_issue", "issue_size") and reporting_unit:
+                return f"INR {reporting_unit}"
+            if leaf in (
+                "fresh_shares",
+                "post_issue_shares",
+                "pre_issue_shares",
+                "shares_sold",
+            ):
+                return "equity shares"
+            return None
 
         items: List[EvidenceDetail] = []
         for idx, item in enumerate(raw_items):
             ev_id = item.get("evidence_id") or f"ev_{idx+1:03d}"
+            field_path = item.get("field") or item.get("evidence_id") or f"field_{idx+1}"
+            source_id = item.get("source_id") or item.get("source")
+            source_entry = sources_by_id.get(source_id) or {}
+
+            extracted_value = item.get("extracted_value")
+            unit = item.get("unit")
+            value_summary = item.get("value_summary")
+            candidate_paths = []
+            if isinstance(field_path, str) and "." in field_path:
+                candidate_paths.append(field_path)
+            if ev_id.startswith("EV-"):
+                candidate_paths.append(ev_id[3:])
+                # Extraction evidence IDs join the section with a hyphen
+                # (EV-issue-price_band_low -> issue.price_band_low).
+                candidate_paths.append(ev_id[3:].replace("-", ".", 1))
+            if extracted_value is None:
+                for candidate in candidate_paths:
+                    value = _canonical_value(candidate)
+                    if value is not None:
+                        extracted_value = value
+                        if unit is None:
+                            unit = _unit_for(candidate)
+                        break
+                if extracted_value is None and value_summary is None:
+                    for candidate in candidate_paths:
+                        node = _canonical_node(candidate)
+                        if isinstance(node, (list, dict)):
+                            value_summary = _value_summary(candidate, node)
+                            break
+
+            # Document identity comes from the source manifest only:
+            # the display name is the final path segment of a recorded
+            # document URI. Descriptive text (not a document reference)
+            # stays honestly unresolved; only the basename is exposed,
+            # never a local directory path.
+            document = item.get("document")
+            if not document:
+                uri = source_entry.get("uri")
+                if isinstance(uri, str) and uri:
+                    cleaned = uri.strip()
+                    if "/" in cleaned or "\\" in cleaned:
+                        candidate = cleaned.replace("\\", "/").rsplit("/", 1)[-1]
+                        # Accept a path/URL final segment only when it
+                        # plausibly names a document (file extension, or
+                        # a URL reference); descriptive manifest text
+                        # stays unresolved.
+                        if candidate and ("." in candidate or "://" in cleaned):
+                            document = candidate
+                    elif "." in cleaned and " " not in cleaned:
+                        document = cleaned
+
+            note = item.get("note")
+            quote_text_value = item.get("quoted_text") or item.get("quote")
+            if isinstance(note, str) and note.startswith("PROCESSING_SUMMARY:"):
+                quote_kind = "PROCESSING"
+            elif quote_text_value:
+                quote_kind = "RECORDED"
+            else:
+                quote_kind = None
+
+            source_type = source_entry.get("source_type")
+            uri = source_entry.get("uri") or ""
+            host = ""
+            if isinstance(uri, str) and "://" in uri:
+                host = uri.split("://", 1)[1].split("/", 1)[0].lower()
+            from ..issue_terms import OFFICIAL_HOSTS
+
+            if item.get("extraction_method") == "DERIVED" or source_type == "DERIVED":
+                verification = "DERIVED"
+            elif not source_entry:
+                verification = "UNVERIFIED"
+            elif source_type in ("RHP", "DRHP"):
+                verification = "FILING"
+            elif host in OFFICIAL_HOSTS:
+                verification = "OFFICIAL_VERIFIED"
+            elif source_type == "EXCHANGE":
+                verification = "RETAINED_UNVERIFIED"
+            else:
+                verification = "UNVERIFIED"
+
             items.append(
                 EvidenceDetail(
                     evidence_id=ev_id,
-                    field=item.get("field") or item.get("evidence_id") or f"field_{idx+1}",
-                    source=item.get("source_id") or item.get("source"),
-                    document=item.get("document"),
+                    field=field_path,
+                    source=source_id,
+                    document=document,
                     page=item.get("page"),
                     locator=item.get("locator") or item.get("section"),
                     quote=item.get("quoted_text") or item.get("quote"),
-                    extracted_value=item.get("extracted_value"),
-                    unit=item.get("unit"),
+                    extracted_value=extracted_value,
+                    unit=unit,
+                    verification=verification,
+                    value_summary=value_summary,
+                    quote_kind=quote_kind,
+                    note=note,
+                    extraction_method=item.get("extraction_method"),
                 )
             )
 
@@ -847,11 +1072,144 @@ class PresentationService:
 
     MAX_INGEST_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB bound
 
+    MANUAL_ISSUE_TERM_FIELDS = ("price_band_low", "price_band_high", "lot_size")
+    MANUAL_ENTRY_SOURCE_ID = "SRC-MANUAL-ENTRY"
+
     def ingest_document(
         self,
         file_bytes: bytes,
         filename: str = "filing.pdf",
         mode: str = "final",
+        manual_terms: Optional[Dict[str, Any]] = None,
+        manual_explanation: Optional[str] = None,
+        confirm_conflicts: bool = False,
+        recorder: Optional[IngestionRecorder] = None,
+    ) -> IngestionResponse:
+        """Ingest with a durable activity trace (see ingestion_activity).
+
+        The trace is generated by the actual execution below; the
+        terminal outcome is recorded before any exception propagates,
+        and the ingestion id is attached to the exception so API error
+        responses can correlate to the recoverable history.
+        """
+        act = recorder or self.activity_store.new_recorder(filename=filename, mode=mode)
+        try:
+            result = self._ingest_document_impl(
+                file_bytes=file_bytes,
+                filename=filename,
+                mode=mode,
+                manual_terms=manual_terms,
+                manual_explanation=manual_explanation,
+                confirm_conflicts=confirm_conflicts,
+                act=act,
+            )
+        except IngestionAwaitingIssueTermsError as exc:
+            act.record["evaluation_run"] = False
+            act.record["persisted"] = False
+            act.finish(
+                "BLOCKED",
+                error_code="AWAITING_ISSUE_TERMS",
+                error_message=str(exc),
+                missing_fields=[f"issue.{f}" for f in exc.missing_fields],
+            )
+            exc.ingestion_id = act.ingestion_id  # type: ignore[attr-defined]
+            raise
+        except IngestionIssueTermConflictError as exc:
+            act.finish("BLOCKED", error_code="ISSUE_TERM_CONFLICT", error_message=str(exc))
+            exc.ingestion_id = act.ingestion_id  # type: ignore[attr-defined]
+            raise
+        except IngestionError as exc:
+            code = {
+                IngestionValidationError: "VALIDATION_ERROR",
+                IngestionPayloadTooLargeError: "PAYLOAD_TOO_LARGE",
+                IngestionExtractionError: "PROCESSING_FAILED",
+                IngestionEvaluationError: "PROCESSING_FAILED",
+            }.get(type(exc), "INGESTION_ERROR")
+            stage = {
+                IngestionValidationError: "document_validation",
+                IngestionPayloadTooLargeError: "upload",
+                IngestionExtractionError: "filing_extraction",
+                IngestionEvaluationError: "evaluation",
+            }.get(type(exc), "finalization")
+            act.emit(stage, "failed", "FAILED", str(exc), error_code=code,
+                     retryable=(code == "PROCESSING_FAILED"))
+            act.finish("FAILED", error_code=code, error_message=str(exc))
+            exc.ingestion_id = act.ingestion_id  # type: ignore[attr-defined]
+            raise
+        except Exception as exc:  # unexpected: still leave a safe trail
+            act.emit("finalization", "failed", "FAILED",
+                     f"Unexpected ingestion error ({type(exc).__name__}).",
+                     error_code="INGESTION_INTERNAL_ERROR", retryable=True)
+            act.finish("FAILED", error_code="INGESTION_INTERNAL_ERROR",
+                       error_message=f"Unexpected ingestion error ({type(exc).__name__}).")
+            exc.ingestion_id = act.ingestion_id  # type: ignore[attr-defined]
+            raise
+        act.record["evaluation_id"] = result.evaluation_id
+        act.record["evaluation_run"] = True
+        act.record["persisted"] = not result.is_duplicate
+        act.record["is_duplicate"] = bool(result.is_duplicate)
+        act.record["result"] = {
+            "evaluation_id": result.evaluation_id,
+            "ipo_id": result.ipo_id,
+            "company_name": result.company_name,
+            "evaluation_mode": result.evaluation_mode,
+            "final_score": result.final_score,
+            "verdict": result.verdict,
+            "confidence": result.confidence,
+            "is_duplicate": result.is_duplicate,
+        }
+        act.finish("SUCCEEDED")
+        result.ingestion_id = act.ingestion_id
+        result.correlation_id = act.ingestion_id
+        return result
+
+    # ------------------------------------------------------------------
+    # Ingestion activity (durable diagnostics; separate from evaluations)
+    # ------------------------------------------------------------------
+    def get_ingestion_activity(self, ingestion_id: str) -> Optional[Dict[str, Any]]:
+        return self.activity_store.get(ingestion_id)
+
+    def list_ingestion_activities(self, limit: int = 50) -> List[Dict[str, Any]]:
+        return self.activity_store.list_recent(limit)
+
+    def start_ingestion_async(
+        self,
+        file_bytes: bytes,
+        filename: str = "filing.pdf",
+        mode: str = "final",
+    ) -> IngestionRecorder:
+        """Start ingestion on a background thread with a live trace.
+
+        Returns the recorder immediately; the UI polls the activity
+        endpoints for events while processing continues.  The terminal
+        outcome is recorded by ``ingest_document`` itself, so a thread
+        failure can never leave a trace stuck at RUNNING without the
+        wrapper's terminal recording having run.
+        """
+        import threading as _threading
+
+        recorder = self.activity_store.new_recorder(filename=filename, mode=mode)
+
+        def _run() -> None:
+            try:
+                self.ingest_document(
+                    file_bytes=file_bytes, filename=filename, mode=mode, recorder=recorder
+                )
+            except Exception:
+                pass  # terminal outcome already recorded by ingest_document
+
+        _threading.Thread(target=_run, daemon=True, name=f"ingest-{recorder.ingestion_id}").start()
+        return recorder
+
+    def _ingest_document_impl(
+        self,
+        file_bytes: bytes,
+        filename: str = "filing.pdf",
+        mode: str = "final",
+        manual_terms: Optional[Dict[str, Any]] = None,
+        manual_explanation: Optional[str] = None,
+        confirm_conflicts: bool = False,
+        act: Optional[IngestionRecorder] = None,
     ) -> IngestionResponse:
         """Process an uploaded PDF filing through extraction and evaluation pipelines.
 
@@ -866,6 +1224,14 @@ class PresentationService:
         - Duplicate detection & idempotency: returns existing evaluation if result_hash matches.
         - Persistent storage of new evaluations in EvaluationStore.
         """
+        def _emit(stage, event_type, status, message, **kw):
+            if act is not None:
+                act.emit(stage, event_type, status, message, **kw)
+
+        _emit("upload", "received", "SUCCEEDED",
+              "File received by the ingestion service.",
+              details={"filename": filename, "size_bytes": len(file_bytes) if file_bytes else 0, "mode": mode})
+
         if not file_bytes or len(file_bytes) == 0:
             raise IngestionValidationError("Uploaded file is empty.")
 
@@ -885,6 +1251,46 @@ class PresentationService:
                 f"Invalid evaluation mode '{mode}'. Allowed modes are 'final' and 'preliminary'."
             )
 
+        # Step 5 (Step 4 Area C, approved 2026-10-17): bounded manual entry
+        # for price_band_low / price_band_high / lot_size only. Manual values
+        # are provenance-labelled MANUAL_ENTRY and are never source-verified.
+        manual_clean: Dict[str, Any] = {}
+        if manual_terms:
+            unknown_keys = sorted(set(manual_terms) - set(self.MANUAL_ISSUE_TERM_FIELDS))
+            if unknown_keys:
+                raise IngestionValidationError(
+                    "Manual issue-term entry is limited to price_band_low, "
+                    f"price_band_high and lot_size; unsupported field(s): {unknown_keys}."
+                )
+            manual_clean = {k: v for k, v in manual_terms.items() if v is not None}
+            if manual_clean:
+                if not (manual_explanation or "").strip():
+                    raise IngestionValidationError(
+                        "An explanation is required for manually entered issue terms."
+                    )
+                for field_name, value in manual_clean.items():
+                    if isinstance(value, bool) or not isinstance(value, (int, float)):
+                        raise IngestionValidationError(
+                            f"Manually entered issue.{field_name} must be a number."
+                        )
+                    if value <= 0:
+                        raise IngestionValidationError(
+                            f"Manually entered issue.{field_name} must be positive."
+                        )
+                    if field_name == "lot_size" and float(value) != int(value):
+                        raise IngestionValidationError(
+                            "Manually entered issue.lot_size must be a whole number of shares."
+                        )
+                if "price_band_low" in manual_clean and "price_band_high" in manual_clean:
+                    if float(manual_clean["price_band_low"]) > float(manual_clean["price_band_high"]):
+                        raise IngestionValidationError(
+                            "Manually entered price_band_low must not exceed price_band_high."
+                        )
+
+        _emit("document_validation", "passed", "SUCCEEDED",
+              "Document passed format, size and mode validation.",
+              details={"filename": filename, "mode": mode_clean})
+
         config_path = self.config.config_dir / f"ipo-config.v{V1_5_BASELINE_VERSION}.json"
         if not config_path.is_file():
             config_path = self.config.config_dir / "ipo-config.v1.5.0.json"
@@ -902,6 +1308,8 @@ class PresentationService:
         temp_pdf_path = staging_dir / "filing.pdf"
         temp_pdf_path.write_bytes(file_bytes)
 
+        _emit("filing_extraction", "started", "RUNNING",
+              "Extracting the filing (tables, sections, canonical input).")
         try:
             extractor = DocumentExtractor()
             canonical_dict, extraction_report = extractor.extract_from_pdf(
@@ -915,6 +1323,340 @@ class PresentationService:
         finally:
             shutil.rmtree(staging_dir, ignore_errors=True)
 
+        _emit("filing_extraction", "completed", "SUCCEEDED",
+              "Filing extraction completed.",
+              details={"company_name": str(canonical_dict.get("company_name", "")),
+                       "ipo_id": str(canonical_dict.get("ipo_id", ""))})
+        _emit("issuer_identification", "identified", "SUCCEEDED",
+              "Issuer identified from the filing.",
+              details={"company_name": str(canonical_dict.get("company_name", "")),
+                       "ipo_id": str(canonical_dict.get("ipo_id", ""))})
+        _filing_issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+        for _f in ("price_band_low", "price_band_high", "lot_size", "ofs", "fresh_issue"):
+            _emit("term_resolution", "term_status",
+                  "SUCCEEDED" if _filing_issue.get(_f) is not None else "BLOCKED",
+                  f"issue.{_f}: " + ("disclosed by the filing." if _filing_issue.get(_f) is not None else "not disclosed by the filing."),
+                  details={"field": f"issue.{_f}",
+                           "state": "extracted" if _filing_issue.get(_f) is not None else "missing",
+                           "origin": "filing"})
+
+        # Automatically resolve required issue terms the filing does not
+        # disclose ([●] placeholders pending the Price Band Notice) from
+        # official sources, through the established enrichment assembly.
+        # Fail closed with an AWAITING_ISSUE_TERMS status when no verified
+        # official evidence is available: no value is invented, substituted
+        # or borrowed, and nothing is evaluated or persisted.
+        issue_terms_report: Optional[Dict[str, Any]] = None
+        pending_awaiting: Optional[Tuple[list, dict, str]] = None
+        issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+        missing_issue_fields = [
+            field
+            for field in ("price_band_low", "price_band_high", "lot_size", "ofs")
+            if issue.get(field) is None
+        ]
+        if missing_issue_fields:
+            from ..enrichment_engine import EnrichmentEngine
+            from ..issue_terms import IssueTermsResolver
+
+            _emit("official_discovery", "started", "RUNNING",
+                  "Searching official sources for the missing issue terms.",
+                  details={"missing_fields": [f"issue.{f}" for f in missing_issue_fields]})
+            resolver: IssueTermsResolver = self.config.issue_terms_resolver
+            outcome = resolver.resolve(
+                company_name=str(canonical_dict.get("company_name", "")),
+                ipo_id=str(canonical_dict.get("ipo_id", "")),
+                missing_fields=missing_issue_fields,
+            )
+            resolution_dict = outcome.to_dict()
+            for _rep in outcome.provider_reports:
+                _emit("official_discovery", "source_attempt",
+                      "SUCCEEDED" if _rep.outcome == "FOUND" else ("BLOCKED" if _rep.outcome in ("NOT_FOUND",) else "FAILED"),
+                      f"{_rep.provider}: {_rep.outcome} -- {_rep.detail}",
+                      details={"provider": _rep.provider, "outcome": _rep.outcome,
+                               "detail": _rep.detail,
+                               "listing_searched": bool(_rep.listing_searched),
+                               "searched_listings": list(_rep.searched_listings),
+                               "notes": list(_rep.notes),
+                               "sources": [
+                                   {"url": s.url, "classification": s.classification,
+                                    "searched": bool(s.searched), "issue_entries": s.issue_entries,
+                                    "detail": s.detail}
+                                   for s in _rep.sources
+                               ]},
+                      source_reference=outcome.source_uri)
+                # One event per configured source, whatever it
+                # yielded: a source that was searched and a source
+                # that could not be used must both be visible, so
+                # no source can contribute to the aggregate outcome
+                # without a trace of its own.
+                for _attempt in _rep.sources:
+                    _emit("official_discovery", "source_attempt",
+                          "SUCCEEDED" if _attempt.searched else "FAILED",
+                          f"{_attempt.url}: {_attempt.detail}",
+                          details={"provider": _rep.provider, "outcome": _rep.outcome,
+                                   "url": _attempt.url,
+                                   "classification": _attempt.classification,
+                                   "searched": bool(_attempt.searched),
+                                   "issue_entries": _attempt.issue_entries,
+                                   "source_unusable": not _attempt.searched},
+                          source_reference=outcome.source_uri)
+                # One event per remaining reason (a candidate
+                # document that could not be used), so every reason
+                # survives the bounded event message and is visible
+                # on its own in the activity trace.  Reasons that
+                # already have their own source event are not
+                # repeated.
+                _covered = {f"{s.url}: {s.detail}" for s in _rep.sources}
+                for _note in _rep.notes:
+                    if _note in _covered:
+                        continue
+                    _emit("official_discovery", "source_attempt", "FAILED",
+                          _note,
+                          details={"provider": _rep.provider, "outcome": _rep.outcome,
+                                   "source_unusable": True},
+                          source_reference=outcome.source_uri)
+            _emit("official_discovery", "completed",
+                  "SUCCEEDED" if outcome.notice is not None else "BLOCKED",
+                  f"Official discovery outcome: {outcome.status}.",
+                  details={"status": outcome.status,
+                           "resolved_fields": list(outcome.resolved_fields),
+                           "unresolved_fields": list(outcome.unresolved_fields),
+                           "conflicts": list(outcome.conflicts)},
+                  source_reference=outcome.source_uri)
+            if outcome.notice is not None:
+                try:
+                    # Carry the verified retrieval provenance (official
+                    # URL + retrieval timestamp) into the canonical source
+                    # manifest so the persisted record identifies the
+                    # actual disclosure document, not a local filename.
+                    notice_payload = outcome.notice.to_enrichment_dict()
+                    if notice_payload.get("sources"):
+                        source_ref = dict(notice_payload["sources"][0])
+                        if outcome.source_uri:
+                            source_ref["uri"] = outcome.source_uri
+                        if outcome.retrieved_at:
+                            source_ref["retrieval_timestamp"] = outcome.retrieved_at
+                        notice_payload["sources"] = [source_ref]
+                    assembled = EnrichmentEngine.assemble(
+                        base_input=canonical_dict,
+                        price_band_notice=notice_payload,
+                        mode=mode_clean,
+                    )
+                    canonical_dict = assembled.canonical_input
+                except Exception as exc:
+                    # Diagnosable, not silent: the terms were verified
+                    # but could not be assembled into the canonical
+                    # input (e.g. an identity inconsistency). Surface it
+                    # in the resolution diagnostics; still fail closed.
+                    resolution_dict["assembly_error"] = (
+                        f"{type(exc).__name__}: {exc}"
+                    )
+            elif set(missing_issue_fields) == {"ofs"}:
+                # Terms are disclosed in the filing itself; only the OFS
+                # amount needs the approved enrichment derivation
+                # (seller shares x cap price).
+                try:
+                    assembled = EnrichmentEngine.assemble(
+                        base_input=canonical_dict,
+                        mode=mode_clean,
+                    )
+                    canonical_dict = assembled.canonical_input
+                except Exception as exc:
+                    resolution_dict["assembly_error"] = (
+                        f"{type(exc).__name__}: {exc}"
+                    )
+
+            issue_after = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+            still_missing = [f for f in missing_issue_fields if issue_after.get(f) is None]
+            for _f in missing_issue_fields:
+                _resolved = issue_after.get(_f) is not None
+                _emit("term_resolution", "term_status",
+                      "SUCCEEDED" if _resolved else "BLOCKED",
+                      f"issue.{_f}: " + ("resolved from official evidence." if _resolved else "still missing after official discovery."),
+                      details={"field": f"issue.{_f}",
+                               "state": "accepted" if _resolved else (
+                                   "conflicting" if outcome.status == "CONFLICT" else
+                                   "unavailable" if outcome.status == "UNAVAILABLE" else "missing"),
+                               "origin": "official_discovery"},
+                      source_reference=outcome.source_uri)
+            if not still_missing and issue_after.get("fresh_issue") is None:
+                # The four issue terms resolved, but the stated
+                # fresh-issue amount (a canonical requirement) is only
+                # established by the final Prospectus; fail closed with
+                # that precise field rather than a schema failure.
+                still_missing = ["fresh_issue"]
+            if outcome.notice is not None and not still_missing:
+                issue_terms_report = resolution_dict
+            else:
+                unresolved = still_missing or list(missing_issue_fields)
+                reason = {
+                    "CONFLICT": "official sources conflict and no value was arbitrarily selected",
+                    "UNAVAILABLE": "no usable official listing was searched: official sources could not be retrieved, or returned unusable content (this is not evidence that the terms are unpublished)",
+                    "PARTIAL": "only some required terms could be verified from official sources",
+                    "UNVERIFIED": "an issuer-matched notice exists only as a retained copy whose official provenance is not established (configure the official exchange announcement via IPO_PRICE_BAND_NOTICE_URLS to use it)",
+                }.get(outcome.status, "no issuer-matched official document was found by automatic discovery or the configured official sources (this does not by itself establish that the terms are unpublished)")
+                if outcome.status == "UNAVAILABLE" and any(
+                    r.outcome == "REJECTED" for r in outcome.provider_reports
+                ):
+                    # Retrieval succeeded but the document failed
+                    # classification/identity/value checks -- a different
+                    # failure from "could not be retrieved", and the
+                    # operator must be able to tell them apart.
+                    reason = (
+                        "official source documents were retrieved but rejected "
+                        "(classification, issuer identity or value checks failed; "
+                        "see the resolution diagnostics)"
+                    )
+                if resolution_dict.get("assembly_error"):
+                    reason = (
+                        "verified official terms could not be assembled into "
+                        "the evaluation input (see the resolution diagnostics)"
+                    )
+                # Defer the awaiting raise: authorized manual entry (Step 5)
+                # may still resolve the bounded terms below. Without manual
+                # terms the deferred raise fires unchanged before evaluation.
+                pending_awaiting = (unresolved, resolution_dict, reason)
+
+        # --- Step 5: bounded manual issue-term entry ---------------------
+        # Runs after verified-official resolution. Manual values never
+        # upgrade provenance: they are recorded as MANUAL_ENTRY against a
+        # STRUCTURED_INPUT operator source, and a conflicting verified
+        # official value always wins over a manual value.
+        if manual_clean:
+            issue_now = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+            evidence_map = canonical_dict.get("_evidence", {})
+            if not isinstance(evidence_map, dict):
+                evidence_map = {}
+
+            def _origin(field_name: str) -> str:
+                spec = evidence_map.get(f"issue.{field_name}")
+                src = spec.get("source_id", "") if isinstance(spec, dict) else ""
+                return "OFFICIAL_VERIFIED" if str(src).startswith(("SRC-PBN-", "SRC-PROSPECTUS-")) else "FILING_EXTRACTION"
+
+            conflicts = []
+            for field_name, value in manual_clean.items():
+                existing = issue_now.get(field_name)
+                if existing is not None and float(existing) != float(value):
+                    conflicts.append(
+                        {
+                            "field": f"issue.{field_name}",
+                            "manual_value": value,
+                            "existing_value": existing,
+                            "existing_origin": _origin(field_name),
+                        }
+                    )
+            if conflicts and not confirm_conflicts:
+                raise IngestionIssueTermConflictError(
+                    "Manually entered issue terms conflict with existing "
+                    "values; explicit confirmation is required before "
+                    "proceeding. Nothing was evaluated or persisted.",
+                    conflicts=conflicts,
+                )
+
+            sources = canonical_dict.setdefault("_sources", [])
+            if not any(
+                isinstance(s, dict) and s.get("source_id") == self.MANUAL_ENTRY_SOURCE_ID
+                for s in sources
+            ):
+                sources.append(
+                    {
+                        "source_id": self.MANUAL_ENTRY_SOURCE_ID,
+                        "source_type": "STRUCTURED_INPUT",
+                        "retrieval_timestamp": datetime.now(timezone.utc).strftime(
+                            "%Y-%m-%dT%H:%M:%SZ"
+                        ),
+                    }
+                )
+            manual_applied: List[str] = []
+            overridden_by_verified: List[str] = []
+            for field_name, value in manual_clean.items():
+                existing = issue_now.get(field_name)
+                if (
+                    existing is not None
+                    and float(existing) != float(value)
+                    and _origin(field_name) == "OFFICIAL_VERIFIED"
+                ):
+                    # A verified official value is never displaced by a
+                    # manual entry, even after explicit confirmation.
+                    overridden_by_verified.append(field_name)
+                    continue
+                issue_now[field_name] = int(value) if field_name == "lot_size" else float(value)
+                prev_spec = evidence_map.get(f"issue.{field_name}")
+                new_spec = dict(prev_spec) if isinstance(prev_spec, dict) else {}
+                new_spec.update(
+                    {
+                        "source_id": self.MANUAL_ENTRY_SOURCE_ID,
+                        "extraction_method": "MANUAL_ENTRY",
+                        "section": "Operator Manual Entry",
+                        "locator": "Pre-processing manual issue-term entry (Step 5)",
+                        "note": (
+                            "Manually entered by the operator; NOT source-verified. "
+                            f"Explanation: {(manual_explanation or '').strip()}"
+                        ),
+                    }
+                )
+                new_spec.pop("quote", None)
+                new_spec.pop("quoted_text", None)
+                evidence_map[f"issue.{field_name}"] = new_spec
+                manual_applied.append(field_name)
+            canonical_dict["issue"] = issue_now
+            canonical_dict["_evidence"] = evidence_map
+
+            low_now, high_now = issue_now.get("price_band_low"), issue_now.get("price_band_high")
+            if low_now is not None and high_now is not None and float(low_now) > float(high_now):
+                raise IngestionValidationError(
+                    "price_band_low must not exceed price_band_high after manual entry."
+                )
+
+            if issue_terms_report is None:
+                issue_terms_report = {}
+            issue_terms_report["manual_entry"] = {
+                "fields": manual_applied,
+                "values": {f: manual_clean[f] for f in manual_applied},
+                "explanation": (manual_explanation or "").strip(),
+                "provenance": "MANUAL_ENTRY",
+                "verified": False,
+                "overridden_by_verified": overridden_by_verified,
+            }
+            _emit("term_resolution", "manual_entry", "SUCCEEDED",
+                  "Operator manual issue-term entry applied (MANUAL_ENTRY; not source-verified).",
+                  details={"fields": [f"issue.{f}" for f in manual_applied],
+                           "overridden_by_verified": overridden_by_verified,
+                           "provenance": "MANUAL_ENTRY"})
+            if pending_awaiting is not None:
+                remaining = [f for f in pending_awaiting[0] if issue_now.get(f) is None]
+                if remaining:
+                    augmented = dict(pending_awaiting[1])
+                    augmented["manual_entry"] = issue_terms_report["manual_entry"]
+                    pending_awaiting = (remaining, augmented, pending_awaiting[2])
+                else:
+                    pending_awaiting = None
+
+        if pending_awaiting is not None:
+            unresolved, resolution_dict, reason = pending_awaiting
+            _emit("evaluation_eligibility", "blocked", "BLOCKED",
+                  "Evaluation blocked: required issue terms remain unresolved.",
+                  details={"missing_fields": [f"issue.{f}" for f in unresolved],
+                           "reason": reason},
+                  error_code="AWAITING_ISSUE_TERMS")
+            _emit("evaluation", "not_run", "SKIPPED",
+                  "Evaluation was not run; nothing was persisted.")
+            _emit("persistence", "not_attempted", "SKIPPED",
+                  "No evaluation artifact was persisted.")
+            raise IngestionAwaitingIssueTermsError(
+                "AWAITING_ISSUE_TERMS: required issue terms are unavailable: "
+                + ", ".join(f"issue.{field}" for field in unresolved)
+                + f". The uploaded filing does not disclose them and {reason}. "
+                "No evaluation was produced, no values were assumed, and nothing was persisted. "
+                "Retry after the official Price Band Notice is published, or upload a filing that discloses these terms.",
+                missing_fields=unresolved,
+                resolution=resolution_dict,
+            )
+
+        _emit("evaluation_eligibility", "passed", "SUCCEEDED",
+              "Required issue terms are complete; evaluation is eligible to run.")
+        _emit("evaluation", "started", "RUNNING",
+              "Running the deterministic evaluation pipeline.")
         # Execute deterministic pipeline evaluation
         try:
             outcome = evaluate(
@@ -927,7 +1669,35 @@ class PresentationService:
                 f"Evaluation pipeline failed: {exc}"
             ) from exc
 
-        # Check duplicate / idempotency against immutable EvaluationStore
+        _emit("evaluation", "completed", "SUCCEEDED",
+              "Evaluation completed.",
+              details={"evaluation_id": outcome.record.evaluation_id,
+                       "final_score": float(outcome.score.final_score),
+                       "verdict": str(outcome.score.verdict)})
+        # Check duplicate / idempotency against immutable EvaluationStore.
+        # Duplicate identity covers the scored input, the configuration
+        # AND the evidence content (ids/sources/methods -- deliberately
+        # excluding volatile retrieval timestamps). Two evaluations with
+        # identical scored inputs but materially different evidence
+        # registries are not interchangeable: returning the older record
+        # would permanently hide corrected evidence registration behind
+        # idempotency (the record itself is never rewritten). A new
+        # evaluation is created instead; history is preserved.
+        def _evidence_fingerprint(evidence_payload: Any) -> frozenset:
+            items: Any = []
+            if isinstance(evidence_payload, dict):
+                items = evidence_payload.get("evidence") or []
+            return frozenset(
+                (
+                    str(item.get("evidence_id")),
+                    str(item.get("source_id")),
+                    str(item.get("extraction_method")),
+                )
+                for item in items
+                if isinstance(item, dict)
+            )
+
+        new_evidence_fingerprint = _evidence_fingerprint(outcome.record.evidence)
         existing_eval_id: Optional[str] = None
         if self.eval_store.exists(outcome.record.evaluation_id):
             existing_eval_id = outcome.record.evaluation_id
@@ -936,6 +1706,8 @@ class PresentationService:
                 try:
                     rec = self.eval_store.read(eid)
                     if rec.get("evaluation_mode", "").upper() == outcome.record.evaluation_mode.upper():
+                        if _evidence_fingerprint(rec.get("evidence")) != new_evidence_fingerprint:
+                            continue
                         if rec.get("result_hash") == outcome.record.result_hash:
                             existing_eval_id = eid
                             break
@@ -949,6 +1721,9 @@ class PresentationService:
                     continue
 
         if existing_eval_id is not None:
+            _emit("persistence", "duplicate", "SKIPPED",
+                  "Identical evaluation already exists; returning the existing record without rewriting history.",
+                  details={"evaluation_id": existing_eval_id})
             existing_rec = self.eval_store.read(existing_eval_id)
             eval_detail = self.get_evaluation_detail(existing_eval_id)
             score_data = existing_rec.get("score") or {}
@@ -967,9 +1742,15 @@ class PresentationService:
                 message="Identical evaluation record already exists in immutable store.",
                 evaluation_url=f"/#evaluations/{existing_eval_id}",
                 evaluation=eval_detail,
+                issue_terms=issue_terms_report,
             )
 
+        _emit("persistence", "started", "RUNNING",
+              "Persisting the evaluation record.")
         self.eval_store.write(outcome.record)
+        _emit("persistence", "completed", "SUCCEEDED",
+              "Evaluation record persisted.",
+              details={"evaluation_id": outcome.record.evaluation_id})
         # Register in lifecycle governance
         self.lifecycle_mgr.register_evaluation(
             outcome.record,
@@ -997,6 +1778,7 @@ class PresentationService:
             message="Filing successfully ingested, extracted, and evaluated.",
             evaluation_url=f"/#evaluations/{eval_id_to_return}",
             evaluation=eval_detail,
+            issue_terms=issue_terms_report,
         )
 
     # -------------------------------------------------------------------------

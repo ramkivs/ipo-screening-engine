@@ -79,6 +79,38 @@ def test_valid_input_passes_the_schema_gate(golden_input, schema):
     assert validate_schema(golden_input, schema) == []
 
 
+def test_schema_error_message_names_the_field_paths(golden_input, config):
+    """Regression: undisclosed issue terms must not surface as opaque
+    "None is not of type ..." messages with no field identity.
+
+    The Vishal Nirmiti RHP leaves price band, bid lot and OFS amount as
+    [●] placeholders; carried as null (unknown, never zero), the schema
+    gate still rejects them -- but the raised error must name every path.
+    """
+    document = copy.deepcopy(golden_input)
+    for field in ("price_band_low", "price_band_high", "lot_size", "ofs"):
+        document["issue"][field] = None
+    with pytest.raises(SchemaValidationError) as excinfo:
+        evaluate(document, config, evaluation_datetime=EVAL_AT)
+    message = str(excinfo.value)
+    for field in ("price_band_low", "price_band_high", "lot_size", "ofs"):
+        assert f"issue/{field}" in message
+    locations = {f.location for f in excinfo.value.findings}
+    assert {
+        "issue/price_band_low",
+        "issue/price_band_high",
+        "issue/lot_size",
+        "issue/ofs",
+    } <= locations
+
+
+def test_schema_rejects_malformed_issue_numbers_with_path(golden_input, schema):
+    document = copy.deepcopy(golden_input)
+    document["issue"]["price_band_low"] = "two-hundred-eight"
+    findings = validate_schema(document, schema)
+    assert any(f.location == "issue/price_band_low" for f in findings)
+
+
 # --------------------------------------------------------------------------
 # Semantic
 # --------------------------------------------------------------------------

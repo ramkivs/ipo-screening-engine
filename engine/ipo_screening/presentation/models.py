@@ -171,6 +171,21 @@ class EvaluationScoreDetail(BaseModel):
     modules: List[ModuleScore] = Field(default_factory=list)
 
 
+class MarketBlockState(BaseModel):
+    """One persisted market-data block state, projected read-only from
+    the evaluation record's market snapshot. Status values are the
+    existing snapshot states (FRESH | STALE | MISSING); freshness is a
+    statement about the recorded data's currency, not source
+    qualification."""
+
+    model_config = ConfigDict(extra="ignore")
+    block: str
+    status: str
+    as_of: Optional[str] = None
+    source_id: Optional[str] = None
+    reason: Optional[str] = None
+
+
 class EvaluationDetail(BaseModel):
     model_config = ConfigDict(extra="ignore")
     evaluation_id: str
@@ -186,6 +201,7 @@ class EvaluationDetail(BaseModel):
     source_manifest_hash: str
     market_snapshot_hash: Optional[str] = None
     peer_snapshot_hash: Optional[str] = None
+    market_blocks: List[MarketBlockState] = Field(default_factory=list)
     result_hash: str
     score: EvaluationScoreDetail
     knockouts: KnockoutSummary
@@ -231,6 +247,18 @@ class EvidenceDetail(BaseModel):
     quote: Optional[str] = None
     extracted_value: Optional[Any] = None
     unit: Optional[str] = None
+    # OFFICIAL_VERIFIED | FILING | DERIVED | RETAINED_UNVERIFIED | UNVERIFIED
+    verification: Optional[str] = None
+    # Read-only presentation of a non-scalar canonical value (e.g. the
+    # financial-period list), derived from the persisted input snapshot.
+    value_summary: Optional[str] = None
+    # PROCESSING (extractor-generated summary, not source text) |
+    # RECORDED (quotation as recorded in the evidence artifact).
+    quote_kind: Optional[str] = None
+    note: Optional[str] = None
+    # Provenance method as recorded (e.g. MANUAL_ENTRY for operator-entered
+    # issue terms). Presentation-only: manual entry is never verified.
+    extraction_method: Optional[str] = None
 
 
 class EvidenceResponse(BaseModel):
@@ -389,4 +417,7 @@ class IngestionResponse(BaseModel):
     message: str = "Document processed and evaluated successfully."
     evaluation_url: str
     evaluation: Optional[EvaluationDetail] = None
+    issue_terms: Optional[Dict[str, Any]] = None
+    ingestion_id: Optional[str] = None
+    correlation_id: Optional[str] = None
 

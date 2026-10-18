@@ -257,3 +257,41 @@ test('UI-3 App - Evidence Detail Inspector dialog structure', () => {
   assert.ok(stylesCss.includes('.raw-json-box'));
   assert.ok(stylesCss.includes('.btn-evidence-link'));
 });
+
+test('UI-3 App - Unverified retained source is never presented as verified', () => {
+  const appJs = fs.readFileSync(path.resolve(__dirname, '../app.js'), 'utf8');
+
+  // The Explorer must distinguish a retained copy whose official
+  // provenance is not established from verified official evidence,
+  // even when a canonical value is present.
+  assert.ok(appJs.includes("item.verification === 'RETAINED_UNVERIFIED'"));
+  assert.ok(appJs.includes('UNVERIFIED RETAINED SOURCE'));
+  assert.ok(appJs.includes('UNVERIFIED RETAINED SOURCE (official provenance not established)'));
+  assert.ok(appJs.includes('SOURCE EVIDENCE (Verified Official Source)'));
+});
+
+test('UI-3 App - Processing summaries and non-scalar value summaries are not shown as quotations', () => {
+  const appJs = fs.readFileSync(path.resolve(__dirname, '../app.js'), 'utf8');
+
+  // Extractor-generated processing information must be labelled as such,
+  // never as a verbatim quotation; non-scalar canonical values are shown
+  // through the read-only summary, not as UNKNOWN.
+  assert.ok(appJs.includes("item.quote_kind === 'PROCESSING'"));
+  assert.ok(appJs.includes('PROCESSING SUMMARY (Extractor-Generated, Not Source Text)'));
+  assert.ok(appJs.includes('Extractor processing information — not a quotation from the source document.'));
+  assert.ok(appJs.includes('item.value_summary'));
+  assert.ok(appJs.includes('Recorded Quotation (as recorded in evidence)'));
+});
+
+test('Market Data State panel distinguishes missing/stale from an observed negative signal', () => {
+  const appJs = fs.readFileSync(path.resolve(__dirname, '../app.js'), 'utf8');
+
+  // The scorecard must surface the persisted market block states and
+  // must never present unavailable data as a checked-and-negative signal.
+  assert.ok(appJs.includes('Market Data State (as recorded at evaluation)'));
+  assert.ok(appJs.includes('NOT SUPPLIED — NO SIGNAL OBSERVED'));
+  assert.ok(appJs.includes('STALE — NOT USED'));
+  assert.ok(appJs.includes('SUPPLIED (FRESH)'));
+  assert.ok(appJs.includes('not</strong> that a market signal was observed and found negative'));
+  assert.ok(appJs.includes('evaluation.market_blocks'));
+});

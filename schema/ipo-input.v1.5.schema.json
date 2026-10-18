@@ -832,7 +832,8 @@
     },
     "peers": {
       "type": "array",
-      "minItems": 1,
+      "description": "Genuine comparable companies. An empty array is permitted (D-PEER-1) and means no peer data is available: peer-relative metrics resolve UNKNOWN. Synthetic placeholder peers must never be inserted to satisfy this field.",
+      "minItems": 0,
       "items": {
         "type": "object",
         "required": [
