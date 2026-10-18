@@ -3490,8 +3490,16 @@ export class App {
             </div>
           </div>
 
-          <!-- Ingestion Activity: actual backend events (live + recoverable) -->
-          <div id="ingest-activity-panel" style="margin-top: 16px;"></div>
+          <!-- Ingestion Activity: actual backend events (live + recoverable).
+               The shell is always visible so the panel can be located
+               before, during and after a submission; the body is replaced
+               with the real backend event trace when an ingestion runs. -->
+          <div id="ingest-activity-panel" style="margin-top: 16px;">
+            <div class="activity-panel" role="region" aria-label="Ingestion Activity">
+              <div class="activity-head"><strong>Ingestion Activity</strong><span class="badge badge-insufficient">IDLE</span></div>
+              <div class="activity-meta">No ingestion submitted yet in this session. Submit a filing above to see the live backend activity trace here; the trace of the most recent ingestion is restored automatically after a page refresh.</div>
+            </div>
+          </div>
 
           <!-- Ingestion Completed Outcome (Hidden until complete) -->
           <div id="ingest-outcome-container" style="display: none;"></div>

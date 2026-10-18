@@ -102,3 +102,24 @@ test). Fixture-driven throughout — **not live-source acceptance**.
 - Windows acceptance: restart at this commit, upload the Jio RHP, and
   read the Ingestion Activity panel (it survives refresh; the trace
   is also returned by `GET /api/v1/ingestions/{id}`).
+
+## Addendum 2026-10-18: panel visibility fix
+
+**User report:** the Ingestion Activity panel could not be located in
+the running UI at `22f82b8`. **Trace:** route `#ingest` →
+`renderIngestView()` mounts `#ingest-activity-panel` inside the
+"Workflow Progress & Audit Status" card, and the submit handler does
+use `POST /ingestions/start` + polling when the real `ApiClient` is
+present (verified by simulation and by fetching the served
+`/ui/app.js`). **Defect:** the panel was an empty, unlabelled `<div>`
+until the first poll returned — nothing on screen identified an
+Ingestion Activity panel before, between, or after submissions
+unless a trace happened to render into it. **Fix:** the panel now
+renders a permanent visible shell (title, IDLE state, guidance, and
+automatic restoration of the most recent trace after refresh).
+**Integration test** (`frontend/test/ingestion-activity-flow.test.js`):
+the shell is present in the rendered view before submission, and a
+submission through the view (activity endpoints only — the legacy
+sync method is absent from the double) populates the panel with the
+blocked-ingestion backend events, terminal summary, unresolved
+terms, and evaluation-run/persisted facts.
