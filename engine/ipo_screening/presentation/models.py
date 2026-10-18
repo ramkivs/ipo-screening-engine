@@ -418,4 +418,6 @@ class IngestionResponse(BaseModel):
     evaluation_url: str
     evaluation: Optional[EvaluationDetail] = None
     issue_terms: Optional[Dict[str, Any]] = None
+    ingestion_id: Optional[str] = None
+    correlation_id: Optional[str] = None
 

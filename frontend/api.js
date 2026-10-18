@@ -253,6 +253,66 @@ export class ApiClient {
    * @param {string} [options.mode] - 'final' or 'preliminary' (default: 'final')
    * @returns {Promise<Object>} Ingestion response containing evaluation_id, score, verdict, etc.
    */
+  /**
+   * Start a traced ingestion in the background (202) and return the
+   * ingestion/correlation id.  Poll getIngestionEvents for the live,
+   * durable activity trace; the history remains retrievable after the
+   * request ends (including after a page refresh).
+   */
+  async startIngestion(file, options = {}) {
+    if (!file) {
+      throw new ApiError(400, 'INVALID_FILE', 'A filing document file is required.');
+    }
+    const formData = new FormData();
+    let blobFile = file;
+    if (typeof Blob !== 'undefined' && !(file instanceof Blob)) {
+      blobFile = new Blob([file], { type: 'application/pdf' });
+    }
+    formData.append('file', blobFile, file.name || 'filing.pdf');
+    if (options.mode) {
+      formData.append('mode', options.mode);
+    }
+    const url = new URL(
+      `${this.apiPrefix}/ingestions/start`,
+      typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000'
+    );
+    let response;
+    try {
+      response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body: formData,
+      });
+    } catch (networkErr) {
+      throw new ApiError(0, 'NETWORK_ERROR', `Network failure during upload: ${networkErr.message}`);
+    }
+    if (!response.ok) {
+      let errPayload = {};
+      try { errPayload = await response.json(); } catch { /* non-JSON */ }
+      throw new ApiError(
+        response.status,
+        errPayload.code || `HTTP_${response.status}`,
+        errPayload.message || response.statusText,
+        errPayload
+      );
+    }
+    return await response.json();
+  }
+
+  /** Full ingestion activity record (status + ordered events). */
+  async getIngestion(ingestionId) {
+    if (!ingestionId) throw new ApiError(400, 'INVALID_IDENTIFIER', 'Ingestion ID must be provided');
+    return this._get(`/ingestions/${encodeURIComponent(ingestionId)}`);
+  }
+
+  /** Activity events after a sequence number (live polling). */
+  async getIngestionEvents(ingestionId, afterSequence = 0) {
+    if (!ingestionId) throw new ApiError(400, 'INVALID_IDENTIFIER', 'Ingestion ID must be provided');
+    return this._get(`/ingestions/${encodeURIComponent(ingestionId)}/events`, {
+      after_sequence: afterSequence,
+    });
+  }
+
   async ingestDocument(file, options = {}) {
     if (!file) {
       throw new ApiError(400, 'INVALID_FILE', 'A filing document file is required.');

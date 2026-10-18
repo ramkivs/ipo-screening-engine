@@ -12,7 +12,7 @@
  * ZERO client-side scoring calculations; ZERO API keys stored.
  */
 
-import { ApiClient } from './api.js';
+import { ApiClient, ApiError } from './api.js';
 
 export class App {
   constructor(apiClient = null) {
@@ -3490,6 +3490,9 @@ export class App {
             </div>
           </div>
 
+          <!-- Ingestion Activity: actual backend events (live + recoverable) -->
+          <div id="ingest-activity-panel" style="margin-top: 16px;"></div>
+
           <!-- Ingestion Completed Outcome (Hidden until complete) -->
           <div id="ingest-outcome-container" style="display: none;"></div>
         </div>
@@ -3618,6 +3621,8 @@ export class App {
       clearFile();
     });
 
+    this.restoreLastIngestionActivity(container);
+
     // Ingest submit execution
     submitBtn.addEventListener('click', async () => {
       if (!this.selectedIngestFile) return;
@@ -3634,7 +3639,9 @@ export class App {
         updateStage('stage-extract', 'active');
 
         const mode = modeSelect ? modeSelect.value : 'final';
-        const result = await this.api.ingestDocument(this.selectedIngestFile, { mode });
+        const result = (typeof this.api.startIngestion === 'function')
+          ? await this.runIngestionWithActivity(container, this.selectedIngestFile, mode)
+          : await this.api.ingestDocument(this.selectedIngestFile, { mode });
 
         updateStage('stage-extract', 'completed');
         updateStage('stage-evaluate', 'completed');
@@ -3720,6 +3727,126 @@ export class App {
         submitBtn.textContent = 'Retry Evaluation';
       }
     });
+  }
+
+  /**
+   * Ingestion Activity: renders the actual backend event trace for an
+   * ingestion attempt.  Nothing here is inferred from HTTP status --
+   * every row is a persisted backend event, and history is retrievable
+   * after the request ends or the page refreshes.
+   */
+  renderIngestionActivity(container, record) {
+    const panel = container ? container.querySelector('#ingest-activity-panel') : null;
+    if (!panel || !record) return;
+    const badgeFor = (s) => ({
+      SUCCEEDED: 'badge-apply', FAILED: 'badge-avoid', BLOCKED: 'badge-consider',
+      RUNNING: 'badge-neutral', SKIPPED: 'badge-insufficient', CANCELLED: 'badge-insufficient',
+      PENDING: 'badge-insufficient',
+    }[s] || 'badge-neutral');
+    const started = record.started_at ? new Date(record.started_at) : null;
+    const finished = record.finished_at ? new Date(record.finished_at) : null;
+    const elapsedMs = started ? ((finished || new Date()) - started) : null;
+    const elapsed = elapsedMs != null ? `${(elapsedMs / 1000).toFixed(1)}s` : '—';
+    const events = Array.isArray(record.events) ? record.events : [];
+    const currentStage = [...events].reverse().find((e) => e.status === 'RUNNING');
+    const rows = events.map((e) => {
+      const details = e.details && Object.keys(e.details).length
+        ? `<details class="activity-details"><summary>details</summary><pre>${this.escape(JSON.stringify(e.details, null, 1))}</pre>${e.source_reference ? `<div>source: <code>${this.escape(e.source_reference)}</code></div>` : ''}${e.error_code ? `<div>error_code: <code>${this.escape(e.error_code)}</code></div>` : ''}</details>`
+        : '';
+      return `<div class="activity-event activity-${this.escape(String(e.status || '').toLowerCase())}">
+        <span class="activity-seq">${this.escape(String(e.sequence))}</span>
+        <span class="badge ${badgeFor(e.status)}">${this.escape(e.status || '')}</span>
+        <div class="activity-main">
+          <div><strong>${this.escape(e.stage || '')}</strong> · ${this.escape(e.event_type || '')}
+          ${e.duration_ms != null ? `<span class="activity-dur">${this.escape(String(e.duration_ms))} ms</span>` : ''}</div>
+          <div>${this.escape(e.message || '')}</div>
+          ${details}
+        </div>
+      </div>`;
+    }).join('');
+    let summary = '';
+    if (record.status && record.status !== 'RUNNING') {
+      const missing = (record.missing_fields || []).map((f) => `<li><code>${this.escape(f)}</code></li>`).join('');
+      const nextAction = record.status === 'SUCCEEDED'
+        ? 'Open the evaluation from the outcome panel.'
+        : record.status === 'BLOCKED'
+          ? 'Upload a filing that discloses the unresolved terms, retry after the official terms are published, or use the bounded manual entry below where offered. An unavailable source is not proof that terms do not exist.'
+          : 'Review the failed stage above and retry. Quote the ingestion id when seeking diagnostics.';
+      summary = `<div class="activity-summary">
+        <div><strong>Terminal summary</strong> — status <span class="badge ${badgeFor(record.status)}">${this.escape(record.status)}</span></div>
+        <div>Evaluation run: <strong>${record.evaluation_run ? 'yes' : 'no'}</strong> · Persisted: <strong>${record.persisted ? 'yes' : 'no'}</strong>${record.evaluation_id ? ` · Evaluation: <code>${this.escape(record.evaluation_id)}</code>` : ''}</div>
+        ${missing ? `<div>Unresolved required terms:<ul>${missing}</ul></div>` : ''}
+        ${record.error_message ? `<div>Reason: ${this.escape(record.error_message)}</div>` : ''}
+        <div>Next action: ${this.escape(nextAction)}</div>
+      </div>`;
+    }
+    panel.innerHTML = `
+      <div class="activity-panel" role="region" aria-label="Ingestion Activity">
+        <div class="activity-head">
+          <strong>Ingestion Activity</strong>
+          <span class="badge ${badgeFor(record.status)}">${this.escape(record.status || '')}</span>
+        </div>
+        <div class="activity-meta">
+          File: ${this.escape(record.filename || '—')} · Mode: ${this.escape(record.mode || '—')} ·
+          Id: <code>${this.escape(record.ingestion_id || '')}</code> ·
+          Elapsed: ${this.escape(elapsed)}${currentStage ? ` · Current stage: <strong>${this.escape(currentStage.stage)}</strong>` : ''}
+        </div>
+        <div class="activity-timeline">${rows || '<div>No events recorded yet.</div>'}</div>
+        ${summary}
+      </div>
+    `;
+  }
+
+  /** Poll the durable activity trace until its terminal outcome. */
+  async runIngestionWithActivity(container, file, mode) {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const start = await this.api.startIngestion(file, { mode });
+    const ingestionId = start.ingestion_id;
+    try { localStorage.setItem('ipo.lastIngestionId', ingestionId); } catch { /* private mode */ }
+    let record = null;
+    let consecutiveFailures = 0;
+    for (;;) {
+      try {
+        record = await this.api.getIngestion(ingestionId);
+        consecutiveFailures = 0;
+      } catch (pollErr) {
+        consecutiveFailures += 1;
+        if (consecutiveFailures > 8) throw pollErr;
+        await sleep(1500);
+        continue;
+      }
+      this.renderIngestionActivity(container, record);
+      if (record.status !== 'RUNNING') break;
+      await sleep(1200);
+    }
+    if (record.status === 'SUCCEEDED') {
+      const r = record.result || {};
+      return {
+        ...r,
+        evaluation_url: `/#evaluations/${r.evaluation_id}`,
+        message: record.is_duplicate
+          ? 'Identical evaluation record already exists in immutable store.'
+          : 'Filing successfully ingested, extracted, and evaluated.',
+      };
+    }
+    const missing = (record.missing_fields || []).map((f) => String(f).replace(/^issue\./, ''));
+    throw new ApiError(
+      record.status === 'BLOCKED' ? 422 : 500,
+      record.error_code || 'INGESTION_FAILED',
+      record.error_message || 'Ingestion did not complete.',
+      { missing_fields: missing, ingestion_id: ingestionId, activity_url: `/api/v1/ingestions/${ingestionId}` }
+    );
+  }
+
+  /** After a refresh, re-attach to the most recent ingestion's history. */
+  async restoreLastIngestionActivity(container) {
+    try {
+      if (typeof this.api.getIngestion !== 'function') return;
+      const ingestionId = localStorage.getItem('ipo.lastIngestionId');
+      if (!ingestionId) return;
+      const record = await this.api.getIngestion(ingestionId);
+      this.renderIngestionActivity(container, record);
+    } catch { /* no recoverable history; the panel simply stays empty */ }
   }
 
   /**

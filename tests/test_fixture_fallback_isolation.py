@@ -62,7 +62,9 @@ def test_a_default_allow_fixture_fallbacks_is_supported():
     assert sig_builder.parameters["allow_fixture_fallbacks"].default is False
 
     # 3. PresentationService.ingest_document implementation explicitly uses False
-    service_src = inspect.getsource(PresentationService.ingest_document)
+    # Extraction lives in _ingest_document_impl (ingest_document is the
+    # activity-recording wrapper); the fallback guard is pinned there.
+    service_src = inspect.getsource(PresentationService._ingest_document_impl)
     assert "allow_fixture_fallbacks=False" in service_src
 
 

@@ -2084,3 +2084,21 @@ table.data-table tbody tr:last-child td {
 }
 
 
+
+/* Ingestion Activity (durable backend event trace) */
+.activity-panel { border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px; background: var(--bg-surface); }
+.activity-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.activity-meta { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; word-break: break-all; }
+.activity-timeline { display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow-y: auto; }
+.activity-event { display: flex; gap: 8px; align-items: flex-start; font-size: 0.82rem; padding: 6px 8px; border-left: 3px solid var(--border-color); background: var(--bg-main, transparent); }
+.activity-event.activity-succeeded { border-left-color: var(--color-apply); }
+.activity-event.activity-failed { border-left-color: var(--color-avoid); }
+.activity-event.activity-blocked { border-left-color: var(--color-consider); }
+.activity-event.activity-running { border-left-color: var(--text-muted); }
+.activity-event.activity-skipped { opacity: 0.75; }
+.activity-seq { color: var(--text-muted); font-size: 0.72rem; min-width: 20px; text-align: right; }
+.activity-main { flex: 1; }
+.activity-dur { color: var(--text-muted); font-size: 0.72rem; margin-left: 6px; }
+.activity-details summary { cursor: pointer; color: var(--text-muted); font-size: 0.75rem; }
+.activity-details pre { white-space: pre-wrap; word-break: break-word; font-size: 0.72rem; background: var(--bg-surface); padding: 6px; border-radius: 4px; }
+.activity-summary { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px; font-size: 0.82rem; display: flex; flex-direction: column; gap: 4px; }

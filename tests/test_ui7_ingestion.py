@@ -465,7 +465,10 @@ def test_service_ingest_document_signature_has_no_path_parameter():
     assert "path" not in param_names
     # Step 5 extends the signature with bounded manual-entry parameters;
     # caller-controlled filesystem path parameters remain prohibited.
-    assert param_names == ["self", "file_bytes", "filename", "mode", "manual_terms", "manual_explanation", "confirm_conflicts"]
+    # The ingestion-activity `recorder` is an internal instrumentation
+    # object supplied only by the service/API layer itself -- it is
+    # never accepted from request input and carries no path authority.
+    assert param_names == ["self", "file_bytes", "filename", "mode", "manual_terms", "manual_explanation", "confirm_conflicts", "recorder"]
 
 
 def test_repository_native_internal_extractor_retains_reference_base_path_support():
