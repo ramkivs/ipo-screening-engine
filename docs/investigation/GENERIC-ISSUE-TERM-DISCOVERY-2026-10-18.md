@@ -143,3 +143,75 @@ evidence (modelled on the recorded official BSE pages), not a claim
 of live retrieval from this sandbox, whose egress still cannot reach
 the exchanges. Live completion on the user's Windows runtime remains
 theirs to confirm with one fresh upload.
+
+## Addendum 2026-10-18: first failing stage after the issue-page correction
+
+**User-reported Windows acceptance at `cbac38c`:** the Jio RHP still
+returned `AWAITING_ISSUE_TERMS` naming all four fields, even though
+bseindia.com and sebi.gov.in homepages loaded (HTTP 200) and the API
+health was healthy. Those checks prove homepage reachability only;
+they do not exercise the listing retrieval, link following, or
+issue-page parsing stages.
+
+**Stage trace (A-L):** A. listing retrieval; B. listing parsing;
+C. issuer matching; D. issue-detail link extraction; E. link following;
+F. issue-page retrieval; G. exchange-page parser; H. source/issuer
+validation; I. candidate resolution/merging; J. canonical population
+(+ OFS); K. required-field gate; L. persisted evaluation.
+
+**First failing stage: A/B (listing discovery).** Discovery scanned
+`https://www.bseindia.com/publicissue.html`, which is a JavaScript
+application shell: the raw HTML a plain HTTP client receives contains
+no issue rows and no `DisplayIPO` links, so stages C-L never run and
+discovery honestly reports NOT_FOUND while the terms are in fact
+published. The server-rendered BSE listing
+`https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P`
+carries the full issue table with the issuer's `DisplayIPO` link in
+the served HTML (verified by direct fetch through the investigator
+tooling, 2026-10-18). Additionally, hrefs in served HTML encode query
+separators as `&amp;`; raw URLs must be HTML-unescaped before
+following, with decoded query parameters (`idtype`, `IPONo`,
+`startdt`) preserved exactly.
+
+**Sandbox limitation (explicit):** this environment's application-side
+HTTPS to BSE/NSE/SEBI fails at TLS (egress restrictions documented in
+earlier sections); live retrieval from here is UNAVAILABLE and is not
+evidence about the Windows runtime. The classic-listing fixtures are
+deterministic mechanics evidence modelled on the directly fetched
+server-rendered page, not a claim of application-side live retrieval.
+
+**Correction (generic, no issuer-specific code):** (1) the classic
+server-rendered BSE listing was added to `LISTING_URLS` ahead of the
+JS shell; (2) `_candidate_links` HTML-unescapes listing text before
+href extraction. Downstream stages are unchanged: allowlist hosts,
+issuer matching, `ExchangeIssuePageParser` (labelled Price Band /
+Market Lot / Issue Period; Market Lot only), verified `EXCHANGE_DATA`
+provenance as `EXCHANGE_ISSUE_PAGE`, hard conflict rejection, and
+the richest-primary (Prospectus) preference.
+
+**OFS (separate investigation):** zero and missing remain distinct
+(`issue.get(field) is None`). Sandbox extraction of the committed
+Jio RHP at HEAD establishes fresh-only content (no offer-for-sale)
+and yields `ofs 0.0` from the filing itself; the service-level Jio
+tests confirm `ofs 0.0` in the persisted evaluation. The Windows
+report's `issue.ofs` therefore indicates that in the Windows run the
+FRESH-only/NIL establishment did not fire — consistent with the
+uploaded document's cover layout differing from the committed copy,
+a stale runtime process, or discovery having been invoked on a
+record whose filing evidence differs. Arena cannot inspect the
+Windows file/process and does not claim otherwise; no issuer-specific
+branch was added for it. The generic NIL window was already widened
+(16→32 lines) in `cbac38c`; any further change requires the actual
+Windows document's cover text as evidence.
+
+**Regression tests added:** classic BSE listing with `&amp;`-encoded
+hrefs (exact followed URL asserted, band/lot extracted), JS-shell
+listing yielding NOT_FOUND (not a crash, not a false unpublished
+claim about the issuer). Two index-shifted pre-existing discovery
+tests were made position-independent — no assertions weakened.
+
+**Windows acceptance (still user-side):** restart the API from the
+updated checkout and upload the Jio RHP once. Expected: pricing
+resolves from the official BSE issue page; if the uploaded filing
+establishes fresh-only content, `ofs 0.0` is filing-sourced and only
+`issue.fresh_issue` awaits until the final Prospectus is published.

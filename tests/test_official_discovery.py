@@ -72,10 +72,10 @@ def test_discovers_price_band_notice_without_configuration():
 
 def test_discovers_final_prospectus_and_rejects_other_issuers_document():
     fetcher = _fetcher({
-        OfficialDiscoveryProvider.LISTING_URLS[2]: LISTING_WITH_PROSPECTUS.encode(),
+        OfficialDiscoveryProvider.LISTING_URLS[-1]: LISTING_WITH_PROSPECTUS.encode(),
         "https://www.sebi.gov.in/sebi_data/attachdocs/oct-2026/acme-prospectus.pdf": PROSPECTUS.encode(),
     })
-    provider = OfficialDiscoveryProvider(fetcher=fetcher, listing_urls=[OfficialDiscoveryProvider.LISTING_URLS[2]])
+    provider = OfficialDiscoveryProvider(fetcher=fetcher, listing_urls=[OfficialDiscoveryProvider.LISTING_URLS[-1]])
     candidate, report = provider.find("Acme Forge Limited", "ACME-FORGE-LIMITED")
     assert report.outcome == "FOUND"
     assert candidate is not None
@@ -266,3 +266,47 @@ def test_jio_evaluation_completes_when_prospectus_also_discovered(tmp_path):
     assert issue["lot_size"] == 12
     assert issue["ofs"] == 0.0
     assert record["score"]["final_score"] is not None
+
+
+# ----------------------------------------------------------------------
+# Actual BSE link shapes (server-rendered IPOIssues listing, recorded
+# 2026-10-18: hrefs are &amp;-encoded; the JS-shell page yields nothing)
+# ----------------------------------------------------------------------
+BSE_CLASSIC_LISTING = """<html><body><table>
+<tr><td><a href="https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4894&amp;type=IPO&amp;idtype=1&amp;status=F&amp;IPONo=8047&amp;startdt=21%2F10%2F2026">Jio Platforms Limited</a></td><td>MainBoard</td><td>21-10-2026</td><td>23-10-2026</td><td>1065.00 - 1119.00</td></tr>
+<tr><td><a href="https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4895&amp;type=IPO&amp;status=F">Paras Healthcare Limited</a></td><td>MainBoard</td></tr>
+</table></body></html>"""
+
+BSE_JS_SHELL = "<html><head><title>Public Issues</title></head><body><app-root></app-root><script src='main.js'></script></body></html>"
+
+
+# The classic listing href decodes to this exact URL; query parameters
+# (idtype, IPONo, startdt) are preserved when the link is followed.
+JIO_DISPLAY_URL_FULL = (
+    "https://www.bseindia.com/markets/publicIssues/DisplayIPO"
+    "?id=4894&type=IPO&idtype=1&status=F&IPONo=8047&startdt=21%2F10%2F2026"
+)
+
+
+def test_discovers_via_classic_bse_listing_with_amp_encoded_hrefs():
+    classic_url = "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P"
+    fetcher = _fetcher({
+        classic_url: BSE_CLASSIC_LISTING.encode(),
+        JIO_DISPLAY_URL_FULL: BSE_ISSUE_PAGE.encode(),
+    })
+    provider = OfficialDiscoveryProvider(fetcher=fetcher, listing_urls=[classic_url])
+    candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert report.outcome == "FOUND"
+    assert candidate is not None
+    assert candidate.uri == JIO_DISPLAY_URL_FULL  # &amp; decoded to &, params preserved
+    assert candidate.values["price_band_low"] == 1065.0
+    assert candidate.values["lot_size"] == 12
+
+
+def test_js_shell_listing_yields_not_found_not_crash():
+    fetcher = _fetcher({"https://www.bseindia.com/publicissue.html": BSE_JS_SHELL.encode()})
+    provider = OfficialDiscoveryProvider(
+        fetcher=fetcher, listing_urls=["https://www.bseindia.com/publicissue.html"]
+    )
+    candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert candidate is None and report.outcome == "NOT_FOUND"

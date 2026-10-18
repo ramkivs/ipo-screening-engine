@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from html import unescape as html_unescape
 import os
 import re
 import tempfile
@@ -444,6 +445,12 @@ class OfficialDiscoveryProvider:
 
     LISTING_URLS = (
         "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+        # BSE's server-rendered public-issues listing (the newer
+        # publicissue.html is a JavaScript application shell whose raw
+        # HTML contains no issue rows, so a plain HTTP client finds
+        # nothing there; this classic page carries the DisplayIPO
+        # links in the served HTML).
+        "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
         "https://www.bseindia.com/publicissue.html",
         "https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0",
     )
@@ -469,7 +476,9 @@ class OfficialDiscoveryProvider:
         return _default_http_fetch(url, self.timeout_seconds)
 
     def _candidate_links(self, listing_bytes: bytes, base_url: str, company_name: str) -> List[str]:
-        text = listing_bytes.decode("utf-8", errors="ignore")
+        # Served HTML encodes query separators as &amp; in hrefs;
+        # unescape first so followed URLs carry real parameters.
+        text = html_unescape(listing_bytes.decode("utf-8", errors="ignore"))
         tokens = [
             tok
             for tok in re.split(r"[^A-Za-z0-9]+", (company_name or "").upper())
