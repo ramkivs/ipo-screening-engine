@@ -215,3 +215,69 @@ updated checkout and upload the Jio RHP once. Expected: pricing
 resolves from the official BSE issue page; if the uploaded filing
 establishes fresh-only content, `ofs 0.0` is filing-sourced and only
 `issue.fresh_issue` awaits until the final Prospectus is published.
+
+## Addendum 2026-10-18 (2): HTTP 200 homepage — response identity and session
+
+**New Windows evidence:** a direct PowerShell GET of the classic BSE
+listing URL returned HTTP 200, `text/html`, 14,287 characters, the BSE
+**homepage** (masthead title "LIVE Stock/Share Market | … | BSE
+SENSEX | BSE (formerly Bombay Stock Exchange)"), with no Jio text and
+no `DisplayIPO`/`IPONo` markers. HTTP 200 was therefore being treated
+as a searched listing when no listing had been retrieved at all.
+
+**Why the homepage is served:** the same URLs return the real pages
+to a browser-like session (investigator tooling fetched the genuine
+listing — title "IPOs Listing|New Live Public Issues on BSE", Jio row
+present — and the genuine `DisplayIPO` page with Price Band / Market
+Lot, 2026-10-18). The distinguishing factor is the session: BSE
+serves its homepage to cookie-less one-shot requests (the Windows
+PowerShell GET, and equally this app's previous cookie-less urllib
+fetches), while a session that first establishes cookies from the
+site receives the real pages. Homepage reachability checks (200) do
+not exercise any of this.
+
+**Correction (generic):**
+1. **Session-aware retrieval** — `_default_http_fetch` now installs a
+   shared cookie-jar opener and performs a one-time best-effort
+   homepage warm-up per official host before fetching listing/issue
+   pages (skipped for PDF document URLs, so single-document retrieval
+   and its retry accounting are unchanged), with a browser header set
+   including `Referer`.
+2. **Response-identity validation** — fetched listings are classified
+   `ok | empty | homepage | shell` before use. Homepage fingerprints
+   require the BSE masthead AND absence of genuine issue content
+   (issue-detail links, Price Band, Market Lot, Issue Period), because
+   real BSE pages share the masthead in their chrome — a real
+   DisplayIPO page is never misclassified. A homepage or JS shell
+   never counts as a searched listing.
+3. **Specific failure reasons** — every stage (listing retrieval,
+   listing wrong-page/shell, issue-page retrieval, wrong-page,
+   non-HTML, parse, issuer mismatch, missing labelled terms) records
+   a precise note carried into the provider report. Outcomes:
+   FOUND only for a verified candidate; NOT_FOUND only when at least
+   one *valid* listing was actually searched; otherwise UNAVAILABLE
+   with the per-URL reasons (resolver maps this to UNAVAILABLE, not
+   UNPUBLISHED). Conflicting verified terms still reject outright.
+
+**Honesty bounds:** this sandbox's own HTTPS to BSE/NSE/SEBI fails at
+TLS (egress policy), so live retrieval from here reports UNAVAILABLE
+with per-URL retrieval reasons — verified above. Mocked/fixture tests
+prove the validation and session mechanics (including cookie
+persistence over a real loopback socket); they do not prove the
+Windows runtime now receives the real BSE pages. If BSE's protection
+additionally fingerprints the Python TLS stack, the Windows run will
+now fail as UNAVAILABLE naming the homepage wrong-page response —
+a precise diagnosis rather than a false unpublished signal — and the
+next step would be a browser-session retrieval mechanism, which
+would need its own authorization and evidence.
+
+**Regression tests:** observed homepage response → UNAVAILABLE
+(+ resolver UNAVAILABLE); homepage on one listing does not poison a
+valid listing (FOUND preserved); issue page returning the homepage →
+NOT_FOUND-with-valid-listing-searched and the detail names the
+wrong-page stage; JS shell → UNAVAILABLE (supersedes the earlier
+NOT_FOUND expectation for shells — a shell means no listing was
+searched); valid classic listing, `&amp;` decoding and full
+query-parameter preservation unchanged; cookie persistence pinned
+over loopback. OFS handling is untouched by this correction
+(fresh-only filing establishment remains the only zero source).

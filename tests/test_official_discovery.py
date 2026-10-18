@@ -303,10 +303,70 @@ def test_discovers_via_classic_bse_listing_with_amp_encoded_hrefs():
     assert candidate.values["lot_size"] == 12
 
 
-def test_js_shell_listing_yields_not_found_not_crash():
+def test_js_shell_listing_is_unavailable_not_searched():
+    # A JavaScript shell contains no issue rows: the listing was never
+    # searched, so this is a response-validation failure (UNAVAILABLE
+    # with a specific reason), never a NOT_FOUND/unpublished signal.
     fetcher = _fetcher({"https://www.bseindia.com/publicissue.html": BSE_JS_SHELL.encode()})
     provider = OfficialDiscoveryProvider(
         fetcher=fetcher, listing_urls=["https://www.bseindia.com/publicissue.html"]
     )
     candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
-    assert candidate is None and report.outcome == "NOT_FOUND"
+    assert candidate is None and report.outcome == "UNAVAILABLE"
+    assert "shell" in report.detail
+
+
+# ----------------------------------------------------------------------
+# Wrong-page (homepage) responses -- the observed Windows behaviour
+# (2026-10-18): a cookie-less GET of the classic BSE listing URL
+# returned HTTP 200 with the BSE homepage (masthead title, ~14k chars,
+# no DisplayIPO/Jio content).  HTTP 200 is not a listing.
+# ----------------------------------------------------------------------
+BSE_HOMEPAGE = """<html><head><title>LIVE Stock/Share Market | Indian Stock/Share Market LIVE | BSE SENSEX | BSE (formerly Bombay Stock Exchange)</title></head>
+<body><nav>Public Issues | Markets | Sensex</nav>
+<a href="https://www.bseindia.com/sensex/code/16">BSE SENSEX 74,729.27</a>
+<p>Welcome to BSE - India's leading stock exchange group.</p>
+</body></html>"""
+
+
+def test_homepage_response_is_not_a_searched_listing():
+    fetcher = _fetcher({u: BSE_HOMEPAGE.encode() for u in OfficialDiscoveryProvider.LISTING_URLS})
+    provider = OfficialDiscoveryProvider(fetcher=fetcher)
+    candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert candidate is None
+    assert report.outcome == "UNAVAILABLE"  # never NOT_FOUND/unpublished
+    assert "homepage" in report.detail
+    outcome = IssueTermsResolver(providers=[provider]).resolve(
+        company_name="Jio Platforms Limited", ipo_id="JIO-PLATFORMS-LIMITED",
+        missing_fields=["price_band_low"],
+    )
+    assert outcome.status == "UNAVAILABLE"
+
+
+def test_homepage_on_one_listing_does_not_poison_valid_listing():
+    classic_url = "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P"
+    fetcher = _fetcher({
+        OfficialDiscoveryProvider.LISTING_URLS[0]: LISTING_WITH_NOTICE.encode(),
+        classic_url: BSE_HOMEPAGE.encode(),
+        "https://www.nseindia.com/content/ipo/acme-price-band.pdf": NOTICE.encode(),
+    })
+    provider = OfficialDiscoveryProvider(fetcher=fetcher)
+    candidate, report = provider.find("Acme Forge Limited", "ACME-FORGE-LIMITED")
+    assert report.outcome == "FOUND"
+    assert candidate is not None and candidate.values["price_band_low"] == 100.0
+
+
+def test_issue_page_returning_homepage_reports_wrong_page_reason():
+    classic_url = "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P"
+    fetcher = _fetcher({
+        classic_url: BSE_CLASSIC_LISTING.encode(),
+        JIO_DISPLAY_URL_FULL: BSE_HOMEPAGE.encode(),
+    })
+    provider = OfficialDiscoveryProvider(fetcher=fetcher, listing_urls=[classic_url])
+    candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
+    assert candidate is None
+    # A valid listing WAS searched, so NOT_FOUND -- but the detail must
+    # name the wrong-page failure at the issue-page stage, not imply
+    # the terms are unpublished.
+    assert report.outcome == "NOT_FOUND"
+    assert "homepage" in report.detail

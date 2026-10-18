@@ -168,3 +168,40 @@ def test_genuine_pdf_bytes_rejected_as_non_prospectus():
     candidate, report = provider.find(COMPANY, IPO_ID)
     assert candidate is None
     assert report.outcome == "REJECTED"
+
+
+class _CookieHandler(http.server.BaseHTTPRequestHandler):
+    seen_cookies: list = []
+
+    def do_GET(self):  # noqa: N802
+        type(self).seen_cookies.append(self.headers.get("Cookie"))
+        body = b"ok"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Set-Cookie", "BSESESSION=abc123; Path=/")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):  # silence
+        pass
+
+
+def test_default_fetcher_keeps_session_cookies():
+    """BSE serves its homepage (HTTP 200) to cookie-less requests for
+    listing/issue URLs (observed on the user's Windows runtime,
+    2026-10-18); the default fetcher must therefore carry session
+    cookies across requests like a browser session does.  Loopback
+    proves the cookie mechanism only -- not live BSE access."""
+    _CookieHandler.seen_cookies = []
+    server = http.server.HTTPServer(("127.0.0.1", 0), _CookieHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/markets/PublicIssues/IPOIssues?id=1&Type=P"
+        assert _default_http_fetch(url, 5.0) == b"ok"
+        assert _default_http_fetch(url, 5.0) == b"ok"
+    finally:
+        server.shutdown()
+    assert _CookieHandler.seen_cookies[0] is None  # first request: no cookie yet
+    assert "BSESESSION=abc123" in (_CookieHandler.seen_cookies[1] or "")

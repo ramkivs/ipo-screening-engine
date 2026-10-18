@@ -24,6 +24,7 @@ Semantics preserved:
 from __future__ import annotations
 
 import hashlib
+import http.cookiejar
 import json
 from html import unescape as html_unescape
 import os
@@ -59,6 +60,65 @@ OFFICIAL_HOSTS = {
 }
 
 
+_BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/pdf,application/xhtml+xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
+    "Accept-Language": "en-IN,en;q=0.9",
+}
+
+# Session state for official-site retrieval.  BSE (verified 2026-10-18
+# from the user's Windows runtime) serves its HOMEPAGE with HTTP 200 to
+# cookie-less one-shot requests for listing/issue URLs, while a session
+# that first establishes cookies from the site itself receives the real
+# pages.  A shared cookie jar plus a one-time homepage warm-up per
+# official host reproduces the browser session behaviour; content
+# validation in the discovery provider still decides what counts as a
+# listing, so a wrong-page response is never silently accepted.
+_SESSION_JAR = http.cookiejar.CookieJar()
+_SESSION_OPENER_READY = False
+_WARMED_HOSTS: set = set()
+
+
+def _ensure_session_opener() -> None:
+    global _SESSION_OPENER_READY
+    if _SESSION_OPENER_READY:
+        return
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(_SESSION_JAR)
+    )
+    urllib.request.install_opener(opener)
+    _SESSION_OPENER_READY = True
+
+
+def _warm_up_session(url: str, timeout_seconds: float) -> None:
+    """Establish session cookies from an official host's homepage.
+
+    One attempt per host per process, best-effort: failure simply means
+    the subsequent fetch proceeds cookie-less (and wrong-page responses
+    are classified as such by the caller).  Warm-up is skipped for
+    document (PDF) URLs so single-document retrieval behaviour -- and
+    its retry accounting -- is unchanged.
+    """
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if host not in OFFICIAL_HOSTS or host in _WARMED_HOSTS:
+        return
+    if parsed.path.lower().endswith(".pdf"):
+        return
+    _WARMED_HOSTS.add(host)
+    try:
+        warm = urllib.request.Request(
+            f"{parsed.scheme}://{host}/", headers=dict(_BROWSER_HEADERS)
+        )
+        with urllib.request.urlopen(warm, timeout=min(timeout_seconds, 15.0)) as response:
+            response.read(4096)
+    except Exception:
+        pass  # best-effort; the real fetch and its validation decide
+
+
 def _default_http_fetch(url: str, timeout_seconds: float) -> bytes:
     """Default retrieval for official documents.
 
@@ -66,18 +126,18 @@ def _default_http_fetch(url: str, timeout_seconds: float) -> bytes:
     agents; a browser-compatible header set keeps retrieval behaviour
     consistent with how the documents are published for public access.
     The host allowlist -- not the headers -- is the security boundary.
+    Listing/issue pages are fetched inside a cookie session (see
+    ``_warm_up_session``): an HTTP 200 homepage response to a
+    cookie-less request is a known BSE behaviour and must never be
+    mistaken for the requested page.
     """
-    request = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-            ),
-            "Accept": "application/pdf,text/plain;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-IN,en;q=0.9",
-        },
-    )
+    _ensure_session_opener()
+    _warm_up_session(url, timeout_seconds)
+    parsed = urlparse(url)
+    headers = dict(_BROWSER_HEADERS)
+    if parsed.scheme and parsed.hostname:
+        headers["Referer"] = f"{parsed.scheme}://{parsed.hostname}/"
+    request = urllib.request.Request(url, headers=headers)
     # Bounded retries for transient retrieval failures (connection
     # resets, timeouts, HTTP 429/5xx): official document servers are
     # intermittently unavailable, and a single attempt turned a
@@ -456,6 +516,45 @@ class OfficialDiscoveryProvider:
     )
     _GENERIC_TOKENS = {"LIMITED", "INDIA", "PRIVATE", "COMPANY", "INDUSTRIES", "INDUSTRY", "GLOBAL", "INTERNATIONAL"}
 
+    # Response-identity fingerprints.  An HTTP 200 is not a listing:
+    # BSE serves its homepage (title carries the LIVE/SENSEX masthead)
+    # to session-less requests, and its newer public-issues page is a
+    # JavaScript shell.  Neither may count as a searched listing, and
+    # neither is evidence that an issuer's terms are unpublished.
+    _LISTING_MARKERS = (
+        "displayipo", "issue-information", "issue_information",
+        "public issues", "public issue", "security name", "attachdocs",
+        "all-upcoming-issues", "price band",
+    )
+    _HOMEPAGE_MARKERS = ("bse sensex", "live stock/share market", "formerly bombay stock exchange")
+    _SHELL_MARKERS = ("<app-root", "app-root>", "enable javascript to run this app", "you need to enable javascript")
+
+    @classmethod
+    def _classify_listing(cls, raw: bytes) -> str:
+        """Classify a fetched listing response: ok | empty | homepage | shell.
+
+        BSE pages share the homepage masthead in their chrome, so the
+        homepage verdict requires the masthead AND the absence of any
+        genuine issue content (issue-detail links, Price Band, Market
+        Lot, Issue Period): a real DisplayIPO page carries the masthead
+        title but is not the homepage.
+        """
+        text = raw.decode("utf-8", errors="ignore").lower()
+        if any(marker in text for marker in cls._SHELL_MARKERS):
+            return "shell"
+        has_issue_links = any(
+            marker in text
+            for marker in ("displayipo", "issue-information", "issue_information")
+        )
+        has_issue_content = has_issue_links or any(
+            marker in text for marker in ("price band", "market lot", "issue period")
+        )
+        if not has_issue_content and sum(marker in text for marker in cls._HOMEPAGE_MARKERS) >= 2:
+            return "homepage"
+        if has_issue_content or any(marker in text for marker in cls._LISTING_MARKERS):
+            return "ok"
+        return "empty"
+
     def __init__(
         self,
         fetcher: Optional[Callable[[str], bytes]] = None,
@@ -525,27 +624,37 @@ class OfficialDiscoveryProvider:
         return [url for _prio, url in found[: self.max_candidates]]
 
 
-    def _from_issue_page(self, url: str, company_name: str) -> Optional[NoticeCandidate]:
-        """Fetch and parse an official exchange issue-information page."""
+    def _from_issue_page(self, url: str, company_name: str) -> tuple[Optional[NoticeCandidate], str]:
+        """Fetch and parse an official exchange issue-information page.
+
+        Returns (candidate, reason); reason names the exact failing
+        stage when no candidate results, so a wrong-page (homepage)
+        response is never conflated with an unpublished issue.
+        """
         from .extraction.exchange_issue_page import ExchangeIssuePageParser
 
         host = (urllib.parse.urlparse(url).hostname or "").lower()
         if host not in self.allowed_hosts:
-            return None
+            return None, f"{url}: host is not an official source host"
         try:
             raw = self._fetch(url)
-        except Exception:
-            return None
+        except Exception as exc:
+            return None, f"{url}: issue-page retrieval failed ({type(exc).__name__})"
         if not raw.lstrip()[:15].lower().startswith((b"<!doctype", b"<html", b"<")):
-            return None
+            return None, f"{url}: issue page returned a non-HTML response"
+        if self._classify_listing(raw) == "homepage":
+            return None, (
+                f"{url}: issue page returned the exchange homepage instead of "
+                "issue information (HTTP 200 wrong-page/session response)"
+            )
         try:
             result = ExchangeIssuePageParser().parse(raw, url=url)
-        except Exception:
-            return None
+        except Exception as exc:
+            return None, f"{url}: issue page could not be parsed ({type(exc).__name__})"
         if _norm_name(result.company_name) != _norm_name(company_name):
-            return None
+            return None, f"{url}: issue page names a different issuer"
         if result.price_band_low is None and result.lot_size is None:
-            return None
+            return None, f"{url}: issue page has no labelled Price Band or Market Lot"
         return NoticeCandidate(
             result=result,
             provider=self.name,
@@ -553,7 +662,7 @@ class OfficialDiscoveryProvider:
             retrieved_at=_utcnow().isoformat().replace("+00:00", "Z"),
             raw_bytes=None,
             verified=True,
-        )
+        ), ""
 
     @staticmethod
     def _merge_candidates(candidates: List[NoticeCandidate]) -> NoticeCandidate:
@@ -598,21 +707,41 @@ class OfficialDiscoveryProvider:
 
     def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
         reached = False
-        errors: List[str] = []
+        notes: List[str] = []
+
+        def note(text: str) -> None:
+            if text and text not in notes and len(notes) < 6:
+                notes.append(text)
+
         for listing_url in self.listing_urls:
             try:
                 raw = self._fetch(listing_url)
             except Exception as exc:
-                errors.append(f"{listing_url}: {type(exc).__name__}")
+                note(f"{listing_url}: listing retrieval failed ({type(exc).__name__})")
+                continue
+            kind = self._classify_listing(raw)
+            if kind == "homepage":
+                note(
+                    f"{listing_url}: returned the exchange homepage, not an issue "
+                    "listing (HTTP 200 wrong-page response; a listing was not searched)"
+                )
+                continue
+            if kind == "shell":
+                note(
+                    f"{listing_url}: returned a JavaScript application shell with no "
+                    "issue rows in the served HTML (a listing was not searched)"
+                )
                 continue
             reached = True
             collected: List[NoticeCandidate] = []
             for link in self._candidate_links(raw, listing_url, company_name):
                 low = link.lower()
                 if "displayipo" in low or "issue-information" in low or "issue_information" in low:
-                    page_candidate = self._from_issue_page(link, company_name)
+                    page_candidate, reason = self._from_issue_page(link, company_name)
                     if page_candidate is not None:
                         collected.append(page_candidate)
+                    else:
+                        note(reason)
                     continue
                 for provider_cls in (HttpNoticeProvider, HttpProspectusProvider):
                     provider = provider_cls({ipo_id: link}, fetcher=self._fetcher, allowed_hosts=self.allowed_hosts, timeout_seconds=self.timeout_seconds)
@@ -629,12 +758,17 @@ class OfficialDiscoveryProvider:
                     self.name, "FOUND", f"discovered official document via {listing_url}: {merged.uri}"
                 )
         if reached:
-            return None, ProviderReport(
-                self.name, "NOT_FOUND",
-                "official NSE/BSE/SEBI listings searched; no issuer-matched price-band or prospectus document is published yet",
+            detail = (
+                "official listings searched; no issuer-matched official document "
+                "was found (this does not by itself establish non-publication)"
             )
+            if notes:
+                detail += "; " + "; ".join(notes)
+            return None, ProviderReport(self.name, "NOT_FOUND", detail)
         return None, ProviderReport(
-            self.name, "UNAVAILABLE", f"official listing discovery unreachable ({'; '.join(errors) or 'no listing sources'})"
+            self.name, "UNAVAILABLE",
+            "no valid official listing could be retrieved: "
+            + ("; ".join(notes) if notes else "no listing sources configured"),
         )
 
 
