@@ -1181,6 +1181,83 @@ class SectionExtractor:
             )
         return extractions
 
+    # A going-concern *uncertainty* is established only by the standard
+    # disclosure language: a material uncertainty related to going concern,
+    # substantial doubt about the ability to continue, or an equivalent
+    # statement.  A transfer "on a going concern basis" (an accounting
+    # measurement convention) is not an uncertainty.
+    _GOING_CONCERN_UNCERTAINTY = re.compile(
+        r"material\s+uncertainty[^.]{0,200}?going\s+concern"
+        r"|going\s+concern[^.]{0,200}?material\s+uncertainty"
+        r"|substantial\s+doubt[^.]{0,160}?(?:ability\s+to\s+continue|going\s+concern)"
+        r"|ability\s+to\s+continue\s+as\s+a\s+going\s+concern[^.]{0,160}?(?:uncertain|doubt)",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _has_positive_emphasis_of_matter(cls, text: str) -> bool:
+        """True only for a positive Emphasis of Matter statement.
+
+        "There are no Emphasis of matters in auditor's report" is a negative
+        disclosure; treating it as an EOM would invert its meaning.
+        """
+        for match in re.finditer(r"emphasis\s+of\s+matters?", text, re.IGNORECASE):
+            before = text[max(0, match.start() - 80):match.start()].lower()
+            if re.search(r"\b(?:no|nil|without)\s*$", before):
+                continue
+            if re.search(r"\bthere\s+(?:are|is)\s+no\s*$", before):
+                continue
+            return True
+        return False
+
+    @staticmethod
+    def _opinion_sentence(text: str, pattern: str) -> str:
+        """Verbatim sentence around the opinion phrase (whitespace-normalised)."""
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            return ""
+        start = max(text.rfind(".", 0, match.start()), text.rfind("\n", 0, match.start()))
+        end = text.find(".", match.end())
+        end = len(text) if end == -1 else end + 1
+        return " ".join(text[start + 1:end].split())[:400]
+
+    def _examination_report_pages(self, scan_pages: List[int]) -> List[int]:
+        """Contiguous pages of the auditors' examination report.
+
+        The opinion is stated in the report's conclusion, which usually does
+        not repeat the heading wording.  Anchor on the first page carrying the
+        examination-report heading, then include pages up to and including the
+        auditor signature (UDIN) — bounded to eight pages — and stop before
+        the restated statements begin.
+        """
+        anchor = None
+        for p in scan_pages:
+            if "examination report" in self.extract_page_text(p).lower():
+                anchor = p
+                break
+        if anchor is None:
+            return []
+        pages: List[int] = []
+        for p in range(anchor, min(anchor + 8, self.page_count + 1)):
+            txt = self.extract_page_text(p)
+            low = txt.lower()
+            # The statements themselves begin with a standalone heading
+            # line; the report's scope paragraph mentions the same statements
+            # inline, so only the heading counts.
+            if p > anchor and re.search(
+                r"^\s*restated\s+consolidated\s+statements?\s+of\s+assets\s+and\s+liabilit(?:y|ies)\s*$",
+                txt,
+                re.IGNORECASE | re.MULTILINE,
+            ):
+                break
+            pages.append(p)
+            # UDIN is the auditors' unique document identification number and
+            # appears in the signature block.  Match the token, not the
+            # substring: "including" contains "udin".
+            if re.search(r"\bUDIN\b", txt) or "for and on behalf of" in low:
+                break
+        return pages
+
     def extract_governance(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract auditor opinion, litigation bucket, SEBI action, and board independence."""
         extractions: List[RawExtraction] = []
@@ -1201,42 +1278,104 @@ class SectionExtractor:
         if self.page_count >= 350:
             scan_pages.extend(range(340, 350))
 
-        for p in scan_pages:
-            txt = self.extract_page_text(p)
+        # The opinion is stated on the report's conclusion page, which does
+        # not repeat the words "examination report" / "independent auditor".
+        # Gating on those words on the SAME page skipped Jio's conclusion
+        # (pp. 321-324: the opinion language is on pp. 323-324).  Scan the
+        # contiguous examination-report section instead: from the anchor page
+        # up to and including the auditor signature (UDIN), bounded.
+        report_pages = self._examination_report_pages(scan_pages)
+        page_texts = {p: self.extract_page_text(p) for p in report_pages}
+        section_text = "\n".join(page_texts[p] for p in report_pages)
+        opinion_quote = ""
+
+        def page_for(offset: int) -> int:
+            cursor = 0
+            for p in report_pages:
+                cursor += len(page_texts[p]) + 1
+                if offset < cursor:
+                    return p
+            return report_pages[-1] if report_pages else p_start
+
+        # 1. A qualification, adverse opinion, disclaimer or positive Emphasis
+        #    of Matter anywhere in the report dominates.  A qualification is
+        #    never overridden by a later "no modification" sentence.
+        for p in report_pages:
+            txt = page_texts[p]
             low = txt.lower()
-            if "examination report" in low or "independent auditor" in low:
-                if "emphasis of matter" in low or "included following matter(s)" in low:
-                    auditor_opinion = "emphasis_of_matter"
-                    found_opinion_page = p
-                    break
-                elif "adverse opinion" in low:
-                    auditor_opinion = "adverse"
-                    found_opinion_page = p
-                    break
-                elif "disclaimer of opinion" in low:
-                    auditor_opinion = "disclaimer"
-                    found_opinion_page = p
-                    break
-                elif "unqualified opinion" in low or "unmodified opinion" in low:
-                    auditor_opinion = "unqualified"
-                    found_opinion_page = p
-                    break
-                elif "qualified opinion" in low:
-                    auditor_opinion = "qualified"
-                    found_opinion_page = p
-                    break
+            if self._has_positive_emphasis_of_matter(txt) or "included following matter(s)" in low:
+                auditor_opinion = "emphasis_of_matter"
+                found_opinion_page = p
+                opinion_quote = self._opinion_sentence(txt, r"emphasis\s+of\s+matters?")
+                break
+            if "adverse opinion" in low:
+                auditor_opinion = "adverse"
+                found_opinion_page = p
+                opinion_quote = self._opinion_sentence(txt, r"adverse\s+opinion")
+                break
+            if "disclaimer of opinion" in low:
+                auditor_opinion = "disclaimer"
+                found_opinion_page = p
+                opinion_quote = self._opinion_sentence(txt, r"disclaimer\s+of\s+opinion")
+                break
+            # "unqualified opinion" contains "qualified opinion" as a
+            # substring; only a standalone qualification counts.
+            if re.search(
+                r"basis\s+for\s+qualified\s+opinion|(?<!un)qualified\s+opinion", txt, re.IGNORECASE
+            ):
+                auditor_opinion = "qualified"
+                found_opinion_page = p
+                opinion_quote = self._opinion_sentence(txt, r"(?<!un)qualified\s+opinion")
+                break
+
+        # 2. Unmodified-opinion evidence, strongest statement first.  The
+        #    examination report's own conclusion ("we report that the
+        #    Restated Consolidated Financial Information ... no modification
+        #    in the underlying audit reports") is the statement that bears on
+        #    the restated information; a component auditor's equivalent
+        #    confirmation (paragraph 7, about one subsidiary's standalone
+        #    statements) is not accepted in its place.
+        if auditor_opinion is None:
+            conclusion = re.search(
+                r"we\s+report\s+that\s+the\s+Restated\s+Consolidated\s+Financial\s+Information"
+                r"[\s\S]{0,1200}?no\s+modifications?\s+in\s+the\s+underlying\s+audit\s+reports?",
+                section_text,
+                re.IGNORECASE,
+            )
+            if conclusion:
+                auditor_opinion = "unqualified"
+                # Cite the page that carries the clause itself (a paragraph
+                # can begin at the foot of the preceding page).
+                clause_offset = conclusion.start() + conclusion.group(0).lower().find(
+                    "no modification"
+                )
+                found_opinion_page = page_for(max(clause_offset, conclusion.start()))
+                opinion_quote = self._opinion_sentence(
+                    section_text[conclusion.start():conclusion.end()],
+                    r"no\s+modifications?\s+in\s+the\s+underlying\s+audit\s+reports?",
+                )
+            else:
+                for pattern in (
+                    r"(?:unqualified|unmodified)\s+opinion",
+                    r"opinion[^.]{0,160}?\bis\s+not\s+modified\b",
+                ):
+                    match = re.search(pattern, section_text, re.IGNORECASE)
+                    if match:
+                        auditor_opinion = "unqualified"
+                        found_opinion_page = page_for(match.start())
+                        opinion_quote = self._opinion_sentence(section_text, pattern)
+                        break
 
         if auditor_opinion is not None:
             extractions.append(
                 RawExtraction(
                     field_path="governance.auditor_opinion",
                     candidate_value=auditor_opinion,
-                    raw_text=auditor_opinion,
+                    raw_text=opinion_quote or auditor_opinion,
                     page=found_opinion_page,
                     section="Financial Information",
                     locator="Auditor Examination Report — Opinion",
-                    quote=f"Auditor opinion classified as {auditor_opinion} from examination-report opinion language",
-                    quote_is_processing=True,
+                    quote=opinion_quote or auditor_opinion,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.90,
                 )
@@ -1334,19 +1473,34 @@ class SectionExtractor:
                     extraction_confidence=0.95,
                 )
             )
-            extractions.append(
-                RawExtraction(
-                    field_path="governance.going_concern_uncertainty",
-                    candidate_value=False,
-                    raw_text="False",
-                    page=found_opinion_page,
-                    section="Financial Information",
-                    locator="Auditor Opinion Notes",
-                    quote="No material going concern uncertainty noted",
-                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
-                    extraction_confidence=0.95,
-                )
-            )
+
+        # Going concern is established ONLY by positive going-concern
+        # uncertainty language in the auditors' report.  It is never emitted
+        # as False: the absence of a going-concern paragraph is not evidence
+        # that no uncertainty exists, and the previous unconditional
+        # ``going_concern_uncertainty = False`` emission (with a quote that did
+        # not appear in any source) cleared knockout K1 without evidence.
+        # This applies the already-approved Step 4 Area B(i) principle
+        # (unknown instead of an unsupported favourable default) to the second
+        # K1 input.
+        if report_pages:
+            for p in report_pages:
+                m = self._GOING_CONCERN_UNCERTAINTY.search(self.extract_page_text(p))
+                if m:
+                    extractions.append(
+                        RawExtraction(
+                            field_path="governance.going_concern_uncertainty",
+                            candidate_value=True,
+                            raw_text=" ".join(m.group(0).split()),
+                            page=p,
+                            section="Financial Information",
+                            locator="Auditor Examination Report — Going Concern",
+                            quote=" ".join(m.group(0).split()),
+                            extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                            extraction_confidence=0.95,
+                        )
+                    )
+                    break
 
         # 2. Litigation bucket & SEBI action
         lit_range = page_ranges.get("litigation") if page_ranges else None

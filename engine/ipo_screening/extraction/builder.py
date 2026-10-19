@@ -259,11 +259,16 @@ class CanonicalInputBuilder:
         unit = fin_base["reporting_unit"] if "reporting_unit" in fin_base else self._get_field("financials.reporting_unit", "INR_LAKHS")
         periods = fin_base["periods"] if "periods" in fin_base else self._get_field("financials.periods", [])
         cl = fin_base["contingent_liabilities"] if "contingent_liabilities" in fin_base else self._get_field("financials.contingent_liabilities", None)
+        # The unquantified flag is extracted only from a positive disclosure;
+        # an absent disclosure leaves it unknown (never False).
+        cl_unquantified = fin_base.get("contingent_liabilities_unquantified")
+        if cl_unquantified is None:
+            cl_unquantified = self._get_field("financials.contingent_liabilities_unquantified", None)
         result = {
             "reporting_unit": unit,
             "periods": periods,
             "contingent_liabilities": cl,
-            "contingent_liabilities_unquantified": fin_base.get("contingent_liabilities_unquantified", None),
+            "contingent_liabilities_unquantified": cl_unquantified,
         }
         # Schema-permitted penalty inputs must not be dropped by the builder:
         # the ``unreconciled_metrics`` penalty consumes this flag, and a value

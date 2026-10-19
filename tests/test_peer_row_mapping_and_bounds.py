@@ -327,6 +327,7 @@ def test_ingest_rejects_out_of_contract_peers_early_with_actionable_diagnostic(
     assert "never clamped or substituted" in message
     # Nothing was evaluated or persisted under a false successful state.
     assert "evaluation_id" not in body
+    assert service.eval_store.list_evaluations() == []
 
 
 # ---------------------------------------------------------------------------
@@ -505,3 +506,66 @@ def test_absent_valuation_date_is_not_defaulted():
     peers = _peers_from(table)
     assert [p["name"].split()[0] for p in peers] == ["GPT", "Indian"]
     assert {p["as_of"] for p in peers} == {None}
+
+
+def test_blank_and_non_numeric_cells_keep_their_columns():
+    """An empty/``NA`` revenue cell and an ``NM`` RONW cell occupy their own
+    columns.  Neither shortens the row nor shifts a later value into RONW
+    (the demonstrated placeholder-collapse defect, in its ``NA``/``NM``
+    spelling)."""
+    rows = (
+        "Alpha Fire Safety Limited\n"
+        "114.24 10.0 NA 7.7 7.7 14.83 52775.35 18.25 41.77\n"
+        "Beta Fire Safety Limited\n"
+        "371.4 2.0 130556.83 26.79 26.79 13.86 148435.98 NM 281.76\n"
+    )
+    peers = _peers_from(VISHAL_HEADER + rows)
+    assert [p["name"].split()[0] for p in peers] == ["Alpha", "Beta"]
+    alpha, beta = peers
+    assert (alpha["pe"], alpha["roe_pct"]) == (14.83, 18.25)
+    assert alpha["pb"] == pytest.approx(114.24 / 41.77, abs=0.01)
+    assert beta["pe"] == 13.86
+    assert beta["pb"] == pytest.approx(371.4 / 281.76, abs=0.01)
+    assert beta["roe_pct"] is None  # NM stays in the RONW column
+
+
+def test_valid_peer_ingestion_reaches_a_scored_valuation(
+    tmp_path, monkeypatch, golden_input
+):
+    """A contract-valid peer set survives ingestion, is snapshotted as VALID,
+    and reaches evaluation: ``pe_vs_peers`` is SCORED (a real zero), not
+    UNKNOWN.  This is the positive control for the rejection tests above."""
+
+    def factory():
+        doc = copy.deepcopy(golden_input)
+        doc["peers"] = [_peer("Peer Limited", pe=12.5, pb=1.4, roe_pct=9.5)]
+        return doc
+
+    monkeypatch.setattr(
+        DocumentExtractor, "extract_from_pdf",
+        lambda self, pdf_path=None, allow_fixture_fallbacks=False: (factory(), {}),
+    )
+    cfg = PresentationConfig(
+        store_root=tmp_path / "evaluations", config_dir=REPO_ROOT / "config",
+        issue_terms_resolver=IssueTermsResolver(providers=[]),
+    )
+    service = PresentationService(cfg)
+    client = TestClient(create_app(service), base_url="http://127.0.0.1:8000",
+                        headers={"Origin": "http://127.0.0.1:8000"})
+    res = client.post(
+        "/api/v1/ingest/manual-terms",
+        files={"file": ("filing.pdf", io.BytesIO(PDF_BYTES), "application/pdf")},
+        data={"mode": "final", "price_band_low": "208", "price_band_high": "220",
+              "lot_size": "68", "ofs": "3300", "fresh_issue": "14500",
+              "explanation": EXPLANATION, "confirm_conflicts": "true"},
+    )
+    assert res.status_code == 201, res.text
+    record = service.eval_store.read(res.json()["evaluation_id"])
+    assert record["peer_snapshot"]["valid_count"] == 1
+    assert record["peer_snapshot"]["observations"][0]["status"] == "VALID"
+    module_b = next(m for m in record["score"]["modules"] if m["module_id"] == "B")
+    pe = next(c for c in module_b["criteria"] if c["criterion_id"] == "pe_vs_peers")
+    # 220 / 9.46 = 23.26 issuer P/E vs a 12.5 peer P/E -> +86 %, the
+    # "richer than peers" band: a scored zero, not an unknown.
+    assert pe["state"] == "SCORED"
+    assert pe["score"] == 0.0

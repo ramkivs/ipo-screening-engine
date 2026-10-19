@@ -140,11 +140,11 @@ class FinancialTableExtractor:
                               r"Return on (?:Average )?Capital\s+Employed"],
         )
 
-        cl_start = 250 if self.page_count >= 250 else 1
-        cl_page, cl_text = self._find_page(
-            ["Contingent Liabilities and Commitments", "Contingent Liabilities"],
-            cl_start,
-            self.page_count,
+        # Contingent liabilities: read the note itself (not the summary page,
+        # not the first line containing "Total").  A wrong amount here is a
+        # direct knockout input, so the reader fails closed.
+        cl_page, cl_amount, cl_unquantified, cl_quote = self._extract_contingent_liabilities(
+            page_ranges
         )
 
         # Detect reporting unit from P&L or BS
@@ -238,22 +238,35 @@ class FinancialTableExtractor:
         nim_vals = self._parse_kpi_line(kpi_text or "", r"net interest margin|nim\b", len(years))
         cost_income_vals = self._parse_kpi_line(kpi_text or "", r"cost to income", len(years))
 
-        # Parse Contingent liabilities
-        cl_amount = self._parse_contingent_liabilities(cl_text or "")
+        # Contingent liabilities (see _extract_contingent_liabilities).
         if cl_amount is not None:
             extractions.append(
                 RawExtraction(
                     field_path="financials.contingent_liabilities",
                     candidate_value=cl_amount,
-                    raw_text=str(cl_amount),
+                    raw_text=cl_quote or str(cl_amount),
                     raw_unit=unit,
                     page=cl_page or 1,
                     section="Notes to Restated Financials",
-                    locator="Contingent Liabilities and Commitments",
-                    quote=f"Total Contingent Liabilities: {cl_amount}",
-                    quote_is_processing=True,
+                    locator="Contingent Liabilities and Commitments (claims not acknowledged as debts, latest fiscal year)",
+                    quote=cl_quote or str(cl_amount),
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
+                )
+            )
+        if cl_unquantified is not None:
+            extractions.append(
+                RawExtraction(
+                    field_path="financials.contingent_liabilities_unquantified",
+                    candidate_value=True,
+                    raw_text=cl_quote or "unquantified contingent liabilities",
+                    raw_unit=unit,
+                    page=cl_page or 1,
+                    section="Notes to Restated Financials",
+                    locator="Contingent Liabilities and Commitments — unquantified disclosure",
+                    quote=cl_quote or "unquantified contingent liabilities",
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.9,
                 )
             )
 
@@ -540,14 +553,112 @@ class FinancialTableExtractor:
                 return parsed[-n_cols:]
         return None
 
-    def _parse_contingent_liabilities(self, text: str) -> Optional[float]:
-        lines = text.split("\n")
-        for line in lines:
-            if re.search(r'Total', line, re.IGNORECASE) and re.search(r'[0-9,]+\.[0-9]+', line):
-                nums = re.findall(r'[0-9,]+(?:\.[0-9]+)?', line)
-                if nums:
-                    return parse_indian_number(nums[0])
-        return None
+    # Contingent-liabilities note (issuer-neutral).
+    _CL_NOTE_HEADING = re.compile(
+        r"^\s*(?:\d{1,2}(?:\.\d+)?\s+)?contingent\s+liabilities\s*"
+        r"(?:and\s+commitments?)?\s*:?\s*$",
+        re.IGNORECASE,
+    )
+    _CL_DATE = re.compile(
+        r"(\d{1,2})(?:st|nd|rd|th)?\s+"
+        r"(January|February|March|April|May|June|July|August|September|October|November|December)"
+        r"\s*,?\s*(\d{4})",
+        re.IGNORECASE,
+    )
+    _CL_CLAIMS_LABEL = re.compile(r"claims?\s*(?:/|and)?\s*disputed\s+liabilit", re.IGNORECASE)
+    _CL_UNQUANTIFIED = re.compile(
+        r"\bunquantified\b|\bcannot\s+be\s+quantified\b|\bnot\s+quantifiable\b"
+        r"|\bamounts?\s+(?:is|are)\s+not\s+ascertainable\b",
+        re.IGNORECASE,
+    )
+
+    def _extract_contingent_liabilities(
+        self,
+        page_ranges: Optional[Dict[str, Tuple[int, int]]],
+    ) -> Tuple[Optional[int], Optional[float], Optional[bool], str]:
+        """Read the quantified claims figure from the contingent-liability note.
+
+        Returns ``(page, amount, unquantified, quote)``.
+
+        Selection rule (deterministic, period-consistent with the canonical
+        periods, which are full fiscal years): the disclosed amount under the
+        LATEST fiscal-year column ("31st March, YYYY").  An interim column
+        (30 June) is never mixed with a full-year net worth, and the issuer's
+        own summary percentage is not reused.
+
+        Fails closed (``amount=None``) when the note heading, the period
+        headers, or a numeric row matching the header width cannot be
+        established; the previous implementation returned the first line
+        containing "Total" and a decimal, which is not necessarily a
+        contingent-liability amount.
+        """
+        ranges: List[Tuple[int, int]] = []
+        if page_ranges and page_ranges.get("restated_financials"):
+            ranges.append(page_ranges["restated_financials"])
+        if self.page_count >= 250:
+            ranges.append((250, self.page_count))
+        ranges.append((1, self.page_count))
+
+        seen_pages: set = set()
+        for start, end in ranges:
+            for p in range(max(1, start), min(end, self.page_count) + 1):
+                if p in seen_pages:
+                    continue
+                seen_pages.add(p)
+                lines = [l.strip() for l in self.extract_page_text(p).splitlines() if l.strip()]
+                heading_index = next(
+                    (i for i, line in enumerate(lines) if self._CL_NOTE_HEADING.match(line)),
+                    None,
+                )
+                if heading_index is None:
+                    continue
+                # The table (or the row) may continue on the next page.
+                note_lines = list(lines[heading_index + 1:])
+                for extra in range(p + 1, min(p + 2, self.page_count) + 1):
+                    note_lines.extend(
+                        l.strip() for l in self.extract_page_text(extra).splitlines() if l.strip()
+                    )
+                row_index = next(
+                    (i for i, line in enumerate(note_lines) if self._CL_CLAIMS_LABEL.search(line)),
+                    None,
+                )
+                if row_index is None:
+                    continue
+                # The period headers are the date labels immediately above the
+                # row.  Taking the whole page would blend the note's header
+                # with an adjacent note's identical header (Jio pp. 405-406).
+                header_window = note_lines[max(0, row_index - 30): row_index]
+                dates: List[Tuple[int, str, int]] = [
+                    (int(d), m.capitalize(), int(y))
+                    for d, m, y in self._CL_DATE.findall("\n".join(header_window))
+                ]
+                if not dates:
+                    continue
+                numbers: List[float] = []
+                label_parts: List[str] = []
+                for line in note_lines[row_index: row_index + 3]:
+                    label_parts.append(line)
+                    numbers.extend(self._extract_row_numbers(line))
+                    if len(numbers) >= len(dates):
+                        break
+                if len(numbers) != len(dates):
+                    continue  # ambiguous row width: never guess a column
+                march_columns = [
+                    (index, year)
+                    for index, (_, month, year) in enumerate(dates)
+                    if month.lower() == "march"
+                ]
+                if not march_columns:
+                    continue
+                column, _ = max(march_columns, key=lambda item: item[1])
+                amount = numbers[column]
+                # The unquantified-claims statement usually sits just below
+                # the claims row; keep the scan inside the note's own block.
+                note_text = "\n".join(note_lines[max(0, row_index - 30): row_index + 8])
+                unquantified = True if self._CL_UNQUANTIFIED.search(note_text) else None
+                quote = " ".join(" ".join(label_parts).split())
+                return p, amount, unquantified, quote
+        return None, None, None, ""
 
     def _extract_from_kpi_and_summary_tables(
         self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None

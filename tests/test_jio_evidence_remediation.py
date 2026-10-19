@@ -109,9 +109,17 @@ def test_live_extraction_pins_remediated_evidence():
     assert governance["rpt_pct_revenue"] == pytest.approx(4.3094, abs=0.0005)
     assert governance["rpt_pct_of_revenue_growth"] == pytest.approx(-0.1141, abs=0.0005)
 
-    # 6. K1 and K5 evidence boundary: no inference from an absent disclosure.
-    assert governance["auditor_opinion"] is None
+    # 6. Audit evidence: the joint auditors' examination report conclusion
+    #    (p. 324) establishes an unmodified opinion.  Going concern and
+    #    emphasis of matter are not established: Note 47.4 states there are
+    #    none, but the governed fields are not set from a negative statement.
+    assert governance["auditor_opinion"] == "unqualified"
     assert governance["going_concern_uncertainty"] is None
     assert governance["eom_materiality"] is None
-    assert financials["contingent_liabilities"] is None
+
+    # 7. K5: the quantified figure is the latest fiscal year's claims
+    #    (Note 37, p. 405: 15,021 for FY2026, not the June-2026 interim
+    #    14,688).  No unquantified disclosure exists, so that leaf is
+    #    unknown, not False.
+    assert financials["contingent_liabilities"] == 15021.0
     assert financials["contingent_liabilities_unquantified"] is None
