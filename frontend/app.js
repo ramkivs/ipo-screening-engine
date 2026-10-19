@@ -501,6 +501,28 @@ export class App {
   // View 3: Evaluation Scorecard & Detail (#evaluations/{id})
   // --------------------------------------------------------------------------
 
+  renderPenaltyItems(penalties) {
+    if (!penalties || penalties.length === 0) {
+      return '<p style="color: var(--text-muted); font-size: 0.85rem;">Zero penalties triggered for this evaluation.</p>';
+    }
+    return `<ul style="list-style: none;">${penalties.map(p => {
+      const isUnknown = p.state === 'UNKNOWN';
+      const stateLabel = isUnknown
+        ? 'UNKNOWN \u2014 carried in range'
+        : (p.points === 0 ? 'Not triggered' : 'Applied');
+      const badgeClass = isUnknown ? 'badge-unknown' : (p.points === 0 ? 'badge-clear' : 'badge-avoid');
+      return `
+      <li style="padding: 8px 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+        <div>
+          <strong>${this.escape(p.id)}:</strong> ${this.escape(p.label)}
+          <div style="margin-top: 3px;"><span class="badge ${badgeClass}">${stateLabel}</span></div>
+          ${p.reason ? `<div style="color: var(--text-muted); font-size: 0.78rem; margin-top: 2px;">${this.escape(p.reason)}</div>` : ''}
+        </div>
+        <span class="badge badge-avoid">${p.points.toFixed(1)} pts</span>
+      </li>`;
+    }).join('')}</ul>`;
+  }
+
   async renderScorecard(evaluationId) {
     this.setViewActive('scorecard-view');
     const container = document.getElementById('scorecard-view');
@@ -715,20 +737,7 @@ export class App {
                 Total: ${score.penalties_total.toFixed(1)} pts
               </span>
             </div>
-            ${penalties.length === 0 ? `
-              <p style="color: var(--text-muted); font-size: 0.85rem;">Zero penalties triggered for this evaluation.</p>
-            ` : `
-              <ul style="list-style: none;">
-                ${penalties.map(p => `
-                  <li style="padding: 8px 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-                    <div>
-                      <strong>${this.escape(p.id)}:</strong> ${this.escape(p.label)}
-                    </div>
-                    <span class="badge badge-avoid">${p.points.toFixed(1)} pts</span>
-                  </li>
-                `).join('')}
-              </ul>
-            `}
+            ${this.renderPenaltyItems(penalties)}
           </div>
 
           <!-- Missing / Unverified Items -->

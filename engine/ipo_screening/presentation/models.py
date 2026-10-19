@@ -146,6 +146,10 @@ class PenaltyItem(BaseModel):
     points: float
     state: str
     trigger: Optional[bool] = None
+    #: Why the item is in this state.  A zero-point item is either
+    #: ``SCORED`` ("not triggered") or ``UNKNOWN`` ("carried in the lower
+    #: bound"); the state and reason make the distinction auditable.
+    reason: Optional[str] = None
 
 
 class MissingUnverifiedItem(BaseModel):

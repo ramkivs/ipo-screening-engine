@@ -979,6 +979,13 @@ components:
         trigger:
           type: boolean
           nullable: true
+        reason:
+          type: string
+          nullable: true
+          description: >-
+            Why the item is in this state. A zero-point item is either SCORED
+            ("not triggered") or UNKNOWN ("carried in the lower bound"); the
+            reason makes the distinction auditable.
 
     MissingUnverifiedItem:
       type: object

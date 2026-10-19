@@ -491,6 +491,7 @@ class PresentationService:
                     points=float(p.get("points", 0.0)),
                     state=p.get("state", "SCORED"),
                     trigger=p.get("trigger"),
+                    reason=p.get("reason"),
                 )
             )
 

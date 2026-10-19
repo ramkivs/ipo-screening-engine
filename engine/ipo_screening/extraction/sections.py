@@ -20,6 +20,86 @@ from .interfaces import RawExtraction, SourceDocument
 from .numbers import is_undisclosed_marker, parse_indian_number
 
 
+# ---------------------------------------------------------------------------
+# Offer-for-Sale NIL binding
+# ---------------------------------------------------------------------------
+#
+# A cover table can state the Offer for Sale as NIL / "Not applicable".  The
+# original pattern searched up to 32 newlines after *any* "offer for sale"
+# occurrence, so an unrelated NIL in an adjacent row (a fresh-issue NIL, a
+# pre-IPO NIL, a promoter-group NIL) could be bound to the OFS and stored as
+# an explicit ``issue.ofs = 0`` -- fabricating a zero where the filing states
+# a real OFS amount.  The matcher below keeps the positive two-column cases
+# (including the Jio cover, where "Not applicable" is the OFS cell) while
+# refusing a NIL that is itself the value of another structural label.
+
+_OFS_NIL_PATTERN = re.compile(
+    r'offer for sale(?: size)?[^\n]*?(?:[^\n]*?\n){0,32}?\s*(?:NIL|Not\s+Applicable)\b',
+    re.IGNORECASE,
+)
+_OFS_NIL_TOKEN = re.compile(r'(?:NIL|Not\s+Applicable)\b', re.IGNORECASE)
+_OFS_NIL_BARE_LABEL = re.compile(
+    r'^(?:'
+    r'fresh\s+(?:issue|offer)(?:\s+size)?'
+    r'|pre[-\s]?ipo(?:\s+(?:placement|issue))?'
+    r'|promoter(?:\s+group)?'
+    r'|anchor\s+investor(?:s)?'
+    r'|(?:eligible\s+)?employee(?:s)?\s+reservation'
+    r'|(?:shareholders?|eligible\s+ril\s+shareholders?)\s+reservation'
+    r'|reservation'
+    r'|total\s+issue(?:\s+size)?'
+    r'|issue\s+size'
+    r')\s*[:.\-]?$',
+    re.IGNORECASE,
+)
+_OFS_NIL_AMOUNT = re.compile(r'(?:₹|Rs\.?|INR)\s*[\d,]+|\b\d[\d,]{2,}\b', re.IGNORECASE)
+
+
+def _find_ofs_nil(cover_text: str) -> Optional[str]:
+    """Return the matched OFS-NIL quotation, or None when it is ambiguous.
+
+    Accepted:
+      * "Offer for Sale Size: Not applicable" (same line);
+      * "OFFER FOR SALE SIZE" followed by a value line "Not applicable";
+      * "OFFER FOR SALE SIZE" followed by a fresh row and then the OFS cell
+        "Not applicable" (the real Jio cover shape).
+
+    Rejected:
+      * an OFS label line that itself states an amount or quantity;
+      * a NIL that is the value of a bare Fresh Issue / Pre-IPO / Promoter /
+        reservation / total-issue label, on its own line or as the previous
+        line.
+    """
+    for match in _OFS_NIL_PATTERN.finditer(cover_text):
+        quote = match.group(0)
+        first_line = quote.split("\n", 1)[0]
+        after_label = re.sub(
+            r'^offer\s+for\s+sale(?:\s+size)?', '', first_line, flags=re.IGNORECASE
+        )
+        if _OFS_NIL_AMOUNT.search(after_label):
+            # The OFS row states an amount/quantity: it is not NIL.
+            continue
+
+        tokens = list(_OFS_NIL_TOKEN.finditer(quote))
+        if not tokens:
+            continue
+        nil_abs = match.start() + tokens[-1].start()
+        line_start = cover_text.rfind("\n", 0, nil_abs) + 1
+        line_prefix = cover_text[line_start:nil_abs].strip()
+        if _OFS_NIL_BARE_LABEL.match(line_prefix):
+            # "Fresh Issue: NIL" -- the NIL belongs to the other label.
+            continue
+
+        before = cover_text[:line_start].rstrip("\n")
+        prev_line = before.rsplit("\n", 1)[-1].strip() if before else ""
+        if _OFS_NIL_BARE_LABEL.match(prev_line):
+            # "Fresh Issue" / "Pre-IPO Placement" / "Promoter Group" on the
+            # line immediately before a standalone NIL: not the OFS value.
+            continue
+        return quote
+    return None
+
+
 class SectionExtractor:
     """Extracts structured IPO domain fields across text sections."""
 
@@ -412,12 +492,8 @@ class SectionExtractor:
             )
 
         # 3. OFS Seller & shares / NIL detection
-        m_ofs_nil = re.search(
-            r'offer for sale(?: size)?[^\n]*?(?:[^\n]*?\n){0,32}?\s*(?:NIL|Not\s+Applicable)\b',
-            cover_text,
-            re.IGNORECASE,
-        )
-        if m_ofs_nil:
+        ofs_nil_quote = _find_ofs_nil(cover_text)
+        if ofs_nil_quote is not None:
             extractions.append(
                 RawExtraction(
                     field_path="issue.ofs",
@@ -427,7 +503,7 @@ class SectionExtractor:
                     page=1,
                     section="Cover",
                     locator="Cover page, Offer for Sale Size",
-                    quote=m_ofs_nil.group(0),
+                    quote=ofs_nil_quote,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=1.0,
                 )
@@ -440,7 +516,7 @@ class SectionExtractor:
                     page=1,
                     section="Cover",
                     locator="Cover page, Offer for Sale Size",
-                    quote=m_ofs_nil.group(0),
+                    quote=ofs_nil_quote,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=1.0,
                 )

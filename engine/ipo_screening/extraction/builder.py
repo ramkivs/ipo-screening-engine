@@ -252,12 +252,26 @@ class CanonicalInputBuilder:
         unit = fin_base["reporting_unit"] if "reporting_unit" in fin_base else self._get_field("financials.reporting_unit", "INR_LAKHS")
         periods = fin_base["periods"] if "periods" in fin_base else self._get_field("financials.periods", [])
         cl = fin_base["contingent_liabilities"] if "contingent_liabilities" in fin_base else self._get_field("financials.contingent_liabilities", None)
-        return {
+        result = {
             "reporting_unit": unit,
             "periods": periods,
             "contingent_liabilities": cl,
             "contingent_liabilities_unquantified": fin_base.get("contingent_liabilities_unquantified", None),
         }
+        # Schema-permitted penalty inputs must not be dropped by the builder:
+        # the ``unreconciled_metrics`` penalty consumes this flag, and a value
+        # present in the input/extraction was previously lost here (the
+        # penalty could never be evaluated).  Only carried when established,
+        # so an absent value stays absent (UNKNOWN), never defaulted.
+        if "adjusted_metrics_unreconciled" in fin_base:
+            result["adjusted_metrics_unreconciled"] = fin_base["adjusted_metrics_unreconciled"]
+        else:
+            extracted_unreconciled = self._get_field(
+                "financials.adjusted_metrics_unreconciled", None
+            )
+            if extracted_unreconciled is not None:
+                result["adjusted_metrics_unreconciled"] = extracted_unreconciled
+        return result
 
     def _build_capital_structure(self) -> Dict[str, Any]:
         cap_base = self.base.get("capital_structure", {})
@@ -313,6 +327,20 @@ class CanonicalInputBuilder:
             "board_independent_majority": _pick_gov("board_independent_majority", False),
             "kmp_exits_2y": _pick_gov("kmp_exits_2y", 0),
         }
+        # Schema-permitted governance inputs that a penalty/knockout consumes
+        # must not be dropped.  ``auditor_or_cfo_exit_2y`` drives the
+        # auditor/CFO-exit penalty; it was previously read by the derived
+        # metric but never carried into the canonical input, so the penalty
+        # was structurally UNKNOWN for every builder-based evaluation.  The
+        # key is added only when the input/extraction establishes it, so the
+        # absent case remains UNKNOWN (and the golden input is unchanged).
+        for optional_key in ("auditor_or_cfo_exit_2y",):
+            if optional_key in gov_base:
+                gov[optional_key] = gov_base[optional_key]
+            else:
+                extracted = self._get_field(f"governance.{optional_key}", None)
+                if extracted is not None:
+                    gov[optional_key] = extracted
         self._derive_rpt_metrics(gov)
         return gov
 
