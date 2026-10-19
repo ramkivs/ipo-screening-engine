@@ -3858,6 +3858,26 @@ export class App {
   }
 
   /**
+   * Audit-log linkage for the manual issue-term flow: register the
+   * submission's durable activity record as the latest ingestion and
+   * refresh the Ingestion Activity panel so the audit surface shows the
+   * manual submission (accepted or rejected) instead of staying silent.
+   * Display is best-effort; the record itself is durable server-side.
+   */
+  async attachIngestionAudit(ingestionId) {
+    if (!ingestionId) return null;
+    try { localStorage.setItem('ipo.lastIngestionId', String(ingestionId)); } catch { /* private mode */ }
+    if (typeof this.api.getIngestion !== 'function') return null;
+    try {
+      const record = await this.api.getIngestion(String(ingestionId));
+      if (typeof document !== 'undefined' && document) {
+        this.renderIngestionActivity(document, record);
+      }
+      return record;
+    } catch { return null; }
+  }
+
+  /**
    * Step 5 pre-processing workflow: when required issue terms are
    * unresolved (AWAITING_ISSUE_TERMS), let the operator enter the four
    * required terms (price-band floor/cap, lot size, OFS amount) with a
@@ -3990,6 +4010,17 @@ export class App {
         const result = await this.api.ingestManualTerms(this.selectedIngestFile, {
           mode, terms, explanation, confirmConflicts: conflictPending,
         });
+        // Audit log: the manual submission has its own durable activity
+        // record. Register it as the latest ingestion and refresh the
+        // Ingestion Activity panel so the audit surface shows this
+        // submission (events, evaluation outcome, persistence).
+        await this.attachIngestionAudit(result.ingestion_id);
+        const auditNote = result.ingestion_id
+          ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
+               Audit trace recorded: <code>${this.escape(String(result.ingestion_id))}</code>
+               (manual submission, validation, evaluation and persistence events)
+               &mdash; see <strong>Ingestion Activity</strong> in Workflow Progress &amp; Audit Status.</div>`
+          : '';
         const manualEntry = result.issue_terms && result.issue_terms.manual_entry;
         let manualNote = '';
         if (manualEntry) {
@@ -4023,6 +4054,7 @@ export class App {
                 <div style="margin-top: 6px;">${this.renderVerdictBadge(result.verdict)}</div></div>
             </div>
             ${manualNote}
+            ${auditNote}
             <div class="ingest-actions">
               <a href="#evaluations/${this.escape(result.evaluation_id)}" class="btn btn-primary" style="text-decoration: none; text-align: center;">Open Full Evaluation Scorecard &rarr;</a>
             </div>
@@ -4030,6 +4062,14 @@ export class App {
         `;
       } catch (err2) {
         submitBtn.disabled = false;
+        // Rejected submissions are auditable too: register the trace so
+        // the Ingestion Activity log shows what was submitted and why it
+        // was rejected (validation, conflict, or unresolved terms).
+        const errAuditId = err2 && err2.details ? err2.details.ingestion_id : null;
+        if (errAuditId) await this.attachIngestionAudit(errAuditId);
+        const auditRef = errAuditId
+          ? ` <span style="color: var(--text-muted);">Audit trace: <code>${this.escape(String(errAuditId))}</code></span>`
+          : '';
         if (err2.code === 'ISSUE_TERM_CONFLICT' && err2.details && Array.isArray(err2.details.conflicts)) {
           conflictPending = true;
           const rows = err2.details.conflicts.map((c) => `<li><code>${this.escape(c.field)}</code>: entered <strong>${this.escape(String(c.manual_value))}</strong> vs existing <strong>${this.escape(String(c.existing_value))}</strong> (${this.escape(c.existing_origin === 'OFFICIAL_VERIFIED' ? 'verified official source — the verified value will be kept' : 'filing extraction — the entered value will replace it')})</li>`).join('');
@@ -4043,14 +4083,14 @@ export class App {
                 <span>I confirm these resolutions. Manual values stay labelled MANUAL_ENTRY (unverified); verified official values are never displaced.</span>
               </label>
             </div>`;
-          statusBox.innerHTML = '<span class="badge badge-consider">Resolve the conflicts above, then submit again.</span>';
+          statusBox.innerHTML = `<span class="badge badge-consider">Resolve the conflicts above, then submit again.</span>${auditRef}`;
         } else if (err2.code === 'AWAITING_ISSUE_TERMS') {
           missing = (err2.details && err2.details.missing_fields) || missing;
           const list = container.querySelector('#mt-missing-list');
           if (list) list.innerHTML = renderMissing();
-          statusBox.innerHTML = `<span class="badge badge-unknown-evidence">Still awaiting terms</span> <span>${this.escape(err2.message || '')}</span>`;
+          statusBox.innerHTML = `<span class="badge badge-unknown-evidence">Still awaiting terms</span> <span>${this.escape(err2.message || '')}</span>${auditRef}`;
         } else {
-          statusBox.innerHTML = `<span class="badge badge-unknown-evidence">${this.escape(err2.code || 'ERROR')}</span> <span>${this.escape(err2.message || 'Submission failed')}</span>`;
+          statusBox.innerHTML = `<span class="badge badge-unknown-evidence">${this.escape(err2.code || 'ERROR')}</span> <span>${this.escape(err2.message || 'Submission failed')}</span>${auditRef}`;
         }
       }
     });

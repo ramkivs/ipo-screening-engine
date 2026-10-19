@@ -92,11 +92,18 @@ export class ApiClient {
       }
       const code = errPayload.code || (errPayload.detail && errPayload.detail.code) || `HTTP_${response.status}`;
       const message = errPayload.message || (errPayload.detail && errPayload.detail.message) || (typeof errPayload.detail === 'string' ? errPayload.detail : response.statusText);
-      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : {};
+      // The local API's HTTPException handler returns the detail dict
+      // as the flat body; accept both that contract and nested `detail`.
+      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : errPayload;
       const details = { ...(detailObj.details || {}), ...(errPayload.details || {}) };
       if (detailObj.missing_fields) details.missing_fields = detailObj.missing_fields;
       if (detailObj.resolution) details.resolution = detailObj.resolution;
       if (detailObj.conflicts) details.conflicts = detailObj.conflicts;
+      // Preserve the audit-log correlation so every submission
+      // (accepted or rejected) can be traced to its durable activity record.
+      if (detailObj.ingestion_id) details.ingestion_id = detailObj.ingestion_id;
+      if (detailObj.correlation_id) details.correlation_id = detailObj.correlation_id;
+      if (detailObj.activity_url) details.activity_url = detailObj.activity_url;
       throw new ApiError(response.status, code, message, Object.keys(details).length ? details : null);
     }
 
@@ -363,11 +370,18 @@ export class ApiClient {
       // AWAITING_ISSUE_TERMS diagnostics (missing fields + per-provider
       // resolution reports) so the UI can show WHY terms are unresolved
       // instead of only the generic message.
-      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : {};
+      // The local API's HTTPException handler returns the detail dict
+      // as the flat body; accept both that contract and nested `detail`.
+      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : errPayload;
       const details = { ...(detailObj.details || {}), ...(errPayload.details || {}) };
       if (detailObj.missing_fields) details.missing_fields = detailObj.missing_fields;
       if (detailObj.resolution) details.resolution = detailObj.resolution;
       if (detailObj.conflicts) details.conflicts = detailObj.conflicts;
+      // Preserve the audit-log correlation so every submission
+      // (accepted or rejected) can be traced to its durable activity record.
+      if (detailObj.ingestion_id) details.ingestion_id = detailObj.ingestion_id;
+      if (detailObj.correlation_id) details.correlation_id = detailObj.correlation_id;
+      if (detailObj.activity_url) details.activity_url = detailObj.activity_url;
       throw new ApiError(response.status, code, message, Object.keys(details).length ? details : null);
     }
 
@@ -419,11 +433,18 @@ export class ApiClient {
       }
       const code = errPayload.code || (errPayload.detail && errPayload.detail.code) || 'INGESTION_ERROR';
       const message = errPayload.message || (errPayload.detail && errPayload.detail.message) || (typeof errPayload.detail === 'string' ? errPayload.detail : 'Manual-terms ingestion failed');
-      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : {};
+      // The local API's HTTPException handler returns the detail dict
+      // as the flat body; accept both that contract and nested `detail`.
+      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : errPayload;
       const details = { ...(detailObj.details || {}), ...(errPayload.details || {}) };
       if (detailObj.missing_fields) details.missing_fields = detailObj.missing_fields;
       if (detailObj.resolution) details.resolution = detailObj.resolution;
       if (detailObj.conflicts) details.conflicts = detailObj.conflicts;
+      // Preserve the audit-log correlation so every submission
+      // (accepted or rejected) can be traced to its durable activity record.
+      if (detailObj.ingestion_id) details.ingestion_id = detailObj.ingestion_id;
+      if (detailObj.correlation_id) details.correlation_id = detailObj.correlation_id;
+      if (detailObj.activity_url) details.activity_url = detailObj.activity_url;
       throw new ApiError(response.status, code, message, Object.keys(details).length ? details : null);
     }
     return response.json();

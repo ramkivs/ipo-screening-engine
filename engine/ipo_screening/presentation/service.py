@@ -1283,49 +1283,70 @@ class PresentationService:
         # "no offer for sale", never a default for an unknown value.
         manual_clean: Dict[str, Any] = {}
         if manual_terms:
-            unknown_keys = sorted(set(manual_terms) - set(self.MANUAL_ISSUE_TERM_FIELDS))
-            if unknown_keys:
-                raise IngestionValidationError(
-                    "Manual issue-term entry is limited to price_band_low, "
-                    "price_band_high, lot_size and ofs; "
-                    f"unsupported field(s): {unknown_keys}."
-                )
-            manual_clean = {k: v for k, v in manual_terms.items() if v is not None}
-            if manual_clean:
-                if not (manual_explanation or "").strip():
+            submitted_fields = sorted(str(k) for k in manual_terms.keys())
+            submitted_values = {k: v for k, v in manual_terms.items() if v is not None}
+            # Audit receipt: the submission itself is an auditable act,
+            # recorded before validation so a rejected submission still
+            # shows exactly what was submitted (values are operator
+            # issue-term figures, sanitized/bounded like all details).
+            _emit("term_resolution", "manual_submission", "SUCCEEDED",
+                  "Manual issue-term submission received (MANUAL_ENTRY; not source-verified).",
+                  details={"fields": submitted_fields,
+                           "values": submitted_values,
+                           "explanation_supplied": bool((manual_explanation or "").strip())})
+            try:
+                unknown_keys = sorted(set(manual_terms) - set(self.MANUAL_ISSUE_TERM_FIELDS))
+                if unknown_keys:
                     raise IngestionValidationError(
-                        "An explanation is required for manually entered issue terms."
+                        "Manual issue-term entry is limited to price_band_low, "
+                        "price_band_high, lot_size and ofs; "
+                        f"unsupported field(s): {unknown_keys}."
                     )
-                for field_name, value in manual_clean.items():
-                    if isinstance(value, bool) or not isinstance(value, (int, float)):
+                manual_clean = {k: v for k, v in manual_terms.items() if v is not None}
+                if manual_clean:
+                    if not (manual_explanation or "").strip():
                         raise IngestionValidationError(
-                            f"Manually entered issue.{field_name} must be a number."
+                            "An explanation is required for manually entered issue terms."
                         )
-                    if not math.isfinite(float(value)):
-                        raise IngestionValidationError(
-                            f"Manually entered issue.{field_name} must be a finite number."
-                        )
-                    if field_name == "ofs":
-                        if float(value) < 0:
+                    for field_name, value in manual_clean.items():
+                        if isinstance(value, bool) or not isinstance(value, (int, float)):
                             raise IngestionValidationError(
-                                "Manually entered issue.ofs must be zero or a positive "
-                                "amount in the filing's reporting unit."
+                                f"Manually entered issue.{field_name} must be a number."
                             )
-                    elif field_name == "lot_size":
-                        if float(value) != int(value) or int(value) <= 0:
+                        if not math.isfinite(float(value)):
                             raise IngestionValidationError(
-                                "Manually entered issue.lot_size must be a whole number of shares."
+                                f"Manually entered issue.{field_name} must be a finite number."
                             )
-                    else:
-                        if value <= 0:
+                        if field_name == "ofs":
+                            if float(value) < 0:
+                                raise IngestionValidationError(
+                                    "Manually entered issue.ofs must be zero or a positive "
+                                    "amount in the filing's reporting unit."
+                                )
+                        elif field_name == "lot_size":
+                            if float(value) != int(value) or int(value) <= 0:
+                                raise IngestionValidationError(
+                                    "Manually entered issue.lot_size must be a whole number of shares."
+                                )
+                        else:
+                            if value <= 0:
+                                raise IngestionValidationError(
+                                    f"Manually entered issue.{field_name} must be positive."
+                                )
+                    if "price_band_low" in manual_clean and "price_band_high" in manual_clean:
+                        if float(manual_clean["price_band_low"]) > float(manual_clean["price_band_high"]):
                             raise IngestionValidationError(
-                                f"Manually entered issue.{field_name} must be positive."
+                                "Manually entered price_band_low must not exceed price_band_high."
                             )
-                if "price_band_low" in manual_clean and "price_band_high" in manual_clean:
-                    if float(manual_clean["price_band_low"]) > float(manual_clean["price_band_high"]):
-                        raise IngestionValidationError(
-                            "Manually entered price_band_low must not exceed price_band_high."
-                        )
+            except IngestionValidationError as exc:
+                # The rejection is an auditable outcome in its own right;
+                # nothing proceeds and no value is silently replaced.
+                _emit("term_resolution", "manual_validation", "FAILED",
+                      f"Manual issue-term submission rejected: {exc}",
+                      details={"fields": submitted_fields,
+                               "values": submitted_values},
+                      error_code="VALIDATION_ERROR")
+                raise
 
         _emit("document_validation", "passed", "SUCCEEDED",
               "Document passed format, size and mode validation.",
@@ -1587,6 +1608,17 @@ class PresentationService:
                         }
                     )
             if conflicts and not confirm_conflicts:
+                # The conflict and its requirement for explicit
+                # confirmation are auditable outcomes of the submission;
+                # nothing was evaluated or persisted.
+                _emit("term_resolution", "conflict", "BLOCKED",
+                     "Manual issue terms conflict with existing values; "
+                     "explicit confirmation is required before proceeding. "
+                     "Nothing was evaluated or persisted.",
+                     details={"conflicts": conflicts,
+                              "fields": [c["field"] for c in conflicts],
+                              "confirmation_required": True},
+                     error_code="ISSUE_TERM_CONFLICT")
                 raise IngestionIssueTermConflictError(
                     "Manually entered issue terms conflict with existing "
                     "values; explicit confirmation is required before "
@@ -1671,8 +1703,13 @@ class PresentationService:
             _emit("term_resolution", "manual_entry", "SUCCEEDED",
                   "Operator manual issue-term entry applied (MANUAL_ENTRY; not source-verified).",
                   details={"fields": [f"issue.{f}" for f in manual_applied],
+                           "values": {f: manual_clean[f] for f in manual_applied},
+                           "explanation": (manual_explanation or "").strip(),
                            "overridden_by_verified": overridden_by_verified,
                            "provenance": "MANUAL_ENTRY",
+                           "verified": False,
+                           "conflicts_confirmed": bool(confirm_conflicts),
+                           "ipo_id": str(canonical_dict.get("ipo_id", "")),
                            "reporting_unit": reporting_unit})
             if pending_awaiting is not None:
                 remaining = [f for f in pending_awaiting[0] if issue_now.get(f) is None]

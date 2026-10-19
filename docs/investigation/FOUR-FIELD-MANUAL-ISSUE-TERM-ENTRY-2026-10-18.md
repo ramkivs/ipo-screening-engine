@@ -190,3 +190,35 @@ the Step 4 record remains as written (its Area C scope clause is now
 superseded by this directive, recorded here and in the tracker). No
 genuine unresolved governance issue blocks this feature; `issue.ofs`'s
 canonical contract was unambiguous (monetary amount in `reporting_unit`).
+
+## 9. Audit trail for manual submissions (added 2026-10-19)
+
+Every manual issue-term submission — accepted, rejected or conflicted — now has an accurate,
+retrievable audit record in the ingestion activity log (see
+`MANUAL-TERMS-AUDIT-LOG-2026-10-19.md` for the investigation, reproduction evidence and
+full contract):
+
+- **Submitted:** `term_resolution/manual_submission/SUCCEEDED` — fields (bare names), the
+  submitted values, and whether an explanation was supplied. Emitted *before* validation, so a
+  rejected submission still records exactly what was submitted.
+- **Rejected:** `term_resolution/manual_validation/FAILED` — the offending field(s) and the
+  rejection message; record `FAILED/VALIDATION_ERROR`; nothing evaluated or persisted.
+- **Conflict / confirmation required:** `term_resolution/conflict/BLOCKED` — the conflict list
+  (`field`, `manual_value`, `existing_value`, `existing_origin`) and `confirmation_required:
+  true`; record `BLOCKED/ISSUE_TERM_CONFLICT`.
+- **Accepted:** `term_resolution/manual_entry/SUCCEEDED` — fields, applied **values**,
+  the operator explanation (or reference), `provenance: MANUAL_ENTRY`, `verified: false`,
+  `conflicts_confirmed`, `ipo_id`, `reporting_unit`, `overridden_by_verified`. Evaluation and
+  persistence are separate, later events; the record links the evaluation via
+  `result.evaluation_id` and `result.ipo_id`.
+- **Correlation:** every manual-terms API response — including 400/409/422/500 errors —
+  carries `ingestion_id`, `correlation_id` and `activity_url`
+  (`/api/v1/ingestions/{ingestion_id}`). The UI registers the id (`ipo.lastIngestionId`),
+  refreshes the *Ingestion Activity* panel and shows `Audit trace: <id>` on both success and
+  error surfaces.
+- **Retrieval:** `GET /api/v1/ingestions` (list), `GET /api/v1/ingestions/{id}` (record + full
+  event list), `GET /api/v1/ingestions/{id}/events?after_sequence=` (incremental).
+
+Provenance is never upgraded by recording: manual values remain `MANUAL_ENTRY` / unverified in
+both the audit events and the evaluation evidence. If the audit store itself fails, the
+operation fails loudly (422/500) — it is never presented as an auditable success.

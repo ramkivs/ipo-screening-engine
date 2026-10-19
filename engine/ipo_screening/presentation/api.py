@@ -462,12 +462,12 @@ def create_router(service: PresentationService) -> APIRouter:
         except IngestionPayloadTooLargeError as exc:
             raise HTTPException(
                 status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                detail={"error": "Payload Too Large", "message": str(exc), "code": "PAYLOAD_TOO_LARGE"},
+                detail={"error": "Payload Too Large", "message": str(exc), "code": "PAYLOAD_TOO_LARGE", **_activity_ref(exc)},
             ) from exc
         except IngestionValidationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "Bad Request", "message": str(exc), "code": "VALIDATION_ERROR"},
+                detail={"error": "Bad Request", "message": str(exc), "code": "VALIDATION_ERROR", **_activity_ref(exc)},
             ) from exc
         except IngestionIssueTermConflictError as exc:
             raise HTTPException(
@@ -477,6 +477,7 @@ def create_router(service: PresentationService) -> APIRouter:
                     "message": str(exc),
                     "code": "ISSUE_TERM_CONFLICT",
                     "conflicts": exc.conflicts,
+                    **_activity_ref(exc),
                 },
             ) from exc
         except IngestionAwaitingIssueTermsError as exc:
@@ -494,12 +495,12 @@ def create_router(service: PresentationService) -> APIRouter:
         except (IngestionExtractionError, IngestionEvaluationError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail={"error": "Unprocessable Entity", "message": str(exc), "code": "PROCESSING_FAILED"},
+                detail={"error": "Unprocessable Entity", "message": str(exc), "code": "PROCESSING_FAILED", **_activity_ref(exc)},
             ) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={"error": "Internal Error", "message": f"Unexpected ingestion error: {exc}", "code": "INGESTION_INTERNAL_ERROR"},
+                detail={"error": "Internal Error", "message": f"Unexpected ingestion error: {exc}", "code": "INGESTION_INTERNAL_ERROR", **_activity_ref(exc)},
             ) from exc
 
     # -------------------------------------------------------------------------

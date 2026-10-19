@@ -389,3 +389,224 @@ test('Step5 App - every official source is shown with whether its listing was re
   assert.ok(html.includes('UNAVAILABLE'));
   assert.ok(!html.includes('UNPUBLISHED'));
 });
+
+// ---------------------------------------------------------------------------
+// Audit-log recording of manual issue-term submissions (2026-10-19).
+// The manual submission has a durable ingestion-activity record; the
+// UI/API path must preserve its correlation and present it (the defect:
+// submissions were processed but the audit log "recorded nothing" --
+// the error responses dropped the ingestion id and the manual flow
+// never displayed the record).
+// ---------------------------------------------------------------------------
+
+async function withBrowserDoubles(run) {
+  const originalDocument = globalThis.document;
+  const originalLocalStorage = globalThis.localStorage;
+  const store = new Map();
+  const panelEl = makeElement('ingest-activity-panel');
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  globalThis.document = {
+    querySelector: (sel) => (sel === '#ingest-activity-panel' ? panelEl : null),
+    getElementById: () => null,
+  };
+  try {
+    return await run({ store, panelEl });
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.localStorage = originalLocalStorage;
+  }
+}
+
+test('Step5 ApiClient - ingestManualTerms errors preserve the audit-log correlation ids', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    // The local API's HTTPException handler returns the detail dict as
+    // the flat error body (no `detail`/`error` nesting).
+    globalThis.fetch = async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: 'Bad Request',
+        code: 'VALIDATION_ERROR',
+        message: 'Manually entered issue.ofs must be zero or a positive amount.',
+        issues: ['issue.ofs'],
+        ingestion_id: 'ing-abc123',
+        correlation_id: 'ing-abc123',
+        activity_url: '/api/v1/ingestions/ing-abc123',
+      }),
+    });
+    const client = new ApiClient();
+    await assert.rejects(
+      () => client.ingestManualTerms(new Blob(['%PDF-1.4']), {
+        mode: 'final', terms: { ofs: -5 }, explanation: 'x',
+      }),
+      (err) => {
+        // The defect: the id was previously dropped (and the flat error
+        // contract unread), leaving the submission's audit record
+        // unreachable from the failure.
+        assert.equal(err.details.ingestion_id, 'ing-abc123');
+        assert.equal(err.details.correlation_id, 'ing-abc123');
+        assert.equal(err.details.activity_url, '/api/v1/ingestions/ing-abc123');
+        return true;
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Step5 App - successful manual submission registers and displays the audit record', async () => {
+  await withBrowserDoubles(async ({ store, panelEl }) => {
+    const app = new App();
+    app.selectedIngestFile = new Blob(['%PDF-1.4']);
+    let fetchedId = null;
+    app.api = {
+      ingestManualTerms: async () => ({
+        evaluation_id: 'EVAL-9', company_name: 'Acme', ipo_id: 'ACME', evaluation_mode: 'FINAL',
+        final_score: 61.2, verdict: 'CONSIDER', is_duplicate: false,
+        ingestion_id: 'ing-audit1', correlation_id: 'ing-audit1',
+        issue_terms: {
+          manual_entry: {
+            fields: ['price_band_low', 'price_band_high', 'lot_size', 'ofs'],
+            values: { price_band_low: 208, price_band_high: 220, lot_size: 68, ofs: 3300 },
+            explanation: 'broker platform IPO page', provenance: 'MANUAL_ENTRY', verified: false,
+          },
+        },
+      }),
+      getIngestion: async (id) => {
+        fetchedId = id;
+        return {
+          ingestion_id: id, status: 'SUCCEEDED', evaluation_run: true, persisted: true,
+          events: [
+            { sequence: 1, stage: 'term_resolution', event_type: 'manual_submission', status: 'SUCCEEDED', message: 'received' },
+            { sequence: 2, stage: 'term_resolution', event_type: 'manual_entry', status: 'SUCCEEDED', message: 'applied' },
+          ],
+        };
+      },
+    };
+    const container = makePanelContainer();
+    app.renderManualTermsPanel(container, {
+      code: 'AWAITING_ISSUE_TERMS', message: 'awaiting',
+      details: { missing_fields: ['price_band_low', 'price_band_high', 'lot_size', 'ofs'] },
+    }, 'final');
+    container.querySelector('#mt-price-band-low').value = '208';
+    container.querySelector('#mt-price-band-high').value = '220';
+    container.querySelector('#mt-lot-size').value = '68';
+    container.querySelector('#mt-ofs').value = '3300';
+    container.querySelector('#mt-explanation').value = 'broker platform IPO page';
+    await container.querySelector('#mt-submit-btn').listeners.click();
+
+    // The record is fetched and registered as the latest ingestion.
+    assert.equal(fetchedId, 'ing-audit1');
+    assert.equal(store.get('ipo.lastIngestionId'), 'ing-audit1');
+    // The result panel shows the audit reference to the recorded trace.
+    assert.ok(container.innerHTML.includes('ing-audit1'));
+    assert.ok(container.innerHTML.includes('Audit trace recorded'));
+    // The Ingestion Activity audit surface was refreshed with the record
+    // (the panel within the "Workflow Progress & Audit Status" card).
+    assert.ok(panelEl.innerHTML.includes('Ingestion Activity'));
+    assert.ok(panelEl.innerHTML.includes('manual_submission'));
+    assert.ok(panelEl.innerHTML.includes('manual_entry'));
+    assert.ok(panelEl.innerHTML.includes('ing-audit1'));
+  });
+});
+
+test('Step5 App - rejected manual submission shows its audit reference', async () => {
+  await withBrowserDoubles(async ({ store, panelEl }) => {
+    const app = new App();
+    app.selectedIngestFile = new Blob(['%PDF-1.4']);
+    app.api = {
+      ingestManualTerms: async () => {
+        const err = new ApiError(400, 'VALIDATION_ERROR', 'Manually entered issue.ofs must be zero or a positive amount.');
+        err.details = {
+          ingestion_id: 'ing-rej1', correlation_id: 'ing-rej1',
+          activity_url: '/api/v1/ingestions/ing-rej1', issues: ['issue.ofs'],
+        };
+        throw err;
+      },
+      getIngestion: async (id) => ({
+        ingestion_id: id, status: 'FAILED', error_code: 'VALIDATION_ERROR', evaluation_run: false, persisted: false,
+        events: [
+          { sequence: 1, stage: 'term_resolution', event_type: 'manual_submission', status: 'SUCCEEDED', message: 'received' },
+          { sequence: 2, stage: 'term_resolution', event_type: 'manual_validation', status: 'FAILED', message: 'rejected' },
+        ],
+      }),
+    };
+    const container = makePanelContainer();
+    app.renderManualTermsPanel(container, {
+      code: 'AWAITING_ISSUE_TERMS', message: 'awaiting', details: { missing_fields: ['ofs'] },
+    }, 'final');
+    container.querySelector('#mt-ofs').value = '-5';
+    container.querySelector('#mt-explanation').value = 'broker platform page';
+    await container.querySelector('#mt-submit-btn').listeners.click();
+
+    const status = container.querySelector('#mt-status').innerHTML;
+    assert.ok(status.includes('VALIDATION_ERROR'));
+    assert.ok(status.includes('ing-rej1'));
+    // The rejected submission is registered and shown in the audit surface.
+    assert.equal(store.get('ipo.lastIngestionId'), 'ing-rej1');
+    assert.ok(panelEl.innerHTML.includes('manual_validation'));
+  });
+});
+
+test('Step5 App - conflict response carries its audit reference', async () => {
+  await withBrowserDoubles(async ({ store, panelEl }) => {
+    const app = new App();
+    app.selectedIngestFile = new Blob(['%PDF-1.4']);
+    app.api = {
+      ingestManualTerms: async () => {
+        const err = new ApiError(409, 'ISSUE_TERM_CONFLICT', 'conflict');
+        err.details = {
+          ingestion_id: 'ing-conf1', correlation_id: 'ing-conf1',
+          activity_url: '/api/v1/ingestions/ing-conf1',
+          conflicts: [{ field: 'issue.price_band_low', manual_value: 200, existing_value: 208, existing_origin: 'FILING_EXTRACTION' }],
+        };
+        throw err;
+      },
+      getIngestion: async (id) => ({
+        ingestion_id: id, status: 'BLOCKED', error_code: 'ISSUE_TERM_CONFLICT', evaluation_run: false, persisted: false,
+        events: [{ sequence: 1, stage: 'term_resolution', event_type: 'conflict', status: 'BLOCKED', message: 'confirmation required' }],
+      }),
+    };
+    const container = makePanelContainer();
+    app.renderManualTermsPanel(container, {
+      code: 'AWAITING_ISSUE_TERMS', message: 'awaiting', details: { missing_fields: ['price_band_low'] },
+    }, 'final');
+    container.querySelector('#mt-price-band-low').value = '200';
+    container.querySelector('#mt-explanation').value = 'operator note';
+    await container.querySelector('#mt-submit-btn').listeners.click();
+
+    const status = container.querySelector('#mt-status').innerHTML;
+    assert.ok(status.includes('ing-conf1'));
+    assert.equal(store.get('ipo.lastIngestionId'), 'ing-conf1');
+    assert.ok(panelEl.innerHTML.includes('conflict'));
+  });
+});
+
+test('Step5 App - failures without an audit id keep the established unavailable wording', async () => {
+  await withBrowserDoubles(async ({ store, panelEl }) => {
+    const app = new App();
+    app.selectedIngestFile = new Blob(['%PDF-1.4']);
+    app.api = {
+      ingestManualTerms: async () => {
+        const err = new ApiError(500, 'INGESTION_INTERNAL_ERROR', 'Unexpected ingestion error');
+        err.details = {};
+        throw err;
+      },
+      getIngestion: async () => { throw new Error('unreachable'); },
+    };
+    const container = makePanelContainer();
+    app.renderManualTermsPanel(container, {
+      code: 'AWAITING_ISSUE_TERMS', message: 'awaiting', details: { missing_fields: ['ofs'] },
+    }, 'final');
+    container.querySelector('#mt-ofs').value = '3300';
+    container.querySelector('#mt-explanation').value = 'note';
+    await container.querySelector('#mt-submit-btn').listeners.click();
+    assert.ok(container.querySelector('#mt-status').innerHTML.includes('INGESTION_INTERNAL_ERROR'));
+    assert.equal(store.has('ipo.lastIngestionId'), false);
+  });
+});
