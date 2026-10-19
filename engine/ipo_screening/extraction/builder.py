@@ -208,17 +208,24 @@ class CanonicalInputBuilder:
         if post_shares is None and pre_shares is not None and fresh_shares is not None:
             post_shares = pre_shares + fresh_shares
 
-        # Deterministically derive post_issue_eps from restated PAT and post_issue_shares if not explicitly provided
+        # Deterministically derive post_issue_eps from restated PAT and
+        # post_issue_shares if not explicitly provided.  The reporting unit
+        # is the filing's, never an assumed lakh default: a filing stated in
+        # INR millions previously produced an EPS ten times too small
+        # (Jio: 3.26 instead of 32.63), which feeds P/E and PEG.
         post_eps = _pick_issue("post_issue_eps", None)
         if post_eps is None:
             fin_base = self.base.get("financials", {})
             periods = fin_base.get("periods") or self._get_field("financials.periods", [])
-            if post_shares and periods and post_shares > 0:
+            unit = fin_base.get("reporting_unit") or self._get_field(
+                "financials.reporting_unit", "INR_LAKHS"
+            )
+            factor = self._ISSUE_UNIT_TO_RUPEES.get(unit)
+            if post_shares and periods and post_shares > 0 and factor:
                 latest_p = periods[-1]
                 latest_pat = latest_p.get("pat")
                 if latest_pat is not None:
-                    # latest_pat in INR_LAKHS -> multiply by 100,000 for total INR
-                    post_eps = round((latest_pat * 100000.0) / post_shares, 2)
+                    post_eps = round((latest_pat * factor) / post_shares, 2)
         if post_eps is None and self.allow_fixture_fallbacks:
             post_eps = default_eps
 
@@ -359,8 +366,15 @@ class CanonicalInputBuilder:
     # missing periods/revenue, non-positive revenue, unknown or
     # unconvertible units, or a missing numerator leave the fields null.
     _RPT_SALES_SERVICES_CATEGORIES = frozenset(
-        {"sale_of_goods", "sale_of_services", "job_work_charges_received"}
+        {"sale_of_goods", "sale_of_services", "revenue_from_operations", "job_work_charges_received"}
     )
+    _ISSUE_UNIT_TO_RUPEES = {
+        "INR_LAKHS": 1e5,
+        "INR_CRORES": 1e7,
+        "INR_MILLIONS": 1e6,
+        "INR_BILLIONS": 1e9,
+    }
+
     _RPT_UNIT_TO_RUPEES = {
         "INR_LAKHS": 1e5,
         "INR_CRORES": 1e7,

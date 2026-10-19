@@ -200,6 +200,18 @@ class FinancialTableExtractor:
             len(years),
         )
 
+        # Total equity is not always printed as a row (Jio's restated
+        # statement lists Equity Share capital, Other Equity and
+        # Non-Controlling Interest, then goes straight to Liabilities).
+        # Derive it from the disclosed components only when they reconcile
+        # to Total Assets - Total Liabilities; otherwise leave it unknown.
+        if "net_worth" not in bs_items:
+            derived_net_worth = self._derive_net_worth_from_equity(
+                bs_text or "", len(years)
+            )
+            if derived_net_worth is not None:
+                bs_items["net_worth"] = derived_net_worth
+
         # Parse non-current and current borrowings if total borrowings not already extracted
         if "total_borrowings" not in bs_items:
             borrowings_lines = self._extract_all_borrowings(bs_text or "", len(years))
@@ -401,6 +413,80 @@ class FinancialTableExtractor:
                         results[field_name] = nums[-n_cols:]
 
         return results
+
+    _EQUITY_COMPONENT_SPECS = [
+        ("equity_share_capital", [r"^equity\s+share\s+capital\b"]),
+        ("other_equity", [r"^other\s+equity\b"]),
+        ("non_controlling_interest", [r"^non[-\s]?controlling\s+interests?\b"]),
+    ]
+
+    def _derive_net_worth_from_equity(
+        self, text: str, n_cols: int
+    ) -> Optional[List[Optional[float]]]:
+        """Derive net worth (equity attributable to owners) from components.
+
+        Used only when the statement prints no Total Equity row.  Net worth
+        is Equity Share Capital + Other Equity.  A separately presented
+        Non-Controlling Interest line is *not* part of net worth: the issuer
+        reports "Total Equity (As per Restated Consolidated Statement of
+        Assets and Liabilities)" as the two owner components (see Jio Note
+        38: 3,359,769 at FY2026), while the balance-sheet reconciliation
+        Total Assets - Total Liabilities includes NCI.  When NCI is
+        disclosed, the components must still tie to that residual after NCI
+        is added back; otherwise the field stays unknown.  The result never
+        includes the "Total Equity and Liabilities" grand total and is never
+        a guessed or partial component.
+        """
+        components = self._parse_table_lines(
+            text, self._EQUITY_COMPONENT_SPECS, n_cols
+        )
+        share_capital = components.get("equity_share_capital")
+        other_equity = components.get("other_equity")
+        if not share_capital or not other_equity:
+            return None
+        nci = components.get("non_controlling_interest")
+        totals = self._parse_table_lines(
+            text,
+            [
+                ("total_assets", [r"^total\s+assets\b"]),
+                ("total_liabilities", [r"^total\s+liabilities\b"]),
+            ],
+            n_cols,
+        )
+        total_assets = totals.get("total_assets")
+        total_liabilities = totals.get("total_liabilities")
+        result: List[Optional[float]] = []
+        for index in range(n_cols):
+            try:
+                net_worth = float(share_capital[index]) + float(other_equity[index])
+            except (IndexError, TypeError, ValueError):
+                return None
+            if (
+                total_assets is not None
+                and total_liabilities is not None
+                and index < len(total_assets)
+                and index < len(total_liabilities)
+                and total_assets[index] is not None
+                and total_liabilities[index] is not None
+            ):
+                target = float(total_assets[index]) - float(total_liabilities[index])
+                tolerance = max(0.5, abs(target) * 0.0005)
+                reconciled = net_worth
+                if nci is not None:
+                    try:
+                        reconciled += float(nci[index])
+                    except (IndexError, TypeError, ValueError):
+                        return None
+                if abs(reconciled - target) > tolerance:
+                    return None
+                result.append(round(net_worth, 2))
+            else:
+                # Without a balance-sheet reconciliation an NCI row makes
+                # the treatment of non-controlling interest ambiguous.
+                if nci is not None:
+                    return None
+                result.append(round(net_worth, 2))
+        return result
 
     def _extract_all_borrowings(self, text: str, n_cols: int) -> List[List[Optional[float]]]:
         rows: List[List[Optional[float]]] = []

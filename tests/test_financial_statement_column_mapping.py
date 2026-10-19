@@ -217,6 +217,98 @@ def test_jio_real_filing_periods_are_fiscal_and_cagr_is_the_fiscal_figure():
     assert periods[-1]["cfo"] == 775563.0
     assert periods[-1]["disclosed_roce_pct"] == 10.76
     assert periods[-1]["total_debt"] == 707810.0
-    # Net worth is not a stated row in these statements: it must stay
-    # absent (governed unknown), never the Total Assets grand total.
-    assert all(p.get("net_worth") is None for p in periods)
+    # Net worth is not a printed row in these statements.  Equity Share
+    # Capital + Other Equity is the filing's own "Total Equity (As per
+    # Restated Consolidated Statement of Assets and Liabilities)" -- Note 38
+    # states 3,359,769 / 3,050,474 / 2,782,864 -- and reconciles to
+    # Total Assets - Total Liabilities once the separately presented
+    # Non-Controlling Interest is added back.  NCI is not part of the
+    # issuer's total equity and is never added to net worth.  The grand
+    # total "Total Equity and Liabilities" is never used.
+    assert [p.get("net_worth") for p in periods] == [
+        2782864.0, 3050474.0, 3359769.0
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Total equity derived from disclosed components (no printed Total Equity row)
+# ---------------------------------------------------------------------------
+
+NET_WORTH_BS = """
+Restated Consolidated Statement of Assets and Liabilities
+(All amounts are Rs. in millions unless otherwise stated)
+Particulars As at 31st March, 2026 As at 31st March, 2025 As at 31st March, 2024
+Equity Share capital 14 89,390 89,390 89,390
+Other Equity 15 3,270,379 2,961,084 2,693,474
+Non-Controlling Interest 10,993 11,338 11,353
+Total Liabilities 2,785,178 2,750,526 2,601,587
+Total Assets 6,155,940 5,812,338 5,395,804
+Total Equity and Liabilities 6,155,940 5,812,338 5,395,804
+"""
+
+
+def test_net_worth_is_derived_from_reconciling_equity_components():
+    """Jio's statement prints no Total Equity row.  The owner components,
+    plus the separately presented NCI, sum to the balance-sheet residual
+    exactly; net worth is the owner components (Note 38 total equity)."""
+    fe = _extractor()
+    derived = fe._derive_net_worth_from_equity(NET_WORTH_BS, 3)
+    assert derived == [3359769.0, 3050474.0, 2782864.0]
+    # NCI reconciles the balance sheet but is never net worth.
+    assert all(
+        derived[i] != round(3359769.0 + 10993.0, 2)
+        for i in (0,)
+    )
+
+
+def test_net_worth_derivation_never_uses_the_grand_total():
+    """The 'Total Equity and Liabilities' row is a grand total, not equity.
+    It must not match Total Liabilities or Total Assets either."""
+    fe = _extractor()
+    totals = fe._parse_table_lines(
+        NET_WORTH_BS,
+        [("total_assets", [r"^total\s+assets\b"]),
+         ("total_liabilities", [r"^total\s+liabilities\b"])],
+        3,
+    )
+    assert totals["total_assets"] == [6155940.0, 5812338.0, 5395804.0]
+    assert totals["total_liabilities"] == [2785178.0, 2750526.0, 2601587.0]
+
+
+def test_net_worth_derivation_fails_closed_when_components_do_not_reconcile():
+    """A corrupt Total Liabilities column must leave net worth unknown, not
+    silently produce the component sum."""
+    fe = _extractor()
+    corrupted = NET_WORTH_BS.replace(
+        "Total Liabilities 2,785,178", "Total Liabilities 2,700,000"
+    )
+    assert fe._derive_net_worth_from_equity(corrupted, 3) is None
+
+
+def test_net_worth_derivation_without_totals_requires_unambiguous_components():
+    """With no balance-sheet totals an NCI row makes the treatment of
+    non-controlling interest ambiguous, so the field stays unknown."""
+    fe = _extractor()
+    no_totals = "\n".join(
+        line for line in NET_WORTH_BS.splitlines()
+        if not line.startswith("Total Assets")
+        and not line.startswith("Total Liabilities")
+    )
+    assert fe._derive_net_worth_from_equity(no_totals, 3) is None
+    without_nci = "\n".join(
+        line for line in no_totals.splitlines()
+        if not line.startswith("Non-Controlling Interest")
+    )
+    assert fe._derive_net_worth_from_equity(without_nci, 3) == [
+        3359769.0, 3050474.0, 2782864.0
+    ]
+
+
+def test_non_controlling_interest_is_never_added_to_net_worth():
+    """The filing presents NCI as a separate equity line and defines total
+    equity as ES + OE (Note 38); adding NCI would overstate net worth by
+    10,993 even though the sum reconciles to Total Assets - Liabilities."""
+    fe = _extractor()
+    derived = fe._derive_net_worth_from_equity(NET_WORTH_BS, 3)
+    assert derived[0] == 3359769.0
+    assert derived[0] + 10993.0 == 3370762.0  # the balance-sheet residual

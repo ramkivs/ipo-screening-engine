@@ -19,6 +19,7 @@ scoring rule is changed by the test.
 from __future__ import annotations
 
 import copy
+import json
 
 import pytest
 
@@ -29,6 +30,16 @@ from ipo_screening.presentation.service import PresentationConfig, PresentationS
 
 JIO_PDF = REPO_ROOT / "evidence" / "non-authoritative" / "jio" / "U72900GJ2019PLC110816_JIO.pdf"
 EXPLANATION = "Reproduction of the 2026-10-19 Windows evaluation issue structure."
+
+# Frozen output of the pre-remediation extractor (commit 86d4950) on the
+# committed RHP.  The live extractor now supplies evidence-backed fields that
+# were unknown on 2026-10-19 (net worth, peers, Note 36 RPT metrics) and a
+# unit-correct post-issue EPS; this fixture keeps the published 29/21 bridge
+# verifiable without rewriting the historical result.
+HISTORICAL_CANONICAL = (
+    REPO_ROOT / "fixtures" / "jio"
+    / "jio_canonical_2026-10-19_pre_evidence_remediation.json"
+)
 
 
 def _service(tmp_path):
@@ -66,13 +77,14 @@ def _criterion(module, criterion_id):
     return next(c for c in module["criteria"] if c["criterion_id"] == criterion_id)
 
 
-@pytest.mark.slow
 def test_jio_correct_structure_is_29_and_inverted_is_21(tmp_path, monkeypatch):
-    # One real extraction, reused for both evaluations (the issue terms are
-    # the only difference and are applied after extraction).
-    doc, _report = DocumentExtractor().extract_from_pdf(
-        pdf_path=JIO_PDF, allow_fixture_fallbacks=False
-    )
+    # Historical reproduction: the frozen pre-remediation canonical input is
+    # reused for both evaluations (the issue terms are the only difference
+    # and are applied after extraction).
+    doc = json.loads(HISTORICAL_CANONICAL.read_text())
+    assert doc["issue"]["post_issue_eps"] == 3.26  # pre-fix unit defect, frozen
+    assert all(p.get("net_worth") is None for p in doc["financials"]["periods"])
+    assert doc["peers"] == []
     monkeypatch.setattr(
         DocumentExtractor,
         "extract_from_pdf",

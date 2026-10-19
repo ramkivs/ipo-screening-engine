@@ -431,3 +431,77 @@ def _spec_for(record, field):
         if candidate in evidence:
             return evidence[candidate]
     raise KeyError(field)
+
+
+def _peers_from_pages(pages):
+    ex = SectionExtractor(
+        _StubDoc(), _StubReader(200), text_cache={p: t for p, t in pages.items()}
+    )
+    raw = ex.extract_peers()
+    return (raw[0].candidate_value if raw else [])
+
+
+JIO_PEER_TABLE = (
+    "Particulars Face \nvalu\ne \n(₹) \nRevenue \nfrom \noperations \nfor Fiscal \n"
+    "2026 \n(in ₹ million) \nEPS \n(Basic) \n(₹) \nEPS \n(Diluted) \n(₹) \n"
+    "P/E Return on \nAverage \nNet Worth \n(%) \nNAV per \nEquity \nShare (₹) \n"
+    "The Company* 10 1,468,853 33.63 33.59 [●]# 9.42%^ 373.66^ \n"
+    "Peer Companies \n"
+    "Bharti Airtel Limited 5 2,109,728(1) 45.96(3) 44.37(3) 40.71 (4) 20.32%(5) 244.60(6) \n"
+    "Vodafone Idea Limited 10 448,730(2) 3.21(3) 3.21(3) 3.99 (4) NM$ (3.30)(7) \n"
+)
+JIO_PEER_NOTE = (
+    "(4) P/E ratio of peer companies has been computed based on the closing "
+    "market price of the equity shares of respective peer companies on NSE "
+    "as on October 13, 2026, divided by diluted EPS for fiscal ended "
+    "March 31, 2026."
+)
+
+
+def test_jio_peer_companies_layout_maps_pe_and_ronw_only():
+    """The Jio RHP layout (Face value, Revenue, EPS Basic, EPS Diluted, P/E,
+    Return on Average Net Worth, NAV) maps each column to its own field.
+    There is no CMP column, so no P/B is invented."""
+    peers = _peers_from_pages({150: JIO_PEER_TABLE, 151: JIO_PEER_NOTE})
+    assert [p["name"] for p in peers] == ["Bharti Airtel Limited", "Vodafone Idea Limited"]
+    bharti, vi = peers
+    assert (bharti["pe"], bharti["roe_pct"]) == (40.71, 20.32)
+    assert (vi["pe"], vi["roe_pct"]) == (3.99, None)  # NM is not a number
+    assert bharti["pb"] is None and vi["pb"] is None
+    # The valuation date is the filing's, never a 2026-09-28 default.
+    assert bharti["as_of"] == vi["as_of"] == "2026-10-13"
+    # Listing history is not disclosed, so it is not asserted as 15 years.
+    assert bharti["listed_years"] is None
+
+
+def test_short_data_row_never_leaks_into_the_next_peer_name():
+    """A row with too few numeric cells is an unmappable data row.  Its
+    numbers must not become the next peer's name (the demonstrated defect:
+    '.75 10.0 26957.28 12.35 Beta Fire Safety Limited')."""
+    rows = (
+        "412.75 10.0 26957.28 12.35\n"
+        "Beta Fire Safety Limited\n"
+        "318.50 10.0 21700.34 9.85 9.85 16.20 21700.34 8.90 38.15\n"
+    )
+    peers = _peers_from(VISHAL_HEADER + rows)
+    assert len(peers) == 1
+    assert peers[0]["name"] == "Beta Fire Safety Limited"
+    assert peers[0]["pe"] == 16.2  # the row's own P/E, not a shifted cell
+
+
+def test_missing_numeric_cell_row_emits_no_peer():
+    """A blank cell that vanishes in text extraction shortens the row; the
+    row is rejected rather than shifting a later value into ROE."""
+    rows = "Alpha Fire Safety Limited\n412.75 10.0 26957.28 12.35 12.35 18.40 26957.28 12.40\n"
+    assert _peers_from(VISHAL_HEADER + rows) == []
+
+
+def test_absent_valuation_date_is_not_defaulted():
+    """With no disclosed valuation date the peer's currency is unknown; a
+    fixed 2026-09-28 default must never be substituted."""
+    table = VISHAL_HEADER.replace(
+        "Closing price as on July 23, 2026", "Closing price"
+    ) + VISHAL_ROWS
+    peers = _peers_from(table)
+    assert [p["name"].split()[0] for p in peers] == ["GPT", "Indian"]
+    assert {p["as_of"] for p in peers} == {None}

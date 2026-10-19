@@ -913,10 +913,29 @@ class SectionExtractor:
     # ------------------------------------------------------------------
     # Related-party transactions (generic, issuer-neutral)
     # ------------------------------------------------------------------
+    # The related-party note is introduced in several wordings:
+    #   "Transactions with related parties"            (Vishal)
+    #   "Transactions with the related parties"        (Jio)
+    #   "Transactions during the period / year with Related Parties" (Jio table)
+    _RPT_TRANSACTIONS_HEADER = re.compile(
+        r"transactions?\s+(?:(?:during|for)\s+(?:the\s+)?(?:period|year)"
+        r"[^.]{0,40}\s+)?with\s+(?:the\s+)?related\s+part(?:y|ies)",
+        re.IGNORECASE,
+    )
+
+    # A table carrying a Relationship column labels each amount row by
+    # relationship (Parent / Fellow Subsidiaries / Associate/JV / Others).
+    _RPT_RELATIONSHIP_PREFIX = re.compile(
+        r"^(?:parent\b|fellow\s+subsidiar|associate\b|joint\s+venture\b|jv\b|"
+        r"others?\b|key\s+managerial\b|kmp\b|promoter|non[-\s]?controlling)",
+        re.IGNORECASE,
+    )
+
     _RPT_CATEGORY_PHRASES: Tuple[Tuple[str, str], ...] = (
         ("sale of goods", "sale_of_goods"),
         ("sales of goods", "sale_of_goods"),
         ("sale of services", "sale_of_services"),
+        ("revenue from operations", "revenue_from_operations"),
         ("purchase of goods", "purchase_of_goods"),
         ("purchases of goods", "purchase_of_goods"),
         ("sale of property, plant and equipment", "sale_of_ppe"),
@@ -987,14 +1006,14 @@ class SectionExtractor:
         for p in scan:
             if p > self.page_count:
                 break
-            if "transactions with related parties" in self.extract_page_text(p).lower():
+            if self._RPT_TRANSACTIONS_HEADER.search(self.extract_page_text(p)):
                 anchor_page = p
                 break
         if anchor_page is None and fin_range:
             # The TOC range for the financial section may end before the
             # related-party note; fall back to a full-document search.
             for p in range(1, self.page_count + 1):
-                if "transactions with related parties" in self.extract_page_text(p).lower():
+                if self._RPT_TRANSACTIONS_HEADER.search(self.extract_page_text(p)):
                     anchor_page = p
                     break
         if anchor_page is None:
@@ -1009,7 +1028,15 @@ class SectionExtractor:
                 line = raw_line.strip()
                 if not line:
                     continue
-                if "outstanding balances" in line.lower():
+                low_line = line.lower()
+                if (
+                    "outstanding balances" in low_line
+                    or "balances as at" in low_line
+                    or "major related party transactions" in low_line
+                ):
+                    # Balance tables and the "major transactions" breakdown
+                    # repeat the same amounts at counterparty level; parsing
+                    # them would double count the note's category totals.
                     stop = True
                     break
                 lines.append((p, line))
@@ -1019,9 +1046,11 @@ class SectionExtractor:
             return []
 
         # Period columns from the table header ("year ended 31 March YYYY").
+        # Header rows can wrap across many lines (Jio's note spreads the
+        # five period columns over ~20 lines); scan a bounded header window.
         years: List[int] = []
-        for _, line in lines[:14]:
-            for m in re.finditer(r"31\s*March\s+(20\d{2})", line):
+        for _, line in lines[:30]:
+            for m in re.finditer(r"31(?:st)?\s+March,?\s+(20\d{2})", line):
                 y = int(m.group(1))
                 if y not in years:
                     years.append(y)
@@ -1044,6 +1073,8 @@ class SectionExtractor:
         elif re.search(r"in\s+millions?\b", unit_window, re.IGNORECASE):
             unit = "INR_MILLIONS"
 
+        header_blob = " ".join(line for _, line in lines[:14]).lower()
+        has_relationship_column = "relationship" in header_blob
         amount_token = re.compile(r"^(?:-|\d[\d,]*\.\d+|\d[\d,]*)$")
         transactions: List[Dict[str, Any]] = []
         seen = set()
@@ -1052,7 +1083,7 @@ class SectionExtractor:
         started = False
         for page, line in lines:
             low = line.lower()
-            if "transactions with related parties" in low:
+            if self._RPT_TRANSACTIONS_HEADER.search(line):
                 started = True
                 continue
             if not started:
@@ -1068,13 +1099,28 @@ class SectionExtractor:
             if len(amounts) == len(years) and (name_part or pending_name):
                 display = " ".join(f"{pending_name} {name_part}".split())
                 pending_name = ""
-                match = self._rpt_category_match(self._rpt_norm(display))
+                # A leading Sr. No. is a row key, never part of the category.
+                display = re.sub(r"^\d{1,3}\s+", "", display)
+                normalized = self._rpt_norm(display)
+                match = self._rpt_category_match(normalized)
                 counterparty = display
                 if match is not None:
                     key, label, consumed = match
                     current_category = (key, label)
                     counterparty = display[consumed:].strip(" .")
+                elif has_relationship_column and not self._RPT_RELATIONSHIP_PREFIX.match(normalized):
+                    # A table with a Relationship column names its category on
+                    # the row itself.  An unrecognised category header must
+                    # never inherit the previous category: "Revenue Received
+                    # in Advance" is not revenue from operations.
+                    current_category = None
+                    continue
                 if current_category is None or not counterparty:
+                    continue
+                # Interim columns can remain in the text; a counterparty is a
+                # name, never a trailing number.
+                counterparty = re.sub(r"(?:\s+[\d,]+(?:\.\d+)?)+$", "", counterparty).strip()
+                if not counterparty:
                     continue
                 counterparty_clean = " ".join(counterparty.split()).strip("* ").strip().rstrip(".")
                 for year, token in zip(years, amounts):
@@ -1784,10 +1830,64 @@ class SectionExtractor:
             ),
             "cmp": 0, "pe": 5, "roe": 7, "nav": 8,
         },
+        {
+            # Jio Platforms RHP (2026), "Comparison of accounting ratios":
+            # Face value, Revenue, EPS (Basic), EPS (Diluted), P/E,
+            # Return on Average Net Worth, NAV per Equity Share.  There is
+            # no CMP column (the filing supplies the peer P/E directly), so
+            # ``cmp`` is None and no P/B is formed from an invented price.
+            "id": "accounting_ratios_peer_companies",
+            "width": 7,
+            "header": re.compile(
+                r"face\s*valu\s*e.{0,120}revenue.{0,80}operations.{0,80}"
+                r"eps.{0,40}\(basic\).{0,60}eps.{0,40}\(diluted\).{0,60}"
+                r"p\s*/\s*e.{0,80}return\s+on\s+average\s+net\s+worth.{0,80}"
+                r"n\s*a\s*v\s+per\s+equity\s+share",
+                re.IGNORECASE | re.DOTALL,
+            ),
+            "cmp": None, "pe": 4, "roe": 5, "nav": 6,
+        },
     )
 
     # Non-numeric cells that still occupy a column position ([●], NA, -).
-    _PEER_PLACEHOLDERS = {"[●]", "●", "(●)", "-", "--", "—", "na", "n/a", "nil", "[]", "[ ]"}
+    _PEER_PLACEHOLDERS = {
+        "[●]", "●", "(●)", "-", "--", "—", "na", "n/a", "nil", "[]", "[ ]",
+        "nm", "n.m.", "n.m", "not meaningful",
+    }
+
+    @classmethod
+    def _peer_cell(cls, token: str) -> Tuple[bool, Optional[float]]:
+        """Classify one peer-table token.
+
+        Returns ``(True, value)`` for a number, ``(True, None)`` for a
+        placeholder that occupies a column, and ``(False, None)`` for text
+        outside the numeric grid.
+
+        Handles the disclosure typography used by the source filings:
+        thousands separators, a trailing percent sign, a trailing footnote
+        marker (``2,109,728(1)``, ``20.32%(5)``), and accounting negatives
+        (``(3.30)``).  Placeholder cells (including ``NM``) keep their
+        column so no later value shifts left.
+        """
+        raw = token.strip()
+        # A footnote marker may be attached to the value or stand alone.
+        without_footnote = re.sub(r"\(\d{1,2}\)$", "", raw).strip()
+        if not without_footnote:
+            return (False, None)  # a standalone footnote marker occupies no column
+        core = without_footnote.rstrip("%^#").replace(",", "").strip()
+        if core.startswith("(") and core.endswith(")"):
+            try:
+                return (True, -float(core[1:-1].strip()))
+            except ValueError:
+                return (False, None)
+        try:
+            return (True, float(core))
+        except ValueError:
+            pass
+        placeholder = without_footnote.rstrip("$^#").strip().lower()
+        if placeholder in cls._PEER_PLACEHOLDERS:
+            return (True, None)
+        return (False, None)
 
     @classmethod
     def _peer_cells(cls, line: str) -> List[Optional[float]]:
@@ -1796,13 +1896,97 @@ class SectionExtractor:
         cell grid and are skipped (the caller accumulates them separately)."""
         cells: List[Optional[float]] = []
         for t in line.split():
-            t_clean = t.replace(",", "").strip()
-            try:
-                cells.append(float(t_clean))
-            except ValueError:
-                if t_clean.lower() in cls._PEER_PLACEHOLDERS:
-                    cells.append(None)
+            is_cell, value = cls._peer_cell(t)
+            if is_cell:
+                cells.append(value)
         return cells
+
+    # The peer multiple's valuation date is stated in the table header
+    # ("CMP as on ...") or in the accompanying note ("P/E ... computed based
+    # on the closing market price ... as on ...").  It is never defaulted:
+    # an absent date leaves the peer's currency unestablished (STALE) rather
+    # than inventing one.
+    _PEER_AS_OF = re.compile(
+        r"(?:\bCMP\b|closing\s+(?:market\s+)?price)[^.]{0,240}?"
+        r"([A-Za-z]{3,9}\s+\d{1,2},\s*\d{4})",
+        re.IGNORECASE | re.DOTALL,
+    )
+
+    # A name containing a monetary/decimal cell is a leaked data row, not a
+    # company name (see the short-row defect pinned in tests).
+    _PEER_NAME_NUMBER = re.compile(
+        r"(?:^|\s)(?:\d{1,3}(?:,\d{3})+|\d+\.\d+)(?=\s|$)"
+    )
+
+    def _peer_as_of_date(self, p_start: int, p_end: int) -> Optional[str]:
+        import datetime
+
+        for p in range(p_start, min(p_end + 1, self.page_count + 1)):
+            txt = self.extract_page_text(p)
+            for m in self._PEER_AS_OF.finditer(txt):
+                for fmt in ("%B %d, %Y", "%B %d,%Y", "%d %B %Y"):
+                    try:
+                        return datetime.datetime.strptime(
+                            m.group(1).strip(), fmt
+                        ).strftime("%Y-%m-%d")
+                    except Exception:
+                        continue
+        return None
+
+    @classmethod
+    def _peer_row(cls, line: str) -> Tuple[List[Optional[float]], str]:
+        """Split a table line into its numeric cells and any inline name.
+
+        Reference layouts put the company name on its own line (R.K Fashion,
+        Vishal Nirmiti) or inline before the numbers (Jio).  Only the text
+        that precedes the numeric block can be a name; a leading row-serial
+        column is tolerated.
+        """
+        tokens = line.split()
+        cells: List[Optional[float]] = []
+        name_parts: List[str] = []
+        i = 0
+        while i < len(tokens):
+            is_cell, _ = cls._peer_cell(tokens[i])
+            if is_cell:
+                break
+            name_parts.append(tokens[i])
+            i += 1
+        if not name_parts and i < len(tokens):
+            is_cell, value = cls._peer_cell(tokens[i])
+            if is_cell and value is not None and float(value).is_integer() and 1 <= value <= 50:
+                j = i + 1
+                while j < len(tokens):
+                    next_is_cell, _ = cls._peer_cell(tokens[j])
+                    if next_is_cell:
+                        break
+                    j += 1
+                if j > i + 1:
+                    # A serial must be followed by text to be a row number;
+                    # otherwise the leading value is the first data cell and
+                    # must not be dropped (an RK row begins with face value
+                    # 10.00, which is not a serial).
+                    name_parts = tokens[i + 1:j]
+                    i = j
+        for token in tokens[i:]:
+            is_cell, value = cls._peer_cell(token)
+            if is_cell:
+                cells.append(value)
+        return cells, " ".join(name_parts)
+
+    @classmethod
+    def _peer_name_is_valid(cls, name: str) -> bool:
+        """A peer name is a company name, not prose or a leaked data row."""
+        if not name or len(name.split()) > 10:
+            return False
+        low = name.lower()
+        if any(k in low for k in ("total", "average", "highest", "lowest")):
+            return False
+        if "the company" in low or "our company" in low:
+            return False
+        if cls._PEER_NAME_NUMBER.search(name):
+            return False
+        return True
 
     def extract_peers(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract listed industry peers from Basis for Offer Price section."""
@@ -1810,22 +1994,16 @@ class SectionExtractor:
         b_range = page_ranges.get("basis_for_offer_price") if page_ranges else None
         p_start, p_end = b_range or (140, min(180, self.page_count))
 
-        as_of_date = None
+        as_of_date = self._peer_as_of_date(p_start, p_end)
         peers: List[Dict[str, Any]] = []
 
         for p in range(p_start, min(p_end + 1, self.page_count + 1)):
             txt = self.extract_page_text(p)
-            if "comparison of accounting ratios" in txt.lower() or "peer group" in txt.lower():
-                m_date = re.search(r"CMP\s+As\s+on\s+([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})", txt, re.IGNORECASE)
-                if m_date and not as_of_date:
-                    import datetime
-                    for fmt in ("%B %d, %Y", "%B %d,%Y"):
-                        try:
-                            as_of_date = datetime.datetime.strptime(m_date.group(1).strip(), fmt).strftime("%Y-%m-%d")
-                            break
-                        except Exception:
-                            pass
-
+            if (
+                "comparison of accounting ratios" in txt.lower()
+                or "peer group" in txt.lower()
+                or "peer companies" in txt.lower()
+            ):
                 shape: Optional[Dict[str, Any]] = None
                 for cand in self._PEER_SHAPES:
                     if cand["header"].search(txt):
@@ -1842,29 +2020,28 @@ class SectionExtractor:
                 accumulated_name: List[str] = []
 
                 for l in lines:
-                    if "PEER GROUP" in l.upper():
+                    if "PEER GROUP" in l.upper() or "PEER COMPANIES" in l.upper():
                         in_peers = True
                         accumulated_name = []
                         continue
                     if in_peers:
                         if l.startswith("Note:") or l.startswith("*") or l.startswith("#"):
                             break
-                        cells = self._peer_cells(l)
+                        cells, inline_name = self._peer_row(l)
                         if len(cells) == shape["width"] + 1 and cells[0] is not None and \
                                 float(cells[0]).is_integer() and 1 <= cells[0] <= 50:
                             cells = cells[1:]  # leading row-serial column
                         if len(cells) == shape["width"]:
-                            pname = " ".join(accumulated_name)
+                            pname = " ".join(accumulated_name) or inline_name
                             pname = re.sub(r"^[0-9]+\s*", "", pname).strip()
-                            # A peer name is a company name, not a sentence:
-                            # rows whose accumulated name is prose (table
-                            # narrative, header fragments) are not peers.
-                            if (
-                                pname
-                                and len(pname.split()) <= 10
-                                and not any(k in pname.lower() for k in ["total", "average", "highest", "lowest"])
-                            ):
-                                cmp = cells[shape["cmp"]]
+                            pname = re.sub(
+                                r"^(?:listed\s+peers?[*\s]*)+", "", pname, flags=re.IGNORECASE
+                            ).strip()
+                            # A peer name is a company name, not a sentence
+                            # or a misaligned data row.
+                            if self._peer_name_is_valid(pname):
+                                cmp_index = shape["cmp"]
+                                cmp = cells[cmp_index] if cmp_index is not None else None
                                 pe = cells[shape["pe"]]
                                 ronw = cells[shape["roe"]]
                                 nav = cells[shape["nav"]]
@@ -1872,8 +2049,11 @@ class SectionExtractor:
                                 peers.append({
                                     "name": pname,
                                     "business_match": "partial",
-                                    "listed_years": 15.0,
-                                    "as_of": as_of_date or "2026-09-28",
+                                    # Listing history is not disclosed by the
+                                    # peer table: never assert an invented
+                                    # 15-year history.
+                                    "listed_years": None,
+                                    "as_of": as_of_date,
                                     "pe": pe,
                                     "pb": pb,
                                     "roe_pct": ronw,
@@ -1881,7 +2061,14 @@ class SectionExtractor:
                                 })
                             accumulated_name = []
                         else:
-                            accumulated_name.append(l)
+                            # A line carrying numeric cells but not matching
+                            # the declared width is an unmappable data row.
+                            # It must never be accumulated as the next peer's
+                            # name (the demonstrated short-row leak).
+                            if sum(1 for c in cells if c is not None) >= 2:
+                                accumulated_name = []
+                            else:
+                                accumulated_name.append(l)
 
                 if peers:
                     break
