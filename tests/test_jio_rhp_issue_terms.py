@@ -163,13 +163,17 @@ def test_jio_completes_via_verified_prospectus_pathway(tmp_path):
     issue = record["input_snapshot"]["input"]["issue"]
     assert (issue["price_band_low"], issue["price_band_high"], issue["lot_size"]) == (500.0, 550.0, 25)
     assert issue["ofs"] == 0.0  # filing-established: no Offer for Sale
-    # Stated Rs.148,500 million converted to canonical INR lakhs.
-    assert issue["fresh_issue"] == 1485000.0
+    # Stated Rs.148,500 million. The document's reporting unit is detected
+    # as INR_MILLIONS (the statement headers say "in ₹ million"), so the
+    # amount is recorded in its own unit without cross-unit conversion
+    # (2026-10-19 unit-detection correction; previously misdetected as
+    # INR_LAKHS and scaled to 1,485,000).
+    assert issue["fresh_issue"] == 148500.0
     assert issue["fresh_shares"] == 270000000
 
     evidence = service.get_evaluation_evidence(resp.evaluation_id)
     items = {item.evidence_id: item for item in evidence.items}
     amount = items["EV-issue.fresh_issue"]
-    assert amount.extracted_value == 1485000.0
+    assert amount.extracted_value == 148500.0
     assert amount.verification == "OFFICIAL_VERIFIED"  # stated in the verified Prospectus
     assert items["EV-issue-ofs"].verification == "FILING"  # never re-labelled official

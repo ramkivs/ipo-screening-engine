@@ -92,7 +92,7 @@ def parse_indian_number(text: Optional[str]) -> Optional[float]:
 _UNIT_PATTERNS = (
     (re.compile(r"\b(?:amount\s+in\s+lakhs?|in\s+lakhs?|₹\s*in\s*lakhs?|rs\.?\s*in\s*lakhs?)\b", re.IGNORECASE), "INR_LAKHS"),
     (re.compile(r"\b(?:amount\s+in\s+crores?|in\s+crores?|₹\s*in\s*crores?|rs\.?\s*in\s*crores?)\b", re.IGNORECASE), "INR_CRORES"),
-    (re.compile(r"\b(?:amount\s+in\s+millions?|in\s+millions?|₹\s*in\s*millions?)\b", re.IGNORECASE), "INR_MILLIONS"),
+    (re.compile(r"\b(?:amount\s+in\s+millions?|in\s+millions?|₹\s*in\s+millions?|in\s+₹\s+millions?|₹\s+millions?)\b", re.IGNORECASE), "INR_MILLIONS"),
     (re.compile(r"\b(?:amount\s+in\s+billions?|in\s+billions?|₹\s*in\s*billions?)\b", re.IGNORECASE), "INR_BILLIONS"),
     (re.compile(r"\b(?:amount\s+in\s+thousands?|in\s+thousands?|₹\s*in\s*thousands?)\b", re.IGNORECASE), "INR_THOUSANDS"),
 )

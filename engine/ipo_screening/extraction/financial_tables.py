@@ -132,10 +132,12 @@ class FinancialTableExtractor:
 
         kpi_start = 50 if self.page_count >= 50 else 1
         kpi_page, kpi_text = self._find_page(
-            ["Key Performance Indicators", "Key performance indicators", "Return on Capital Employed"],
+            ["Key Performance Indicators", "Key performance indicators", "Return on Capital Employed",
+             r"Return on (?:Average )?Capital\s+Employed"],
             kpi_start,
             min(self.page_count, 250),
-            required_content=["Return on Capital Employed", "ROCE", "CRAR"],
+            required_content=["Return on Capital Employed", "ROCE", "CRAR",
+                              r"Return on (?:Average )?Capital\s+Employed"],
         )
 
         cl_start = 250 if self.page_count >= 250 else 1
@@ -178,7 +180,7 @@ class FinancialTableExtractor:
                 ("cost_of_materials", [r"cost of material consumed"]),
                 ("employee_expenses", [r"employee benefits expenses", r"employee benefits"]),
                 ("finance_costs", [r"finance costs", r"finance cost", r"interest expended"]),
-                ("depreciation", [r"depreciation and amortization"]),
+                ("depreciation", [r"depreciation and amorti[sz]ation"]),
                 ("total_expenses", [r"total expenses\b"]),
                 ("pbt", [r"profit/(loss) before tax", r"profit before tax"]),
                 ("pat", [r"profit after tax", r"profit/(loss) for the year", r"profit/(loss) after tax"]),
@@ -192,7 +194,7 @@ class FinancialTableExtractor:
             [
                 ("trade_receivables", [r"trade receivables"]),
                 ("cash_and_equivalents", [r"cash and cash equivalents"]),
-                ("net_worth", [r"total equity\b", r"total equity \(d\)"]),
+                ("net_worth", [r"total equity(?! and liabilit)", r"total equity \(d\)"]),
                 ("total_borrowings", [r"total borrowings\b"]),
             ],
             len(years),
@@ -211,14 +213,14 @@ class FinancialTableExtractor:
         cf_items = self._parse_table_lines(
             cf_text or "",
             [
-                ("cfo", [r"net cash provided by/\(used in\) operating activities", r"net cash from operating activities"]),
+                ("cfo", [r"net cash provided by/\(used in\) operating activities", r"net cash from operating activities", r"net cash flow from operating activities"]),
                 ("capex", [r"purchase of property,\s*plant and equipment", r"purchase of fixed assets"]),
             ],
             len(years),
         )
 
         # Parse KPI items
-        roce_vals = self._parse_kpi_line(kpi_text or "", r"return on capital employed", len(years))
+        roce_vals = self._parse_kpi_line(kpi_text or "", r"return on (?:average )?capital\s+employed", len(years))
         crar_vals = self._parse_kpi_line(kpi_text or "", r"crar\b|capital adequacy ratio", len(years))
         gnpa_vals = self._parse_kpi_line(kpi_text or "", r"gross npa", len(years))
         nim_vals = self._parse_kpi_line(kpi_text or "", r"net interest margin|nim\b", len(years))
@@ -388,10 +390,15 @@ class FinancialTableExtractor:
                         next_nums = self._extract_row_numbers(lines[i + 1])
                         if len(next_nums) >= n_cols:
                             nums = next_nums
-                    if len(nums) == n_cols + 1:
-                        nums = nums[1:]
                     if len(nums) >= n_cols:
-                        results[field_name] = nums[:n_cols]
+                        # Statement tables are newest-first and may carry a
+                        # note number and interim (three-month) columns
+                        # before the fiscal-year block (SEBI RHP summary and
+                        # Ind AS statement convention). The fiscal block is
+                        # the rightmost n_cols. For legacy 3/4-numeric rows
+                        # this selects exactly what the previous
+                        # (drop-first-then-take-first) rules selected.
+                        results[field_name] = nums[-n_cols:]
 
         return results
 
@@ -399,12 +406,12 @@ class FinancialTableExtractor:
         rows: List[List[Optional[float]]] = []
         lines = [l.strip() for l in text.split("\n") if l.strip()]
         for line in lines:
-            if re.search(r'-\s*borrowings\b', line, re.IGNORECASE):
+            # Dash-rendered ("- Borrowings") or plain "Borrowings" rows;
+            # never "Total Borrowings" (that total has its own item key).
+            if re.search(r'^\s*-?\s*borrowings\b', line, re.IGNORECASE):
                 nums = self._extract_row_numbers(line)
-                if len(nums) == n_cols + 1:
-                    nums = nums[1:]
                 if len(nums) >= n_cols:
-                    rows.append(nums[:n_cols])
+                    rows.append(nums[-n_cols:])
         return rows
 
     def _extract_row_numbers(self, line: str) -> List[Optional[float]]:
@@ -428,12 +435,23 @@ class FinancialTableExtractor:
         return None
 
     def _parse_kpi_line(self, text: str, pattern: str, n_cols: int) -> Optional[List[Optional[float]]]:
-        for line in text.split("\n"):
-            if re.search(pattern, line, re.IGNORECASE):
-                nums = re.findall(r'[0-9]+\.[0-9]+', line)
-                parsed = [float(x) for x in nums if float(x) < 200.0]
-                if len(parsed) >= n_cols:
-                    return parsed[:n_cols]
+        lines = text.split("\n")
+        for i, line in enumerate(lines):
+            window = line
+            if not re.search(pattern, window, re.IGNORECASE) or not re.search(r"[0-9]+\.[0-9]+", window):
+                # KPI rows wrap across lines (e.g. "Return on Average
+                # Capital" / "Employed(18) % 2.56% ..."); join one line.
+                if i + 1 < len(lines):
+                    window = f"{line} {lines[i + 1]}"
+            if not re.search(pattern, window, re.IGNORECASE):
+                continue
+            nums = re.findall(r'[0-9]+\.[0-9]+', window)
+            parsed = [float(x) for x in nums if float(x) < 200.0]
+            if len(parsed) >= n_cols:
+                # Newest-first tables may carry interim columns before the
+                # fiscal block; select the rightmost n_cols (identical to
+                # the previous selection for exactly-n_cols rows).
+                return parsed[-n_cols:]
         return None
 
     def _parse_contingent_liabilities(self, text: str) -> Optional[float]:
@@ -583,17 +601,16 @@ class FinancialTableExtractor:
             fc_vals = [0.97, 0.24, 0.33]
 
         def _get_val(arr: Optional[List[float]], yr_offset: int) -> Optional[float]:
-            if not arr:
+            if not arr or len(arr) < 3:
                 return None
-            if len(arr) == 4:
-                mapping = {0: 3, 1: 2, 2: 1}
-                idx = mapping.get(yr_offset, 1)
-                return arr[idx] if idx < len(arr) else None
-            elif len(arr) == 3:
-                mapping = {0: 2, 1: 1, 2: 0}
-                idx = mapping.get(yr_offset, 0)
-                return arr[idx] if idx < len(arr) else None
-            return None
+            # Newest-first fiscal block is the rightmost 3 values (rows may
+            # carry note numbers and interim columns before it). Identical
+            # to the previous 3/4-element mappings; also covers 5-column
+            # summary tables (interim + fiscal).
+            sel = arr[-3:]
+            mapping = {0: 2, 1: 1, 2: 0}
+            idx = mapping.get(yr_offset, 0)
+            return sel[idx]
 
         periods: List[Dict[str, Any]] = []
         for offset, yr in enumerate(["2024", "2025", "2026"]):

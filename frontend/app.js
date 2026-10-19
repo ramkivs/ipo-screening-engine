@@ -3895,7 +3895,9 @@ export class App {
       ? 'amount in ₹ crore'
       : reportingUnit === 'INR_LAKHS'
         ? 'amount in ₹ lakh'
-        : 'monetary amount in the filing\u2019s reporting unit (₹ lakh or ₹ crore)';
+        : reportingUnit === 'INR_MILLIONS'
+          ? 'amount in ₹ million'
+          : 'monetary amount in the filing\u2019s reporting unit (₹ lakh, ₹ crore or ₹ million)';
     const LABELS = {
       price_band_low: 'Price-Band Floor (₹ per share)',
       price_band_high: 'Price-Band Cap (₹ per share)',
