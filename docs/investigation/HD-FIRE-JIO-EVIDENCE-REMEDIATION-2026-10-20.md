@@ -705,9 +705,11 @@ COMPLETE; `pe_vs_peers` verified on an operator band, `second_multiple` and
 
 - **Branch:** `arena/ae4d04e8-ipo-screening-engine`. **Base:** `main`
   `01ba66c12ca1195fd7acbd287c3e39a019808094` (untouched).
-- **Implementation commit:** this pass's commit (SHA recorded in the tracker
-  publication amendment after the push) carrying the auditor and K5 extractor
-  changes, the two new test files, the updated pin and the two new peer tests.
+- **Implementation commit:** `af54cfc823a58b2c8c477f7f6264ac5eeb59f376`
+  (remote-verified), carrying the auditor and K5 extractor changes, the two
+  new test files, the updated pin and the two new peer tests. This Markdown
+  amendment is published in the following docs-only commit; the tracker
+  publication amendment records it.
 - **PR #6:** must remain OPEN and UNMERGED; state re-verified after the push
   (`mergedAt: null`, head unchanged at `e05c0ef…`).
 - **Tracker:** separate HD Fire and Jio sections plus the publication
