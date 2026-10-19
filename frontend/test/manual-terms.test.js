@@ -128,7 +128,7 @@ test('Step5 ApiClient - conflict and awaiting payloads surface structured detail
   }
 });
 
-test('Step5 App - manual panel offers all four required terms and marks non-enterable blockers', () => {
+test('Step5 App - manual panel offers all five enterable terms and marks non-enterable blockers', () => {
   const app = new App();
   app.selectedIngestFile = new Blob(['%PDF-1.4']);
   const container = makePanelContainer();
@@ -136,32 +136,64 @@ test('Step5 App - manual panel offers all four required terms and marks non-ente
     code: 'AWAITING_ISSUE_TERMS',
     message: 'awaiting',
     details: {
-      missing_fields: ['price_band_low', 'price_band_high', 'lot_size', 'ofs', 'fresh_issue'],
+      missing_fields: ['price_band_low', 'price_band_high', 'lot_size', 'ofs', 'fresh_issue', 'open_date'],
       resolution: { reporting_unit: 'INR_LAKHS' },
     },
   }, 'final');
   const html = container.innerHTML;
   assert.ok(html.includes('AWAITING ISSUE TERMS'));
   assert.ok(html.includes('Manual entry is not official-source verification'));
-  // All four issue terms are enterable, including issue.ofs.
+  // All five issue terms are enterable, including issue.ofs and the
+  // fresh-issue amount (the Jio dead-end correction, 2026-10-19).
   assert.ok(html.includes('may be entered manually below'));
   assert.ok(html.includes('id="mt-price-band-low"'));
   assert.ok(html.includes('id="mt-price-band-high"'));
   assert.ok(html.includes('id="mt-lot-size"'));
   assert.ok(html.includes('id="mt-ofs"'));
+  assert.ok(html.includes('id="mt-fresh-issue"'));
   assert.ok(html.includes('Offer For Sale (OFS)'));
-  // The OFS field states the canonical unit taken from the engine payload.
+  assert.ok(html.includes('Fresh Issue Amount'));
+  // The monetary fields state the canonical unit from the engine payload.
   assert.ok(html.includes('amount in ₹ lakh'));
-  // Terms outside the manual contract (e.g. the fresh-issue amount) stay blockers.
+  // Terms outside the manual contract stay blockers.
   assert.ok(html.includes('cannot be entered manually'));
-  assert.ok(html.includes('issue.fresh_issue'));
-  // The workflow contract is stated: all four required, broker platform
+  assert.ok(html.includes('issue.open_date'));
+  assert.ok(!html.includes('issue.fresh_issue</code> — <strong>cannot'));
+  // The workflow contract is stated: all five required, broker platform
   // source of values, unverified status, invalid/incomplete blocked.
-  assert.ok(html.includes('All four issue terms above are required'));
+  assert.ok(html.includes('All five issue terms above are required'));
   assert.ok(html.includes('broker platform'));
   assert.ok(html.includes('MANUAL_ENTRY'));
   assert.ok(html.includes('Invalid or incomplete values prevent evaluation'));
   assert.ok(html.includes('mt-explanation'));
+});
+
+test('Step5 ApiClient - ingestManualTerms posts the fresh-issue amount including explicit 0', async () => {
+  const originalFetch = globalThis.fetch;
+  const captured = [];
+  try {
+    globalThis.fetch = async (url, options) => {
+      captured.push({ url, options });
+      return { ok: true, status: 201, json: async () => ({ evaluation_id: 'E2' }) };
+    };
+    const client = new ApiClient();
+    await client.ingestManualTerms(new Blob(['%PDF-1.4']), {
+      mode: 'final',
+      terms: { price_band_low: 208, price_band_high: 220, lot_size: 68, ofs: 3300, fresh_issue: 14500 },
+      explanation: 'broker platform IPO page',
+    });
+    await client.ingestManualTerms(new Blob(['%PDF-1.4']), {
+      mode: 'final',
+      terms: { fresh_issue: 0 },
+      explanation: 'operator statement: pure-OFS offer',
+    });
+    assert.equal(captured[0].options.body.get('fresh_issue'), '14500');
+    // Explicit 0 is an operator statement, preserved exactly (never omitted).
+    assert.equal(captured[1].options.body.get('fresh_issue'), '0');
+    assert.equal(captured[1].options.body.get('ofs'), null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('Step5 App - OFS unit label follows the reporting unit from the awaiting payload', () => {
@@ -181,6 +213,52 @@ test('Step5 App - OFS unit label follows the reporting unit from the awaiting pa
     details: { missing_fields: ['ofs'] },
   }, 'final');
   assert.ok(fallback.innerHTML.includes('reporting unit'));
+});
+
+test('Step5 App - five-field submission posts the fresh-issue amount and shows it as manual', async () => {
+  const app = new App();
+  app.selectedIngestFile = new Blob(['%PDF-1.4']);
+  const calls = [];
+  app.api = {
+    ingestManualTerms: async (file, options) => {
+      calls.push(options);
+      return {
+        evaluation_id: 'EVAL-5', company_name: 'Jio', ipo_id: 'JIO', evaluation_mode: 'FINAL',
+        final_score: 61.0, verdict: 'CONSIDER', is_duplicate: false,
+        issue_terms: {
+          status: 'UNAVAILABLE',
+          manual_entry: {
+            fields: ['price_band_low', 'price_band_high', 'lot_size', 'ofs', 'fresh_issue'],
+            values: { price_band_low: 1065, price_band_high: 1119, lot_size: 12, ofs: 0, fresh_issue: 1485000 },
+            explanation: 'broker platform IPO page, 2026-10-19',
+            provenance: 'MANUAL_ENTRY',
+            verified: false,
+            reporting_unit: 'INR_LAKHS',
+          },
+        },
+      };
+    },
+  };
+  const container = makePanelContainer();
+  app.renderManualTermsPanel(container, {
+    code: 'AWAITING_ISSUE_TERMS', message: 'awaiting',
+    details: { missing_fields: ['price_band_low', 'price_band_high', 'lot_size', 'ofs', 'fresh_issue'], resolution: { reporting_unit: 'INR_LAKHS' } },
+  }, 'final');
+  container.querySelector('#mt-price-band-low').value = '1065';
+  container.querySelector('#mt-price-band-high').value = '1119';
+  container.querySelector('#mt-lot-size').value = '12';
+  container.querySelector('#mt-ofs').value = '0';
+  container.querySelector('#mt-fresh-issue').value = '1485000';
+  container.querySelector('#mt-explanation').value = 'broker platform IPO page, 2026-10-19';
+  await container.querySelector('#mt-submit-btn').listeners.click();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].terms.fresh_issue, 1485000);
+  assert.equal(calls[0].terms.ofs, 0);
+  const html = container.innerHTML;
+  assert.ok(html.includes('MANUALLY ENTERED (Not Source-Verified)'));
+  assert.ok(html.includes('issue.fresh_issue'));
+  assert.ok(html.includes('1485000'));
 });
 
 test('Step5 App - four-field submission posts every supplied term including OFS', async () => {

@@ -222,3 +222,21 @@ full contract):
 Provenance is never upgraded by recording: manual values remain `MANUAL_ENTRY` / unverified in
 both the audit events and the evaluation evidence. If the audit store itself fails, the
 operation fails loudly (422/500) — it is never presented as an auditable success.
+
+## 10. Addendum — `issue.fresh_issue` manual entry (2026-10-19)
+
+Supersedes the §3 scope clause ("`issue.fresh_issue` is not part of the manual contract").
+The four-field scope produced a dead end on the Jio RHP (Windows ingestion
+`ing-8db36776dd794ec3`): after the four terms were accepted, eligibility blocked evaluation
+solely because `issue.fresh_issue` was missing, and the manual form did not accept it.
+Contract reconciliation (see `JIO-FRESH-ISSUE-MANUAL-ENTRY-2026-10-19.md`) established that
+`issue.fresh_issue` is a genuine prerequisite under the canonical input contract v1.5
+(schema `issue.required`; `evaluate()` hard-fails without it) — the gate is correct and stays
+fail-closed when the field is genuinely absent. Per the user's 2026-10-19 directive, the
+bounded manual entry now covers **five** fields: `price_band_low`, `price_band_high`,
+`lot_size`, `ofs` and `fresh_issue` (monetary, in `reporting_unit`, minimum 0; explicit 0 =
+operator pure-OFS statement). Everything else in this record stands: validation posture,
+mandatory explanation, `MANUAL_ENTRY` / `verified: false` provenance, conflict confirmation,
+`OFFICIAL_VERIFIED` never displaced, per-IPO isolation, discovery `UNAVAILABLE` preserved,
+audit-log contract applied to the fifth field. This record is not rewritten; its scope clause
+is superseded by this directive.

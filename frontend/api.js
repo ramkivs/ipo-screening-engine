@@ -411,6 +411,7 @@ export class ApiClient {
     if (terms.price_band_high !== undefined && terms.price_band_high !== null && terms.price_band_high !== '') formData.append('price_band_high', String(terms.price_band_high));
     if (terms.lot_size !== undefined && terms.lot_size !== null && terms.lot_size !== '') formData.append('lot_size', String(terms.lot_size));
     if (terms.ofs !== undefined && terms.ofs !== null && terms.ofs !== '') formData.append('ofs', String(terms.ofs));
+    if (terms.fresh_issue !== undefined && terms.fresh_issue !== null && terms.fresh_issue !== '') formData.append('fresh_issue', String(terms.fresh_issue));
     if (options.explanation) formData.append('explanation', options.explanation);
     if (options.confirmConflicts) formData.append('confirm_conflicts', 'true');
 

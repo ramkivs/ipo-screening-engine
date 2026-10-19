@@ -3889,7 +3889,7 @@ export class App {
    */
   renderManualTermsPanel(container, err, mode) {
     if (!container) return;
-    const ENTERABLE = ['price_band_low', 'price_band_high', 'lot_size', 'ofs'];
+    const ENTERABLE = ['price_band_low', 'price_band_high', 'lot_size', 'ofs', 'fresh_issue'];
     const reportingUnit = (err && err.details && err.details.resolution && err.details.resolution.reporting_unit) || '';
     const ofsUnit = reportingUnit === 'INR_CRORES'
       ? 'amount in ₹ crore'
@@ -3901,6 +3901,7 @@ export class App {
       price_band_high: 'Price-Band Cap (₹ per share)',
       lot_size: 'Lot Size (shares)',
       ofs: `Offer For Sale (OFS) \u2014 ${ofsUnit}`,
+      fresh_issue: `Fresh Issue Amount \u2014 ${ofsUnit}`,
     };
     let missing = (err && err.details && err.details.missing_fields) || [];
     let awaitingMessage = err ? err.message : '';
@@ -3943,7 +3944,7 @@ export class App {
         </div>
         ${providerDiagnostics}
         <div class="alert" style="margin-bottom: 12px; font-size: 0.85rem;">
-          <strong>All four issue terms above are required to complete initial screening manually</strong>
+          <strong>All five issue terms above are required to complete initial screening manually</strong>
           and may be supplied from the broker platform&rsquo;s IPO page.
           <strong>Manual entry is not official-source verification:</strong> entered values are recorded as
           <code>MANUAL_ENTRY</code> provenance, remain unverified, are flagged as manually supplied on the
@@ -3958,6 +3959,8 @@ export class App {
             <input type="number" step="1" min="0" class="form-select" id="mt-lot-size" placeholder="e.g. 68" /></div>
           <div class="form-group"><label class="form-label" for="mt-ofs">${LABELS.ofs}</label>
             <input type="number" step="any" min="0" class="form-select" id="mt-ofs" placeholder="e.g. 3300 (0 = no offer for sale)" /></div>
+          <div class="form-group"><label class="form-label" for="mt-fresh-issue">${LABELS.fresh_issue}</label>
+            <input type="number" step="any" min="0" class="form-select" id="mt-fresh-issue" placeholder="e.g. 14500 (0 = pure OFS offer, no fresh issue)" /></div>
         </div>
         <div class="form-group" style="margin-top: 12px;">
           <label class="form-label" for="mt-explanation">Explanation (required for any manual entry)</label>
@@ -3983,10 +3986,12 @@ export class App {
       const high = container.querySelector('#mt-price-band-high').value;
       const lot = container.querySelector('#mt-lot-size').value;
       const ofsInput = container.querySelector('#mt-ofs').value;
+      const freshInput = container.querySelector('#mt-fresh-issue').value;
       if (low !== '') terms.price_band_low = Number(low);
       if (high !== '') terms.price_band_high = Number(high);
       if (lot !== '') terms.lot_size = Number(lot);
       if (ofsInput !== '') terms.ofs = Number(ofsInput);
+      if (freshInput !== '') terms.fresh_issue = Number(freshInput);
       const explanation = container.querySelector('#mt-explanation').value.trim();
 
       if (Object.keys(terms).length === 0) {
@@ -4027,7 +4032,7 @@ export class App {
           const unit = manualEntry.reporting_unit ? ` (${this.escape(String(manualEntry.reporting_unit))})` : '';
           const rows = (manualEntry.fields || []).map((f) => {
             const value = manualEntry.values ? manualEntry.values[f] : '';
-            const unitCell = f === 'ofs' ? unit : (f === 'lot_size' ? ' (shares)' : ' (₹/share)');
+            const unitCell = (f === 'ofs' || f === 'fresh_issue') ? unit : (f === 'lot_size' ? ' (shares)' : ' (₹/share)');
             return `<tr><td><code>issue.${this.escape(f)}</code></td><td><strong>${this.escape(String(value))}</strong>${unitCell}</td></tr>`;
           }).join('');
           manualNote = `

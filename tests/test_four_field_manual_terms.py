@@ -243,10 +243,11 @@ def test_omitting_ofs_on_a_fully_unresolved_issue_keeps_ofs_awaiting(
 def test_missing_fresh_issue_still_fails_closed_after_four_terms(
     tmp_path, monkeypatch, golden_input
 ):
-    """issue.fresh_issue is not one of the four manually enterable terms.
-    When the filing does not state it, evaluation stays fail-closed with
-    that precise field instead of a schema failure or a fabricated
-    amount."""
+    """issue.fresh_issue is a genuine requirement of the canonical input
+    contract v1.5 (schema issue.required). It has been manually enterable
+    since 2026-10-19 (see test_fresh_issue_manual_entry.py), but a
+    submission that does not supply it stays fail-closed with that precise
+    field instead of a schema failure or a fabricated amount."""
 
     def factory():
         doc = _missing_doc(golden_input)

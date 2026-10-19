@@ -1083,17 +1083,24 @@ class PresentationService:
 
     MAX_INGEST_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB bound
 
-    # The four required issue terms, all manually enterable (Step 4 Area C
-    # bounded entry, 2026-10-17; four-field scope directed 2026-10-18 so
-    # initial screening never waits for official-source retrieval).
+    # The required issue terms that the filing may leave undisclosed, all
+    # manually enterable (Step 4 Area C bounded entry, 2026-10-17; four-field
+    # scope directed 2026-10-18 so initial screening never waits for
+    # official-source retrieval; issue.fresh_issue added 2026-10-19 to close
+    # the Jio manual-entry dead end -- the canonical input contract v1.5
+    # requires it for every evaluation and the broker's IPO page states it).
     # issue.ofs is the Offer-for-Sale MONETARY amount in the filing's
     # financials.reporting_unit (v1.5 input contract: number, minimum 0,
     # "in reporting_unit") -- never a share count and never assumed zero.
+    # issue.fresh_issue is the fresh-issue MONETARY amount in the same
+    # reporting unit (v1.5 input contract: number, minimum 0): explicit 0 is
+    # an operator statement of a pure-OFS offer, never a default.
     MANUAL_ISSUE_TERM_FIELDS = (
         "price_band_low",
         "price_band_high",
         "lot_size",
         "ofs",
+        "fresh_issue",
     )
     MANUAL_ENTRY_SOURCE_ID = "SRC-MANUAL-ENTRY"
 
@@ -1299,7 +1306,7 @@ class PresentationService:
                 if unknown_keys:
                     raise IngestionValidationError(
                         "Manual issue-term entry is limited to price_band_low, "
-                        "price_band_high, lot_size and ofs; "
+                        "price_band_high, lot_size, ofs and fresh_issue; "
                         f"unsupported field(s): {unknown_keys}."
                     )
                 manual_clean = {k: v for k, v in manual_terms.items() if v is not None}
@@ -1317,11 +1324,14 @@ class PresentationService:
                             raise IngestionValidationError(
                                 f"Manually entered issue.{field_name} must be a finite number."
                             )
-                        if field_name == "ofs":
+                        if field_name in ("ofs", "fresh_issue"):
+                            # Monetary amounts in the filing's reporting
+                            # unit: explicit 0 is an operator statement
+                            # (no OFS / pure-OFS offer), never a default.
                             if float(value) < 0:
                                 raise IngestionValidationError(
-                                    "Manually entered issue.ofs must be zero or a positive "
-                                    "amount in the filing's reporting unit."
+                                    f"Manually entered issue.{field_name} must be zero or a "
+                                    "positive amount in the filing's reporting unit."
                                 )
                         elif field_name == "lot_size":
                             if float(value) != int(value) or int(value) <= 0:
@@ -1542,10 +1552,11 @@ class PresentationService:
                                "origin": "official_discovery"},
                       source_reference=outcome.source_uri)
             if not still_missing and issue_after.get("fresh_issue") is None:
-                # The four issue terms resolved, but the stated
-                # fresh-issue amount (a canonical requirement) is only
-                # established by the final Prospectus; fail closed with
-                # that precise field rather than a schema failure.
+                # The pricing terms resolved, but the stated fresh-issue
+                # amount (a canonical input requirement, schema
+                # issue.required) is only established by the filing, the
+                # final Prospectus or the bounded manual entry; fail closed
+                # with that precise field rather than a schema failure.
                 still_missing = ["fresh_issue"]
             if outcome.notice is not None and not still_missing:
                 issue_terms_report = resolution_dict
@@ -1721,19 +1732,20 @@ class PresentationService:
                     pending_awaiting = None
 
         if pending_awaiting is None:
-            # The four required issue terms are complete, but the canonical
-            # input also requires the stated fresh-issue amount. It is not
-            # one of the four manually enterable terms and is never
-            # invented; fail closed with that precise field rather than a
-            # schema failure (same posture as the official-resolution path).
+            # The manually enterable issue terms are complete, but the
+            # canonical input contract v1.5 also requires the stated
+            # fresh-issue amount (schema issue.required; it is never
+            # invented or defaulted). It may come from the filing, the
+            # final Prospectus, or the bounded manual entry above; fail
+            # closed with that precise field rather than a schema failure.
             issue_gate = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
             if issue_gate.get("fresh_issue") is None:
                 pending_awaiting = (
                     ["fresh_issue"],
                     dict(issue_terms_report) if issue_terms_report else {},
-                    "the stated fresh-issue amount is established by the filing or "
-                    "the final Prospectus, and remains undisclosed (it is not one "
-                    "of the four manually enterable issue terms)",
+                    "the stated fresh-issue amount is established by the filing, the "
+                    "final Prospectus, or the bounded manual issue-term entry, and "
+                    "remains undisclosed",
                 )
 
         if pending_awaiting is not None:
