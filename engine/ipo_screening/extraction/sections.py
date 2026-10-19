@@ -1668,6 +1668,66 @@ class SectionExtractor:
 
         return extractions
 
+    # Peer comparison tables declare their columns in the table header.
+    # Cells may be mapped ONLY against a recognised header layout: the
+    # 2026-10-19 diagnostic (audit trace ing-81fd285e5b8248c6) showed that
+    # blind positional mapping across mismatched layouts puts monetary or
+    # NAV cells into roe_pct (observed: 26957.28 / 21700.34, failing the
+    # pct contract at evaluation time), and that dropping [●] placeholder
+    # cells shifts every later column left. The layouts below are anchored
+    # to the repository's reference documents:
+    #   - "accounting_ratios": R.K Fashion accessories RHP,
+    #     Comparison of Accounting Ratios (FV, CMP, EPS, Diluted EPS,
+    #     P/E, RONW, NAV, PAT);
+    #   - "listed_peers_closing_price": Vishal Nirmiti RHP, Comparison of
+    #     Accounting Ratios with listed industry peers (Closing price,
+    #     FV, Revenue, EPS Basic, EPS Diluted, P/E, Net worth, RONW, NAV).
+    # An unrecognised layout yields no peers -- module B stays UNKNOWN
+    # ("evidence discovered but not parsed") instead of receiving
+    # wrong-field values.
+    _PEER_SHAPES = (
+        {
+            "id": "accounting_ratios",
+            "width": 8,
+            "header": re.compile(
+                r"face\s*value.{0,160}\bcmp\b.{0,160}eps.{0,160}"
+                r"dilute\s*d?\s*eps.{0,160}p\s*/\s*e.{0,160}"
+                r"r\s*o\s*n\s*w.{0,80}n\s*a\s*v.{0,120}p\s*a\s*t",
+                re.IGNORECASE | re.DOTALL,
+            ),
+            "cmp": 1, "pe": 4, "roe": 5, "nav": 6,
+        },
+        {
+            "id": "listed_peers_closing_price",
+            "width": 9,
+            "header": re.compile(
+                r"closing\s*price.{0,200}face\s*value.{0,200}revenue.{0,200}"
+                r"eps.{0,160}p\s*/\s*e.{0,160}net\s*worth.{0,160}"
+                r"r\s*o\s*n\s*w.{0,80}n\s*a\s*v",
+                re.IGNORECASE | re.DOTALL,
+            ),
+            "cmp": 0, "pe": 5, "roe": 7, "nav": 8,
+        },
+    )
+
+    # Non-numeric cells that still occupy a column position ([●], NA, -).
+    _PEER_PLACEHOLDERS = {"[●]", "●", "(●)", "-", "--", "—", "na", "n/a", "nil", "[]", "[ ]"}
+
+    @classmethod
+    def _peer_cells(cls, line: str) -> List[Optional[float]]:
+        """Cell-aligned row parse: placeholder cells keep their position so
+        later columns never shift left; name/label words are outside the
+        cell grid and are skipped (the caller accumulates them separately)."""
+        cells: List[Optional[float]] = []
+        for t in line.split():
+            t_clean = t.replace(",", "").strip()
+            try:
+                cells.append(float(t_clean))
+            except ValueError:
+                if t_clean.lower() in cls._PEER_PLACEHOLDERS:
+                    cells.append(None)
+        return cells
+
     def extract_peers(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract listed industry peers from Basis for Offer Price section."""
         extractions: List[RawExtraction] = []
@@ -1690,6 +1750,17 @@ class SectionExtractor:
                         except Exception:
                             pass
 
+                shape: Optional[Dict[str, Any]] = None
+                for cand in self._PEER_SHAPES:
+                    if cand["header"].search(txt):
+                        shape = cand
+                        break
+                if shape is None:
+                    # Table present but the column layout is not one this
+                    # parser can map without guessing: emit no peers
+                    # (fail-closed) rather than wrong-field values.
+                    continue
+
                 lines = [l.strip() for l in txt.splitlines() if l.strip()]
                 in_peers = False
                 accumulated_name: List[str] = []
@@ -1702,23 +1773,25 @@ class SectionExtractor:
                     if in_peers:
                         if l.startswith("Note:") or l.startswith("*") or l.startswith("#"):
                             break
-                        tokens = l.split()
-                        nums: List[float] = []
-                        for t in tokens:
-                            try:
-                                nums.append(float(t.replace(",", "")))
-                            except ValueError:
-                                pass
-                        if len(nums) >= 4:
+                        cells = self._peer_cells(l)
+                        if len(cells) == shape["width"] + 1 and cells[0] is not None and \
+                                float(cells[0]).is_integer() and 1 <= cells[0] <= 50:
+                            cells = cells[1:]  # leading row-serial column
+                        if len(cells) == shape["width"]:
                             pname = " ".join(accumulated_name)
                             pname = re.sub(r"^[0-9]+\s*", "", pname).strip()
-                            if pname and not any(k in pname.lower() for k in ["total", "average", "highest", "lowest"]):
-                                fv = nums[0] if len(nums) > 0 else 10.0
-                                cmp = nums[1] if len(nums) > 1 else None
-                                eps = nums[2] if len(nums) > 2 else None
-                                pe = nums[4] if len(nums) > 4 else None
-                                ronw = nums[5] if len(nums) > 5 else None
-                                nav = nums[6] if len(nums) > 6 else None
+                            # A peer name is a company name, not a sentence:
+                            # rows whose accumulated name is prose (table
+                            # narrative, header fragments) are not peers.
+                            if (
+                                pname
+                                and len(pname.split()) <= 10
+                                and not any(k in pname.lower() for k in ["total", "average", "highest", "lowest"])
+                            ):
+                                cmp = cells[shape["cmp"]]
+                                pe = cells[shape["pe"]]
+                                ronw = cells[shape["roe"]]
+                                nav = cells[shape["nav"]]
                                 pb = round(cmp / nav, 2) if (cmp and nav and nav > 0) else None
                                 peers.append({
                                     "name": pname,

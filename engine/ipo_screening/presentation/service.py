@@ -1411,6 +1411,33 @@ class PresentationService:
                            "state": "extracted" if _filing_issue.get(_f) is not None else "missing",
                            "origin": "filing"})
 
+        # Peer rows enter the canonical input here and are schema-bound
+        # (roe_pct and the sibling percentage fields share the contract's
+        # pct bounds). The full document gate runs at evaluation time;
+        # validating the peers array at ingestion time rejects
+        # out-of-contract peer data EARLY with a diagnostic naming the
+        # peer and field, instead of the anonymous evaluation-time
+        # SCHEMA_VIOLATION wall (audit trace ing-81fd285e5b8248c6:
+        # peers/0/roe_pct 26957.28, peers/1/roe_pct 21700.34). Raw values
+        # are never clamped, substituted or silently dropped.
+        from ..schema_validation import validate_peer_records
+
+        peer_findings = validate_peer_records(
+            (canonical_dict.get("peers") if isinstance(canonical_dict, dict) else None) or []
+        )
+        if peer_findings:
+            detail = "; ".join(f"{f.location}: {f.message}" for f in peer_findings)
+            _emit("validation", "peer_contract", "FAILED",
+                  "Peer data violates the canonical input contract.",
+                  details={"findings": [f.to_dict() for f in peer_findings[:5]]},
+                  error_code="SCHEMA_VIOLATION")
+            raise IngestionValidationError(
+                "Peer data in the filing violates the canonical input contract: "
+                + detail
+                + ". Raw values are never clamped or substituted; correct the "
+                "peer source data and re-upload the filing."
+            )
+
         # Automatically resolve required issue terms the filing does not
         # disclose ([●] placeholders pending the Price Band Notice) from
         # official sources, through the established enrichment assembly.
