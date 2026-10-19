@@ -364,7 +364,7 @@ All runs below were executed in this workspace on 2026-10-20 with
 | 8 | `node --check frontend/api.js && node --check frontend/app.js` | both OK |
 | 9 | `python -m compileall -q engine tests` | OK |
 | 10 | `git diff --stat -- config schema` | empty (no policy/schema change) |
-| 11 | `pytest tests/ -q` (full backend, final tree) | **1139 passed**, 0 failed, 36 warnings, 1421.69 s, exit 0 |
+| 11 | `pytest tests/ -q` (full backend; final code/test tree at commit `f42b6ce`) | **1139 passed**, 0 failed, 36 warnings, 1421.69 s, exit 0 |
 
 Golden result hash: **`e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`**
 unchanged; frozen-core check passes. The Jio bridge test preserves 29 (fresh
@@ -381,10 +381,15 @@ Jio historical fixture: `fixtures/jio/jio_canonical_2026-10-19_pre_evidence_reme
 # Report D — Publication
 
 - Branch: `arena/ae4d04e8-ipo-screening-engine` (fixed session branch).
-- Implementation commit: `IMPLEMENTATION_SHA` (records the four extraction
-  changes, three modified test files, the new remediation test, the frozen
-  fixture and this record).
-- Remote verification: `REMOTE_VERIFICATION`.
+- Implementation commit: `f42b6ce1ba4c3058f1d5e52ef2b8d4cacd2d0ebc`
+  (records the four extraction changes, three modified test files, the new
+  remediation test, the frozen fixture and this record).
+- Remote verification: `git ls-remote origin
+  refs/heads/arena/ae4d04e8-ipo-screening-engine` returned
+  `f42b6ce1ba4c3058f1d5e52ef2b8d4cacd2d0ebc` after the push; the working
+  tree is clean. `git merge-base --is-ancestor` confirms `e1df89b…`,
+  `e05c0ef…` (PR #6 head) and `01ba66c…` (`main`) are in the published
+  ancestry.
 - PR #6: OPEN, unmerged; head `arena/5dd3fe52-ipo-screening-engine` @
   `e05c0efbca1ecb3024e52da73a22e180ea171118`; base
   `arena/573e69a4-ipo-screening-engine`; untouched by this session.
