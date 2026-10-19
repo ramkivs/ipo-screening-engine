@@ -540,10 +540,12 @@ Frozen-core and golden verification are part of `test_vishal_golden.py` and the 
 
 ## 7. Deliverable 7 — Publication and remote state
 
-- **Branch:** `arena/ae4d04e8-ipo-screening-engine` (this session's fixed branch), fast-forward-equivalent to the published `e1df89b` baseline, plus this session's commits.
-- **PR #6:** remains **OPEN and UNMERGED**; head unchanged at `e05c0ef`; this session does not move, merge or close it.
-- **`main`:** `01ba66c`, untouched.
-- The published commit and remote verification are recorded at the end of this section after the push; the authoritative tracker is updated in the same commit.
+- **Branch:** `arena/ae4d04e8-ipo-screening-engine`, based on the published `e1df89b` baseline.
+- **Implementation commit:** `345caf75690fc67ade687592b2be5bfe8ae408d4` (this record, the extraction/builder/presentation corrections, the tests, the OpenAPI update and the tracker entry). Remote-verified with `git ls-remote`; `git merge-base --is-ancestor` confirms `e1df89b`, `e05c0ef` (PR #6 head) and `01ba66c` (`main`) are ancestors.
+- **PR #6:** remains **OPEN and UNMERGED**; head unchanged at `e05c0ef`; this session does not move, merge or close it. (Verified `state=OPEN`, `mergedAt=null`.)
+- **`main`:** `01ba66c`, untouched (remote-verified).
+- **CI:** no hosted workflows are configured; the executed local test matrix in §6.4 is the verification evidence.
+- The publication amendment that follows this record is a docs-only commit on the same branch.
 
 ---
 
