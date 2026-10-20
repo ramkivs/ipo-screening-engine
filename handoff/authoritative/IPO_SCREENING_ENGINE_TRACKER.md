@@ -1002,3 +1002,66 @@ Reconciled against the remote repository (`ramkivs/ipo-screening-engine`), all b
   behaviour of the published tree. The full suite was **not** re-run: nothing in
   this pass changes implementation, so a full run could not validate anything new
   (the last published full run remains 1288/1288 passed at `41f2f86`).
+
+### A26 / A27 / A8-R one-pass convergence — 2026-10-20
+
+- **Authority / scope.** Current one-pass instruction authorizes bounded specifications,
+  a consolidated non-scoring audit, focused tests and publication. It explicitly adopts
+  A26's safe interim UNKNOWN posture and retains current K2 policy. It does not approve
+  CARO scoring implementation, new evidence thresholds, new fields, or external K2 authority.
+  This entry supersedes only the preceding entry's statement that no interim option
+  was adopted; earlier historical records remain unchanged.
+- **A26 actual disposition: INTERIM UNKNOWN ADOPTED under the current task instruction.**
+  Tax-only proceedings that cannot reliably fit an approved bucket remain UNKNOWN,
+  neither scored zero, clean nor automatically adverse. Independently supported K5
+  and auditor treatment continue. No runtime change was needed or made. Permanent tax
+  dimension/calibration remains UNRESOLVED. Corpus requirements now cover sampling,
+  readability denominators, party/direction, outcomes, amounts, overlap and review.
+- **A27 specification PREPARED, not implemented/approved policy.**
+  `docs/investigation/A26-A27-A8R-CONVERGENCE-2026-10-20.md` records six CARO/EOM
+  evidence states, current and proposed branch precedence, future acceptance cases,
+  two exact prospective wording options, and four calculated wording-only config
+  fingerprints using in-memory copies. Supplied materiality=none gives scored 0;
+  absent/null remains UNKNOWN with reserve 3, not an applied -3 penalty. This does
+  not prove independent review of none. Existing -1/-2/-3 magnitudes remain unchanged.
+  The missing/ambiguous/unavailable CARO clean-branch gate remains a real scoring
+  decision: compatibility and evidence-complete options are explicitly not adopted.
+- **Hash/version precision.** Both config copies contain stale disputed-tax wording;
+  no config was edited. Config text changes config_hash and hence result_hash even
+  with unchanged scores. Code formula strings, not config formula strings, populate
+  expected_derived/expected_score. Old goldens are not automatically to be re-pinned:
+  preserve old-version tests and separately authorize any new-version baseline.
+  Numerical future result hashes were not fabricated or evaluated without a full
+  deterministic payload. No historical evaluation was rerun.
+- **A8-R acceptance specification PREPARED; K2 authority UNCHANGED.** Six regulatory
+  states formalized; independent SEBI/ED, authority, matching, periods, completeness,
+  partial/blocked/empty results, dual timestamps/hashes, conflicts and reproduction
+  covered. Existing carriers assessed first. Numeric CROSS_SOURCE_DIVERGENCE is
+  not a regulator-flag conflict resolver; existing source-type/section contracts
+  do not by themselves authorize external regulator integration. No new field,
+  source class, connector, retrieval or knockout interpretation was introduced.
+- **Five-input audit COMPLETED (inventory, not remediation).** No named engine or
+  downstream semantic consumer or extractor found for eom_count_3y,
+  auditor_change_count_3y, caro_remarks, regulatory_actions, independent_director_count.
+  Direct JSON canonical input retains them; the extraction-builder governance
+  allowlist omits them, verified by focused tests. Generic retention is not scoring
+  consumption. Unknown intent remains unknown; no “every declared field must be
+  scored” lint or schema removal was adopted. New audit tests are not evidence of
+  a production consumer.
+- **Checks:** initial focused run 116/116 passed in 0.28 s; after adding pathway and
+  CARO non-consumption checks, final run of test_governance_contract_audit.py,
+  test_auditor_tenure_defaults.py, test_litigation_regulatory_defaults.py and
+  test_hd_fire_primary_source_extraction.py: **122/122 passed in 0.33 s**, including
+  **17 new audit checks**; existing progress plugin reported 100% completion.
+  `python3 engine/tools/ipo_screen.py check-config`: **valid True, 10 profiles**.
+  Full suite deliberately not rerun: no application/config/schema/fixture change.
+- **Remaining authority boundaries:** qualifying CARO remarks and absent-state scoring,
+  evidence sufficiency, exact deployed wording/version and any new-version baseline;
+  permanent tax scoring/calibration; named external authority/coverage/freshness and
+  categorical conflict policy; any future external K2 trigger/clear authority.
+  These remain PROPOSED / UNRESOLVED, not blanket-approved by standing PA.
+- **Publication scope:** this additive tracker entry, the new convergence document,
+  and tests/test_governance_contract_audit.py only. Protected implementation, configs,
+  schemas, fixtures, decision records and historical artifacts are unchanged.
+  main remains untouched; PR #6 must remain OPEN / UNMERGED. Remote commit/content
+  verification is performed after push and reported in the completion response.
