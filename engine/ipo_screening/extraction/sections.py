@@ -108,6 +108,12 @@ class SectionExtractor:
         self.reader = reader
         self.page_count = len(reader.pages)
         self._text_cache: Dict[int, str] = text_cache if text_cache is not None else {}
+        # A25-D2 (approved 2026-10-20): per-page extraction status, so a page whose
+        # text extraction *failed* is never indistinguishable from a page that was
+        # read and came back blank.  Values: READ, BLANK, FAILED, OUT_OF_RANGE.
+        # Nothing else changes -- the returned text and the shared cache behave
+        # exactly as before, so no existing extraction result can move.
+        self._page_status: Dict[int, str] = {}
 
     def extract_page_text(self, page_1_indexed: int) -> str:
         """Extract text from a 1-indexed page with caching."""
@@ -116,11 +122,45 @@ class SectionExtractor:
         if 1 <= page_1_indexed <= self.page_count:
             try:
                 txt = self.reader.pages[page_1_indexed - 1].extract_text() or ""
+                self._page_status[page_1_indexed] = "READ" if txt else "BLANK"
             except Exception:
                 txt = ""
+                self._page_status[page_1_indexed] = "FAILED"
             self._text_cache[page_1_indexed] = txt
             return txt
+        self._page_status[page_1_indexed] = "OUT_OF_RANGE"
         return ""
+
+    @property
+    def page_status(self) -> Dict[int, str]:
+        """How each touched page was read (A25-D2 observability)."""
+        return dict(self._page_status)
+
+    def pages_read(self, start: int, end: int) -> bool:
+        """True when every page of ``[start, end]`` was read or was blank.
+
+        A page that failed to extract, or that this document does not contain,
+        leaves the range incompletely read.  That is insufficient evidence for a
+        conclusion of *absence* and is never treated as one; it says nothing
+        about a page that was read and did contain a finding.  A range covering
+        no page of this document was not searched at all, so it is not read
+        either -- the empty case is deliberately not vacuously true.
+        """
+        if start > self.page_count or end < 1:
+            return False
+        for page in range(max(1, start), min(end, self.page_count) + 1):
+            status = self._page_status.get(page)
+            if status is None:
+                # No status recorded for a page this instance did not extract.
+                # Text supplied through the shared cache counts as read; a page
+                # nobody touched is not evidence of anything, least of all of an
+                # absence.
+                if page not in self._text_cache:
+                    return False
+                continue
+            if status not in ("READ", "BLANK"):
+                return False
+        return True
 
     @staticmethod
     def _labelled_quantity_candidates(
@@ -1531,6 +1571,44 @@ class SectionExtractor:
     _LIT_DENIES_CIVIL = re.compile(r"\bcivil\b|\bdisputes?\b", re.IGNORECASE)
     _LIT_LITIGATION_NOUN = re.compile(r"\blitigation\b", re.IGNORECASE)
 
+    #: A24-D1 (approved 2026-10-20): the party population the bucket is defined
+    #: over -- the Company, its Promoters and its Directors, exactly as the
+    #: governed metric formula states it ("across promoters, directors and the
+    #: company", ``derived.py:1384``; likewise the upstream reference config's
+    #: bucket note at ``handoff/reference/ipo-config.json:294``).  KMP and
+    #: Senior Management are deliberately *not* required: widening the
+    #: population is a separate governed decision, not an extraction choice.
+    _LIT_POP_ISSUER = re.compile(
+        r"\b(?:our|the)\s+company\b|\bthe\s+issuer\b|\bour\s+body\s+corporate\b",
+        re.IGNORECASE,
+    )
+    _LIT_POP_PROMOTERS = re.compile(r"\bpromoters?\b|\bpromoter\s+group\b", re.IGNORECASE)
+    _LIT_POP_DIRECTORS = re.compile(r"\bdirectors?\b", re.IGNORECASE)
+    #: A mention of *other* corporate bodies is not coverage of the issuer:
+    #: "our Promoters, Directors, or Group Companies" names the group, so
+    #: stripping these first is what keeps A24 R3 honest.
+    _LIT_POP_OTHER_BODIES = re.compile(
+        r"\bgroup\s+compan(?:y|ies)\b|\bother\s+compan(?:y|ies)\b|\bsubsi(?:diar(?:y|ies)|diar)\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _lit_absence_covers_population(cls, sentence: str) -> bool:
+        """Does this denial assert absence for all three parties of the bucket?
+
+        ``clean`` is a statement about the Company, its Promoters and its
+        Directors, so a denial reaching fewer of them leaves part of the
+        population undisclosed -- UNKNOWN, not the favourable end.  Adverse
+        findings keep their wider scope: any party in ``_LIT_PARTY`` still
+        condemns, because a finding needs no population coverage to be true.
+        """
+        without_others = cls._LIT_POP_OTHER_BODIES.sub(" ", sentence)
+        return bool(
+            cls._LIT_POP_ISSUER.search(without_others)
+            and cls._LIT_POP_PROMOTERS.search(sentence)
+            and cls._LIT_POP_DIRECTORS.search(sentence)
+        )
+
     @classmethod
     def _lit_absence_is_comprehensive(cls, sentence: str) -> bool:
         """May this absence statement support ``clean``?
@@ -1780,6 +1858,41 @@ class SectionExtractor:
             return [cell.strip() for cell in line.split("|") if cell.strip()]
         return line.split()
 
+    #: A party label may carry a qualifier of its own -- real ICDR summary
+    #: tables write ``Against our Directors (excluding Promoters)``.  The row
+    #: pattern ends the party name at the first pipe, so the qualifier is left
+    #: at the start of the row body and would otherwise become a spurious first
+    #: cell: every value shifts one column, and a row that a person reads
+    #: instantly is counted as unreadable (A24-D3, approved 2026-10-20).  Only a
+    #: bracketed run immediately followed by a cell boundary is removed, and
+    #: only in the row body -- never in the quotation, which is taken from the
+    #: unmodified line, so provenance and the Directors/Promoters distinction
+    #: survive.  A row that is still ambiguous after this stays unparseable,
+    #: which blocks a favourable conclusion instead of inventing one.
+    _LIT_PARTY_QUALIFIER = re.compile(r"^\s*\([^|()]*\)\s*(?=\||$)")
+
+    @classmethod
+    def _lit_row_cells(cls, rest: str) -> List[str]:
+        """Cells of a table row body, with a party-label qualifier removed."""
+        return cls._lit_cells(cls._LIT_PARTY_QUALIFIER.sub("", rest, count=1))
+
+    @staticmethod
+    def _lit_party_class(label: str) -> Optional[str]:
+        """Which party of the criterion's population an ICDR table row speaks for.
+
+        Ordered deliberately: ``Directors (excluding Promoters)`` is a Directors
+        row, not a Promoters row, and the qualifier is never read as coverage of
+        the excluded group.
+        """
+        low = (label or "").lower()
+        if "director" in low:
+            return "directors"
+        if "promoter" in low:
+            return "promoters"
+        if "company" in low or "body corporate" in low:
+            return "company"
+        return None
+
     @classmethod
     def _lit_prefix(cls, text: str, start: int) -> str:
         """Same-sentence prefix before a phrase (D-1's polarity technique)."""
@@ -1938,6 +2051,10 @@ class SectionExtractor:
                     # population undisclosed: no bucket, so the criterion is
                     # UNKNOWN rather than awarded the favourable end.
                     continue
+                if not self._lit_absence_covers_population(sentence):
+                    # A24-D1: a nil naming fewer parties than the bucket is
+                    # defined over does not establish absence for the rest.
+                    continue
                 return ("clean", page, sentence, "prose-absence")
         return None
 
@@ -1995,7 +2112,7 @@ class SectionExtractor:
             for row in self._LIT_TABLE_ROW.finditer(text):
                 if row.group("side").lower() != "against":
                     continue  # "by our Company" is the issuer's own claim
-                parts = self._lit_cells(row.group("rest"))
+                parts = self._lit_row_cells(row.group("rest"))
                 if len(parts) != len(keys):
                     continue
                 cell = parts[sebi_at]
@@ -2031,9 +2148,11 @@ class SectionExtractor:
             adverse_rows = 0
             unreadable_adverse_rows = 0
             evidence_row: Optional[Tuple[int, str]] = None
+            # A24-D1: which parties the *readable* "against" rows cover.
+            covered_parties: set = set()
             for row in self._LIT_TABLE_ROW.finditer(text):
                 side = row.group("side").lower()
-                parts = self._lit_cells(row.group("rest"))
+                parts = self._lit_row_cells(row.group("rest"))
                 if len(parts) != len(keys):
                     # An adverse row that cannot be read leaves the population
                     # incomplete, so "clean" is off the table even if every
@@ -2060,6 +2179,15 @@ class SectionExtractor:
                         break
                 if not readable or not counts:
                     continue
+                if side == "against":
+                    # A24-D1: coverage is claimed only by a row whose cells were
+                    # actually read.  A party whose row exists but cannot be
+                    # parsed is a party whose position is unknown, so counting it
+                    # as covered would let an unreadable Directors row help clear
+                    # the table.
+                    party_class = self._lit_party_class(row.group("party"))
+                    if party_class is not None:
+                        covered_parties.add(party_class)
                 quote = " ".join(row.group(0).split())[:400]
                 if counts.get("sebi") and side == "against":
                     sebi = True
@@ -2100,6 +2228,12 @@ class SectionExtractor:
             # absence, so "clean" additionally requires the columns that the
             # bucket is defined over to be present.
             if not {"criminal", "civil", "regulatory"} <= {key for key in keys if key}:
+                return None
+            if not {"company", "promoters", "directors"} <= covered_parties:
+                # A24-D1, the same rule the prose route applies: a table whose
+                # "against" rows reach fewer than the three parties of the
+                # criterion's population covers only the parties it shows, and a
+                # row that is missing is not a row that says Nil.
                 return None
             return ("clean", page, header_quote, "summary-table")
         return None
@@ -2185,7 +2319,7 @@ class SectionExtractor:
         return None
 
     def _sebi_ed_action_finding(
-        self, lit_pages: Sequence[Tuple[int, str]]
+        self, lit_pages: Sequence[Tuple[int, str]], allow_absence: bool = True
     ) -> Optional[Tuple[bool, int, str]]:
         """Establish an active SEBI/ED action -- or its explicit absence.
 
@@ -2196,6 +2330,14 @@ class SectionExtractor:
         cites SEBI regulations, and negatives scoped to one regulator only,
         emit nothing -- which is exactly how a promoter-scoped "Nil" cell or an
         inaccessible regulatory page must be represented.
+
+        ``allow_absence`` is the A25 condition that the searched range was
+        genuinely usable: when the litigation section was located only by the
+        hardcoded fallback window, or a page in the range failed to extract, the
+        denial is still an *observed* statement but the coverage behind it is not
+        established, so ``False`` is withheld and the field stays absent
+        (K2 UNVERIFIED).  ``True`` never depends on this: a disclosed action is
+        evidence whoever found it.
         """
         negative: Optional[Tuple[int, str]] = None
         for page, text in self._lit_prose_pages(lit_pages):
@@ -2273,13 +2415,18 @@ class SectionExtractor:
                     # A SEBI-only (or ED-only) negative cannot clear a flag
                     # whose governed name covers both regulators; the field
                     # stays absent and K2 stays UNVERIFIED.
-                    if sebi_named and ed_named and not self._REG_ABSENT_CLOSED.search(
-                        sentence
+                    if (
+                        sebi_named
+                        and ed_named
+                        and allow_absence
+                        and not self._REG_ABSENT_CLOSED.search(sentence)
                     ):
                         return (False, page, sentence)
                     continue
                 return (True, page, sentence)
-        return (False, negative[0], negative[1]) if negative is not None else None
+        if negative is not None and allow_absence:
+            return (False, negative[0], negative[1])
+        return None
 
     def extract_governance(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract auditor opinion, litigation bucket, SEBI action, and board independence."""
@@ -2563,12 +2710,37 @@ class SectionExtractor:
         # is UNKNOWN and K2 is UNVERIFIED rather than CLEAR -- when the section
         # is missing, unreadable, empty, or ambiguous about who the proceeding
         # involves or which regulator acted.
+        # A25-D2 (approved 2026-10-20): the two observability states, recorded
+        # where they are knowable.  ``lit_located`` distinguishes a window that
+        # came from the filing's own table of contents from the hardcoded
+        # fallback; ``lit_all_read`` says whether every page of the window was
+        # actually read (A25-D2 per-page status) rather than failing to extract.
         lit_range = page_ranges.get("litigation") if page_ranges else None
+        lit_located = lit_range is not None
         p_lstart, p_lend = lit_range or (430, min(500, self.page_count))
         lit_pages = [
             (p, self.extract_page_text(p))
             for p in range(max(1, p_lstart), min(p_lend, self.page_count) + 1)
         ]
+        # A range that covers no page at all (a short document, a fallback
+        # window past its end) is not a searched section.
+        lit_scanned_pages = list(range(max(1, p_lstart), min(p_lend, self.page_count) + 1))
+        lit_all_read = self.pages_read(p_lstart, p_lend)
+        # A25-D1: an absence may be *emitted* only on a located, completely read
+        # window.  Adverse findings do not depend on this -- seeing an action is
+        # evidence regardless of how the page was found.
+        lit_allow_absence = lit_located and lit_all_read
+        lit_coverage = (
+            "litigation section located via the filing's table of contents; "
+            if lit_located
+            else "litigation window from the hardcoded fallback range, not located in the table of contents; "
+        ) + (
+            "all pages in the window read"
+            if lit_all_read and lit_scanned_pages
+            else "window did not cover any readable page"
+            if not lit_scanned_pages
+            else "one or more pages in the window failed to extract"
+        )
 
         lit_finding = self._litigation_bucket_finding(lit_pages)
         if lit_finding is not None:
@@ -2583,15 +2755,17 @@ class SectionExtractor:
                     locator="Outstanding Litigation and Material Developments",
                     quote=lit_quote,
                     notes=(
-                        f"bucket from the {lit_basis} disclosure; parties named in "
-                        f"the quoted text: {self._lit_parties_named(lit_quote)}"
+                        f"bucket from the {lit_basis} disclosure; coverage basis: {lit_coverage}; "
+                        f"parties named in the quoted text: {self._lit_parties_named(lit_quote)}"
                     ),
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95 if lit_basis != "prose" else 0.90,
                 )
             )
 
-        sebi_finding = self._sebi_ed_action_finding(lit_pages)
+        sebi_finding = self._sebi_ed_action_finding(
+            lit_pages, allow_absence=lit_allow_absence
+        )
         if sebi_finding is None or sebi_finding[0] is not True:
             # A disclosed action outranks a general denial, and the structured
             # routes state one positively; neither can state the absence, which
@@ -2615,11 +2789,19 @@ class SectionExtractor:
                     locator="Disciplinary actions by SEBI or Stock Exchanges",
                     quote=sebi_quote,
                     notes=(
-                        "explicit "
-                        + ("SEBI/ED action disclosed" if sebi_active else "absence of SEBI and ED action")
-                        + "; parties named in the quoted text: "
-                        + self._lit_parties_named(sebi_quote)
-                    ),
+                        # A25-D1: a `false` means "no SEBI/ED action is disclosed
+                        # on the searched pages", never that the engine verified
+                        # none exists.  The wording the record carries is the
+                        # difference, so the stronger claim cannot be rebuilt
+                        # downstream from a bare boolean.
+                        "SEBI/ED action disclosed by the filing"
+                        if sebi_active
+                        else "issuer-authored denial that any SEBI or ED action exists; "
+                        "no external or regulator-source check was performed, so this is "
+                        "absence of disclosure, not verified absence"
+                    )
+                    + f"; search basis: {lit_coverage}; parties named in the quoted text: "
+                    + self._lit_parties_named(sebi_quote),
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.92,
                 )

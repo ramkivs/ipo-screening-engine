@@ -193,15 +193,27 @@ def test_unreadable_prose_is_unknown_and_not_zero_points():
 
 
 def test_explicit_absence_statement_is_clean_and_quoted():
+    """A denial covering the whole party population is ``clean``, and is quoted.
+
+    Re-pinned for A24-D1 (approved 2026-10-20).  This test used to accept the
+    wording taken from ``class_b_cyclical_manufacturing.pdf`` -- "None of our
+    Promoters, Directors, or Group Companies ..." -- as ``clean``.  Under the
+    approved coverage standard that sentence no longer qualifies: it denies
+    anything for the Company itself, and "Group Companies" are separate legal
+    persons that do not stand in for the issuer (A24 R3).  The party population
+    of the criterion is Company + Promoters + Directors, so the test now uses a
+    denial that names all three; the class_b wording is pinned as UNKNOWN by
+    ``test_group_companies_are_not_the_issuer`` below.
+    """
     pages = {
         10: "OUTSTANDING LITIGATION AND MATERIAL DEVELOPMENTS\n"
-            "None of our Promoters, Directors, or Group Companies are involved in any "
+            "None of our Company, our Promoters or our Directors are involved in any "
             "material litigation or criminal cases.\n"
     }
     out = _govern(pages)
     record = out["governance.litigation_bucket"]
     assert record.candidate_value == "clean"
-    assert "None of our Promoters" in record.quote
+    assert "None of our Company" in record.quote
     _assert_verbatim(pages, out)
     # the parties the statement actually names are recorded, not assumed
     assert "Promoters" in record.notes and "Directors" in record.notes
@@ -593,16 +605,24 @@ def test_a_dimension_scoped_nil_is_not_clean(sentence):
 @pytest.mark.parametrize(
     "sentence",
     [
-        # unqualified: the whole bucket is denied
-        "No litigation is pending against our Company.",
-        # both dimensions named (the class_a and class_b disclosures, verbatim)
+        # both dimensions and all three parties named (the class_a disclosure, verbatim)
         "Except as stated below, there are no outstanding criminal proceedings or "
         "material civil litigation involving our Company, Directors or Promoters.",
-        "None of our Promoters, Directors, or Group Companies are involved in any "
-        "material litigation or criminal cases.",
+        # the same, in the other order, with the Company as "the issuer"
+        "There are no proceedings, criminal or civil, pending against the Company, "
+        "its Promoters or its Directors.",
     ],
 )
 def test_a_comprehensive_nil_is_clean_and_quoted(sentence):
+    """Comprehensive means both *dimensions* and the whole *party population*.
+
+    "No litigation is pending against our Company." used to be enough for
+    ``clean``; A24-D1 (approved 2026-10-20) says it is not, because it leaves
+    the Promoters and Directors undisclosed -- it is pinned as UNKNOWN by
+    ``test_partial_party_coverage_is_unknown_not_clean`` below.  "No litigation
+    against our Promoters, Directors or Group Companies" likewise leaves the
+    issuer itself undisclosed.
+    """
     pages = {11: "OUTSTANDING LITIGATION AND MATERIAL DEVELOPMENTS\n" + sentence + "\n"}
     out = _govern(pages)
     record = out["governance.litigation_bucket"]
@@ -938,3 +958,411 @@ def test_input_governance_still_overrides_the_extraction():
     canonical = _build([_lit_extraction("clean")], base=base)
     assert canonical["governance"]["litigation_bucket"] == "criminal_or_regulatory"
     assert canonical["governance"]["sebi_ed_action_active"] is True
+
+
+# ---------------------------------------------------------------------------
+# A24-D1: the party population a ``clean`` conclusion is defined over
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        # the issuer alone; its Promoters and Directors are undisclosed
+        "No litigation is pending against our Company.",
+        # two of the three parties
+        "There are no outstanding criminal proceedings or material civil litigation "
+        "involving our Company or our Promoters.",
+        "No proceedings are pending against our Directors or our Promoters.",
+        # the company that is not the issuer
+        "None of our Promoters, Directors, or Group Companies are involved in any "
+        "material litigation or criminal cases.",
+        "There are no proceedings against our Subsidiary, our Promoters or our Directors.",
+        # a population the criterion does not use, however wide
+        "No proceeding of any kind is pending against our Key Managerial Personnel or "
+        "our Senior Management Personnel.",
+    ],
+)
+def test_partial_party_coverage_is_unknown_not_clean(sentence):
+    """``clean`` asserts absence for Company **and** Promoters **and** Directors.
+
+    A24-D1, approved 2026-10-20: the bucket is defined over the party population
+    the governed metric formula itself names -- "across promoters, directors and
+    the company" (``engine/ipo_screening/derived.py``), the same three parties
+    the upstream reference config enumerates for this bucket.  Before this
+    correction a single party token was enough, so a nil naming only the issuer
+    awarded 4/4 and left the Directors undisclosed.
+
+    A denial about Group Companies or about KMP / Senior Management is *not*
+    coverage: the first names separate legal persons, and the second is a
+    population the criterion does not include (widening it is a separate governed
+    decision, so it is neither required here nor sufficient).
+    """
+    pages = {10: "OUTSTANDING LITIGATION AND MATERIAL DEVELOPMENTS\n" + sentence + "\n"}
+    out = _govern(pages)
+    assert "governance.litigation_bucket" not in out
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "No litigation is pending against our Company, our Promoters or our Directors.",
+        "There are no criminal proceedings, and no material civil litigation, involving "
+        "the Company, the Promoters and the Board of Directors.",
+        # a wider population still covers the required three
+        "No proceeding is pending against our Company, our Promoters, our Directors or "
+        "our Key Managerial Personnel.",
+    ],
+)
+def test_full_party_coverage_nil_is_clean(sentence):
+    """The rule is a floor, not a ceiling: naming more is still enough."""
+    pages = {10: "OUTSTANDING LITIGATION AND MATERIAL DEVELOPMENTS\n" + sentence + "\n"}
+    out = _govern(pages)
+    record = out["governance.litigation_bucket"]
+    assert record.candidate_value == "clean"
+    _assert_verbatim(pages, out)
+
+
+def test_an_adverse_finding_needs_no_party_coverage():
+    """The asymmetry is deliberate: a finding is true on its own evidence.
+
+    Only the *favourable* conclusion has to establish that the whole population
+    was silent.  A criminal proceeding against one Director condemns, whatever
+    the other rows say, so widening the coverage requirement must not be allowed
+    to suppress adverse evidence.
+    """
+    pages = {
+        10: "OUTSTANDING LITIGATION AND MATERIAL DEVELOPMENTS\n"
+            "Criminal Complaint No. 812 of 2024 is pending against one of our Directors "
+            "before the Court of Judicial Magistrate.\n"
+    }
+    out = _govern(pages)
+    assert out["governance.litigation_bucket"].candidate_value == "criminal_or_regulatory"
+
+
+def test_prose_and_table_routes_apply_the_same_coverage_rule():
+    """One standard, two disclosure forms (A24-D3's "both routes" condition).
+
+    The identical coverage -- Company and Promoters silent, Directors simply not
+    shown -- must classify the same way whichever statutory form carries it.
+    Before the correction the prose route accepted any party and the table route
+    required no party row at all, so two filings with the same disclosure could
+    be scored differently for being formatted differently.
+    """
+    partial_prose = {
+        10: "OUTSTANDING LITIGATION AND MATERIAL DEVELOPMENTS\n"
+            "There are no outstanding criminal proceedings or material civil litigation "
+            "involving our Company or our Promoters.\n"
+    }
+    partial_table = {
+        11: "| Category of individuals / entities | Criminal Proceedings | Tax Proceedings "
+            "| Statutory or Regulatory Proceedings | Material civil litigation |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| Against our Company | Nil | Nil | Nil | Nil |\n"
+            "| Against our Promoters | Nil | Nil | Nil | Nil |\n"
+    }
+    full_table = {
+        11: "| Category of individuals / entities | Criminal Proceedings | Tax Proceedings "
+            "| Statutory or Regulatory Proceedings | Material civil litigation |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| Against our Company | Nil | Nil | Nil | Nil |\n"
+            "| Against our Promoters | Nil | Nil | Nil | Nil |\n"
+            "| Against our Directors | Nil | Nil | Nil | Nil |\n"
+    }
+    assert "governance.litigation_bucket" not in _govern(partial_prose)
+    assert "governance.litigation_bucket" not in _govern(partial_table)
+    # ...and the table route does reach `clean` once the population is covered,
+    # so the rule is not a permanent block on the disclosure form.
+    assert _govern(full_table)["governance.litigation_bucket"].candidate_value == "clean"
+
+
+def test_reviewer_assertion_is_outside_the_coverage_rule():
+    """A24-D2: a reviewer's bucket assertion is never treated as source evidence.
+
+    ``governance.litigation_bucket`` supplied by the reviewer is honoured as an
+    assertion (it was, and stays, outside the automated coverage rule) but it
+    does not become an extraction record -- so it cannot acquire a quotation, a
+    page, or the appearance of having been read off the filing.  Conversely, a
+    coverage rule can never *relabel* that assertion: the rule constrains what
+    the engine may conclude from text, not what a reviewer may state.
+    """
+    base = {"governance": {"litigation_bucket": "clean"}}
+    canonical = _build([], base=base)
+    assert canonical["governance"]["litigation_bucket"] == "clean"
+    assert not any(
+        r.field_path == "governance.litigation_bucket" for r in []
+    )  # the extraction that would have carried evidence does not exist
+
+    # an extraction whose own coverage fails yields nothing at all, so the
+    # reviewer's value cannot be quietly re-branded as source-derived
+    partial = {
+        10: "OUTSTANDING LITIGATION AND MATERIAL DEVELOPMENTS\n"
+            "No litigation is pending against our Company.\n"
+    }
+    assert "governance.litigation_bucket" not in _govern(partial)
+
+
+# ---------------------------------------------------------------------------
+# A24-D3: the ``Directors (excluding Promoters)`` row-parsing defect
+# ---------------------------------------------------------------------------
+
+#: The ICDR Schedule VI row label as real filings print it, qualifier included.
+HD_FIRE_STYLE_TABLE = (
+    "| Category of individuals / entities | Criminal Proceedings | Tax Proceedings "
+    "| Statutory or Regulatory Proceedings | Disciplinary actions by SEBI or stock "
+    "exchanges against our Promoters in the last five years | Material civil litigation "
+    "| Aggregate amount involved (Rs in million) |\n"
+    "| --- | --- | --- | --- | --- | --- | --- |\n"
+    "| Company |  |  |  |  |  |  |\n"
+    "{rows}"
+)
+
+
+def _hd_table(*rows: str) -> dict:
+    return {12: "12. Summary table of outstanding litigations\n\n" + HD_FIRE_STYLE_TABLE.format(
+        rows="".join(row + "\n" for row in rows)
+    )}
+
+
+def test_parenthetical_party_label_does_not_shift_the_row():
+    """``Against our Directors (excluding Promoters)`` is a readable row.
+
+    The row pattern ends the party name at the first pipe, so the qualifier was
+    left at the head of the row body and became a spurious first cell: every
+    value slid one column right, ``len(parts) != len(keys)`` failed, and the row
+    was discarded as unreadable -- an adverse criminal count going unreported
+    (and, on a nil row, the whole table being treated as ambiguous).  A24-D3,
+    approved 2026-10-20, authorises exactly this repair.
+    """
+    pages = _hd_table(
+        "| Against our Company | Nil | Nil | Nil | NA | Nil | Nil |",
+        "| Against our Directors (excluding Promoters) | 2 | Nil | Nil | NA | Nil | Nil |",
+        "| Against our Promoters | Nil | Nil | Nil | Nil | Nil | Nil |",
+    )
+    out = _govern(pages)
+    record = out["governance.litigation_bucket"]
+    assert record.candidate_value == "criminal_or_regulatory"
+    # the quotation is the untouched source line: the qualifier is still there,
+    # so the reader can see what the row actually scoped
+    assert "Directors (excluding Promoters)" in record.quote
+    _assert_verbatim(pages, out)
+
+
+def test_qualifier_never_becomes_coverage_of_the_excluded_group():
+    """Directors excluding Promoters is a *Directors* row, not a Promoters row."""
+    pages = _hd_table(
+        "| Against our Company | Nil | Nil | Nil | NA | Nil | Nil |",
+        "| Against our Directors (excluding Promoters) | Nil | Nil | Nil | NA | Nil | Nil |",
+    )
+    # Promoters are then undisclosed, so `clean` is withheld even though every
+    # readable cell is nil.
+    assert "governance.litigation_bucket" not in _govern(pages)
+
+
+def test_nil_in_a_parenthetical_row_is_not_read_as_an_adverse_count():
+    """The repair must not create findings: a nil row stays a nil row."""
+    pages = _hd_table(
+        "| Against our Company | Nil | Nil | Nil | NA | Nil | Nil |",
+        "| Against our Directors (excluding Promoters) | Nil | Nil | Nil | NA | Nil | Nil |",
+        "| Against our Promoters | Nil | Nil | Nil | Nil | Nil | Nil |",
+    )
+    out = _govern(pages)
+    assert out["governance.litigation_bucket"].candidate_value == "clean"
+
+
+def test_unreadable_cell_after_the_qualifier_is_not_inferred_as_nil():
+    """A cell that is neither Nil nor a count leaves the row unreadable.
+
+    The row body ``Refer Note 32(b)`` is not evidence of a nil.  It blocks
+    ``clean`` for the whole table and is reported as UNKNOWN; the quotation and
+    the party label are untouched.
+    """
+    pages = _hd_table(
+        "| Against our Company | Nil | Nil | Nil | NA | Nil | Nil |",
+        "| Against our Directors (excluding Promoters) | Refer Note 32(b) | Nil | Nil | NA | Nil | Nil |",
+        "| Against our Promoters | Nil | Nil | Nil | Nil | Nil | Nil |",
+    )
+    out = _govern(pages)
+    assert "governance.litigation_bucket" not in out
+    assert out.get("governance.sebi_ed_action_active") is None or (
+        out["governance.sebi_ed_action_active"].candidate_value is not False
+    )
+
+
+def test_stacked_qualifiers_stay_unparseable_rather_than_guessed():
+    """The documented limit of the repair (A24-D3's "cannot be parsed" clause).
+
+    One bracketed qualifier is what the ICDR row label carries.  A second is not
+    guessed at: the row stays unreadable, which blocks a favourable conclusion
+    and never produces a NIL out of ambiguity.
+    """
+    pages = _hd_table(
+        "| Against our Company | Nil | Nil | Nil | NA | Nil | Nil |",
+        "| Against our Directors (excluding Promoters) (as on the date of the RHP) "
+        "| 2 | Nil | Nil | NA | Nil | Nil |",
+        "| Against our Promoters | Nil | Nil | Nil | Nil | Nil | Nil |",
+    )
+    out = _govern(pages)
+    assert out.get("governance.litigation_bucket") is None or (
+        out["governance.litigation_bucket"].candidate_value != "clean"
+    )
+
+
+# ---------------------------------------------------------------------------
+# A25-D1 / A25-D2: what an absence may be read from, and what is observable
+# ---------------------------------------------------------------------------
+
+
+class _TextPage:
+    """A PDF page whose text extraction either returns text or fails."""
+
+    def __init__(self, text: str, fails: bool = False) -> None:
+        self._text = text
+        self._fails = fails
+
+    def extract_text(self) -> str:
+        if self._fails:
+            raise RuntimeError("page could not be extracted")
+        return self._text
+
+
+class _TextReader:
+    def __init__(self, page_count: int, texts=None, failing=()) -> None:
+        texts = texts or {}
+        failing = set(failing)
+        self.pages = [
+            _TextPage(texts.get(p, ""), fails=p in failing) for p in range(1, page_count + 1)
+        ]
+
+
+def _govern_window(page_count, texts, page_range=None, failing=()):
+    """Run the scan over a document whose pages were (or were not) read.
+
+    Unlike ``_govern`` this drives real extraction through the reader, so the
+    A25-D2 states -- located vs fallback window, read vs failed page -- are the
+    ones the extractor actually sees instead of being pre-supplied.
+    """
+    ex = SectionExtractor(_StubDoc(), _TextReader(page_count, texts, failing))
+    return ex, {r.field_path: r for r in ex.extract_governance(page_range)}
+
+
+_SEBI_DENIAL = (
+    "Except as disclosed, there has been no action initiated against our Company or "
+    "our Promoters by SEBI or by the Enforcement Directorate."
+)
+_SEBI_ACTION = (
+    "The Enforcement Directorate has initiated proceedings against our Company under "
+    "the Foreign Exchange Management Act, 1999."
+)
+
+
+def test_per_page_extraction_status_is_observable():
+    """A25-D2: a page that failed to extract is distinguishable from a blank one."""
+    ex, _ = _govern_window(4, {1: "cover", 2: "text"}, page_range={"litigation": (1, 4)})
+    assert ex.page_status[1] == "READ"  # read, and it had text
+    assert ex.page_status[2] == "READ"
+    assert ex.page_status[3] == "BLANK"  # read, and it had none -- still a read
+    assert ex.pages_read(1, 4) is True
+    assert ex.pages_read(1, 9) is True  # clamped: the document has no page 5+
+    assert ex.pages_read(9, 12) is False  # a window with no page at all is not searched
+    ex_failed, _ = _govern_window(
+        4, {2: "text"}, page_range={"litigation": (1, 4)}, failing=(3,)
+    )
+    assert ex_failed.page_status[3] == "FAILED"
+    assert ex_failed.pages_read(1, 4) is False
+
+
+def test_a_fallback_window_may_find_action_but_may_not_declare_absence():
+    """Absence requires a window we know was the right one (A25-D1).
+
+    When the filing's own table of contents does not locate the litigation
+    section, the extractor scans a hardcoded range.  A hit there is still a
+    finding -- seeing something does not depend on how the page was looked for --
+    but a *non*-hit cannot mean nothing exists: the section may simply be
+    elsewhere.  Before A25 the two were indistinguishable in the record.
+    """
+    _, guessed = _govern_window(500, {450: "OUTSTANDING LITIGATION\n" + _SEBI_DENIAL})
+    assert "governance.sebi_ed_action_active" not in guessed
+    _, located = _govern_window(
+        500,
+        {450: "OUTSTANDING LITIGATION\n" + _SEBI_DENIAL},
+        page_range={"litigation": (450, 452)},
+    )
+    assert located["governance.sebi_ed_action_active"].candidate_value is False
+    _, adverse_on_guess = _govern_window(500, {450: "OUTSTANDING LITIGATION\n" + _SEBI_ACTION})
+    assert adverse_on_guess["governance.sebi_ed_action_active"].candidate_value is True
+
+
+def test_an_unreadable_page_blocks_absence_not_a_finding():
+    """Same asymmetry, caused by a page that could not be extracted."""
+    pages = {450: "OUTSTANDING LITIGATION\n" + _SEBI_DENIAL, 451: _SEBI_ACTION}
+    _, broken = _govern_window(
+        500, {450: "OUTSTANDING LITIGATION\n" + _SEBI_DENIAL},
+        page_range={"litigation": (450, 452)}, failing=(451,),
+    )
+    assert "governance.sebi_ed_action_active" not in broken
+    _, broken_with_action = _govern_window(
+        500, pages, page_range={"litigation": (450, 452)}, failing=(452,)
+    )
+    assert broken_with_action["governance.sebi_ed_action_active"].candidate_value is True
+
+
+def test_a_negative_record_says_absence_of_disclosure_not_verified_absence():
+    """A25-D1 / C5: the wording is part of the contract, not decoration.
+
+    ``governance.sebi_ed_action_active = false`` means "the filing denies any
+    SEBI or ED action on the pages searched".  It is never an independently
+    verified absence -- no regulator source is consulted -- so the record says so
+    and names the search basis.  ``true`` remains a disclosed adverse action.
+    """
+    _, located = _govern_window(
+        500,
+        {450: "OUTSTANDING LITIGATION\n" + _SEBI_DENIAL},
+        page_range={"litigation": (450, 451)},
+    )
+    record = located["governance.sebi_ed_action_active"]
+    assert record.candidate_value is False
+    assert "absence of disclosure" in record.notes
+    assert "not verified absence" in record.notes
+    assert "table of contents" in record.notes
+    assert "verified that no action exists" not in record.notes
+    _assert_verbatim({450: "OUTSTANDING LITIGATION\n" + _SEBI_DENIAL}, located)
+
+
+def test_a_fallback_window_is_named_as_such_in_the_record():
+    """A guessed range is still usable evidence, but must say it was guessed."""
+    pages = {450: "OUTSTANDING LITIGATION\n" + _SEBI_ACTION}
+    _, out = _govern_window(500, pages)
+    record = out["governance.sebi_ed_action_active"]
+    assert record.candidate_value is True
+    assert "hardcoded fallback" in record.notes
+    assert "litigation section located via" not in record.notes
+
+
+def test_bucket_record_carries_its_coverage_basis():
+    """The litigation bucket reports what was searched, for every route."""
+    pages = {
+        10: "OUTSTANDING LITIGATION AND MATERIAL DEVELOPMENTS\n"
+            "No litigation is pending against our Company, our Promoters or our Directors.\n"
+    }
+    record = _govern(pages)["governance.litigation_bucket"]
+    assert "search basis:" in record.notes or "coverage basis:" in record.notes
+
+
+def test_the_labelled_list_route_cannot_award_clean_on_partial_coverage():
+    """All three statutory forms are held to the same standard.
+
+    The labelled "category line / value line" disclosure can report an adverse
+    finding, but it never concludes absence: a list of nils says nothing about
+    the categories it does not print, let alone about the parties it does not
+    name.  That is the A24-D1 coverage rule already in force on that route,
+    pinned here so a later widening has to pass through this test.
+    """
+    pages = {
+        14: "OUTSTANDING LITIGATION\n"
+            "Criminal proceedings involving our Company: Nil\n"
+            "Material civil litigation involving our Company: Nil\n"
+            "Tax proceedings involving our Company: Nil\n"
+    }
+    out = _govern(pages)
+    assert "governance.litigation_bucket" not in out
