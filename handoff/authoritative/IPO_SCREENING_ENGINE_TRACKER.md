@@ -872,3 +872,84 @@ Reconciled against the remote repository (`ramkivs/ipo-screening-engine`), all b
 - **Approval status of every item.** A24, A25 and A26 are **PROPOSED**; A8-R is **UNRESOLVED** and open. None is APPROVED, ACCEPTED or IMPLEMENTED, and no proposal was treated as authority for a code change. Each record carries its own acceptance criteria, affected components, migration/compatibility analysis, dependencies and the concise questions to RAMKI.
 - **Validation actually run for this pass (documentation-only change set).** Focused behaviour at the current tree: `tests/test_litigation_regulatory_defaults.py` **66 passed** (0.20 s) and `tests/test_hd_fire_primary_source_extraction.py` **7 passed** — these substantiate the "today" column of every table in A24/A26 and the §2 state table in A25; `python3 engine/tools/ipo_screen.py check-config` → **valid True**, 10 profiles × 100 points; the vishal golden hash recomputed directly as `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`, unchanged. **No full-suite rerun was performed or needed:** this pass changes only Markdown under `handoff/`, so the completed full-suite result at the *code-identical* tree `c204c82` (1265 collected, 1265 passed, 0 failed, 0 skipped, 0 xfailed, 1131.26 s; log `docs/investigation/D-5-A23-SUITE-PROGRESS-2026-10-20.log`) remains the applicable checkpoint, and `git diff --stat 38f5157..HEAD` shows no `engine/`, `tests/`, `config/`, `schema/` or `fixtures/` file. The runner-level progress mechanism from the previous pass (`tests/pytest_progress.py`, registered from `tests/conftest.py`, flushed to stderr) stays available for any future long run; Arena's synchronous `bash` tool still returns output only at command completion, so long suites must continue to run as background processes polled from the log — no live-UI progress is claimed.
 - **Integrity.** `git diff --stat 2d52baa..HEAD -- config schema fixtures` still empty; no scoring formula, weight, threshold, knockout semantic, confidence rule, schema enum, config value, golden fixture or historical evaluation record touched; **no** evaluation re-run, rewritten or newly published; D-1…D-5 decisions and their records unmodified apart from the two dated factual corrections noted above; 0 `xfail` in `tests/` (none added).
+
+### A24 / A25 approved and implemented; A26 history checked; A27 raised — 2026-10-20
+
+- **What this pass was.** Ramki approved **A24-D1/D2/D3** and **A25-D1/D2** for implementation;
+  this pass implements exactly that scope in `engine/ipo_screening/extraction/sections.py` and
+  its tests, and does the two bounded investigations that were asked for in the same order —
+  the **A8-R** dependency request (extended, still unresolved) and the **A26** tax-history
+  question (answered with evidence, and it produced **A27** as a new open decision). Starting
+  commit `ce577ea022c1eaf2363fe8cd0e3b93bf5450b4da`, verified remotely before any edit.
+- **A24-D1 — party coverage for `clean`.** A denial may support `clean` only if it reaches the
+  Company **and** its Promoters **and** its Directors, the population the governed formula names
+  in **both** shipped configs (`config/ipo-config.v1.5.0.json`/`v1.6.0.json`:
+  `clean / minor_civil / criminal_or_regulatory (promoters, directors, company)`); "Group
+  Companies" is stripped before the issuer test so the group cannot stand in for the Company,
+  and KMP / Senior Management were **not** added (Option C stays unapproved). Same rule on the
+  ICDR summary-table route, credited only by rows whose cells actually parsed.
+  Record: `A24-…md` §13.
+- **A24-D3 — the `Directors (excluding Promoters)` row defect, repaired.** One bracketed
+  qualifier between the party label and the first cell boundary is removed for column alignment
+  only; the quotation remains the verbatim source line, Directors is never read as Promoters
+  coverage, an unreadable cell yields no bucket and no invented `NIL`, and stacked qualifiers
+  stay UNKNOWN as the approval requires.
+- **A24-D2.** A reviewer-supplied `governance.litigation_bucket` is still honoured by the
+  builder and is still never turned into an extraction record or an evidence quotation; the
+  coverage gate lives in the extractor and neither consumes nor overrides that assertion.
+- **A25-D1/D2.** `sebi_ed_action_active = false` now means and **reads** "issuer-authored denial
+  … absence of disclosure, not verified absence", with a `search basis:` clause naming the
+  window it came from; an absence (bucket or flag) is emitted only on a TOC-located window whose
+  pages were all read (`READ`/`BLANK`/`FAILED`/`OUT_OF_RANGE` per page, exposed via
+  `page_status`/`pages_read`), while an adverse finding never depends on that. No retrieval was
+  built: `SourceClass`, the connectors and the schema are untouched, and **A25-D2's two states
+  are the whole of the observability work**. Record: `A25-…md` §12.
+- **A26 history, investigated rather than assumed.** The premise that v1.5 dropped
+  "disputed tax" from `auditor_bucket.eom_only` is **false**: the clause is in the v1.3 spec
+  (`…Specification.md:105`), the v1.4 reference (`handoff/reference/ipo-config.json:297`) and
+  **still in both shipped configs** (`config/ipo-config.v1.5.0.json:1727`,
+  `config/ipo-config.v1.6.0.json:1727`); `git log --all -S"disputed tax" -- engine/` returns
+  **nothing**, so the engine never had it to lose and `derived._auditor_bucket` has always read
+  only `auditor_opinion`, `auditor_reputed`, `auditor_changed_3y`, `repeated_eom`. Two further
+  facts: `governance.caro_remarks` is declared in `schema/ipo-input.v1.5.schema.json:659` and
+  referenced **nowhere else in the repository**, and four more governance inputs
+  (`eom_count_3y`, `auditor_change_count_3y`, `regulatory_actions`,
+  `independent_director_count`) are likewise declared and unconsumed. So the auditor clause is
+  neither an intentional non-score nor a lost edit — it is text the input surface cannot
+  express. **Tax-only litigation exposure therefore stays UNKNOWN, unchanged**, and the auditor
+  question is posed as a separate, explicitly unimplemented decision in
+  `handoff/decisions/A27-auditor-bucket-unconsumed-clauses.md` (Options A–D, with the
+  absent-input semantics and the double-counting interaction with A20/K5 named as the things
+  Ramki must pick). A26 §11 carries the evidence table; its earlier v1.4→v1.5 reading is
+  corrected in place.
+- **Traceability.** `docs/TRACEABILITY_MATRIX.md` gains row **GAP-4.3** — v1.5 §4.3 tax
+  proceedings and the auditor formula's CARO / disputed-tax clauses, acknowledged inputs with
+  **no consuming metric**, status `BLOCKED — UNRESOLVED (A26, A27; Ramki)` — recorded as an
+  open gap, explicitly *not* as an approved permanent non-score (the file's status vocabulary
+  `DONE / DONE (documented divergence) / BLOCKED` is reused, not widened). Row 11 notes that
+  `litigation_bucket`'s party population is enforced by the extractor as the config's own text
+  states it, with the two new tests cited.
+- **Validation, all executed on the tree this commit carries.** Focused pair
+  `tests/test_litigation_regulatory_defaults.py tests/test_hd_fire_primary_source_extraction.py`
+  → **96 passed, 0.22 s**; 9-module extraction/governance/golden battery → **170 passed,
+  338.57 s**; **full backend suite → 1288 collected, 1288 passed, 0 failed, 0 skipped,
+  1272.03 s (21 m 12 s), EXIT=0** (1265 → 1288 = the 23 tests added; nothing removed, skipped
+  or xfailed); `check-config` → `valid True`, 10 profiles at 100 points; frontend
+  `node --test` → **90 pass / 0 fail**. Progress was visible via `tests/pytest_progress.py` in
+  the run log; Arena's `bash` still returns output only at completion, so the full run was a
+  background process writing one fresh log (§17.4/§17.6).
+- **Integrity.** `git diff --stat 2d52baa..HEAD -- config schema fixtures build evidence` is
+  **empty**: no config, schema, golden fixture, workbook or stored evaluation changed; the
+  vishal golden hash `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` and
+  its `final_score 35.0` pass unchanged; formulas, weights, thresholds, caps, penalties,
+  knockout semantics, the bucket taxonomy and both config versions are untouched; **no
+  historical evaluation was re-run, re-hashed or newly published**. Three fixture expectations
+  moved because the approved rule moves them (class_b 41.0 → 37.0, class_b provenance floor
+  9 → 8, and the three wording tests), each re-pinned with its reason and the approval cited at
+  the pin, and the A24 §13 table records the measured before/after pairs.
+- **Open after this pass.** A26 (tax-only classification) and **A27** (auditor criterion's
+  unconsumed CARO / disputed-tax clauses) are **PROPOSED / UNRESOLVED**; **A8-R** R-S1…R-S10
+  remain **UNRESOLVED** (A25-D2 supplied the in-document half of R-S6; external corroboration,
+  K2's basis field and every retrieval decision are still Ramki's, and A8-R §7 states why the
+  K2 field should follow R-S1 rather than precede it); A24's Option C (KMP / Senior Management)
+  is not adopted; `main` and PR #6 are untouched by design.

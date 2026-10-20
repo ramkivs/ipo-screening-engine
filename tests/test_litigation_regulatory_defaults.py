@@ -480,7 +480,14 @@ def test_boilerplate_sebi_references_are_not_actions():
     assert "governance.sebi_ed_action_active" not in out
 
 
-def test_both_regulators_named_absent_is_a_verified_negative():
+def test_both_regulators_named_absent_is_a_disclosed_negative_not_a_verified_absence():
+    """Renamed for A25-D1 (approved 2026-10-20): the assertion never claimed
+    verification, but the *name* did, and a test name is documentation that the
+    next reader will repeat.  `false` is the issuer's denial on the pages searched
+    -- see ``test_a_negative_record_says_absence_of_disclosure_not_verified_absence``.
+    The expectation itself is unchanged from `c204c82`, where this test passed as
+    ``test_both_regulators_named_absent_is_a_verified_negative``.
+    """
     pages = {
         22: "There are no proceedings initiated by SEBI or the Enforcement Directorate "
             "against our Company or our Promoters.\n"

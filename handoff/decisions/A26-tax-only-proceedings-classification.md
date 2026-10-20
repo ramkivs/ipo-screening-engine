@@ -27,7 +27,7 @@ v1.5 §4.3 lists **"tax proceedings"** among the governance inputs the engine mu
 | A23 §6A.1 | a prose nil covering **only** tax does not establish `clean` | measured: `C4 prose tax denial only` ⇒ no bucket |
 | A20 (D-2, approved) | `financials.contingent_liabilities` = the disclosed total of the contingent-liabilities section, commitments excluded | a tax demand disclosed in that note is **already counted** in the K5 numerator and in the contingent-liability criteria |
 | K5 | "Contingent liabilities >50% of net worth (or unquantified)" | where the **financial magnitude** of tax disputes is governed |
-| v1.5 §11 / reference `handoff/reference/ipo-config.json:297` | v1.5: auditor states are "clean/unqualified", "EOM/CARO only", "repeated EOM…", "qualified → knockout". The **upstream v1.4** text read `eom_only: reputed firm, unqualified, no change; …disputed tax only` | the reference taxonomy placed *disputed tax* in the **auditor** criterion; the v1.5 formula string (`derived.py:1431`) no longer mentions tax |
+| v1.5 §11 / the governed config formulas | the clause "disputed tax" was **not dropped in v1.5**: it appears in the v1.3 spec (`handoff/reference/Claude_IPO Screening Engine v 1.3 — Specification.md:105`), in the v1.4 reference (`handoff/reference/ipo-config.json:297`), and **still in both shipped configs today** — `config/ipo-config.v1.5.0.json:1727` and `config/ipo-config.v1.6.0.json:1727`, both reading `eom_only: Emphasis of Matter/CARO/disputed tax only`. What lacks it is the *implementation*: `derived._auditor_bucket` (`engine/ipo_screening/derived.py:1428-1436`) states "eom_only: EOM/CARO only and no change" and reads four inputs, none of them tax- or CARO-related | the divergence is between governed **text** and code, present since the engine's v1.5 commit — see §11, which replaces the "v1.4 → v1.5 removal" reading in the first draft of this record |
 
 **Direction rules already in force** (measured, unchanged here): only `Against our …` rows are adverse; `By our Company | Nil | 3 | … | 0.40` — three tax proceedings *brought by* the issuer — are the issuer's own claims and are not adverse exposure; a `Nil` in a column or row scoped to a subset covers only that subset; an amount cell that cannot be read blocks the favourable conclusion without creating an adverse one.
 
@@ -95,10 +95,35 @@ A24 (whether tax coverage is part of the population a nil must reach — recomme
 ## 9. Questions for RAMKI
 
 1. Do you confirm Option A — tax-only adverse exposure stays `UNKNOWN` in `litigation_bucket` and its magnitude remains governed through the A20/K5 contingent-liability route?
-2. Is "disputed tax" intended to be absent from `auditor_bucket` in v1.5 (the reference v1.4 text included it in `eom_only`), or is that an omission to repair — and if a repair, in which criterion?
+2. ~~Is "disputed tax" intended to be absent from `auditor_bucket` in v1.5 …?~~ **Rewritten by §11:** nothing was ever absent from the config — the clause is in v1.5.0 and v1.6.0 today, and the engine never implemented it. The question that survives is therefore the one in `handoff/decisions/A27-auditor-bucket-unconsumed-clauses.md`: implement the clause (which needs an input surface, because `governance.caro_remarks` is declared and unconsumed and there is no tax-dispute field at all) or amend the formula text to state what the engine scores. **Not answerable by Arena, and nothing was done about it in this pass.**
 3. If you want tax-only exposure scored at all, do you authorise opening a config **version** (Option C) with the full impact list in §4, including the golden-hash re-baseline decision, or prefer a documented, permanent non-score?
 4. Should `docs/TRACEABILITY_MATRIX.md` record "v1.5 §4.3 tax proceedings: input acknowledged, no consuming metric" as a known coverage gap until 1–3 are answered?
 
 ## 10. Interim behaviour
 
 Exactly what §3 measured, unchanged by this record: tax-only adverse disclosure produces no bucket ⇒ `STATE_UNKNOWN` ⇒ 4 points unavailable (not zero), reason recorded; tax never contributes to `clean`, and issuer-initiated tax claims are not adverse.
+
+## 11. Historical investigation, 2026-10-20 (documentation and measurement only)
+
+Ramki asked whether the v1.4 → v1.5 difference in the auditor clause was a deliberate
+removal or a lost criterion. The change history settles the first half and refutes the
+premise of the second.
+
+| Question | Evidence read this pass | Answer |
+| --- | --- | --- |
+| Was the clause removed between v1.4 and v1.5? | `git log --all -S"disputed tax" -- engine/` → **no commits**; `git show fb822e5:config/ipo-config.v1.5.0.json \| grep -c "disputed tax"` → **1** (present as introduced); `git log --all -S"disputed tax"` → only `fb822e5` (v1.5 config), `49c9944` (v1.6 config), and this session's records | **No.** The clause entered the config with the engine's own v1.5 implementation commit and has never been edited out. It is in v1.6.0 verbatim. |
+| Was it ever implemented? | the `engine/` search above; `engine/ipo_screening/derived.py:1428-1436` (formula + `inputs`), `:1458-1490` (the branches actually taken) | **No.** `auditor_bucket` has always read `auditor_opinion`, `auditor_reputed`, `auditor_changed_3y`, `repeated_eom`. Tax and CARO have never been inputs. |
+| Which criterion owns it? | v1.3 spec row `:105` ("Reputed, clean opinion = 2; Emphasis of Matter / CARO remarks / **disputed tax matters only** = 1; frequent auditor change or repeated EoM = 0"); `config.*.json` criterion `auditor` (`max 2`, map `clean_reputed 2 / eom_only 1 / unstable_or_repeated_eom 0`) | The **auditor** criterion, Module D, 1 of 2 points. Not `litigation_bucket`. The map is untouched by this pass and by every pass so far. |
+| Is the input "intentionally acknowledged-but-unscored", or is there no input to score? | `schema/ipo-input.v1.5.schema.json` governance block: `caro_remarks` **is** declared (`:659`) and `grep -rn caro_remarks` across the whole repository matches **that one line and nothing else** — no engine, test, frontend or doc reference; there is **no** tax-dispute field at all (`"tax"` appears only as `financials.periods[].tax`, the tax *expense*) | Neither, strictly: `caro_remarks` is a declared input that **nothing consumes**, and disputed tax has **no declared input**. So the clause is not "acknowledged but unscored by design" — it is *unimplementable* from the governed input surface, which is why no historical evaluation can be said to have scored it. |
+| What else is in that state? | same schema-vs-engine comparison for all 19 declared governance fields: `eom_count_3y`, `caro_remarks`, `auditor_change_count_3y`, `regulatory_actions`, `independent_director_count` have no reference anywhere in `engine/` | Five unconsumed governance inputs, not one. Recorded so that the auditor question is not treated as an isolated oversight. None of them was wired up in this pass. |
+
+**Consequence for this record.** §5's premise — that tax-only disclosure might have had a
+home in the auditor bucket that v1.5 removed — is withdrawn: there was no home to lose.
+A26 therefore stays exactly where it was: tax-only adverse disclosure produces no bucket
+⇒ `STATE_UNKNOWN`, its magnitude remains governed through A20/K5, and Option C (a fourth
+bucket) remains costed and unadopted. The decision about the auditor formula's unconsumed
+clauses is **not** taken here; it is put to Ramki in
+`handoff/decisions/A27-auditor-bucket-unconsumed-clauses.md`, which changes nothing either.
+No code, config, schema, fixture or golden artefact was modified for this section; the
+only repo changes in this pass are the A24/A25 extraction and test work and this
+documentation.

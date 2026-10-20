@@ -3,14 +3,14 @@
 - **Decision ID:** A24
 - **Title:** Minimum party coverage for the favourable `clean` bucket of `governance.litigation_bucket`
 - **Record type:** **PROPOSAL — decision request.** Under `handoff/decisions/CONVENTION.md` rule 4 this record is *not* an approval and *not* implementation authority; it carries Arena's analysis and recommendation for RAMKI's decision.
-- **Decision status:** **PROPOSED / UNRESOLVED — RAMKI APPROVAL REQUIRED.** Nothing in this record is implemented.
+- **Decision status:** **APPROVED (D1, D2, D3) and IMPLEMENTED 2026-10-20** in commit `41f2f86` — see §13 for what was built, what was measured, and what remains outside the approval. The *decision* is Ramki's approval as conveyed on 2026-10-20; the R1–R8 wording below is what was implemented, and Option C (KMP / Senior Management) remains **not** adopted.
 - **Decision authority:** RAMKI (per `handoff/decisions/A1-evidence-adjudication-authority.md`).
 - **Date:** 2026-10-20 (Asia/Calcutta); no decision time is asserted.
 - **Repository / baseline:** `ramkivs/ipo-screening-engine`, branch `arena/95234306-ipo-screening-engine` at remotely verified commit `38f51571d2a043c91fed054d90ea01141ca41de9`; `main` `01ba66c12ca1195fd7acbd287c3e39a019808094`; PR #6 `OPEN`/`UNMERGED` at `e05c0efbca1ecb3024e52da73a22e180ea171118`.
 - **Supersedes / completes:** the "Party-coverage standard for `clean`" item of `handoff/decisions/A23-litigation-regulatory-evidence-defaults.md` §6.1 and §6A.1.
 - **Scope:** what an issuer disclosure must cover before the extraction layer may conclude `clean`; the same question for the ICDR summary-table route.
 - **Out of scope and unchanged:** the bucket taxonomy, `config/ipo-config.v1.5.0.json` and `config/ipo-config.v1.6.0.json`, `schema/ipo-input.v1.5.schema.json`, `config_validation.py`, `derived.py`, `scoring.py`, `knockouts.py`, confidence rules, `fixtures/` and the golden record, historical evaluations. **No code was changed for this record.**
-- **Implementation authority:** NOT GRANTED by this record.
+- **Implementation authority:** GRANTED for D1, D2 and D3 by Ramki's approval of 2026-10-20, limited to the extraction layer and its tests; anything beyond that (the party population itself, the bucket taxonomy, config, schema, scoring, fixtures) remains ungoverned by this record and was not touched.
 
 ## 1. Problem statement
 
@@ -134,6 +134,69 @@ No schema, config or taxonomy change, so stored records remain valid and replaya
 3. Do you confirm R7 — that human-supplied bucket values remain reviewer assertions outside this standard?
 4. Do you authorise, in the same future pass, the §3.1 parenthetical-row repair (R8)?
 
-## 12. Interim behaviour while this record is unapproved
+## 12. Behaviour this record replaced (historical: superseded by §13 on 2026-10-20)
 
 Today's rule stands: the A23 §6A.1 dimension gate is enforced; party coverage is not required beyond one party token, and the recorded `notes` string names the parties actually covered. This is the fail-closed-but-incomplete state, and no part of this proposal has been applied.
+
+## 13. Implementation record (2026-10-20, commit `41f2f86`)
+
+**What was implemented, in the code.** All of it inside
+`engine/ipo_screening/extraction/sections.py`; no formula, weight, threshold,
+cap, penalty, bucket name, config key, schema field or fixture was altered.
+
+1. **D1 — the coverage gate.** `_lit_absence_covers_population()` requires a
+   denial to name the issuer (``our/the Company``, ``the issuer``, ``our body
+   corporate``), a Promoter(s) **and** a Director(s). "Group Companies", "other
+   companies" and "subsidiaries" are removed from the sentence **before** the
+   issuer test, so a nil addressed to the group cannot stand in for the
+   Company (R3). `_litigation_prose_finding` now refuses `clean` unless both
+   `_lit_absence_is_comprehensive` (the A23 dimension rule) and this party rule
+   hold; the summary-table route gained the matching condition
+   `{"company","promoters","directors"} <= covered_parties` (R5, R6).
+2. **D2 — reviewer assertions stay outside the rule.** The gate lives in the
+   extractor only. `CanonicalInputBuilder._build_governance` still prefers
+   `governance.litigation_bucket` from the input when the reviewer supplied it,
+   unchanged, and the automated rule neither consumes nor overrides it — pinned
+   by `test_reviewer_assertion_is_outside_the_coverage_rule`.
+3. **D3 — the parenthetical row defect.** `_LIT_PARTY_QUALIFIER` removes a
+   bracketed qualifier that sits between the party label and the first cell
+   boundary, and `_lit_row_cells()` is now the single splitter for row bodies.
+   Column alignment is recovered without touching the quotation, which is still
+   `row.group(0)` verbatim (R7). `_lit_party_class()` classifies the label
+   Directors-first, so ``Directors (excluding Promoters)`` is a Directors row
+   and never Promoters coverage (R2, R3). Coverage is credited **after** a row's
+   cells parse, so an unreadable row cannot help clear a table (R4); a cell that
+   is neither `Nil` nor a count still yields no bucket (R8), and stacked
+   qualifiers remain unparseable → UNKNOWN rather than a guessed reading.
+
+**What it changed, measured.**
+
+| Case | Bucket before | Bucket after | Score effect |
+| --- | --- | --- | --- |
+| `class_b_cyclical_manufacturing.pdf` p. 10 nil naming Promoters, Directors, Group Companies | `clean` (4/4) | none → criterion UNKNOWN | `final_score` **41.0 → 37.0**, available 55.0 → 51.0, Module D 6.0 → 2.0, unknown points 6.0 → 10.0 (reproduced by `tests/test_extraction_phase5b.py::test_fixture_class_b_cyclical_manufacturing_5fy`, then re-pinned with the reason recorded in place) |
+| `class_a_financial_lender.pdf` nil naming Company, Directors and Promoters | `clean` | `clean` | none — full coverage, as the rule intends |
+| `class_c` / `class_d` / `class_e` | already UNKNOWN under A23 | unchanged | none (37.0 / 24.0 / 39.0 still pinned) |
+| vishal Nirmiti PDF pp. 439 ff. | `criminal_or_regulatory` | unchanged | adverse findings need no coverage; golden hash `e84f8bc0…5619e1` intact, 19 golden tests pass |
+| R.K. Fashion, Jio RHP (real PDFs, this pass) | bucket absent / `criminal_or_regulatory` | unchanged | none; RK reconciliation (5) and the Jio score bridge (1) pass |
+| class_b provenance | 9 evidenced fields | 8 | one assumed conclusion lost its evidence record — `test_evidence_provenance_and_auditability` re-pinned with that reason |
+
+**Tests and validation (all re-run on the committed tree).**
+`tests/test_litigation_regulatory_defaults.py` + `tests/test_hd_fire_primary_source_extraction.py`
+→ **96 passed, 0 failed, 0.22 s**; the 9-module extraction/governance/golden battery
+(those two plus `test_extraction_phase5b`, `test_fixture_fallback_isolation`,
+`test_vishal_golden`, `test_rk_fashion_reconciliation`, `test_jio_score_bridge`,
+`test_extraction`, `test_ui7_ingestion`) → **170 passed, 0 failed, 338.57 s**; the
+**full backend suite → 1288 collected, 1288 passed, 0 failed, 0 skipped, 1272.03 s
+(21 m 12 s), exit 0**; `check-config` → `valid True`, 10 profiles at 100 points; the
+frontend contract tests → **90 pass, 0 fail** (`frontend/` was not modified, they were
+run to confirm the display of these two fields still holds). 23 tests were added; three
+expectations that encoded the pre-approval rule were re-pinned to the approved standard —
+the class_a/class_b wording tests, the parametrised "comprehensive nil" list, and
+class_b's `41.0` pin plus the `>= 9` provenance floor — each with the approval cited at
+the pin, never silently edited, and no test skipped, xfailed or deleted.
+
+**Not done, deliberately.** Option C (adding KMP / Senior Management to the
+population) is not adopted, so a nil naming only KMP and Senior Management still
+yields nothing, and a nil naming the three required parties plus KMP still yields
+`clean`; the 22 real-filing prose forms listed in §4 were not widened, so the
+recognised denial vocabulary is unchanged; no fourth bucket, no config change.

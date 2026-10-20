@@ -280,6 +280,50 @@ python3 engine/tools/ipo_screen.py project \
 
 ---
 
+### 4.4 Reading what a litigation or regulatory record actually claims (A25-D2, 2026-10-20)
+
+Two fields in a record tell an auditor how far a *negative* may be trusted, and both are
+free text on purpose — they describe evidence, they do not add a state to the model.
+
+```
+bucket from the prose-absence disclosure; coverage basis: litigation section
+located via the filing's table of contents; all pages in the window read;
+parties named in the quoted text: our Company, our Promoters, our Directors
+```
+
+```
+issuer-authored denial that any SEBI or ED action exists; no external or
+regulator-source check was performed, so this is absence of disclosure, not
+verified absence; search basis: litigation section located via the filing's
+table of contents; all pages in the window read
+```
+
+If the window had come from the fallback range instead, the second record would not exist at
+all: `governance.sebi_ed_action_active` is then simply **absent**, K2 reads `UNVERIFIED`
+because a required input is unmet, and `config.critical_data` yields `INSUFFICIENT_DATA` —
+which is the intended reading of "we did not search the right pages", as distinct from "we
+searched and the filing denies it". Pinned by
+`tests/test_litigation_regulatory_defaults.py::test_missing_regulatory_input_leaves_k2_unverified_and_verdict_insufficient`.
+
+* **`located via the filing's table of contents` vs `hardcoded fallback range`.** The
+  extractor may only conclude that something is *absent* from a window it found in the
+  filing's own contents page. A fallback window (pages 430–500 when the TOC is silent) may
+  still surface an adverse disclosure — seeing something does not depend on how the page
+  was looked for — but a non-hit there means nothing, so no negative is emitted and the
+  field is simply absent.
+* **`all pages in the window read` vs `one or more pages in the window failed to extract`.**
+  `SectionExtractor` now records a status per page: `READ`, `BLANK` (the page was read and
+  had no text), `FAILED` (extraction raised), `OUT_OF_RANGE`. A `FAILED` page blocks an
+  absence; it never blocks a finding. `pages_read(start, end)` is the same question asked
+  directly, and an empty window is deliberately *not* treated as read.
+* **Neither line ever means "verified".** No SEBI or Enforcement Directorate register is
+  consulted anywhere in this engine; `sebi_ed_action_active: false` is the issuer's own
+  denial, and the record says so. What external corroboration would require — an authority
+  set, discovery and identity rules, index completeness, event and cutoff semantics,
+  conflict handling, retention — is the open request in
+  `handoff/decisions/A8-R-REGULATOR-SOURCE-COVERAGE-DEPENDENCY-REQUEST-2026-10-20.md`,
+  not a capability of this build.
+
 ## 5. Reading the workbook
 
 Fourteen sheets, in fixed order (`SHEET_ORDER`):
@@ -873,6 +917,9 @@ python3 -m pytest -v tests/test_v16_implementation.py
 | `python3 -m pytest tests/ -q` (A23 disposition tree, §17.5) | 1265 | **1265 passed**, 0 failed, 0 skipped, 25 warnings | **1131.26 s (18 m 51 s)** |
 | 7 extraction/governance modules (`test_litigation_regulatory_defaults`, `test_hd_fire_primary_source_extraction`, `test_extraction_phase5b`, `test_rk_fashion_reconciliation`, `test_vishal_golden`, `test_extraction`, `test_ui7_ingestion`) | 138 | 138 passed | **262.67 s** |
 | `tests/test_litigation_regulatory_defaults.py` alone | 66 | 66 passed | **0.20 s** |
+| `python3 -m pytest tests/ -q` (A24/A25 implementation tree, §17.6) | 1288 | **1288 passed**, 0 failed, 0 skipped, 25 warnings | **1272.03 s (21 m 12 s)** |
+| 9-module extraction/governance/golden battery (§17.6) | 170 | 170 passed | **338.57 s** |
+| `tests/test_litigation_regulatory_defaults.py` alone (A24/A25 tree) | 89 | 89 passed | **0.22 s** |
 | `cd frontend && node --test test/*.test.js` | 90 | 90 passed | **~0.6 s** |
 
 **Where the time actually goes (measured, not assumed).** The suite is CPU-bound, not I/O-bound or framework-bound, and the long tail is dominated by tests that call
@@ -965,3 +1012,24 @@ Durable evidence of the run itself is committed at
 `docs/investigation/D-5-A23-SUITE-PROGRESS-2026-10-20.log`: all 132 `[pytest-progress]` lines in order, plus pytest's summary and `EXIT=0`.
 
 Frontend suite: `cd frontend && node --test test/*.test.js` — **90 tests, 90 passed, 0 failed, 702 ms**.
+
+### 17.6 A24/A25 implementation checkpoint results (2026-10-20)
+
+Tree: `41f2f86` on `arena/95234306-ipo-screening-engine` (the commit that implements
+A24-D1/D2/D3 and A25-D1/D2). Every figure below is the recorded output of the command
+shown, not an estimate.
+
+| Command | Result |
+|---|---|
+| `python3 -m pytest tests/test_litigation_regulatory_defaults.py tests/test_hd_fire_primary_source_extraction.py -q` | 96 passed, 0 failed, 0.22 s |
+| `python3 -m pytest tests/test_litigation_regulatory_defaults.py tests/test_hd_fire_primary_source_extraction.py tests/test_extraction_phase5b.py tests/test_fixture_fallback_isolation.py tests/test_vishal_golden.py tests/test_rk_fashion_reconciliation.py tests/test_jio_score_bridge.py tests/test_extraction.py tests/test_ui7_ingestion.py -q` | 170 passed, 0 failed, 3 warnings, 338.57 s (5 m 38 s) |
+| `python3 -m pytest tests -q` (full backend suite, background run, one log) | **1288 collected, 1288 passed**, 0 failed, 0 skipped, 0 xfailed, 25 warnings, 1272.03 s (21 m 12 s), `EXIT=0` |
+| `python3 engine/tools/ipo_screen.py check-config` | `valid True`, `profiles resolved 10`, every profile 100 points `[A=25 B=20 C=15 D=15 E=15 F=10]` |
+| `cd frontend && node --test test/*.test.js` | 90 tests, 90 pass, 0 fail, 762.70 ms |
+
+Reading the numbers: the full suite grew 1265 → 1288 because 23 tests were added and none
+was removed, skipped or xfailed; per-test wall time fell from 0.89 s to 0.99 s on a box with
+nothing else running, which is the same order as the A23 checkpoint's 1131.26 s for 1265
+tests. Progress was reported by the in-repo plugin (`tests/pytest_progress.py`, §17.2) — the
+percentages in the log are completed ÷ collected, and the run was executed as a background
+process with one fresh log so no earlier run could append to it (§17.4).

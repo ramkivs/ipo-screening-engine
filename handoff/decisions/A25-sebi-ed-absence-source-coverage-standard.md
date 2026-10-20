@@ -3,12 +3,12 @@
 - **Decision ID:** A25
 - **Title:** When may `governance.sebi_ed_action_active` be `false`, and what must be true of the sources that were searched?
 - **Record type:** **PROPOSAL — decision request, with an attached dependency request to A8.** Under `handoff/decisions/CONVENTION.md` rule 4 this record is neither an approval nor implementation authority.
-- **Decision status:** **PROPOSED / UNRESOLVED — RAMKI APPROVAL REQUIRED.** Nothing here is implemented; the corrected-in-A23 narrow defect is the only change in force.
+- **Decision status:** **D1 and D2 APPROVED and IMPLEMENTED 2026-10-20** in commit `41f2f86` (see §12); **Option 3 — any external or regulator-source corroboration — remains UNRESOLVED and blocked on A8-R.** What is implemented is Option 2's gated issuer-denial basis plus the two observability prerequisites, nothing more.
 - **Date:** 2026-10-20 (Asia/Calcutta); no decision time is asserted.
 - **Repository / baseline:** branch `arena/95234306-ipo-screening-engine` at remotely verified `38f51571d2a043c91fed054d90ea01141ca41de9`; `main` `01ba66c…`; PR #6 `OPEN`/`UNMERGED` at `e05c0ef…`.
 - **Completes:** A23 §6.2 / §6A.2. **Depends on:** A8 (source/provider/event/cutoff contracts) — see §6 and the companion proposal `handoff/decisions/A8-R-REGULATOR-SOURCE-COVERAGE-DEPENDENCY-REQUEST-2026-10-20.md`.
 - **Out of scope and unchanged:** K2's definition, `required` list and three-state semantics; `schema/`; `config/` (v1.5.0 and v1.6.0); retrieval implementation; scoring; `fixtures/`; historical evaluations.
-- **Implementation authority:** NOT GRANTED by this record.
+- **Implementation authority:** GRANTED by Ramki's approval of 2026-10-20 for D1 and D2 only — the meaning and labelling of `false`, and the located-vs-guessed / per-page-read observability states. K2's definition, `required` list and three-state semantics, the schema, both config versions and any retrieval implementation remain unauthorised and untouched.
 
 ## 1. Problem statement
 
@@ -127,6 +127,78 @@ The precise provisions that must be approved before Option 3 is available (expan
 3. Do you authorise the two small observability prerequisites (located-vs-guessed range; per-page extraction status) as an implementation pass, given they gate only the *favourable* path and add no state?
 4. Do you want the A8-R request taken up as its own A8 sub-decision (source/matching/completeness/event/cutoff/failure/provenance/staleness/conflict provisions listed in §6), and should K2's evidence policy for an externally corroborated absence (item 9) be decided inside it?
 
-## 11. Interim behaviour while unapproved
+## 11. Behaviour this record replaced (historical: superseded by §12 on 2026-10-20)
 
 A23 §6A.2's rule stands, unmodified by this record: `True` from disclosed adverse action; `False` from a both-regulator, present-scope denial anywhere in the searched litigation pages, including a guessed range; everything else absent. The gap this record identifies is the *unverified* strength of that `False`, which today is stated in `notes` but not gated by C1–C2.
+
+## 12. Implementation record (2026-10-20, commit `41f2f86`)
+
+**D1 — the meaning of `false`.** `_sebi_ed_action_finding()` keeps the A23
+conditions (both regulators named, an act verb, a present-scope marker, no
+closed-window-only denial) and now additionally requires `allow_absence`, i.e.
+that the searched window was located in the filing's own table of contents **and**
+that every page of it was actually read. A `false` therefore means *"this filing
+denies any SEBI or Enforcement Directorate action, on the pages we searched"* —
+never a verified absence — and the emitted record says so:
+
+```
+SEBI/ED action disclosed by the filing                                  # true
+issuer-authored denial that any SEBI or ED action exists; no external
+  or regulator-source check was performed, so this is absence of
+  disclosure, not verified absence                                      # false
+; search basis: litigation section located via the filing's table of
+  contents; all pages in the window read; parties named in the quoted
+  text: …
+```
+
+The `search basis:` clause is appended for the bucket record too
+(`coverage basis:` on the labelled/table paths shares the same string), so a
+reader can see what was actually searched. A `true` never depends on the
+coverage of the window: a disclosed action on a fallback-range page is still a
+disclosed action — the asymmetry is deliberate and is tested in both directions.
+
+**D2 — the two observability states, and nothing else.**
+
+1. `extract_governance` distinguishes `lit_located` (the range came from
+   `TOCRouter.entries`, which the extractor builds only from real TOC matches —
+   `toc.py`'s own `1…min(page_count,50)` fallback never reaches it, verified
+   again on this commit) from the hardcoded `430…min(500, pages)` guess.
+2. `SectionExtractor` now records a per-page status — `READ` (text returned),
+   `BLANK` (page read, no text), `FAILED` (extraction raised), `OUT_OF_RANGE` —
+   exposed by `page_status`, with `pages_read(start, end)` answering "was this
+   window actually searched". A window that covers no page of the document is
+   deliberately **not** vacuously read. Text supplied through the shared
+   `text_cache` counts as read, so the existing harnesses keep working.
+
+No retrieval redesign, no provider, no host, no cache, no new module.
+`presentation/` and the frontend read these fields as before; the two states are
+visible through the record's notes rather than through a new schema field — a
+coverage field on the record is R-S9's question, not this pass's answer.
+
+**Vocabulary follow-up, in the same approval's spirit.** The A23-era test
+`test_both_regulators_named_absent_is_a_verified_negative` asserted exactly the right
+thing but *named* it a verified negative; it is now
+`test_both_regulators_named_absent_is_a_disclosed_negative_not_a_verified_absence`. The
+assertion is byte-identical — only the name changed — because a test name is text the next
+reader repeats. `docs/investigation/D-5-…-2026-10-20.md`'s state table carries the phrase
+"explicitly verified absence" as its row label; a dated pointer to this record was added to
+that row rather than rewriting the finding, per the rule that historical records are not
+edited to match later decisions.
+
+**Measured.** The vishal and Jio litigation sections are TOC-located
+(`(438, 503)` and `(463, 478)`, every page read) so their behaviour is unchanged
+by the gate; R.K. Fashion's litigation section is **not** located by its TOC, so
+an absence could no longer be emitted from a guessed window even if one had been
+found — its governance scan emits no `sebi_ed_action_active` either way, and its
+reconciliation tests pass unchanged. `tests/test_vishal_golden.py` (19 tests),
+`tests/test_rk_fashion_reconciliation.py` (5) and `tests/test_jio_score_bridge.py`
+(1) pass on the implementation; the golden hash is unchanged. Re-run on the
+committed tree: focused pair **96 passed / 0.22 s**, the 9-module battery **170 passed /
+338.57 s**, the full suite **1288 passed, 0 failed, 0 skipped, 1272.03 s, exit 0**.
+
+**Withdrawn, and still withdrawn.** C1/C2's "each page extracted successfully"
+clause as originally drafted asked for something the repository could not observe;
+that is precisely what D2 supplied, so the clause is now satisfied by
+`pages_read` rather than withdrawn — but the *stronger* reading (a page that reads
+blank proves the section is short) remains unsupported and is not claimed. The
+Option 3 external-corroboration conditions stay with **A8-R**, unresolved.

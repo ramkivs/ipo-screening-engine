@@ -4,7 +4,7 @@
 - **Title:** litigation bucket and regulatory-action flag are evidence-or-UNKNOWN; two coverage standards remain open
 - **Record type:** **INVESTIGATION plus a recorded correction.** Per `handoff/decisions/CONVENTION.md` rule 4, this record is **not** an approval of the alternatives in §"Open decisions"; it separates Ramki-approved material from v1.5 requirements, Arena analysis, and unresolved proposals.
 - **Decision status:** **RAMKI DECISION REQUIRED** for the two coverage standards (clean's party coverage; a verified regulatory absence). The removal of the unsupported defaults was executed under the existing contract and needed no new rule — see "What needed no approval".
-- **Disposition after the 2026-10-20 continuation pass (§6A):** matters **A** (dimension coverage) and **B** (closed-period denials) produced demonstrated implementation defects and were corrected in `sections.py`; matter **C** was **investigated and found to be no defect** (the §6.3 premise was wrong and is withdrawn); matter **D** needs **no new bucket** (statutory/regulatory already maps; tax-only stays UNKNOWN).  The three open items are now carried by scoped records: **`A24-litigation-party-coverage-standard.md`** (party coverage for `clean`), **`A25-sebi-ed-absence-source-coverage-standard.md`** with the companion **`A8-R-REGULATOR-SOURCE-COVERAGE-DEPENDENCY-REQUEST-2026-10-20.md`** (verified regulatory absence), and **`A26-tax-only-proceedings-classification.md`** (tax-only adverse proceedings). All three are **PROPOSED / UNRESOLVED — RAMKI APPROVAL REQUIRED**; the governance pass that wrote them changed no semantics, schema, config, scoring or fixture.
+- **Disposition after the 2026-10-20 continuation pass (§6A):** matters **A** (dimension coverage) and **B** (closed-period denials) produced demonstrated implementation defects and were corrected in `sections.py`; matter **C** was **investigated and found to be no defect** (the §6.3 premise was wrong and is withdrawn); matter **D** needs **no new bucket** (statutory/regulatory already maps; tax-only stays UNKNOWN).  The three open items are now carried by scoped records: **`A24-litigation-party-coverage-standard.md`** (party coverage for `clean`), **`A25-sebi-ed-absence-source-coverage-standard.md`** with the companion **`A8-R-REGULATOR-SOURCE-COVERAGE-DEPENDENCY-REQUEST-2026-10-20.md`** (verified regulatory absence), and **`A26-tax-only-proceedings-classification.md`** (tax-only adverse proceedings). **Update, same day: Ramki approved A24 (D1–D3) and A25 (D1–D2) for implementation, and `41f2f86` implements them** — the party-coverage gate, the `Directors (excluding Promoters)` row repair, the meaning of a `false` SEBI/ED record and the two A25-D2 observability states (see `A24` §13 and `A25` §12). **A26 and A8-R remain PROPOSED / UNRESOLVED**, as does the auditor-clause question raised by the A26 history check (`A27`); nothing in those four records is authority for a change, and no scoring formula, weight, threshold, bucket name, schema, config or fixture was altered by any of this.
 - **Decision authority:** RAMKI
 - **Date:** 2026-10-20 (Asia/Calcutta); no decision time is asserted.
 - **Repository:** `ramkivs/ipo-screening-engine`
@@ -112,11 +112,12 @@ or the criminal **and** civil dimensions, before it can answer `clean`;
 otherwise no candidate is emitted (UNKNOWN). This aligns prose with the table
 route that D-5 published; it introduces no new value, no weight and no threshold.
 Measured before/after pairs for the affected synthetic filings are in the §7 addendum.
-*Status.* **RESOLVED for dimension coverage; the party question is now A24.** **PARTY** coverage — whether a nil
-must reach Company **and** Promoters **and** Directors, or the full ICDR
-population — remains a governed choice; **PROPOSED: option B**, aligned with the
-wording of the criterion's own definition ("across promoters, directors and the
-company"), recorded in §6.1 and not implemented. Selected `Nil` rows in the ICDR
+*Status.* **RESOLVED for dimension coverage; the party question was resolved by A24.** **PARTY**
+coverage — whether a nil must reach Company **and** Promoters **and** Directors, or the
+full ICDR population — was a governed choice and is now **APPROVED and IMPLEMENTED
+(A24-D1, 2026-10-20)**, taking the wording of the criterion's own definition ("across
+promoters, directors and the company"); what was built, and what it moved, is in A24 §13.
+Selected `Nil` rows in the ICDR
 summary table are *not* sufficient for `clean` — that is already how the table
 route behaves (it reads every column, and an unreadable row does not cancel an
 affirmative bucket), so no change was needed. Missing / ambiguous / unparseable
@@ -151,8 +152,9 @@ extraction state. A25 §3.5 further records that the "each page actually extract
 successfully" precondition recommended here **cannot be expressed today**
 (`extract_page_text` conflates a failed page with an empty one), and replaces it with the
 C1–C2 prerequisites.
-*Status.* **RESOLVED for the closed-period confusion.** **UNRESOLVED / PROPOSED**
-for the positive standard — now A25, with the A8-R dependency request; A25 §3.5 also replaces the
+*Status.* **RESOLVED for the closed-period confusion, and for the `false` semantics:
+A25-D1/D2 were approved and implemented on 2026-10-20** (A25 §12). **UNRESOLVED** for the
+external-source limb, which remains with the A8-R dependency request; A25 §3.5 also replaces the
 "each page actually extracted successfully" clause recommended below, which today's code
 cannot express. Recommended testable wording: `False` may clear K2
 only from a present-scope denial naming SEBI, the Stock Exchanges and the ED,

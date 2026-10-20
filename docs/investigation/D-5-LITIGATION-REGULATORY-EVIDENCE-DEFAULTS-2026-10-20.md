@@ -92,7 +92,7 @@ All four states D-5.2 asks for are therefore already representable:
 | State | Representation after the fix |
 |---|---|
 | verified active SEBI/ED action | `sebi_ed_action_active = true` + verbatim sentence + page ⇒ K2 **TRIGGERED**, verdict `AVOID` |
-| explicitly verified absence | `sebi_ed_action_active = false` **only** from a negative that names both regulators, quoting that sentence (the source-coverage standard itself is deferred, §5) |
+| explicitly verified absence | `sebi_ed_action_active = false` **only** from a negative that names both regulators, quoting that sentence (the source-coverage standard itself is deferred, §5). **Wording corrected by A25-D1, approved and implemented 2026-10-20:** this state is *not* a verified absence — the record now reads "absence of disclosure, not verified absence", and A25 §12 records the gate that emits it |
 | incomplete / inaccessible / absent evidence | field **absent** ⇒ UNKNOWN ⇒ K2 **UNVERIFIED**, verdict `INSUFFICIENT_DATA`, points unavailable rather than awarded |
 | proceeding involving a Director rather than the issuer | reaches `litigation_bucket` (in scope per the formula) with the party group quoted in the evidence and `notes`; it does **not** set the regulatory flag |
 
