@@ -4,6 +4,7 @@
 - **Title:** litigation bucket and regulatory-action flag are evidence-or-UNKNOWN; two coverage standards remain open
 - **Record type:** **INVESTIGATION plus a recorded correction.** Per `handoff/decisions/CONVENTION.md` rule 4, this record is **not** an approval of the alternatives in §"Open decisions"; it separates Ramki-approved material from v1.5 requirements, Arena analysis, and unresolved proposals.
 - **Decision status:** **RAMKI DECISION REQUIRED** for the two coverage standards (clean's party coverage; a verified regulatory absence). The removal of the unsupported defaults was executed under the existing contract and needed no new rule — see "What needed no approval".
+- **Disposition after the 2026-10-20 continuation pass (§6A):** matters **A** (dimension coverage) and **B** (closed-period denials) produced demonstrated implementation defects and were corrected in `sections.py`; matter **C** was **investigated and found to be no defect** (the §6.3 premise was wrong and is withdrawn); matter **D** needs **no new bucket** (statutory/regulatory already maps; tax-only stays UNKNOWN). The two *coverage standards* — which parties a nil must reach (§6.1) and what search may call a regulatory absence verified (§6.2) — remain **PROPOSED / UNRESOLVED** and are **not** treated as approved authority.
 - **Decision authority:** RAMKI
 - **Date:** 2026-10-20 (Asia/Calcutta); no decision time is asserted.
 - **Repository:** `ramkivs/ipo-screening-engine`
@@ -81,9 +82,125 @@ A related limitation recorded now: the ICDR column merges "**SEBI or stock excha
 * **C:** require corroboration from a regulator source (SEBI order/press-release retrieval) before `False` may clear K2. *Consequence:* consistent with D-2's "no adverse finding from one document" stance, but needs the retrieval contract, a cutoff rule and an unavailable-source policy (A8 territory) before it is implementable.
 Until this is decided, the asymmetry is deliberate: **True needs a finite act (or a disclosed count); False needs both regulators named; everything else is UNKNOWN.** The asymmetry is directional in the safe sense: a `True` that turns out to be a stock-exchange action rather than a SEBI one is visible and correctable, a `False` that clears K2 without coverage is silent.
 
-**6.3 Display-layer default.** `presentation/ui7.py` renders an UNKNOWN flag as "No active SEBI or ED action" (`… if metrics.get(...) is True else "No active …"`). Presentation only, but it changes what every historical record shows in the UI, so it needs its own authority.
+**6.3 Display-layer default.** ~~`presentation/ui7.py` renders an UNKNOWN flag as "No active SEBI or ED action"~~ — **this sentence was wrong and is withdrawn; see §6A.3.** The original claim was checked against the repository on 2026-10-20: there is **no** `engine/ipo_screening/presentation/ui7.py` (`ls engine/ipo_screening/presentation/` → `api.py`, `ingestion_activity.py`, `models.py`, `service.py`), `find . -name "*ui7*"` matches only `tests/test_ui7_ingestion.py` (a workstream label, not a module), and `grep -rln "No active SEBI"` matches only `engine/ipo_screening/extraction/sections.py` (a comment) and `tests/test_litigation_regulatory_defaults.py`. No presentation surface renders a governance flag as an all-clear, so there was **no defect to fix**; the investigation and its evidence are in §6A.3.
 
-**6.4 Adverse counts with no governed bucket.** Tax-only or statutory/regulatory-only adverse litigation currently leaves the bucket UNKNOWN. Deciding to fold them into `criminal_or_regulatory` would be a semantic change to the criterion; deciding to fold them into `clean` would re-create the defect in a new place.
+**6.4 Adverse counts with no governed bucket.** *Corrected 2026-10-20:* the two halves of this sentence are not the same case. A **statutory/regulatory** adverse count is already inside the taxonomy — the bucket is literally named `criminal_or_regulatory`, and the summary-table route already reads the ICDR "Outstanding Statutory/Regulatory Proceedings" column into it (pinned by `test_d_statutory_or_regulatory_count_uses_the_existing_bucket`). Only **tax-only** (and any other type with no column of its own) leaves the bucket UNKNOWN. Deciding to fold tax into `criminal_or_regulatory` would be a semantic change to the criterion; deciding to fold it into `clean` would re-create the defect in a new place. Neither is done; see §6A.4.
+
+## 6A. Disposition of §6 (continuation pass, 2026-10-20)
+
+Four matters were examined against the published implementation, not against the
+prose of this record. Each is reported as **finding → evidence → what changed →
+status**, and no undecided question was implemented.
+
+**6A.1 Party coverage for `clean` — one demonstrable defect fixed, the party question stays open.**
+
+*Finding.* The prose route did treat partial coverage as comprehensive, but the
+dimension that mattered in code was the **type of proceeding**, not the party: any
+sentence matching an absence form set `clean` whether or not it spoke about both
+halves of the bucket. A nil covering only criminal proceedings, only civil
+litigation, only regulatory action, or only tax proceedings therefore earned 4/4.
+The structured summary-table route already refused this (it needs the criminal,
+civil and regulatory columns present before it may answer `clean`), so the two
+routes disagreed with each other.
+*Evidence.* Twelve-case probe over the published code: criminal-only nil,
+civil-only nil and regulatory-only nil each returned `clean`; the class_a
+sentence (both dimensions) and class_b ("material litigation or criminal cases")
+returned `clean` correctly; a tax-only nil returned `clean`.
+*Change.* `SectionExtractor._lit_absence_is_comprehensive` — a prose denial now
+has to deny unqualified litigation, or litigation **and** the criminal dimension,
+or the criminal **and** civil dimensions, before it can answer `clean`;
+otherwise no candidate is emitted (UNKNOWN). This aligns prose with the table
+route that D-5 published; it introduces no new value, no weight and no threshold.
+*Status.* **RESOLVED for dimension coverage.** **PARTY** coverage — whether a nil
+must reach Company **and** Promoters **and** Directors, or the full ICDR
+population — remains a governed choice; **PROPOSED: option B**, aligned with the
+wording of the criterion's own definition ("across promoters, directors and the
+company"), recorded in §6.1 and not implemented. Selected `Nil` rows in the ICDR
+summary table are *not* sufficient for `clean` — that is already how the table
+route behaves (it reads every column, and an unreadable row does not cancel an
+affirmative bucket), so no change was needed. Missing / ambiguous / unparseable
+coverage is already represented as an absent field ⇒ `STATE_UNKNOWN` ⇒ points
+unavailable rather than awarded, with the reason in `missing_inputs`.
+
+**6A.2 Source coverage for a verified SEBI/ED absence — one defect fixed, the positive standard stays open.**
+
+*Finding.* The distinction between absence-of-evidence and evidence-of-absence is
+structural in the current code: nothing is emitted unless a finite adverse act or
+a denial naming **both** regulators is found on the searched pages, so "no search
+match" cannot become a verified absence. A real hole did exist at the other edge:
+a denial scoped to a **closed period** ("…during the financial year 2023-24",
+"…as on 31 March 2022") cleared `sebi_ed_action_active = False`, i.e. it answered
+"no active action" with "nothing happened in a window that has closed".
+*Evidence.* Probe cases B3/B4 (closed FY, closed date) both produced `False`;
+B1/B2/B5 (unqualified, "as on the date of this RHP", "in the last five years")
+legitimately produce `False`.
+*Change.* `_REG_ABSENT_CLOSED` suppresses the `False` when the negative's stated
+scope is a closed financial year / period / date window. A rolling window
+("last five years" — the ICDR disclosure window) and an as-of-the-prospectus
+denial still clear, because both speak to the present; the flag's own word is
+"active". Unavailable / incomplete / failed sources keep their existing
+representation (absent field + `missing_inputs`, and the ingestion lifecycle
+values `AWAITING_SOURCE` / `UNAVAILABLE` / `STALE` / `NOT_FOUND`) — none of them
+maps to `False`.
+*Status.* **RESOLVED for the closed-period confusion.** **UNRESOLVED / PROPOSED**
+for the positive standard. Recommended testable wording: `False` may clear K2
+only from a present-scope denial naming SEBI, the Stock Exchanges and the ED,
+retrieved from (i) the Outstanding Litigation section, (ii) the ICDR summary
+table, (iii) "Our Promoters and Promoter Group" and (iv) the statutory
+declarations in "Promoters", with every one of those pages *actually extracted
+successfully* in the same ingestion run and inside the filing-date currency
+window; a page that failed to extract, was not searched, or is stale marks the
+absence **unverified** rather than false. Option C (external register
+corroboration) stays the alternative until A8's retrieval contract exists. This
+is a coverage/scoring decision and is explicitly **not approved**.
+
+**6A.3 `ui7.py` UNKNOWN display — no defect; the record was wrong, not the code.**
+
+*Finding.* Nothing in the presentation layer converts UNKNOWN / missing / null /
+unverified into a favourable reading, and no `ui7.py` exists.
+*Evidence (all read this pass).* `frontend/app.js::renderMetricValue(val, state)`
+returns `<span class="badge badge-unknown">UNKNOWN</span>` whenever
+`state === 'UNKNOWN'` or the value is null/undefined, and `N/A` only for
+`NOT_APPLICABLE`; booleans render literally as `<code>True</code>` /
+`<code>False</code>` with no wording asserting an all-clear.
+`renderSemanticStateBadge` keeps SCORED / UNKNOWN / NOT_APPLICABLE distinct.
+Knockout cards render `CLEAR` / `TRIGGERED` / `badge-unverified`, and
+`service.py` defaults a missing knockout state to `"UNVERIFIED"` (never
+`CLEAR`); `models.py` documents that state as `CLEAR, TRIGGERED, UNVERIFIED`.
+`grep -rln "No active SEBI"` over the repository matches only `sections.py` and
+its test. The adverse / verified-absence / insufficient-evidence distinction
+therefore survives display.
+*Change.* No code change (none was warranted). Added
+`frontend/test/app.test.js` — "Governance metric rendering keeps UNKNOWN
+distinct from a verified absence" — pinning adverse vs verified-absence vs
+null/UNKNOWN rendering, the absence of any all-clear wording, the state badge,
+and that a missing verdict renders UNKNOWN rather than a pass.
+*Status.* **RESOLVED — documented as no-defect**, with the inaccurate §6.3 claim
+withdrawn above.
+
+**6A.4 Tax and statutory-only proceedings — no new bucket, no `clean`.**
+
+*Finding.* Buckets are defined in exactly three places and all three agree: the
+schema enum, `config_validation.py` (which rejects anything but the three), and
+`builder.py::_LITIGATION_BUCKET_ALIASES`; the taxonomy is
+`clean / minor_civil / criminal_or_regulatory`. Direction matters and is already
+handled: only proceedings *against* the issuer or its parties are adverse —
+issuer-initiated ("By our Company") rows are non-adverse by rule — and a nil in a
+column scoped to a subset (HD Fire's SEBI column is "against our Promoters")
+clears nothing.
+*Gap that is genuinely unmappable:* adverse **tax-only** exposure has no bucket of
+its own. It is not forced into `criminal_or_regulatory` (that would invent a
+scored category) and it never earned `clean`: after §6A.1 a tax-only nil emits
+nothing, and an adverse tax count already blocked `clean` without inventing a
+category.
+*Status.* **RESOLVED for the boundary; UNRESOLVED for the policy.** Recommended
+resolution, to be decided separately: either fold tax/statutory-only adverse
+proceedings into `criminal_or_regulatory` by explicit definition (cheapest, but
+it makes a tax demand equivalent to a criminal case), or add a fourth governed
+bucket, which requires a schema change, a `config_validation` change, an overlay
+mapping and a re-pinned golden fixture — i.e. its own decision record, not this
+one. Until then tax-only exposure stays UNKNOWN and the tracker records it as a
+known coverage gap.
 
 ## 7. Measured effect (no historical evaluation re-run)
 
@@ -100,6 +217,20 @@ Until this is decided, the asymmetry is deliberate: **True needs a finite act (o
 
 All deltas are the removal of a 4-point award that had no evidence, or the removal of a fabricated negative. **Implementation correction vs semantic change:** every number above comes from the correction class (§3); the deferred items (§6) are the ones that would change a governed meaning.
 
+**Addendum for §6A.1 (continuation pass, measured — the table above is the D-5 record and is not edited retroactively).** One-dimension prose denials no longer earn `clean`, so three of the repository's synthetic filings change on re-measurement (all measured through `evaluate(..., mode="final")` exactly as their tests do):
+
+| Filing | Litigation sentence | Before | After |
+|---|---|---|---|
+| `class_a_financial_lender.pdf` p. 11 | criminal **and** material civil, named parties | `clean`, 41.0 | `clean`, **unchanged** — the denial covers both halves |
+| `class_b_cyclical_manufacturing.pdf` p. 10 | "material litigation **or criminal cases**" | `clean`, 41.0 | `clean`, **41.0 unchanged** |
+| `class_c_epc_infrastructure.pdf` p. 10 | criminal + SEBI/Stock-Exchange disciplinary only | `clean` | **absent (UNKNOWN)**; 41.0 → **37.0** (available 51.0, Module D 2.0/15 with 10.0 unknown) |
+| `class_d_loss_making_tech.pdf` p. 10 | "No criminal or active regulatory proceedings" only | `clean` | **absent (UNKNOWN)**; no score assertion in the suite pins this filing, so nothing moved on paper (measured 24.0 with fixture fallbacks) |
+| `class_e_modern_complex_rhp.pdf` p. 9 | criminal + SEBI/Stock-Exchange regulatory only | `clean` | **absent (UNKNOWN)**; 43.0 → **39.0** |
+| `complete_sample_rhp(.pdf / _2)` | no absence sentence at all | absent | absent — unchanged |
+| Jio, vishal, R.K. Fashion | adverse rows present | `criminal_or_regulatory` / absent | **unchanged** (re-measured this pass: vishal p. 439 and Jio p. 464 still verbatim, `sebi_ed_action_active` still absent) |
+
+Every moved number is −4 points of *earned* score **and** −4 of *available* score: the criterion stops being paid for unevidenced coverage, it does not become an adverse finding. `tests/test_extraction_phase5b.py` was re-measured (not hand-adjusted) and now also pins `canonical["governance"]["litigation_bucket"] is None` for class_c and class_e with the reason in a comment.
+
 ## 8. Verification
 
 | Check | Result |
@@ -114,6 +245,19 @@ All deltas are the removal of a 4-point award that had no evidence, or the remov
 | Historical evaluation records | not re-run, not edited, not re-hashed |
 | Full backend suite on the published tree | recorded in the investigation record §8 with the progress capture |
 | Expected failures | **0 `pytest.mark.xfail` remain in `tests/`** — the two strict D-5 pins became passing assertions; the deferred §6 items are undecided questions, so they are pinned by fail-closed assertions on today's behaviour rather than by expected failures |
+
+**Addendum — verification of the §6A disposition pass (all executed 2026-10-20 on the tree published by this pass).**
+
+| Check | Result |
+|---|---|
+| `tests/test_litigation_regulatory_defaults.py` | **66 passed** (51 from D-5 + 15 new: 4 dimension-scoped-nil cases, 4 comprehensive-nil cases, the unrecognised-wording limitation, 3 closed-period regulatory denials, 3 present/rolling-window denials, and the statutory/regulatory mapping pin) |
+| `tests/test_hd_fire_primary_source_extraction.py` | **7 passed** — HD Fire's §12 shapes re-confirmed against the corrected code (Directors' 2 criminal proceedings survive the nil rows; no SEBI/ED finding in either direction; the `By our Company` tax rows never read as `clean`) |
+| `tests/test_extraction_phase5b.py` | **9 passed** on re-measured values — `class_c` 41.0 → **37.0**, `class_e` 43.0 → **39.0** (each −4 earned, −4 available, because their disclosure denies one dimension only), with `litigation_bucket is None` pinned and the reason in a comment; `class_a`/`class_b` keep `clean`; vishal stays 35.0 |
+| Affected-module battery (the 7 extraction/governance modules above, 138 tests) | **138 passed**, 262.67 s |
+| `tests/test_rk_fashion_reconciliation.py`, `tests/test_vishal_golden.py`, `tests/test_extraction.py`, `tests/test_ui7_ingestion.py` | passed inside that battery — no pinned value was moved except the two re-measurements above |
+| `frontend` node harness (`node --test test/*.test.js`) | **90 passed, 0 failed** in 702 ms (89 before this pass; the new test is §6A.3's display-state pin) |
+| Full backend suite | **1265 collected, 1265 passed, 0 failed, 0 skipped, 0 xfailed, 25 warnings, 1131.26 s (18 m 51 s)**, exit 0 — a completed run, not an interrupted one, with the runner-level progress lines from `tests/pytest_progress.py` throughout. The run's log is committed (`docs/investigation/D-5-A23-SUITE-PROGRESS-2026-10-20.log`: 132 progress lines + the summary + `EXIT=0`); root cause and stage breakdown are in `docs/RUNBOOK.md` §17 |
+| `config/`, `schema/`, `fixtures/`, `build/evaluations/`, `evidence/`, historical records | **no diff**; vishal golden hash `e84f8bc0…` verified by the golden tests in that run |
 
 ## 9. Consequences and constraints
 

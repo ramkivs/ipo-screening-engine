@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -25,6 +26,29 @@ if str(ENGINE_ROOT) not in sys.path:
 
 from ipo_screening.evaluation import EvaluationStore  # noqa: E402
 from ipo_screening.pipeline import evaluate, load_config  # noqa: E402
+
+# Live progress for the long suite (see ``tests/pytest_progress.py`` and
+# "Test duration and progress" in docs/RUNBOOK.md).  Registered from here rather
+# than through `-p`/an ini file so it works for both `python -m pytest` and bare
+# `pytest`.  Set PYTEST_PROGRESS=0 to switch it off.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    # Registered here (rather than in an ini file) to keep the warning-free run
+    # without introducing a new configuration surface.
+    config.addinivalue_line(
+        "markers",
+        "slow: exercises a real filing PDF end to end (the long tail of the run).",
+    )
+    if os.environ.get("PYTEST_PROGRESS", "1") == "0":
+        return
+    from pytest_progress import PytestProgress  # noqa: PLC0415
+
+    plugin = PytestProgress(config)
+    config._pytest_progress = plugin
+    config.pluginmanager.register(plugin, "pytest-progress")
+
 
 FIXTURES = REPO_ROOT / "fixtures"
 GOLDEN_INPUT = FIXTURES / "vishal_nirmiti" / "input.json"

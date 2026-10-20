@@ -560,11 +560,154 @@ def test_the_fabricated_sentences_are_gone_from_the_extractor():
         assert "Litigation bucket classified as" not in code
 
 
+# ---------------------------------------------------------------------------
+# A23-A: `clean` needs the denial to cover what the bucket is defined over
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "There are no outstanding criminal proceedings involving our Company or our Promoters.",
+        "No material civil litigation is pending against our Directors.",
+        "Our Company has no pending regulatory proceedings.",
+        "No tax proceedings are pending against our Company.",
+    ],
+)
+def test_a_dimension_scoped_nil_is_not_clean(sentence):
+    """`clean` means no material litigation at all, not "none of one kind".
+
+    The criterion's three values are `clean`, `minor_civil` and
+    `criminal_or_regulatory`, so a denial that reaches only one dimension leaves
+    the other undisclosed -- UNKNOWN, exactly as the summary-table route already
+    requires its criminal/civil/regulatory columns to be present before it may
+    answer `clean`.  Before this correction the prose route accepted a
+    one-dimension nil, and three of the repository's synthetic filings were
+    earning 4/4 on it.
+    """
+    pages = {10: "OUTSTANDING LITIGATION AND MATERIAL DEVELOPMENTS\n" + sentence + "\n"}
+    out = _govern(pages)
+    assert "governance.litigation_bucket" not in out
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        # unqualified: the whole bucket is denied
+        "No litigation is pending against our Company.",
+        # both dimensions named (the class_a and class_b disclosures, verbatim)
+        "Except as stated below, there are no outstanding criminal proceedings or "
+        "material civil litigation involving our Company, Directors or Promoters.",
+        "None of our Promoters, Directors, or Group Companies are involved in any "
+        "material litigation or criminal cases.",
+    ],
+)
+def test_a_comprehensive_nil_is_clean_and_quoted(sentence):
+    pages = {11: "OUTSTANDING LITIGATION AND MATERIAL DEVELOPMENTS\n" + sentence + "\n"}
+    out = _govern(pages)
+    record = out["governance.litigation_bucket"]
+    assert record.candidate_value == "clean"
+    _assert_verbatim(pages, out)
+
+
+def test_a_denial_in_unrecognised_wording_stays_unknown():
+    """A recorded capability limit, in the safe direction.
+
+    "Our Company and its Promoters are **not a party to** any proceedings" is a
+    genuine nil, but the engine's absence forms are the ones prospectuses use
+    ("no litigation", "none of … involved in any …", "no proceedings are
+    pending").  A denial it does not recognise leaves the bucket UNKNOWN rather
+    than guessing at the favourable value; widening the *favourable* vocabulary
+    is a coverage decision (A23 §6.1), so it is not taken here.
+    """
+    pages = {11: "OUTSTANDING LITIGATION\nOur Company and its Promoters are not a party to any proceedings.\n"}
+    out = _govern(pages)
+    assert "governance.litigation_bucket" not in out
+
+
+# ---------------------------------------------------------------------------
+# A23-B: a denial limited to a closed period cannot clear the regulatory flag
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "No proceedings were initiated by SEBI or the Enforcement Directorate against "
+        "our Company during the financial year 2023-24.",
+        "No penalty was imposed by SEBI or the Enforcement Directorate on our Promoters "
+        "as on 31 March 2022.",
+        "SEBI and the Enforcement Directorate initiated no action against our Company "
+        "for the period ended 31 March 2021.",
+    ],
+)
+def test_b_closed_period_denial_does_not_clear_the_flag(sentence):
+    """"Nothing happened in FY2023-24" is not "nothing is active now".
+
+    The governed flag is `sebi_ed_action_**active**`; a denial whose stated scope
+    closed before the disclosure date leaves the present state unestablished, so
+    the field stays absent and K2 stays UNVERIFIED.
+    """
+    pages = {22: "OUTSTANDING LITIGATION\n" + sentence + "\n"}
+    out = _govern(pages)
+    assert "governance.sebi_ed_action_active" not in out
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "There are no proceedings initiated by SEBI or the Enforcement Directorate "
+        "against our Company or our Promoters.",
+        "As on the date of this Red Herring Prospectus, no proceedings have been "
+        "initiated by SEBI or the Enforcement Directorate against our Company.",
+        "No action has been initiated by SEBI or the Enforcement Directorate against "
+        "our Company in the last five years.",
+    ],
+)
+def test_b_present_or_rolling_denial_still_clears_the_flag(sentence):
+    """The guard must not swallow the statements that do speak for the present.
+
+    An unqualified denial, an as-of-the-prospectus denial and a rolling window
+    that includes today all reach the flag's own question, so each yields False
+    with its sentence quoted -- and the "last five years" form is the ICDR
+    disclosure window, so it is the wording real filings use.
+    """
+    pages = {22: "OUTSTANDING LITIGATION\n" + sentence + "\n"}
+    out = _govern(pages)
+    record = out["governance.sebi_ed_action_active"]
+    assert record.candidate_value is False
+    _assert_verbatim(pages, out)
+
+
 SEBI_SCOPED_TABLE = """| Category of individuals / entities | Criminal Proceedings | Tax Proceedings | Statutory or Regulatory Proceedings | Disciplinary actions by SEBI or stock exchanges against our Company, Promoters and Directors in the last five years, including outstanding action | Material civil litigation | Aggregate amount involved |
 | --- | --- | --- | --- | --- | --- | --- |
 | Against our Company | Nil | Nil | Nil | 2 | Nil | Nil |
 | Against our Directors | Nil | Nil | Nil | Nil | Nil | Nil |
 """
+
+# A *statutory or regulatory* adverse count is already inside the governed
+# taxonomy: the bucket is named `criminal_or_regulatory`, and the ICDR table
+# column of the same name is its disclosure form.  Tax is the residual type with
+# no bucket of its own (see the tax-only table below and A23 6.4).
+REGULATORY_ONLY_TABLE = """| Category of individuals / entities | Criminal Proceedings | Tax Proceedings | Statutory or Regulatory Proceedings | Material civil litigation | Aggregate amount involved |
+| --- | --- | --- | --- | --- | --- |
+| Against our Company | Nil | Nil | 1 | Nil | 3.20 |
+| Against our Directors | Nil | Nil | Nil | Nil | Nil |
+"""
+
+
+def test_d_statutory_or_regulatory_count_uses_the_existing_bucket():
+    """No new category: "regulatory" is in the bucket's own name.
+
+    A single adverse statutory/regulatory proceeding scores 0/4 for the same
+    reason a criminal one does, and a *tax*-only nil or count never reaches
+    `clean` (below), so nothing is quietly forgiven.
+    """
+    pages = {12: REGULATORY_ONLY_TABLE}
+    out = _govern(pages)
+    assert out["governance.litigation_bucket"].candidate_value == "criminal_or_regulatory"
+    _assert_verbatim(pages, out)
+
 
 TAX_ONLY_TABLE = """| Category of individuals / entities | Tax Proceedings | Statutory or Regulatory Proceedings | Aggregate amount involved |
 | --- | --- | --- | --- |

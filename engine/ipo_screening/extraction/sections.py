@@ -1513,6 +1513,54 @@ class SectionExtractor:
         r"\b(?:is|are|was|were|has|have|had|does|do|did|shall|will|may|can|could)\b",
         re.IGNORECASE,
     )
+    #: Proceeding types that *qualify* a denial, narrowing what it denies.
+    #: ``material | outstanding | pending | ongoing | such | any | other |
+    #: relevant | legal`` are neutral and leave a denial comprehensive.
+    _LIT_QUALIFIED_TYPES = (
+        r"criminal|civil|regulatory|statutory|tax|disciplinary|money[- ]laundering"
+    )
+    #: Which dimension a denial actually reaches.  ``clean`` is the favourable
+    #: end of a criterion whose other two values are criminal/regulatory matters
+    #: and material civil litigation, so a nil that denies only one of them is
+    #: not evidence for the other -- exactly the situation D-5 says must stay
+    #: UNKNOWN instead of being resolved favourably.
+    _LIT_DENIES_CRIMINAL = re.compile(
+        r"\b(?:criminal|regulatory|statutory|disciplinary|money[- ]laundering)\b",
+        re.IGNORECASE,
+    )
+    _LIT_DENIES_CIVIL = re.compile(r"\bcivil\b|\bdisputes?\b", re.IGNORECASE)
+    _LIT_LITIGATION_NOUN = re.compile(r"\blitigation\b", re.IGNORECASE)
+
+    @classmethod
+    def _lit_absence_is_comprehensive(cls, sentence: str) -> bool:
+        """May this absence statement support ``clean``?
+
+        Yes when the statement is unqualified ("no litigation is pending",
+        "not involved in any material litigation or criminal cases"), or when it
+        reaches both dimensions of the bucket.  No when it denies only criminal
+        / regulatory matters, only civil litigation, or only a type the bucket
+        does not score at all (tax) -- then the other dimension is simply
+        undisclosed, which is UNKNOWN, not ``clean``.
+        """
+        for noun in cls._LIT_LITIGATION_NOUN.finditer(sentence):
+            before = sentence[max(0, noun.start() - 30): noun.start()]
+            if re.search(
+                rf"\b(?:{cls._LIT_QUALIFIED_TYPES})\b(?:\s+\w+){{0,3}}\s*$", before
+            ):
+                continue  # "criminal litigation", "tax litigation": a qualified mention
+            return True  # an unqualified "litigation" covers every dimension
+        criminal = bool(cls._LIT_DENIES_CRIMINAL.search(sentence))
+        civil = bool(cls._LIT_DENIES_CIVIL.search(sentence))
+        # A denial of a type the bucket does not score at all (tax exposure, an
+        # assessment) leaves *both* scored dimensions undisclosed, so it cannot
+        # resolve the bucket either way.
+        other = bool(re.search(r"\btax\b|\bassessment\b|\bduty\b|\bduties\b", sentence, re.IGNORECASE))
+        if criminal or civil or other:
+            return criminal and civil
+        # No type word at all: "no proceedings / no cases are pending" is a
+        # blanket statement about the party, so it carries the whole bucket.
+        return True
+
     #: "None of our Promoters, Directors or Group Companies are involved in any
     #: material litigation" -- subject-first absence, common SME wording.
     _LIT_ABSENCE_NONE_OF = re.compile(
@@ -1574,6 +1622,20 @@ class SectionExtractor:
         r"\bpending\s+before\b[^.\n]{0,50}?(?:SEBI|Enforcement Directorate|\bED\b|PMLA)",
         re.IGNORECASE,
     )
+    #: A denial whose scope is a *closed* period says nothing about whether an
+    #: action is active now, which is what ``sebi_ed_action_active`` asks.  A
+    #: rolling window ("in the last five years") and an as-of-the-prospectus
+    #: statement both reach the present and are accepted; "during the financial
+    #: year 2023-24" or "as on 31 March 2022" does not.
+    _REG_ABSENT_CLOSED = re.compile(
+        r"\b(?:during|in|for|within|as\s+(?:on|at)|upto|up\s+to|till|through)\s+"
+        r"(?:the\s+)?(?:financial\s+year|f\.?y\.?\s*\d|year\s+ended|year\s*\d{4}"
+        r"|quarter|half[-\s]year|period\s+(?:ended|from|to)|six\s+months\s+ended)\b"
+        r"|\bas\s+(?:on|at)\s+\d{1,2}[/ -][A-Za-z0-9]{3,9}[/ -]\d{2,4}"
+        r"|\bas\s+(?:on|at)\s+\d{4}\b",
+        re.IGNORECASE,
+    )
+
     #: Boilerplate that names SEBI without describing any action (the cover
     #: page, "not been recommended or approved by SEBI", bare regulation cites).
     _REG_BOILERPLATE = re.compile(
@@ -1871,6 +1933,11 @@ class SectionExtractor:
                 sentence = " ".join(original[lo:hi].split())[:400]
                 if not self._LIT_PARTY.search(sentence):
                     continue  # nothing is asserted absent for any party
+                if not self._lit_absence_is_comprehensive(sentence):
+                    # A denial of one proceeding type leaves the rest of the
+                    # population undisclosed: no bucket, so the criterion is
+                    # UNKNOWN rather than awarded the favourable end.
+                    continue
                 return ("clean", page, sentence, "prose-absence")
         return None
 
@@ -2155,6 +2222,8 @@ class SectionExtractor:
                     continue
                 if self._REG_BOILERPLATE.search(statement):
                     continue
+                if self._REG_ABSENT_CLOSED.search(statement):
+                    continue  # a closed-period nil cannot speak for the present
                 if not self._LIT_PARTY.search(statement):
                     continue
                 negative = (page, statement)
@@ -2204,7 +2273,9 @@ class SectionExtractor:
                     # A SEBI-only (or ED-only) negative cannot clear a flag
                     # whose governed name covers both regulators; the field
                     # stays absent and K2 stays UNVERIFIED.
-                    if sebi_named and ed_named:
+                    if sebi_named and ed_named and not self._REG_ABSENT_CLOSED.search(
+                        sentence
+                    ):
                         return (False, page, sentence)
                     continue
                 return (True, page, sentence)

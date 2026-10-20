@@ -230,3 +230,52 @@ Recorded after the commit and push; the SHA below is the one returned by `git ls
 5. §5.1 / §5.2 decisions are outstanding, so `clean`'s party coverage and a *verified* regulatory absence are not yet defined by the project; until they are, absence of coverage resolves to UNKNOWN — the safe side of both.
 
 **HD Fire source-level acceptance therefore remains incomplete.** What D-5 removes is the engine's authority to call a filing litigation-free because it was not read.
+
+## 10. A23 disposition pass (2026-10-20): two coverage defects found and fixed, one claim withdrawn
+
+This section records the follow-up pass that resolved the four outstanding A23 §6 matters against the **published** implementation. Sections 0–9 above are the
+D-5 record as published and are not rewritten; where this pass contradicts them, the contradiction is stated here.
+
+**Method.** Every candidate defect was first reproduced against `sections.py` as published at `10b100a`, using a synthetic-page probe that calls
+`SectionExtractor.extract_governance({key: (page, page)})` directly — the same code path the builder consumes. Only after a case produced a wrong bucket or flag was
+the code changed; the probe then re-ran as the basis of the committed tests.
+
+**Fix 1 — one-dimension denials no longer earn `clean` (A23 §6A.1).** `extract_governance`'s prose-absence step accepted any sentence matching an absence form, so
+"there are no outstanding **criminal** proceedings" (no civil coverage) produced the favourable bucket. A new `_lit_absence_is_comprehensive` guard, with
+`_LIT_DENIES_CRIMINAL` / `_LIT_DENIES_CIVIL` / `_LIT_LITIGATION_NOUN`, requires the sentence to deny unqualified litigation, or both dimensions, before it can
+answer `clean`; a class-B nil covering only tax or only regulatory exposure now emits **no bucket** (UNKNOWN) instead of 4/4. The two synthetic filings whose
+sentences do cover both dimensions (`class_a`, `class_b`) keep `clean`, and `class_c`/`class_d`/`class_e` move to UNKNOWN — re-measured, not hand-adjusted
+(`tests/test_extraction_phase5b.py`: class_c **41.0 → 37.0**, class_e **43.0 → 39.0**, −4 earned and −4 available in both cases). The correction matches the rule
+the structured summary-table route already applied (columns must be present before `clean`), so it removes a disagreement between two routes rather than adding a
+policy.
+
+**Fix 2 — a closed-period denial no longer clears the SEBI/ED flag (A23 §6A.2).** `sebi_ed_action_active = False` was set by any negative naming both regulators,
+including "no proceedings … during the financial year 2023-24" and "no penalty … as on 31 March 2022" — statements about a window that has closed, offered as
+evidence about the present. `_REG_ABSENT_CLOSED` suppresses the `False` for closed FY / period / date scopes in both the sentence path and the collected-absence
+loop, while unqualified denials, "as on the date of this RHP" and "in the last five years" (the ICDR disclosure window, which includes today) still clear it.
+Nothing was *added* to the `True` side: an absent field remains the only representation of "not established", so no new state was introduced and the fail-closed
+direction is unchanged.
+
+**No fix — matter C.** The A23 §6.3 claim that a display layer turned UNKNOWN into "No active SEBI or ED action" was checked and found **false**: the cited
+`presentation/ui7.py` does not exist and no such string exists outside `sections.py` and its test. `frontend/app.js::renderMetricValue`,
+`renderSemanticStateBadge` and the knockout cards already keep UNKNOWN / NOT_APPLICABLE / SCORED and CLEAR / TRIGGERED / UNVERIFIED distinct, and
+`presentation/service.py` defaults a missing knockout state to `UNVERIFIED`. Evidence in A23 §6A.3; the behaviour is now pinned by a frontend test
+("Governance metric rendering keeps UNKNOWN distinct from a verified absence") rather than changed.
+
+**Matter D.** Statutory/regulatory adverse counts already map into `criminal_or_regulatory` through the ICDR column (pinned by
+`test_d_statutory_or_regulatory_count_uses_the_existing_bucket`); tax-only adverse exposure has no bucket and stays UNKNOWN, and after Fix 1 a tax-only *nil* no
+longer reads as `clean`. No fourth bucket was created: `config_validation.py:53` pins the map to three keys and the schema enum has no fourth value, so any such
+change needs its own governed decision (A23 §6A.4).
+
+**HD Fire re-confirmation (test case only).** With both fixes applied, HD Fire's §12 shapes still behave as D-5 recorded and as its filing requires: the two
+Director criminal proceedings reach `criminal_or_regulatory` with the Directors row quoted verbatim; the `Nil` in the SEBI column scoped "against our Promoters"
+erases nothing; the `By our Company` tax rows are non-adverse and never imply `clean`; and no SEBI/ED finding is fabricated in either direction (the flag stays
+absent). `tests/test_hd_fire_primary_source_extraction.py` — **7 passed**, and the litigation module's `TAX_ONLY_TABLE` cases pin the issuer-initiated direction.
+
+**Test duration and progress.** The runner-level mechanism moved **into the repository** (`tests/pytest_progress.py`, registered from `tests/conftest.py`) so it
+survives a sandbox reset, unlike the out-of-tree `-p progress_plugin` used in §8. It writes flushed progress to stderr, reports completed ÷ collected of the
+collected count (not a time forecast), prints per-module stage timings and lists tests ≥ 10 s. `docs/RUNBOOK.md` §17 documents the cost breakdown, the staged
+validation order and the harness limitation (the Arena `bash` tool returns output only when the command completes, so a long foreground suite looks stalled and a
+timed-out call kills the run — long runs must go to the background process facility and be polled from the log).
+
+**Numbers for this pass** are recorded in A23 §8 and RUNBOOK §17.5 (focused modules, affected modules, and one full-suite checkpoint on the tree that was pushed).

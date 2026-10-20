@@ -341,7 +341,9 @@ validation limits are all data. After any edit:
 
 ```bash
 python3 engine/tools/ipo_screen.py check-config   # must print valid True
-python3 -m pytest tests/ -q                       # must stay green (238)
+python3 -m pytest tests/ -q                       # must stay green (the collected count
+                                                # is printed at the start of the run —
+                                                # see §17 for duration and progress)
 ```
 
 Changing the config **invalidates every stored result hash** by design: the
@@ -861,7 +863,105 @@ python3 -m pytest -v tests/test_v16_implementation.py
 ```
 
 
+## 17. Test duration and progress
 
+### 17.1 What the suite costs, measured
 
+| Command | Collected | Result | Wall time |
+|---|---|---|---|
+| `python3 -m pytest tests/ -q` (full backend suite, tree at `10b100a`) | 1250 | 1250 passed, 0 failed, 0 xfailed | **1642.70 s (~27 min)** — run while other sandbox processes were competing for CPU |
+| `python3 -m pytest tests/ -q` (A23 disposition tree, §17.5) | 1265 | **1265 passed**, 0 failed, 0 skipped, 25 warnings | **1131.26 s (18 m 51 s)** |
+| 7 extraction/governance modules (`test_litigation_regulatory_defaults`, `test_hd_fire_primary_source_extraction`, `test_extraction_phase5b`, `test_rk_fashion_reconciliation`, `test_vishal_golden`, `test_extraction`, `test_ui7_ingestion`) | 138 | 138 passed | **262.67 s** |
+| `tests/test_litigation_regulatory_defaults.py` alone | 66 | 66 passed | **0.20 s** |
+| `cd frontend && node --test test/*.test.js` | 90 | 90 passed | **~0.6 s** |
 
+**Where the time actually goes (measured, not assumed).** The suite is CPU-bound, not I/O-bound or framework-bound, and the long tail is dominated by tests that call
+`DocumentExtractor.extract_from_pdf` on real filings: the 551-page vishal PDF and the 591-page Jio PDF are re-opened and re-extracted inside `pypdf` by several
+modules, and `pypdf` text extraction is pure Python. `--durations`/the stage markers below show e.g. `test_contingent_liabilities_extraction.py` 17 tests in 23.9 s
+and `test_core_semantics.py` 31 tests in 56.1 s, while the ~800 tests that only exercise the scoring engine finish in seconds. Two consequences: wall time scales with
+how many *other* processes are on the box (the 1642 s figure above was such a run; the same tree ran the same modules in 262 s), and one test
+(`tests/test_evaluation_record_v1.py::…canonical_object_hash`) fails **only under CPU contention**, so a failing run must be re-run in isolation before it is read as
+a regression.
 
+### 17.2 Progress is reported by the runner (in-repo plugin)
+
+`tests/pytest_progress.py` is registered from `tests/conftest.py`, so it is active for both `python3 -m pytest` and bare `pytest` without flags. It writes to
+**stderr, flushed**, because pytest's own terminal progress is block-buffered when stdout is redirected — which is exactly the situation of a long run whose output
+is being teed to a log file, and it is why such runs previously looked stalled.
+
+Real lines from the checkpoint run in §17.5 (132 such lines across the run, verbatim from the log):
+
+```
+[pytest-progress] collected 1265 tests; start 14:08:44
+[pytest-progress] |########......................|  25.7% of collected 325/1265  elapsed 66s  eta 191s (linear-rate estimate)
+[pytest-progress] |#########################.....|  83.0% of collected 1050/1265  elapsed 875s  eta 179s (linear-rate estimate)
+[pytest-progress]   stage tests/test_rpt_extraction.py: 11 tests, 43.5s
+[pytest-progress] |##############################| 100.0% of collected 1265/1265  elapsed 1131s  eta 0s (linear-rate estimate)
+[pytest-progress] finished 1265/1265 tests in 1130.7s (passed=1265 failed=0 skipped=0), exitstatus=0
+[pytest-progress]   slow test    81.3s  tests/test_derived_evidence_registration.py::test_reupload_after_evidence_fix_creates_new_evaluation_not_stale_duplicate
+[pytest-progress]   slow test    56.1s  tests/test_ui7_ingestion.py::test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice
+```
+
+* The percentage is **completed ÷ collected** — a count of progress, *not* a forecast of remaining wall time. The `eta` field is a linear extrapolation from the
+  observed rate and is labelled as such; the suite does not run at a constant rate, so treat it as an order of magnitude only.
+* `PYTEST_PROGRESS_EVERY=10` changes the reporting interval; `PYTEST_PROGRESS_MODULES=0` drops the per-module stage lines; `PYTEST_PROGRESS=0` disables the plugin
+  entirely (the run itself is unaffected either way — the plugin only reads reports).
+* Tests taking ≥ 10 s are listed at the end of the run, and `--durations=10` remains available for a fuller ranking.
+
+### 17.3 Staged validation (the order to use after a change)
+
+1. **Smallest first** — the module that covers the change: `python3 -m pytest tests/test_litigation_regulatory_defaults.py -q` (66 tests, sub-second unless the change touches extraction).
+2. **Affected modules** — the files that read or produce the changed surface; for extraction that is
+   `tests/test_litigation_regulatory_defaults.py tests/test_hd_fire_primary_source_extraction.py tests/test_extraction_phase5b.py tests/test_rk_fashion_reconciliation.py tests/test_vishal_golden.py tests/test_extraction.py tests/test_ui7_ingestion.py -q` (~4.5 min).
+   Frontend changes use `node --test frontend/test/*.test.js` instead (~0.6 s).
+3. **One broad checkpoint** — `python3 -m pytest tests/ -q` before publishing, with its collected/passed/failed counts quoted from the progress summary line. A
+   partial run is reported as partial: an interrupted checkpoint does not validate a tree.
+4. Reuse an earlier result only when the commit, the test scope *and* the environment are demonstrably the same; a run against a different commit never validates this
+   one, and a run under different CPU load is not comparable in wall time.
+
+### 17.4 What the agent sandbox adds
+
+The Arena `bash` tool returns a command's output only when the call finishes, so a foreground suite of this length shows nothing until it is over — and a call that
+exceeds its timeout kills the run it was waiting on. Long runs therefore go through the background process facility
+(`python3 -m pytest tests/ -q > /home/user/suite.log 2>&1`) and are polled from the log; with §17.2 the polled tail then shows live
+completed/collected counts. This is a property of the harness, not something the plugin can change: the plugin makes progress **available** to whoever tails the log;
+it cannot make a UI that withholds mid-command stdout render it incrementally.
+
+### 17.5 A23 checkpoint results (2026-10-20)
+
+`python3 -m pytest tests/ -q` on the tree published by the A23 disposition pass: **1265 collected, 1265 passed, 0 failed, 0 skipped, 0 xfailed, 25 warnings,
+1131.26 s (18 m 51 s)**, started `14:08:44Z` and ended `14:27:36Z`, exit status 0 — a **completed** run, not an interrupted one. The previous D-5 checkpoint on
+this branch measured 1642.70 s for 1250 tests; the honest comparison is **per test**: 1.31 s → 0.89 s, and none of that improvement comes from this pass's code —
+the earlier run competed with other sandbox processes for CPU, which is the single largest source of variance in these numbers — the affected-module battery in
+this pass took 262.67 s on an otherwise idle box (138 tests, 1.9 s/test). Wall time is therefore not a reliable signal; the collected/passed counts are.
+
+**Measured slow stages** (from the plugin's stage lines, which account for the whole run: their sum is 1130.5 s of the 1131.26 s):
+
+| Stage | Tests | Elapsed | Per test |
+|---|---|---|---|
+| `tests/test_step5_auditor_and_manual_terms.py` | 19 | 140.9 s | 7.4 s |
+| `tests/test_ui7_ingestion.py` | 20 | 109.0 s | 5.5 s |
+| `tests/test_derived_evidence_registration.py` | 3 | 108.7 s | **36.2 s** |
+| `tests/test_extraction.py` | 12 | 84.2 s | 7.0 s |
+| `tests/test_official_discovery.py` | 27 | 70.9 s | 2.6 s |
+| `tests/test_core_semantics.py` | 31 | 56.1 s | 1.8 s |
+| `tests/test_rk_fashion_reconciliation.py` | 5 | 50.0 s | 10.0 s |
+| all remaining 100+ modules together | ~1148 | ~511 s | 0.45 s |
+
+The long tail is one pattern repeated: each of those tests re-extracts a real filing PDF (551-page vishal, 591-page Jio, ~450-page R.K. Fashion) through `pypdf` in
+pure Python, several times per test because the ingestion path canonicalises, evidences and re-runs it. **Remaining slow stages are therefore not fixable by
+anything in this pass without changing test semantics**, and two mitigations were deliberately *not* taken: caching extracted pages across tests (would hide exactly
+the extraction regressions these tests exist to catch), and process-level parallelism (`pytest -n auto`). Parallelism was considered and rejected on the evidence
+rather than by taste. The machine was measured first (`nproc`, `free -m`, during this pass): **2 CPUs, 3939 MB total memory**, and the slow tests are the ones
+holding a 551-page or 591-page PDF's extracted text in memory. `pytest -n auto` would therefore start two workers, each paying that memory, for an upper bound of
+about 2× on the CPU-bound tail — and the suite already contains a test (`tests/test_evaluation_record_v1.py`) that has previously failed **only** under CPU
+contention, so a parallel red run would have to be re-run in isolation before it could be trusted anyway. At most two cores are available, so the contention risk
+outweighs the gain. If a future machine has more cores and memory, the cheapest safe experiment is `pytest -n 2 --dist loadscope`, which keeps a module's tests in
+one worker and so preserves module-scoped fixture isolation.
+What the pass *did* do: measure the breakdown, make it visible in every run, and publish the staged order (§17.3) so a routine change costs seconds instead of a
+full-suite checkpoint.
+
+Durable evidence of the run itself is committed at
+`docs/investigation/D-5-A23-SUITE-PROGRESS-2026-10-20.log`: all 132 `[pytest-progress]` lines in order, plus pytest's summary and `EXIT=0`.
+
+Frontend suite: `cd frontend && node --test test/*.test.js` — **90 tests, 90 passed, 0 failed, 702 ms**.

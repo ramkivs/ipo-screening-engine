@@ -140,7 +140,14 @@ def test_fixture_class_c_epc_infrastructure():
     outcome = evaluate(canonical, config, mode="final")
     assert outcome.record.validation["ok"] is True
     assert outcome.record.plan["sector_overlay"] == "epc_real_estate"
-    assert outcome.record.score["final_score"] == 41.0
+    # A23: this filing's litigation disclosure -- "Our Company and Promoters
+    # have no pending criminal actions or disciplinary proceedings by SEBI or
+    # Stock Exchanges." -- denies the criminal/regulatory dimension only.  It
+    # says nothing about material civil litigation, which is the other half of
+    # the `clean` bucket, so the bucket is UNKNOWN instead of the favourable 4/4
+    # (score 41.0 -> 37.0, and 4 points of availability with it).
+    assert canonical["governance"]["litigation_bucket"] is None
+    assert outcome.record.score["final_score"] == 37.0
 
 
 # --------------------------------------------------------------------------
@@ -191,7 +198,11 @@ def test_fixture_class_e_modern_complex_rhp():
     config = load_config(CONFIG_FILE)
     outcome = evaluate(canonical, config, mode="final")
     assert outcome.record.validation["ok"] is True
-    assert outcome.record.score["final_score"] == 43.0
+    # A23, same correction as class_c: "no pending criminal proceedings or
+    # SEBI/Stock Exchange regulatory actions" is a one-dimension denial, so
+    # `clean` is not established (43.0 -> 39.0).
+    assert canonical["governance"]["litigation_bucket"] is None
+    assert outcome.record.score["final_score"] == 39.0
 
 
 # --------------------------------------------------------------------------
