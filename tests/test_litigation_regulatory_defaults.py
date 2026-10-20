@@ -560,6 +560,108 @@ def test_the_fabricated_sentences_are_gone_from_the_extractor():
         assert "Litigation bucket classified as" not in code
 
 
+SEBI_SCOPED_TABLE = """| Category of individuals / entities | Criminal Proceedings | Tax Proceedings | Statutory or Regulatory Proceedings | Disciplinary actions by SEBI or stock exchanges against our Company, Promoters and Directors in the last five years, including outstanding action | Material civil litigation | Aggregate amount involved |
+| --- | --- | --- | --- | --- | --- | --- |
+| Against our Company | Nil | Nil | Nil | 2 | Nil | Nil |
+| Against our Directors | Nil | Nil | Nil | Nil | Nil | Nil |
+"""
+
+TAX_ONLY_TABLE = """| Category of individuals / entities | Tax Proceedings | Statutory or Regulatory Proceedings | Aggregate amount involved |
+| --- | --- | --- | --- |
+| Against our Company | 4 | Nil | 3.20 |
+| Against our Directors | Nil | Nil | Nil |
+"""
+
+
+def test_summary_table_regulatory_column_can_set_the_flag():
+    """The ICDR table is where an outstanding SEBI action is disclosed.
+
+    A count in that column on an adverse row is a positive finding; the row
+    itself is the quotation, so the flag can be traced to the cell that
+    established it.
+    """
+    pages = {12: SEBI_SCOPED_TABLE}
+    out = _govern(pages)
+    record = out["governance.sebi_ed_action_active"]
+    assert record.candidate_value is True
+    assert record.page == 12
+    assert "Against our Company" in record.quote
+    assert out["governance.litigation_bucket"].candidate_value == "criminal_or_regulatory"
+    _assert_verbatim(pages, out)
+
+
+def test_labelled_count_naming_the_regulator_sets_the_flag():
+    pages = {
+        24: "(d) Disciplinary actions by SEBI and / or the Stock Exchanges involving our Company\n"
+            "2\n"
+    }
+    out = _govern(pages)
+    assert out["governance.sebi_ed_action_active"].candidate_value is True
+    assert out["governance.litigation_bucket"].candidate_value == "criminal_or_regulatory"
+    _assert_verbatim(pages, out)
+
+
+def test_enforcement_directorate_only_negative_does_not_clear_the_sebi_side():
+    """The mirror image of the SEBI-only negative: neither half implies both."""
+    pages = {
+        22: "No proceedings have been initiated by the Enforcement Directorate against "
+            "our Company or our Promoters.\n"
+    }
+    out = _govern(pages)
+    assert "governance.sebi_ed_action_active" not in out
+
+
+def test_negation_between_the_regulator_and_the_act_is_read():
+    """"SEBI has **not** imposed any penalty" must not trigger K2.
+
+    The negation sits *after* the agency token, so a prefix-only polarity test
+    would have missed it and emitted ``sebi_ed_action_active = True`` -- a
+    knockout and an AVOID verdict -- out of a sentence that denies the action.
+    """
+    pages = {22: "SEBI has not imposed any penalty on our Promoters.\n"}
+    out = _govern(pages)
+    assert "governance.sebi_ed_action_active" not in out
+
+
+def test_explicit_both_regulator_absence_needs_no_act_verb():
+    pages = {
+        22: "As on the date of the Red Herring Prospectus, there are no active SEBI or ED "
+            "regulatory proceedings against our Company.\n"
+    }
+    out = _govern(pages)
+    record = out["governance.sebi_ed_action_active"]
+    assert record.candidate_value is False
+    assert "no active SEBI or ED regulatory proceedings" in record.quote
+    _assert_verbatim(pages, out)
+
+
+def test_unreadable_row_does_not_cancel_a_disclosed_count():
+    """"Truncated" costs the *favourable* conclusions, not an adverse one.
+
+    The Directors row discloses a criminal proceeding; the Company row could
+    not be parsed.  Reporting the disclosed matter is what the evidence supports
+    -- the missing row can add a proceeding, never remove one.  What the
+    unreadable row does cost is ``clean``.
+    """
+    pages = {
+        12: "| Category of individuals / entities | Criminal Proceedings | Tax Proceedings "
+            "| Statutory or Regulatory Proceedings | Material civil litigation |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| Against our Company | Nil\n"
+            "| Against our Directors | 1 | Nil | Nil | Nil |\n"
+    }
+    out = _govern(pages)
+    assert out["governance.litigation_bucket"].candidate_value == "criminal_or_regulatory"
+    _assert_verbatim(pages, out)
+
+
+def test_table_without_the_bucket_columns_cannot_show_clean():
+    """A summary table carrying only tax / statutory columns proves no absence."""
+    pages = {12: TAX_ONLY_TABLE}
+    out = _govern(pages)
+    assert "governance.litigation_bucket" not in out
+
+
 # ---------------------------------------------------------------------------
 # 9. No accidental change to existing scoring semantics
 # ---------------------------------------------------------------------------

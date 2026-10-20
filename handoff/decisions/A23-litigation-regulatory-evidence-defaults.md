@@ -42,7 +42,9 @@ At `2d52baa`:
 3. **Polarity.** A negated "no litigation" sentence is an absence statement, not a civil finding.
 4. **The statutory disclosure forms are read** — the ICDR summary table and the labelled category/value list — so disclosed counts reach the bucket instead of being invisible. This *narrows* to the disclosed direction and party: "against" rows are adverse, "by our Company" rows are not, a promoter-scoped SEBI column cannot speak for the issuer, and a row or column that cannot be parsed makes coverage **incomplete ⇒ UNKNOWN** rather than `clean`.
 5. **No coercion in the builder.** `minor_civil` stays `minor_civil`; only explicitly stated synonyms normalise; an unrecognised value is UNKNOWN, never the favourable bucket.
-6. **The flag is not inferred from a criminal proceeding.** `sebi_ed_action_active = True` requires SEBI/ED as actor **and** a finite act (`initiated / issued / passed / imposed / conducted / attached / registered / taken / served / filed / raised / recorded / framed`, or "pending before SEBI") **and** a party, with registration/disclaimer boilerplate excluded.
+6. **The flag is not inferred from a criminal proceeding.** `sebi_ed_action_active = True` requires SEBI or the ED as actor **and** a finite act (`initiated / issued / passed / imposed / conducted / attached / registered / taken / served / filed / raised / recorded / framed`, or "pending before SEBI") **and** a party, with registration/disclaimer boilerplate excluded. The same affirmative is accepted from the summary table's SEBI column and from a labelled count, so a disclosed action is not missed merely because it was printed as a number; neither structured route may answer `False`, because a `Nil` there is scoped by its own heading and never mentions the ED.
+7. **Polarity is measured against the act, not the sentence start:** "SEBI has **not** imposed any penalty on our Promoters" does not trigger K2 — a prefix-only test would have.
+8. **`False` requires both regulators named**, since the governed flag is `sebi_ed_action_active`; a negative covering only one of them leaves the field UNKNOWN. An explicit both-regulator denial needs no act verb, and a positive finding anywhere in the range outranks such a general denial (prospectuses open the section with "except as stated below").
 
 No weight, band, threshold, cap, penalty, knockout semantic, confidence rule, missing-value rule, golden fixture or historical record was touched. The governed map (`clean 4 / minor_civil 2 / criminal_or_regulatory 0`) is asserted unchanged by the new tests, and the golden hash `e84f8bc0f9b9…` is intact.
 
@@ -50,8 +52,8 @@ No weight, band, threshold, cap, penalty, knockout semantic, confidence rule, mi
 
 | State | Representation | How it is established |
 |---|---|---|
-| Verified active SEBI/ED action | `sebi_ed_action_active: true` | non-nil SEBI/ED cell in an adverse row, **or** a sentence with agency + finite act + party; K2 **TRIGGERED** ⇒ `AVOID` |
-| Explicitly verified absence | `sebi_ed_action_active: false` | only a negative naming **both** SEBI and the ED (the coverage standard that would widen this is **open**, §6.2) |
+| Verified active SEBI/ED action | `sebi_ed_action_active: true` | a non-nil SEBI/ED cell in an adverse table row, a labelled count under a regulator-named category, **or** a sentence with agency + finite act + party; K2 **TRIGGERED** ⇒ `AVOID` |
+| Explicitly verified absence | `sebi_ed_action_active: false` | only a negative naming **both** SEBI and the ED, with or without an act verb, and only when no positive finding exists in the range (the coverage standard that would widen this is **open**, §6.2) |
 | Incomplete / inaccessible / absent coverage | field **absent** | nothing matched, page range empty, unmappable proceeding type, unparseable adverse row ⇒ K2 **UNVERIFIED**, verdict `INSUFFICIENT_DATA`, litigation points unavailable |
 | Proceeding involving a Director, not the issuer | `litigation_bucket` reflects the disclosure (in scope per the formula); `sebi_ed_action_active` stays absent | evidence quote names the party group; the `notes` field lists the parties named in the quoted text so the attribution is visible without a new scored category |
 
@@ -71,11 +73,13 @@ From the SEBI-hosted **Abridged Prospectus** (RHP dated 5 October 2026), section
 * **C:** require the full ICDR population (Company, Promoters, Directors, KMP, Senior Management), as the summary-table rows do. *Consequence:* prose-only disclosures almost never clear `clean`; most Indian RHPs in this repository move to UNKNOWN, which is defensible but a large availability change.
 This is a change to **what satisfies a governed criterion**, so it is not implemented.
 
+A related limitation recorded now: the ICDR column merges "**SEBI or stock exchanges**", so a stock-exchange-only disciplinary action would set the flag `True`. That is the fail-closed direction (K2 `TRIGGERED` ⇒ `AVOID`, reviewable by a human) and no committed filing exercises it, but it is a reading of the merged column, not a governed definition — resolved by the same §6.2 decision.
+
 **6.2 Source-coverage standard for a verified regulatory absence.** Under what search may `sebi_ed_action_active = false` mean "explicitly verified absence" rather than "not found"?
 * **A (current behaviour):** only a negative naming both regulators clears it; a SEBI-only negative (the wording real filings actually use, and every ICDR table's promoter-scoped SEBI column) leaves UNKNOWN. *Consequence:* K2 stays UNVERIFIED and verdicts stay `INSUFFICIENT_DATA` for filings that may well be clean.
 * **B:** define a coverage set — litigation section + summary table + "Our Promoters and Promoter Group" + the statutory declarations in "Promoters" — where a nil naming SEBI, the Stock Exchanges **and** the ED (or an explicit ED-free declaration) clears the flag. *Consequence:* `False` becomes an evidenced claim on issuer-drafted text only; K2 can clear without any external register.
 * **C:** require corroboration from a regulator source (SEBI order/press-release retrieval) before `False` may clear K2. *Consequence:* consistent with D-2's "no adverse finding from one document" stance, but needs the retrieval contract, a cutoff rule and an unavailable-source policy (A8 territory) before it is implementable.
-Until this is decided, the asymmetry is deliberate: **True needs a finite act; False needs both regulators named; everything else is UNKNOWN.**
+Until this is decided, the asymmetry is deliberate: **True needs a finite act (or a disclosed count); False needs both regulators named; everything else is UNKNOWN.** The asymmetry is directional in the safe sense: a `True` that turns out to be a stock-exchange action rather than a SEBI one is visible and correctable, a `False` that clears K2 without coverage is silent.
 
 **6.3 Display-layer default.** `presentation/ui7.py` renders an UNKNOWN flag as "No active SEBI or ED action" (`… if metrics.get(...) is True else "No active …"`). Presentation only, but it changes what every historical record shows in the UI, so it needs its own authority.
 
@@ -100,7 +104,7 @@ All deltas are the removal of a 4-point award that had no evidence, or the remov
 
 | Check | Result |
 |---|---|
-| `tests/test_litigation_regulatory_defaults.py` (new, D-5.4's nine cases + contract pins) | **44 passed** |
+| `tests/test_litigation_regulatory_defaults.py` (new — D-5.4's nine scenarios, the structured regulatory routes and the contract pins) | **51 passed** |
 | `tests/test_hd_fire_primary_source_extraction.py` | **7 passed, 0 xfailed** — the two strict D-5 xfails are replaced by passing assertions; a new test pins HD Fire's §12 table to `criminal_or_regulatory` with the Directors row quoted verbatim and no regulatory flag |
 | `tests/test_rk_fashion_reconciliation.py` | **5 passed** on re-measured values (45.0 / 48.0 / 69.0 / Module D 6.0 / K2 UNVERIFIED) |
 | `tests/test_ui7_ingestion.py` | passed on re-measured 19.0 and 45.0/48.0/69.0 |

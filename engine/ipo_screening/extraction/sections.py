@@ -1528,7 +1528,28 @@ class SectionExtractor:
         r"|\bEnforcement\s+Directorate\b|\bPMLA\b|\bPrevention\s+of\s+Money\s+Laundering\s+Act\b",
         re.IGNORECASE,
     )
-    _REG_AGENCY_ED = re.compile(r"\bED\b")
+    #: The two regulators the governed flag is named after, tested separately:
+    #: ``sebi_ed_action_active`` may only be *cleared* by a statement that
+    #: covers both of them, and only by one that covers each of them at all.
+    #: ``_REG_AGENCY`` stays the "is a regulator named here" test.
+    _REG_AGENCY_SEBI = re.compile(
+        r"\bSEBI\b|\bSecurities\s+and\s+Exchange\s+Board(?:\s+of\s+India)?\b",
+        re.IGNORECASE,
+    )
+    _REG_AGENCY_ED = re.compile(
+        r"\bED\b|\bEnforcement\s+Directorate\b|\bPMLA\b"
+        r"|\bPrevention\s+of\s+Money\s+Laundering\s+Act\b",
+        re.IGNORECASE,
+    )
+    #: The finite act inside a sentence.  A negation *before* the act negates
+    #: the act ("SEBI has **not** imposed ...", "**no** penalty has been
+    #: imposed by SEBI"); a negation after it does not ("SEBI has imposed a
+    #: penalty, not a fine").
+    _REG_ACT_VERB = re.compile(
+        r"\b(?:initiated|issued|passed|imposed|conducted|attached|registered|taken|served|filed|raised"
+        r"|recorded|framed|pending)\b",
+        re.IGNORECASE,
+    )
     #: An action of a regulator, in either word order, within one sentence.
     _REG_ACTION = re.compile(
         # The regulator must be shown *acting*: "proceedings ... initiated by
@@ -1678,6 +1699,8 @@ class SectionExtractor:
             # an adverse finding.  Only those lines are masked, so narrative
             # prose on the same page stays visible.
             for match in cls._LIT_LABELLED.finditer(joined):
+                if match.group("count") is not None:
+                    continue  # a disclosed count is narrative evidence, not a label
                 lo = joined.rfind("\n", 0, match.start()) + 1
                 hi = joined.find("\n", match.end())
                 hi = len(joined) if hi == -1 else hi
@@ -1748,11 +1771,15 @@ class SectionExtractor:
 
     @classmethod
     def _lit_agencies(cls, sentence: str) -> Tuple[bool, bool]:
-        """(SEBI named?, Enforcement Directorate named?) for one sentence."""
+        """(SEBI named?, Enforcement Directorate named?) for one sentence.
+
+        Kept as a pair because the two states differ: a sentence naming only
+        SEBI can *accuse* (the flag covers "SEBI or ED") but cannot *exonerate*,
+        because exoneration has to speak for the regulator it does not name.
+        """
         return (
-            bool(cls._REG_AGENCY.search(sentence)),
-            bool(cls._REG_AGENCY_ED.search(sentence))
-            or bool(re.search(r"enforcement\s+director(?:ate)?s?", sentence, re.IGNORECASE)),
+            bool(cls._REG_AGENCY_SEBI.search(sentence)),
+            bool(cls._REG_AGENCY_ED.search(sentence)),
         )
 
     @staticmethod
@@ -1847,6 +1874,70 @@ class SectionExtractor:
                 return ("clean", page, sentence, "prose-absence")
         return None
 
+    def _lit_table_header(
+        self, text: str
+    ) -> Optional[Tuple[int, List[Optional[str]], str]]:
+        """Locate an ICDR summary-table header: ``(header_end, keys, quote)``.
+
+        Shared by the bucket and the regulatory-action routes so that both read
+        the same column mapping and neither re-derives it differently.
+        """
+        head = self._LIT_TABLE_HEAD.search(text)
+        if head is None:
+            return None
+        line_start = text.rfind("\n", 0, head.start()) + 1
+        line_end = text.find("\n", head.start())
+        header_line = text[line_start: line_end if line_end != -1 else len(text)]
+        columns = self._lit_cells(header_line)
+        if len(columns) < 3:
+            return None
+        keys: List[Optional[str]] = []
+        for cell in columns[1:]:
+            key: Optional[str] = None
+            for name, pattern in self._LIT_TABLE_COLUMNS:
+                if pattern.search(cell):
+                    key = name
+                    break
+            keys.append(key)
+        if not any(key in ("criminal", "civil", "regulatory", "sebi") for key in keys):
+            return None  # an unmappable header is not evidence either way
+        return head.end(), keys, " ".join(header_line.split())[:400]
+
+    def _sebi_ed_table_finding(
+        self, lit_pages: Sequence[Tuple[int, str]]
+    ) -> Optional[Tuple[bool, int, str]]:
+        """A non-nil SEBI / stock-exchange cell on an adverse table row.
+
+        The ICDR summary table is where an outstanding disciplinary action by
+        SEBI is disclosed, so a count in that column is a positive finding.  Its
+        ``Nil`` is deliberately not read as a verified absence: the column is
+        scoped by its own heading (frequently "against our Promoters in the last
+        five years") and never mentions the Enforcement Directorate, so it can
+        clear nothing.
+        """
+        for page, text in lit_pages:
+            if not text:
+                continue
+            header = self._lit_table_header(text)
+            if header is None:
+                continue
+            _, keys, _ = header
+            if "sebi" not in keys:
+                continue
+            sebi_at = keys.index("sebi")
+            for row in self._LIT_TABLE_ROW.finditer(text):
+                if row.group("side").lower() != "against":
+                    continue  # "by our Company" is the issuer's own claim
+                parts = self._lit_cells(row.group("rest"))
+                if len(parts) != len(keys):
+                    continue
+                cell = parts[sebi_at]
+                if not self._LIT_CELL_COUNT.match(cell):
+                    continue  # Nil / NA / unreadable: no action stated
+                if float(cell.replace(",", "").rstrip("%")) > 0:
+                    return (True, page, " ".join(row.group(0).split())[:400])
+        return None
+
     def _litigation_table_finding(
         self, lit_pages: Sequence[Tuple[int, str]]
     ) -> Optional[Tuple[str, int, str, str]]:
@@ -1863,25 +1954,10 @@ class SectionExtractor:
         for page, text in lit_pages:
             if not text:
                 continue
-            head = self._LIT_TABLE_HEAD.search(text)
-            if head is None:
+            header = self._lit_table_header(text)
+            if header is None:
                 continue
-            line_start = text.rfind("\n", 0, head.start()) + 1
-            line_end = text.find("\n", head.start())
-            header_line = text[line_start: line_end if line_end != -1 else len(text)]
-            columns = self._lit_cells(header_line)
-            if len(columns) < 3:
-                continue
-            keys: List[Optional[str]] = []
-            for cell in columns[1:]:
-                key: Optional[str] = None
-                for name, pattern in self._LIT_TABLE_COLUMNS:
-                    if pattern.search(cell):
-                        key = name
-                        break
-                keys.append(key)
-            if not any(key in ("criminal", "civil", "regulatory", "sebi") for key in keys):
-                continue  # an unmappable header is not evidence either way
+            _, keys, header_quote = header
 
             adverse = civil = sebi = False
             unmapped = False
@@ -1936,13 +2012,20 @@ class SectionExtractor:
                             evidence_row = (page, quote)
             if adverse_rows == 0:
                 continue
+            if adverse or sebi:
+                # An affirmative disclosure stands on its own evidence: a row
+                # elsewhere in the table that could not be parsed can add a
+                # proceeding, never cancel one.
+                return ("criminal_or_regulatory", evidence_row[0], evidence_row[1], "summary-table")
             if unreadable_adverse_rows:
-                return None  # incomplete coverage: UNKNOWN, never a favourable default
-            if adverse:
-                return ("criminal_or_regulatory", evidence_row[0], evidence_row[1], "summary-table")
-            if sebi:
-                return ("criminal_or_regulatory", evidence_row[0], evidence_row[1], "summary-table")
+                # Only a *favourable* conclusion needs the whole adverse
+                # population read; an unreadable row makes the table's silence
+                # ambiguous, which is UNKNOWN -- never the favourable bucket.
+                return None
             if civil:
+                # Material civil litigation is more favourable than a criminal
+                # or regulatory matter, so it is likewise withheld while part of
+                # the table is unreadable.
                 return ("minor_civil", evidence_row[0], evidence_row[1], "summary-table")
             if unmapped:
                 return None
@@ -1951,7 +2034,7 @@ class SectionExtractor:
             # bucket is defined over to be present.
             if not {"criminal", "civil", "regulatory"} <= {key for key in keys if key}:
                 return None
-            return ("clean", page, " ".join(header_line.split())[:400], "summary-table")
+            return ("clean", page, header_quote, "summary-table")
         return None
 
     def _litigation_labelled_finding(
@@ -2003,6 +2086,37 @@ class SectionExtractor:
             return None  # nils in some categories do not establish nil litigation
         return None
 
+    def _sebi_ed_labelled_finding(
+        self, lit_pages: Sequence[Tuple[int, str]]
+    ) -> Optional[Tuple[bool, int, str]]:
+        """A labelled category line naming SEBI or the ED, with a count.
+
+        "Disciplinary actions by SEBI ... involving our Company" followed by
+        "2" is a disclosed action; followed by "Nil" it is not, and a nil in a
+        promoter-scoped category is no evidence about the issuer, so this route
+        can only ever answer True.
+        """
+        for page, text in lit_pages:
+            if not text:
+                continue
+            for match in self._LIT_LABELLED.finditer(text):
+                if match.group("count") is None:
+                    continue  # a nil value is not an action
+                label = match.group("label")
+                if self._LIT_LABEL_SELF.search(label) and not re.search(
+                    r"\bagainst\b", label, re.IGNORECASE
+                ):
+                    continue
+                if not self._LIT_LABEL_ADVERSE.search(label):
+                    continue
+                if not self._LIT_PARTY.search(label):
+                    continue
+                sebi_named, ed_named = self._lit_agencies(label)
+                if not (sebi_named or ed_named):
+                    continue
+                return (True, page, " ".join(match.group(0).split())[:400])
+        return None
+
     def _sebi_ed_action_finding(
         self, lit_pages: Sequence[Tuple[int, str]]
     ) -> Optional[Tuple[bool, int, str]]:
@@ -2016,6 +2130,35 @@ class SectionExtractor:
         emit nothing -- which is exactly how a promoter-scoped "Nil" cell or an
         inaccessible regulatory page must be represented.
         """
+        negative: Optional[Tuple[int, str]] = None
+        for page, text in self._lit_prose_pages(lit_pages):
+            if not text:
+                continue
+            original = dict(lit_pages).get(page, text)
+            # An explicit *absence* statement naming both regulators needs no
+            # act verb: "there are no active SEBI or ED regulatory proceedings
+            # against our Company" is the whole finding.  Collected rather than
+            # returned, because a positive statement anywhere in the range
+            # outranks a general denial elsewhere.
+            for match in list(self._LIT_ABSENCE.finditer(text)) + list(
+                self._LIT_ABSENCE_NONE_OF.finditer(text)
+            ):
+                gap = match.groupdict().get("gap")
+                if gap and self._LIT_ABSENCE_GAP_VERB.search(gap):
+                    continue
+                lo, hi = self._lit_span(text, match.start(), match.end())
+                statement = " ".join(original[lo:hi].split())
+                if len(statement) > 600:
+                    continue
+                sebi_named, ed_named = self._lit_agencies(statement)
+                if not (sebi_named and ed_named):
+                    continue
+                if self._REG_BOILERPLATE.search(statement):
+                    continue
+                if not self._LIT_PARTY.search(statement):
+                    continue
+                negative = (page, statement)
+                break
         for page, text in self._lit_prose_pages(lit_pages):
             if not text:
                 continue
@@ -2042,21 +2185,30 @@ class SectionExtractor:
                 # asserting an action the filing expressly denies triggers K2
                 # and an AVOID verdict.
                 agency_at = len(sentence)
-                for regex in (self._REG_AGENCY, self._REG_AGENCY_ED):
+                for regex in (self._REG_AGENCY_SEBI, self._REG_AGENCY_ED):
                     found = regex.search(sentence)
                     if found is not None:
                         agency_at = min(agency_at, found.start())
-                window = sentence[:agency_at]
+                verb = self._REG_ACT_VERB.search(sentence)
+                # Cut at the act when the sentence states one, so that a
+                # negation between the regulator and the act is seen
+                # ("SEBI has *not* imposed"); cut at the regulator otherwise
+                # ("*no* outstanding disciplinary actions ... imposed by SEBI"
+                # already had its negation before the matched noun).
+                cut_at = verb.start() if verb is not None else agency_at
+                window = sentence[:cut_at]
                 negated = bool(self._LIT_NEGATION.search(window)) or bool(
                     self._LIT_NEGATION.search(self._lit_prefix(text, match.start()))
                 )
                 if negated:
-                    # A SEBI-only negative cannot clear an ED-inclusive flag.
+                    # A SEBI-only (or ED-only) negative cannot clear a flag
+                    # whose governed name covers both regulators; the field
+                    # stays absent and K2 stays UNVERIFIED.
                     if sebi_named and ed_named:
                         return (False, page, sentence)
                     continue
                 return (True, page, sentence)
-        return None
+        return (False, negative[0], negative[1]) if negative is not None else None
 
     def extract_governance(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract auditor opinion, litigation bucket, SEBI action, and board independence."""
@@ -2369,6 +2521,17 @@ class SectionExtractor:
             )
 
         sebi_finding = self._sebi_ed_action_finding(lit_pages)
+        if sebi_finding is None or sebi_finding[0] is not True:
+            # A disclosed action outranks a general denial, and the structured
+            # routes state one positively; neither can state the absence, which
+            # is why they are never consulted for False.
+            for extra in (
+                self._sebi_ed_table_finding(lit_pages),
+                self._sebi_ed_labelled_finding(lit_pages),
+            ):
+                if extra is not None:
+                    sebi_finding = extra
+                    break
         if sebi_finding is not None:
             sebi_active, sebi_page, sebi_quote = sebi_finding
             extractions.append(
