@@ -10,6 +10,15 @@
 - **Branch:** `arena/ae4d04e8-ipo-screening-engine` at `b8723cb` (remote-verified equal
   before this pass; the publication amendment at the end of this file records the
   post-commit state).
+- **SUPERSEDED IN PART (2026-10-20, later pass):** the dispositions in §B of this record were
+  produced when **no** HD Fire document was retrievable. The primary sources have since been
+  recovered and the table re-dispositioned to **25 verified / 8 contradicted / 10 unresolved /
+  1 not applicable** in
+  `docs/investigation/HD-FIRE-PRIMARY-SOURCE-RECOVERY-2026-10-20.md` (§4). That later table is
+  authoritative for field dispositions. The arithmetic, engine findings and §C–§G analysis in
+  this record are retained unchanged as the earlier state of the investigation, and its
+  "no primary source" premise is now known to be a retrieval-method artefact rather than a
+  fact about the world.
 
 ---
 
