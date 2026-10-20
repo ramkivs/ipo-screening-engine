@@ -284,7 +284,46 @@ pre-existing Starlette deprecation and unregistered `slow`-mark warnings.
 
 ## 10. Publication
 
-The implementation commit, its remote verification, the test counts at that commit and the PR/`main` state are recorded in the immediately following publication-record commit (`handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md`, same section).
+### 10.1 Implementation commit
+
+`2ec607cd6195bdd631f6433f40883c1d68c5212d` on `arena/ae4d04e8-ipo-screening-engine`, pushed as
+`7754f9b..2ec607c` and verified with `git ls-remote` (the remote returned the same SHA).
+**11 files, 1224 insertions, 100 deletions:** the two engine modules, the two extraction test
+files, the four decision records A19–A22, this record, the inline period-mix correction in the
+earlier reconciliation record, and the tracker.
+
+### 10.2 Tests at that commit
+
+The engine and test files in this commit are byte-identical to the tree the full suite ran on;
+only documentation changed after that run.
+
+| Run | Result |
+|---|---|
+| Full backend (`pytest tests -q`) | **1192 passed, 0 failed, 0 xfailed**, 38 warnings, 1566.58 s |
+| `test_contingent_liabilities_extraction.py` | 17 passed (29.50 s) |
+| `test_promoter_holding_extraction.py` | 8 passed (7.32 s) |
+| Six decision-related files | 55 passed (130.09 s) |
+| 11-file regression battery | 153 passed (344.58 s) |
+
+### 10.3 PR #6 and `main` (remote-verified)
+
+| Item | Remote value |
+|---|---|
+| PR #6 | `state: open`, `merged: false`, `merged_at: null` |
+| PR #6 head | `e05c0efbca1ecb3024e52da73a22e180ea171118` (`arena/5dd3fe52-ipo-screening-engine`) |
+| PR #6 base | `arena/573e69a4-ipo-screening-engine` |
+| `main` | `01ba66c12ca1195fd7acbd287c3e39a019808094` (unchanged) |
+| Ancestry | both `01ba66c` and `e05c0ef` are ancestors of `2ec607c` |
+| CI | no hosted workflows (`actions/workflows` `total_count: 0`) |
+
+The PR was neither moved nor merged; no force-push, reset, rebase or branch switch was performed.
+
+### 10.4 Non-changes
+
+`config/`, `schema/` and `fixtures/` diffs are empty; the golden result hash
+`e84f8bc0…19e1` is asserted by the golden tests inside the full suite; no historical evaluation
+record was re-run, edited or re-hashed. No scoring weight, threshold, formula, cap, penalty,
+knockout semantic, confidence rule or missing-value rule was touched.
 
 ---
 
