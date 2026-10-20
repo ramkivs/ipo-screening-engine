@@ -659,8 +659,13 @@ move when the filing is supplied and its values pass the existing contracts.
   (this file), `tests/test_promoter_holding_extraction.py` (new),
   `tests/test_auditor_tenure_defaults.py` (new), and a tracker section. No engine, config, schema
   or fixture change.
-- **Commit, push and remote verification:** recorded in the tracker's publication amendment for
-  this pass; the SHA is verified with `git ls-remote` after the push and quoted there.
+- **Implementation commit:** `bdab685a05a96a7531dc9a3f5b218b8c45ebfbfb` on
+  `arena/ae4d04e8-ipo-screening-engine`, pushed and remote-verified (`git ls-remote
+  origin refs/heads/arena/ae4d04e8-ipo-screening-engine` returned the same SHA). 4 files, 918
+  insertions, 0 deletions; `config/`, `schema/` and `fixtures/` untouched.
+- **Publication amendment:** the commit that records this SHA in the tracker is the branch tip and
+  a child of `bdab685`; `git log` on the pushed branch shows both. It changes only this document
+  and the tracker.
 - **Tracker:** `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md`, section
   "HD Fire Protect — RHP evidence reconciliation — 2026-10-20".
 - **Remaining Windows-only acceptance:** the HD Fire RHP, the evaluation record `…551a7eab`, its
