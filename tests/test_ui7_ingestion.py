@@ -101,7 +101,10 @@ def test_ingest_document_success_and_coexistence(test_env):
     assert body["ipo_id"] == "AURORA-SYSTEMS-LIMITED"
     assert body["evaluation_mode"] == "FINAL"
     assert body["is_duplicate"] is False
-    assert body["final_score"] == pytest.approx(23.0)
+    # D-5: this synthetic filing carries no litigation section, so the
+    # litigation criterion is UNKNOWN instead of being awarded 4/4 on the
+    # extractor's "clean" default (final 23.0 -> 19.0, available 26 -> 22).
+    assert body["final_score"] == pytest.approx(19.0)
     assert body["verdict"] == "INSUFFICIENT_DATA"
     assert body["confidence"] == "Low"
     assert body["result_hash"] is not None
@@ -135,7 +138,7 @@ def test_ingest_document_success_and_coexistence(test_env):
     detail = detail_res.json()
     assert detail["evaluation_id"] == sample_eval_id
     assert detail["company_name"] == "AURORA SYSTEMS LIMITED"
-    assert detail["score"]["final_score"] == pytest.approx(23.0)
+    assert detail["score"]["final_score"] == pytest.approx(19.0)  # D-5
 
     # Step 7: Verify golden hash for Vishal Nirmiti is strictly preserved
     vishal_detail = client.get(f"/api/v1/evaluations/{test_env['vishal_eval_id']}").json()
@@ -679,15 +682,18 @@ def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):
     # Step 4 Area B(i): RK's opinion is not establishable from the filing,
     # so the auditor criterion is UNKNOWN instead of scored on an
     # unsupported "unqualified" default (final 50.0 -> 49.0).
-    assert body["final_score"] == pytest.approx(49.0)
+    # D-5: RK's litigation section is never located by the TOC router, so the
+    # scan covers no page at all; "clean" on an empty scan was an unsupported
+    # finding, and the criterion is now UNKNOWN (49.0 -> 45.0).
+    assert body["final_score"] == pytest.approx(45.0)
     assert body["confidence"] == "Low"
     assert body["verdict"] == "INSUFFICIENT_DATA"
 
     eval_data = body["evaluation"]
-    assert eval_data["score"]["final_score"] == pytest.approx(49.0)
-    assert eval_data["score"]["base_score"] == pytest.approx(52.0)
+    assert eval_data["score"]["final_score"] == pytest.approx(45.0)  # D-5
+    assert eval_data["score"]["base_score"] == pytest.approx(48.0)  # D-5
     assert eval_data["score"]["penalties_total"] == pytest.approx(-3.0)
-    assert eval_data["score"]["completeness_pct"] == pytest.approx(73.0)
+    assert eval_data["score"]["completeness_pct"] == pytest.approx(69.0)  # D-5
 
     # Prove absence of Vishal Nirmiti qualitative defaults
     modules = {m["id"]: m for m in eval_data["score"]["modules"]}

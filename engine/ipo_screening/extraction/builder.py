@@ -310,15 +310,45 @@ class CanonicalInputBuilder:
             return extracted_uop
         return []
 
+    #: Bucket spellings an input may legitimately use for one of the three
+    #: governed buckets.  Anything else is UNKNOWN -- never "clean": an
+    #: unreadable value is missing evidence, not evidence of no litigation.
+    _LITIGATION_BUCKET_ALIASES = {
+        "clean": "clean",
+        "none": "clean",
+        "nil": "clean",
+        "no_litigation": "clean",
+        "minor_civil": "minor_civil",
+        "civil": "minor_civil",
+        "material_civil": "minor_civil",
+        "criminal_or_regulatory": "criminal_or_regulatory",
+        "criminal": "criminal_or_regulatory",
+        "regulatory": "criminal_or_regulatory",
+    }
+
+    @classmethod
+    def _normalise_litigation_bucket(cls, value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        return cls._LITIGATION_BUCKET_ALIASES.get(str(value).strip().lower())
+
     def _build_governance(self) -> Dict[str, Any]:
         gov_base = self.base.get("governance", {})
-        lit = gov_base["litigation_bucket"] if "litigation_bucket" in gov_base else self._get_field("governance.litigation_bucket", "clean")
-        if lit in ("none", None, "clean"):
-            lit = "clean"
-        elif lit in ("material_civil", "civil"):
-            lit = "minor_civil"
-        elif lit != "criminal_or_regulatory":
-            lit = "clean"
+        # D-5: neither the litigation bucket nor the SEBI/ED flag may be
+        # defaulted.  The previous code (a) fell back to ``"clean"`` when the
+        # extraction carried no bucket, (b) mapped *any* value that was not
+        # ``criminal_or_regulatory`` onto ``"clean"`` -- so an extracted
+        # ``minor_civil`` finding was silently rewritten into the favourable
+        # bucket, 4/4 points instead of 2/4, destroying the evidence it was
+        # taken from -- and (c) defaulted ``sebi_ed_action_active`` to
+        # ``False``.  Both fields now stay ``None`` (UNKNOWN) unless the input
+        # or an evidenced extraction establishes them; only explicitly stated
+        # synonyms of a bucket are normalised.
+        if "litigation_bucket" in gov_base:
+            raw_lit: Any = gov_base["litigation_bucket"]
+        else:
+            raw_lit = self._get_field("governance.litigation_bucket", None)
+        lit = self._normalise_litigation_bucket(raw_lit)
 
         def _pick_gov(key: str, default: Any = None) -> Any:
             if key in gov_base:
@@ -333,7 +363,7 @@ class CanonicalInputBuilder:
             "eom_materiality": _pick_gov("eom_materiality", None),
             "going_concern_uncertainty": _pick_gov("going_concern_uncertainty", None),
             "litigation_bucket": lit,
-            "sebi_ed_action_active": _pick_gov("sebi_ed_action_active", False),
+            "sebi_ed_action_active": _pick_gov("sebi_ed_action_active", None),
             "rpt_pct_revenue": _pick_gov("rpt_pct_revenue", 6.67 if self.allow_fixture_fallbacks else None),
             "rpt_pct_of_revenue_growth": _pick_gov("rpt_pct_of_revenue_growth", None),
             "board_independent_majority": _pick_gov("board_independent_majority", False),

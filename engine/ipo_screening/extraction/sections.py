@@ -1413,6 +1413,651 @@ class SectionExtractor:
                 break
         return pages
 
+    # ------------------------------------------------------------------
+    # Outstanding litigation and SEBI/ED regulatory action -- defect class D-5
+    # ------------------------------------------------------------------
+    #
+    # ``extract_governance`` used to initialise ``lit_bucket = "clean"`` and
+    # ``sebi_active = False`` *before* the litigation scan and then append both
+    # fields unconditionally afterwards, whatever the scan found -- including
+    # when every page in the range was empty.  Three separate integrity
+    # problems followed from that:
+    #
+    #   1. the absence of an extracted proceeding was treated as proof that no
+    #      proceeding exists, and ``clean`` is the favourable end of a scored
+    #      criterion (Module D ``litigation``, 4/4 points);
+    #   2. ``sebi_ed_action_active = False`` was emitted with the quotation
+    #      "No active SEBI or ED regulatory proceedings" -- text that appears
+    #      nowhere in any filing and was *not* marked ``quote_is_processing``,
+    #      so the evidence record presented a synthesised sentence as a source
+    #      quotation (the same defect D-4 removed from the auditor fields);
+    #   3. the classification regexes saw three phrases only, so the statutory
+    #      *summary-table* form of this disclosure -- one row per party group
+    #      and direction, one column per proceeding type, counts in the cells -
+    #      could not be read at all, and neither could the labelled
+    #      "Criminal proceedings against the Company / Nil" list form.
+    #
+    # The contract already provides the state this needs; nothing governed is
+    # changed.  ``schema/ipo-input.v1.5.schema.json`` allows
+    # ``governance.litigation_bucket: null`` and
+    # ``governance.sebi_ed_action_active: null``; ``derived._litigation_bucket``
+    # returns UNKNOWN for null; the ``litigation`` criterion scores UNKNOWN
+    # rather than zero; K2 lists ``sebi_ed_action_active`` among its required
+    # inputs; and ``config.critical_data`` makes its absence yield
+    # INSUFFICIENT_DATA.  The extractor simply stops asserting what the filing
+    # does not state.  The three buckets, their points and the adverse-marker
+    # vocabulary are exactly as governed -- only the *default* is removed.
+    #
+    # Polarity matters in both directions, as in D-1 and D-2: "there are no
+    # outstanding criminal proceedings or material civil litigation" is a
+    # statement of *absence*, not a finding of material civil litigation, and
+    # the previous code classified precisely that sentence as ``minor_civil``.
+    #
+    # Deliberately NOT decided here (each needs a governed standard, see
+    # docs/investigation/D-5-LITIGATION-REGULATORY-EVIDENCE-DEFAULTS-2026-10-20.md):
+    #   * a party-coverage standard for ``clean`` -- whether an absence
+    #     statement naming "the Company and its Promoters" also clears the
+    #     Directors.  The statement is accepted and the parties it names are
+    #     recorded in the evidence note, so the gap is visible in the record
+    #     rather than silently closed;
+    #   * a source-coverage standard under which a SEBI-only negative could
+    #     clear a flag whose governed name covers SEBI **and** the Enforcement
+    #     Directorate.  Until one is defined, only a negative naming both
+    #     regulators yields False; anything else stays UNKNOWN.
+    # An *affirmative* regulatory finding is always allowed through (a non-nil
+    # SEBI/ED cell in an adverse row, or a sentence with the agency, a finite
+    # act and a party): asserting an action the filing discloses is recoverable,
+    # clearing K2 without evidence is not.  A `Nil` cell never yields True, and
+    # a `Nil` cell scoped to the Promoters never clears the flag either.
+
+    #: Parties whose litigation the bucket covers.  The criterion formula says
+    #: "across promoters, directors and the company", so a proceeding against
+    #: *any* of them is in scope; the issuer's own name is not required.
+    _LIT_PARTY = re.compile(
+        r"\b(?:our\s+|the\s+)?(?:company|body\s+corporate|subsidiar(?:y|ies)|directors?"
+        r"(?:\s*\(excluding\s+promoters\))?|promoters?|key\s+managerial\s+personnel|kmp"
+        r"|senior\s+management|group\s+companies?)\b",
+        re.IGNORECASE,
+    )
+
+    #: Negation immediately before the phrase, within the same sentence
+    #: (the D-1 ``_GOING_CONCERN_NEGATION`` technique).
+    _LIT_NEGATION = re.compile(r"\b(?:no|not|none|nil|without|nothing)\b", re.IGNORECASE)
+
+    #: Adverse-proceeding vocabulary for the prose route, deliberately
+    #: *unchanged* from the baseline so that no filing is newly condemned by
+    #: this pass; only the favourable default is removed.  The table and
+    #: labelled-list routes below read only the filing's own disclosure forms.
+    _LIT_CRIMINAL_PHRASE = re.compile(
+        r"criminal\s+proceedings\s+against\s+our\s+promoters|\br\.c\.c\.|criminal\s+complaint",
+        re.IGNORECASE,
+    )
+    _LIT_CIVIL_PHRASE = re.compile(
+        r"material\s+civil\s+litigation|\bcivil\s+suits?\b",
+        re.IGNORECASE,
+    )
+
+    #: Explicit statement that proceedings of the stated kind do not exist.
+    #: ``no | none | nil`` may be separated from the noun only by adjectives --
+    #: a finite verb in between means the sentence is not an absence statement
+    #: ("No doubt, there are criminal proceedings ..." must stay adverse).
+    _LIT_ABSENCE = re.compile(
+        r"\b(?:no|none|nil)\b(?P<gap>[^.\n]{0,120}?)"
+        r"\b(?:(?:outstanding|pending|active|ongoing|material|such)\s+)*"
+        r"(?:criminal\s+(?:proceedings?|case[s]?|complaint[s]?|action[s]?)"
+        r"|civil\s+litigation|litigation|legal\s+proceedings?|regulatory\s+proceedings?"
+        r"|disciplinary\s+(?:actions?|proceedings?)|proceedings?)\b",
+        re.IGNORECASE,
+    )
+    _LIT_ABSENCE_GAP_VERB = re.compile(
+        r"\b(?:is|are|was|were|has|have|had|does|do|did|shall|will|may|can|could)\b",
+        re.IGNORECASE,
+    )
+    #: "None of our Promoters, Directors or Group Companies are involved in any
+    #: material litigation" -- subject-first absence, common SME wording.
+    _LIT_ABSENCE_NONE_OF = re.compile(
+        r"\bnone\s+of\b[^.\n]{0,200}?\b(?:is|are|was|were)\s+(?:now\s+|ever\s+)?"
+        r"(?:involved|a\s+party|parties|subject|named)\b[^.\n]{0,80}?\bin\s+any\b",
+        re.IGNORECASE,
+    )
+
+    #: Regulator identity.  ``ED`` is matched case-sensitively: a
+    #: case-insensitive two-letter token would fire on ordinary prose.
+    _REG_AGENCY = re.compile(
+        r"\bSEBI\b|\bSecurities\s+and\s+Exchange\s+Board\s+of\s+India\b"
+        r"|\bEnforcement\s+Directorate\b|\bPMLA\b|\bPrevention\s+of\s+Money\s+Laundering\s+Act\b",
+        re.IGNORECASE,
+    )
+    _REG_AGENCY_ED = re.compile(r"\bED\b")
+    #: An action of a regulator, in either word order, within one sentence.
+    _REG_ACTION = re.compile(
+        # The regulator must be shown *acting*: "proceedings ... initiated by
+        # SEBI".  A bare preposition ("actions by SEBI involving our Company")
+        # is a section heading, not a finding; headings are masked before this
+        # scan runs and the finite act is the second guard.
+        r"\b(?:proceedings?|action|actions|order|orders|notice|notices|summons|search\s+and\s+seizure"
+        r"|show\s+cause|attachment|penalt(?:y|ies)|disciplinary\s+action)\b[^.\n]{0,90}?"
+        r"\b(?:initiated|issued|passed|imposed|conducted|attached|registered|taken|served|filed|raised"
+        r"|recorded|framed)\b"
+        r"|\b(?:initiated|issued|passed|imposed|conducted|attached|registered|taken)\b[^.\n]{0,70}?"
+        r"\b(?:against|upon|on)\b[^.\n]{0,60}?(?:SEBI|Enforcement Directorate|\bED\b|PMLA)"
+        # ... or in the natural order, regulator first.  The action noun is
+        # required so that a bare "SEBI has approved the offer document" is not
+        # an action against anybody.
+        r"|\b(?:SEBI|Securities and Exchange Board of India|Enforcement Directorate|\bED\b|PMLA)\b"
+        r"[^.\n]{0,60}?\b(?:has|have|had|is|was)?\s*(?:initiated|issued|passed|imposed|conducted"
+        r"|attached|registered|served)\b[^.\n]{0,60}?"
+        r"\b(?:proceedings?|notice|order|orders|summons|show\s+cause|penalt|attachment|charge\s?sheet)"
+        # ... or a matter stated as pending before the regulator.
+        r"|\b(?:proceedings?|case[s]?|appeal|matter|enquiry|investigation)\b[^.\n]{0,50}?"
+        r"\bpending\s+before\b[^.\n]{0,50}?(?:SEBI|Enforcement Directorate|\bED\b|PMLA)",
+        re.IGNORECASE,
+    )
+    #: Boilerplate that names SEBI without describing any action (the cover
+    #: page, "not been recommended or approved by SEBI", bare regulation cites).
+    _REG_BOILERPLATE = re.compile(
+        r"\bICDR\b|\bregulations,?\s*20\d\d\b|\bnot\s+been\s+recommended\b|\bguarantee\s+the\s+accuracy\b"
+        r"|\bregistration\s+no\b|\bregulation\s+\d|\bSEBI\s+(?:ICDR|LODR|PFRR|DAP|Listing)\b"
+        r"|\blimitation\s+act\b",
+        re.IGNORECASE,
+    )
+
+    #: Labelled list form used inside the litigation section: a category label
+    #: on one line, its value alone on the next --
+    #: "a) Criminal proceedings against the Company" / "Nil".
+    #: This is the ICDR Schedule-VI layout real RHPs print (Jio p. 464, Vishal
+    #: Nirmiti pp. 439-441), and the label often names the regulator itself
+    #: ("Disciplinary actions by SEBI and / or the Stock Exchanges involving
+    #: our Company"), which is why the label is read as a *label* here and
+    #: never as an adverse finding by the prose scan.
+    _LIT_LABELLED = re.compile(
+        r"^(?P<label>(?:\(?[a-z0-9]{1,4}[).]\s*)?[^\n]{0,150}?"
+        r"(?:criminal\s+proceedings?|material\s+civil\s+litigation|civil\s+litigation"
+        r"|disciplinary\s+actions?|actions?\s+by\s+statutory[^.\n]{0,60}?regulatory\s+authorities"
+        r"|regulatory\s+proceedings?|tax\s+proceedings?)"
+        r"[^\n]{0,90})[ \t]*\n+[ \t]*(?P<value>Nil|N/A|NA|Not\s+applicable|[-\u2013\u2014]"
+        r"|\[\u25cf\]|(?P<count>\d[\d,]*(?:\.\d+)?))[ \t]*$",
+        re.IGNORECASE | re.MULTILINE,
+    )
+    #: Adverse versus self-initiated, read out of the label itself.
+    _LIT_LABEL_ADVERSE = re.compile(
+        r"\b(?:against|involving|pending)\b", re.IGNORECASE
+    )
+    _LIT_LABEL_SELF = re.compile(
+        r"\b(?:by|from)\s+(?:our|the)\s+(?:company|promoters?|directors?|subsidiaries|kmp"
+        r"|senior\s+management)\b",
+        re.IGNORECASE,
+    )
+    #: A bare category heading: a short line naming proceeding types with no
+    #: value of its own.  Masked from the prose and SEBI scans, because the
+    #: words "criminal proceedings" or "disciplinary actions by SEBI" inside a
+    #: heading disclose nothing -- the finding lives in the text under it.
+    _LIT_HEADING = re.compile(
+        r"^[ \t]*(?:\(?[a-z0-9]{1,4}[).][ \t]*)?(?:the[ \t]+)?(?:criminal[ \t]+proceedings?"
+        r"|material[ \t]+civil[ \t]+litigation|civil[ \t]+litigation|disciplinary[ \t]+actions?"
+        r"|actions?[ \t]+by[ \t]+statutory[^.\n]{0,60}?regulatory[ \t]+authorities"
+        r"|outstanding[ \t]+litigation[^.\n]{0,60}|regulatory[ \t]+proceedings?"
+        r"|tax[ \t]+proceedings?)[^.\n]{0,90}$",
+        re.IGNORECASE | re.MULTILINE,
+    )
+
+    #: Summary-table form (SEBI ICDR Schedule VI / Materiality Policy): one
+    #: header row naming the proceeding types, one row per party group and
+    #: direction.  Columns are mapped by label, never by assumed position.
+    _LIT_TABLE_HEAD = re.compile(r"category\s+of\s+individuals\s*/\s*entities", re.IGNORECASE)
+    _LIT_TABLE_COLUMNS = (
+        ("criminal", re.compile(r"criminal\s+proceedings?", re.IGNORECASE)),
+        ("tax", re.compile(r"tax\s+proceedings?", re.IGNORECASE)),
+        ("regulatory", re.compile(r"statutory\s+or\s+regulatory\s+proceedings?", re.IGNORECASE)),
+        ("sebi", re.compile(r"disciplinary\s+actions?\s+by\s+sebi", re.IGNORECASE)),
+        ("civil", re.compile(r"material\s+civil\s+litigation", re.IGNORECASE)),
+        ("amount", re.compile(r"aggregate\s+amount\s+involved", re.IGNORECASE)),
+    )
+    _LIT_TABLE_ROW = re.compile(
+        r"^\s*\|?\s*(?P<side>against|by)\s+our\s+(?P<party>company|subsidiary|directors?[^|\n]{0,40}?"
+        r"|promoters?|kmp|key\s+managerial\s+personnel|senior\s+management)\b(?P<rest>.*)$",
+        re.IGNORECASE | re.MULTILINE,
+    )
+    _LIT_TABLE_ROW_LINE = re.compile(r"^\s*\|?\s*(?:against|by)\s+our\s+", re.IGNORECASE)
+    _LIT_CELL_NIL = re.compile(r"^(?:nil|na|n/a|not\s+applicable|[-\u2013\u2014]|\[\u25cf\])$", re.IGNORECASE)
+    _LIT_CELL_COUNT = re.compile(r"^\d[\d,]*(?:\.\d+)?%?$")
+
+    @staticmethod
+    def _lit_is_separator(line: str) -> bool:
+        """A table rule line such as ``| --- | --- |``: structure, not text."""
+        stripped = line.strip()
+        return bool(stripped) and set(stripped) <= set("|-+\u2013\u2014 :.")
+
+    @classmethod
+    def _lit_prose_pages(
+        cls, lit_pages: Sequence[Tuple[int, str]]
+    ) -> List[Tuple[int, str]]:
+        """Litigation pages with any summary-table block blanked out.
+
+        Blanking preserves character offsets, so a quote taken from the masked
+        text is still a verbatim slice of the page.  The table is read by the
+        structured route instead; the prose routes keep the surrounding
+        narrative, which is where "except as stated below" style disclosures
+        live.
+        """
+        out: List[Tuple[int, str]] = []
+        for page, text in lit_pages:
+            if not text:
+                out.append((page, text))
+                continue
+            lines = text.split("\n")
+            masked: List[str] = []
+            in_table = False
+            for line in lines:
+                if cls._LIT_TABLE_HEAD.search(line) or (in_table and cls._lit_is_separator(line)):
+                    in_table = True
+                    masked.append(" " * len(line))
+                    continue
+                if in_table:
+                    # Blank rules, pipe rows and party rows all belong to the
+                    # table block; the first other line ends it.
+                    if (
+                        not line.strip()
+                        or "|" in line
+                        or cls._lit_is_separator(line)
+                        or bool(cls._LIT_TABLE_ROW_LINE.match(line))
+                    ):
+                        masked.append(" " * len(line))
+                        continue
+                    in_table = False
+                elif cls._lit_is_separator(line):
+                    masked.append(" " * len(line))
+                    continue
+                masked.append(line)
+            joined = "\n".join(masked)
+            # A labelled list item ("a) Criminal proceedings against the
+            # Company" + "Nil" on the next line) is structured evidence read by
+            # the structured route.  Its label line names a proceeding type
+            # without disclosing any proceeding, so mask exactly the lines the
+            # item occupies -- otherwise the label of a *nil* row is scanned as
+            # an adverse finding.  Only those lines are masked, so narrative
+            # prose on the same page stays visible.
+            for match in cls._LIT_LABELLED.finditer(joined):
+                lo = joined.rfind("\n", 0, match.start()) + 1
+                hi = joined.find("\n", match.end())
+                hi = len(joined) if hi == -1 else hi
+                joined = joined[:lo] + " " * (hi - lo) + joined[hi:]
+            for match in cls._LIT_HEADING.finditer(joined):
+                joined = joined[: match.start()] + " " * (match.end() - match.start()) + joined[match.end():]
+            out.append((page, joined))
+        return out
+
+
+    @staticmethod
+    def _lit_cells(line: str) -> List[str]:
+        """Split a table line into cells: pipe-delimited, else whitespace."""
+        if "|" in line:
+            return [cell.strip() for cell in line.split("|") if cell.strip()]
+        return line.split()
+
+    @classmethod
+    def _lit_prefix(cls, text: str, start: int) -> str:
+        """Same-sentence prefix before a phrase (D-1's polarity technique)."""
+        prefix = text[max(0, start - 160): start]
+        cut = max(prefix.rfind("."), prefix.rfind("\n"), prefix.rfind(";"), prefix.rfind(":"))
+        return prefix[cut + 1:]
+
+    @staticmethod
+    def _lit_span(masked: str, start: int, end: int) -> Tuple[int, int]:
+        """Whole-line sentence span around a match.
+
+        PDF text is line-structured, so a sentence is assembled from lines:
+        backwards while the previous line is not a sentence end, forwards while
+        the current line is not terminated, and never across a blank line.  The
+        span is computed on the masked text and applied to the original, which
+        keeps every emitted quotation a verbatim contiguous slice of the page.
+        """
+        lines = masked.split("\n")
+        offsets: List[int] = []
+        pos = 0
+        for line in lines:
+            offsets.append(pos)
+            pos += len(line) + 1
+        idx = len(lines) - 1
+        for i, offset in enumerate(offsets):
+            if offset > start:
+                idx = max(0, i - 1)
+                break
+        lo = idx
+        while lo > 0:
+            previous = lines[lo - 1].strip()
+            if not previous or previous.endswith((".", ":", ";", "*")):
+                break
+            if not re.search(r"[a-z]", previous):
+                break  # a section heading, not part of the sentence
+            lo -= 1
+        hi = idx
+        while hi + 1 < len(lines):
+            current = lines[hi].strip()
+            following = lines[hi + 1].strip()
+            if not following or current.endswith("."):
+                break
+            hi += 1
+        return offsets[lo], offsets[hi] + len(lines[hi])
+
+    @classmethod
+    def _lit_sentence(cls, text: str, start: int, end: int) -> str:
+        """The line-spanning sentence around a match, whitespace-normalised."""
+        left, right = cls._lit_span(text, start, end)
+        return " ".join(text[left:right].split())[:400]
+
+    @classmethod
+    def _lit_agencies(cls, sentence: str) -> Tuple[bool, bool]:
+        """(SEBI named?, Enforcement Directorate named?) for one sentence."""
+        return (
+            bool(cls._REG_AGENCY.search(sentence)),
+            bool(cls._REG_AGENCY_ED.search(sentence))
+            or bool(re.search(r"enforcement\s+director(?:ate)?s?", sentence, re.IGNORECASE)),
+        )
+
+    @staticmethod
+    def _lit_parties_named(quote: str) -> str:
+        """Which party groups an emitted statement actually names (audit note)."""
+        found: List[str] = []
+        for label, pattern in (
+            ("Company", r"\bcompany\b"),
+            ("Subsidiaries", r"\bsubsi"),
+            ("Directors", r"\bdirectors?\b"),
+            ("Promoters", r"\bpromoters?\b"),
+            ("KMP", r"\bkey\s+managerial\s+personnel\b|\bKMP\b"),
+            ("Senior management", r"\bsenior\s+management\b"),
+        ):
+            if re.search(pattern, quote, re.IGNORECASE):
+                found.append(label)
+        return ", ".join(found) if found else "not stated"
+
+    def _litigation_bucket_finding(
+        self, lit_pages: Sequence[Tuple[int, str]]
+    ) -> Optional[Tuple[str, int, str, str]]:
+        """Classify the litigation bucket, or return None when unevidenced.
+
+        Returns ``(bucket, page, verbatim quote, basis)``.  Every branch is
+        driven by text present on the page it cites; no finding -- rather than
+        the favourable ``"clean"`` bucket -- is the answer when the section is
+        missing, empty, unreadable or ambiguous.
+
+        Order is deliberate.  An adverse statement wins over any structured nil
+        and over any absence statement, because "no litigation is pending
+        except as described below" is a real disclosure; a structured table can
+        then only *add* an adverse finding, never cancel one.
+        """
+        # 1. Adverse prose, on the governed vocabulary, with a polarity guard.
+        #    The strongest finding in the range wins, as before: a civil
+        #    mention on an earlier page does not hide a criminal one later.
+        prose = self._lit_prose_pages(lit_pages)
+        adverse: Optional[Tuple[int, str]] = None
+        civil_hit: Optional[Tuple[int, str]] = None
+        by_page = dict(lit_pages)
+        for page, masked in prose:
+            if not masked:
+                continue
+            original = by_page.get(page, masked)
+            for regex, is_criminal in (
+                (self._LIT_CRIMINAL_PHRASE, True),
+                (self._LIT_CIVIL_PHRASE, False),
+            ):
+                for match in regex.finditer(masked):
+                    if self._LIT_NEGATION.search(self._lit_prefix(masked, match.start())):
+                        continue  # "no outstanding ... material civil litigation" is not civil litigation
+                    lo, hi = self._lit_span(masked, match.start(), match.end())
+                    quote = " ".join(original[lo:hi].split())[:400]
+                    if is_criminal:
+                        adverse = (page, quote)
+                        break
+                    if civil_hit is None:
+                        civil_hit = (page, quote)
+            if adverse is not None:
+                break
+        if adverse is not None:
+            return ("criminal_or_regulatory", adverse[0], adverse[1], "prose")
+        if civil_hit is not None:
+            return ("minor_civil", civil_hit[0], civil_hit[1], "prose")
+
+        # 2. Statutory summary table: cell counts per party group and type.
+        table = self._litigation_table_finding(lit_pages)
+        if table is not None:
+            return table
+
+        # 3. Labelled list form ("Criminal proceedings against the Company: Nil").
+        labelled = self._litigation_labelled_finding(lit_pages)
+        if labelled is not None:
+            return labelled
+
+        # 4. Explicit statement that no proceedings exist -> the clean bucket,
+        #    now supported by a quotation instead of by the absence of one.
+        for page, masked in prose:
+            if not masked:
+                continue
+            original = by_page.get(page, masked)
+            for match in list(self._LIT_ABSENCE.finditer(masked)) + list(
+                self._LIT_ABSENCE_NONE_OF.finditer(masked)
+            ):
+                gap = match.groupdict().get("gap")
+                if gap and self._LIT_ABSENCE_GAP_VERB.search(gap):
+                    continue
+                lo, hi = self._lit_span(masked, match.start(), match.end())
+                sentence = " ".join(original[lo:hi].split())[:400]
+                if not self._LIT_PARTY.search(sentence):
+                    continue  # nothing is asserted absent for any party
+                return ("clean", page, sentence, "prose-absence")
+        return None
+
+    def _litigation_table_finding(
+        self, lit_pages: Sequence[Tuple[int, str]]
+    ) -> Optional[Tuple[str, int, str, str]]:
+        """Read the ICDR "summary table of outstanding litigation".
+
+        Fail-closed by construction: a header that cannot be mapped to columns,
+        or a row whose cell count does not match the column count, yields no
+        finding at all.  A partially-read table is ambiguous evidence, and
+        ambiguity is UNKNOWN -- never the favourable bucket.  A count in a
+        column that maps to no governed bucket (tax exposures, for instance)
+        blocks ``clean`` without inventing a bucket of its own, so a filing
+        that discloses *something* can never be reported as litigation-free.
+        """
+        for page, text in lit_pages:
+            if not text:
+                continue
+            head = self._LIT_TABLE_HEAD.search(text)
+            if head is None:
+                continue
+            line_start = text.rfind("\n", 0, head.start()) + 1
+            line_end = text.find("\n", head.start())
+            header_line = text[line_start: line_end if line_end != -1 else len(text)]
+            columns = self._lit_cells(header_line)
+            if len(columns) < 3:
+                continue
+            keys: List[Optional[str]] = []
+            for cell in columns[1:]:
+                key: Optional[str] = None
+                for name, pattern in self._LIT_TABLE_COLUMNS:
+                    if pattern.search(cell):
+                        key = name
+                        break
+                keys.append(key)
+            if not any(key in ("criminal", "civil", "regulatory", "sebi") for key in keys):
+                continue  # an unmappable header is not evidence either way
+
+            adverse = civil = sebi = False
+            unmapped = False
+            adverse_rows = 0
+            unreadable_adverse_rows = 0
+            evidence_row: Optional[Tuple[int, str]] = None
+            for row in self._LIT_TABLE_ROW.finditer(text):
+                side = row.group("side").lower()
+                parts = self._lit_cells(row.group("rest"))
+                if len(parts) != len(keys):
+                    # An adverse row that cannot be read leaves the population
+                    # incomplete, so "clean" is off the table even if every
+                    # other row says nil.
+                    if side == "against":
+                        unreadable_adverse_rows += 1
+                    continue
+                if side == "against":
+                    # Only the "against" rows describe exposure; a table whose
+                    # rows are all "by our Company" states no adverse litigation
+                    # but also proves nothing about what is not shown.
+                    adverse_rows += 1
+                counts: Dict[str, bool] = {}
+                readable = True
+                for key, cell in zip(keys, parts):
+                    if key is None:
+                        continue
+                    if self._LIT_CELL_NIL.match(cell):
+                        counts[key] = False
+                    elif self._LIT_CELL_COUNT.match(cell):
+                        counts[key] = float(cell.replace(",", "").rstrip("%")) > 0
+                    else:
+                        readable = False
+                        break
+                if not readable or not counts:
+                    continue
+                quote = " ".join(row.group(0).split())[:400]
+                if counts.get("sebi") and side == "against":
+                    sebi = True
+                    evidence_row = (page, quote)
+                if side == "against":
+                    if counts.get("criminal") or counts.get("regulatory"):
+                        adverse = True
+                        evidence_row = (page, quote)
+                    elif counts.get("civil"):
+                        civil = True
+                        if evidence_row is None:
+                            evidence_row = (page, quote)
+                    elif any(counts.values()):
+                        # disclosed, but its type maps to no governed bucket
+                        unmapped = True
+                        if evidence_row is None:
+                            evidence_row = (page, quote)
+            if adverse_rows == 0:
+                continue
+            if unreadable_adverse_rows:
+                return None  # incomplete coverage: UNKNOWN, never a favourable default
+            if adverse:
+                return ("criminal_or_regulatory", evidence_row[0], evidence_row[1], "summary-table")
+            if sebi:
+                return ("criminal_or_regulatory", evidence_row[0], evidence_row[1], "summary-table")
+            if civil:
+                return ("minor_civil", evidence_row[0], evidence_row[1], "summary-table")
+            if unmapped:
+                return None
+            # A table that omits a whole proceeding type cannot prove its
+            # absence, so "clean" additionally requires the columns that the
+            # bucket is defined over to be present.
+            if not {"criminal", "civil", "regulatory"} <= {key for key in keys if key}:
+                return None
+            return ("clean", page, " ".join(header_line.split())[:400], "summary-table")
+        return None
+
+    def _litigation_labelled_finding(
+        self, lit_pages: Sequence[Tuple[int, str]]
+    ) -> Optional[Tuple[str, int, str, str]]:
+        """Read the labelled list form used inside the litigation section.
+
+        Only "against" rows are adverse: proceedings *initiated by* the issuer
+        are its own claims, not a risk to the screening result, and are
+        therefore recorded without a bucket change.
+        """
+        adverse: Optional[Tuple[int, str, str]] = None
+        civil: Optional[Tuple[int, str, str]] = None
+        seen_nil = False
+        for page, text in lit_pages:
+            if not text:
+                continue
+            for match in self._LIT_LABELLED.finditer(text):
+                value = (match.group("value") or "").strip()
+                quote = " ".join(match.group(0).split())[:400]
+                if self._LIT_CELL_NIL.match(value):
+                    seen_nil = True
+                    continue
+                label = match.group("label")
+                if not self._LIT_LABEL_ADVERSE.search(label):
+                    continue  # no party is named as respondent: not a finding
+                if self._LIT_LABEL_SELF.search(label) and not re.search(
+                    r"\bagainst\b", label, re.IGNORECASE
+                ):
+                    continue  # the issuer as claimant, not as defendant
+                low = label.lower()
+                entry = (page, quote, low)
+                if (
+                    "criminal" in low
+                    or "regulatory" in low
+                    or "disciplinary" in low
+                    or "statutory" in low
+                ):
+                    adverse = adverse or entry
+                elif "civil" in low or "litigation" in low:
+                    civil = civil or entry
+                else:
+                    continue  # e.g. tax: disclosed, but it maps to no bucket
+        if adverse is not None:
+            return ("criminal_or_regulatory", adverse[0], adverse[1], "labelled-list")
+        if civil is not None:
+            return ("minor_civil", civil[0], civil[1], "labelled-list")
+        if seen_nil:
+            return None  # nils in some categories do not establish nil litigation
+        return None
+
+    def _sebi_ed_action_finding(
+        self, lit_pages: Sequence[Tuple[int, str]]
+    ) -> Optional[Tuple[bool, int, str]]:
+        """Establish an active SEBI/ED action -- or its explicit absence.
+
+        ``True`` requires a regulator to be named as the actor of an action
+        involving a party of the issuer; ``False`` requires an explicit
+        negative covering both SEBI and the Enforcement Directorate, because
+        the governed flag is ``sebi_ed_action_active``.  Boilerplate that merely
+        cites SEBI regulations, and negatives scoped to one regulator only,
+        emit nothing -- which is exactly how a promoter-scoped "Nil" cell or an
+        inaccessible regulatory page must be represented.
+        """
+        for page, text in self._lit_prose_pages(lit_pages):
+            if not text:
+                continue
+            original = dict(lit_pages).get(page, text)
+            for match in self._REG_ACTION.finditer(text):
+                lo, hi = self._lit_span(text, match.start(), match.end())
+                sentence = " ".join(original[lo:hi].split())
+                if len(sentence) > 600:
+                    continue  # a span that wide is not one sentence: not quotable
+                sebi_named, ed_named = self._lit_agencies(sentence)
+                if not (sebi_named or ed_named):
+                    continue
+                if self._REG_BOILERPLATE.search(sentence):
+                    continue
+                if not self._LIT_PARTY.search(sentence):
+                    continue
+                # Negation is tested over the sentence *up to the regulator
+                # mention*, not only over the raw prefix before the matched
+                # noun: the noun can sit on a heading line while the negation
+                # sits on the next line of the same statement ("Actions by
+                # statutory or regulatory authorities: ... there are no
+                # outstanding disciplinary actions or penalties imposed by
+                # SEBI ...").  Erring towards "negated" costs a missed trigger;
+                # asserting an action the filing expressly denies triggers K2
+                # and an AVOID verdict.
+                agency_at = len(sentence)
+                for regex in (self._REG_AGENCY, self._REG_AGENCY_ED):
+                    found = regex.search(sentence)
+                    if found is not None:
+                        agency_at = min(agency_at, found.start())
+                window = sentence[:agency_at]
+                negated = bool(self._LIT_NEGATION.search(window)) or bool(
+                    self._LIT_NEGATION.search(self._lit_prefix(text, match.start()))
+                )
+                if negated:
+                    # A SEBI-only negative cannot clear an ED-inclusive flag.
+                    if sebi_named and ed_named:
+                        return (False, page, sentence)
+                    continue
+                return (True, page, sentence)
+        return None
+
     def extract_governance(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract auditor opinion, litigation bucket, SEBI action, and board independence."""
         extractions: List[RawExtraction] = []
@@ -1685,51 +2330,66 @@ class SectionExtractor:
                     )
                     break
 
-        # 2. Litigation bucket & SEBI action
+        # 2. Litigation bucket & SEBI/ED action (D-5).
+        #
+        # Emitted only from evidence.  The scan below used to end in
+        # ``lit_bucket = "clean"`` / ``sebi_active = False`` regardless of what
+        # it found, and both fields were appended unconditionally with a
+        # quotation of its own making.  Now: a finding is emitted when the
+        # litigation section states it, and is *absent* -- so the derived metric
+        # is UNKNOWN and K2 is UNVERIFIED rather than CLEAR -- when the section
+        # is missing, unreadable, empty, or ambiguous about who the proceeding
+        # involves or which regulator acted.
         lit_range = page_ranges.get("litigation") if page_ranges else None
         p_lstart, p_lend = lit_range or (430, min(500, self.page_count))
+        lit_pages = [
+            (p, self.extract_page_text(p))
+            for p in range(max(1, p_lstart), min(p_lend, self.page_count) + 1)
+        ]
 
-        lit_bucket = "clean"
-        sebi_active = False
-        found_lit_page = p_lstart
-
-        for p in range(p_lstart, p_lend + 1):
-            txt = self.extract_page_text(p)
-            if re.search(r'criminal proceedings against our promoters|r\.c\.c\.|criminal complaint', txt, re.IGNORECASE):
-                lit_bucket = "criminal_or_regulatory"
-                found_lit_page = p
-                break
-            elif re.search(r'material civil litigation|civil suit', txt, re.IGNORECASE):
-                lit_bucket = "minor_civil"
-                found_lit_page = p
-
-        extractions.append(
-            RawExtraction(
-                field_path="governance.litigation_bucket",
-                candidate_value=lit_bucket,
-                raw_text=lit_bucket,
-                page=found_lit_page,
-                section="Outstanding Litigation",
-                locator="Outstanding Litigation and Material Developments",
-                quote=f"Litigation bucket classified as: {lit_bucket}",
-                quote_is_processing=True,
-                extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
-                extraction_confidence=0.95,
+        lit_finding = self._litigation_bucket_finding(lit_pages)
+        if lit_finding is not None:
+            lit_bucket, lit_page, lit_quote, lit_basis = lit_finding
+            extractions.append(
+                RawExtraction(
+                    field_path="governance.litigation_bucket",
+                    candidate_value=lit_bucket,
+                    raw_text=lit_quote,
+                    page=lit_page,
+                    section="Outstanding Litigation",
+                    locator="Outstanding Litigation and Material Developments",
+                    quote=lit_quote,
+                    notes=(
+                        f"bucket from the {lit_basis} disclosure; parties named in "
+                        f"the quoted text: {self._lit_parties_named(lit_quote)}"
+                    ),
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.95 if lit_basis != "prose" else 0.90,
+                )
             )
-        )
-        extractions.append(
-            RawExtraction(
-                field_path="governance.sebi_ed_action_active",
-                candidate_value=sebi_active,
-                raw_text=str(sebi_active),
-                page=found_lit_page,
-                section="Outstanding Litigation",
-                locator="Disciplinary actions by SEBI or Stock Exchanges",
-                quote="No active SEBI or ED regulatory proceedings",
-                extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
-                extraction_confidence=0.95,
+
+        sebi_finding = self._sebi_ed_action_finding(lit_pages)
+        if sebi_finding is not None:
+            sebi_active, sebi_page, sebi_quote = sebi_finding
+            extractions.append(
+                RawExtraction(
+                    field_path="governance.sebi_ed_action_active",
+                    candidate_value=sebi_active,
+                    raw_text=sebi_quote,
+                    page=sebi_page,
+                    section="Outstanding Litigation",
+                    locator="Disciplinary actions by SEBI or Stock Exchanges",
+                    quote=sebi_quote,
+                    notes=(
+                        "explicit "
+                        + ("SEBI/ED action disclosed" if sebi_active else "absence of SEBI and ED action")
+                        + "; parties named in the quoted text: "
+                        + self._lit_parties_named(sebi_quote)
+                    ),
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.92,
+                )
             )
-        )
 
         # 3. Board independence
         mgmt_range = page_ranges.get("our_management") if page_ranges else None
