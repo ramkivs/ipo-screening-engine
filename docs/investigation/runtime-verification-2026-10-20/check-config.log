@@ -1,0 +1,14 @@
+config             /home/user/ipo-screening-engine/config/ipo-config.v1.5.0.json
+spec version       1.5 (engine supports 1.5)
+valid              True
+profiles resolved  10
+  cyclical                     100 points  [A=25 B=20 C=15 D=15 E=15 F=10]
+  cyclical+retail_heavy        100 points  [A=25 B=20 C=15 D=15 E=15 F=10]
+  epc_real_estate              100 points  [A=25 B=20 C=15 D=15 E=15 F=10]
+  epc_real_estate+retail_heavy 100 points  [A=25 B=20 C=15 D=15 E=15 F=10]
+  financial                    100 points  [A=25 B=20 C=15 D=15 E=15 F=10]
+  financial+retail_heavy       100 points  [A=25 B=20 C=15 D=15 E=15 F=10]
+  loss_making                  100 points  [A=25 B=20 C=15 D=15 E=15 F=10]
+  loss_making+retail_heavy     100 points  [A=25 B=20 C=15 D=15 E=15 F=10]
+  standard                     100 points  [A=25 B=20 C=15 D=15 E=15 F=10]
+  standard+retail_heavy        100 points  [A=25 B=20 C=15 D=15 E=15 F=10]

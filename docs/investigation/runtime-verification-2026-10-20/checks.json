@@ -1,0 +1,48 @@
+{
+  "tested_commit": "e7b588cffb8a2155c9a0041b2134d34144b371fd",
+  "runs": [
+    {
+      "name": "focused-backend",
+      "command": [
+        "python3",
+        "-m",
+        "pytest",
+        "tests/test_governance_contract_audit.py",
+        "tests/test_auditor_tenure_defaults.py",
+        "tests/test_litigation_regulatory_defaults.py",
+        "tests/test_hd_fire_primary_source_extraction.py",
+        "-q"
+      ],
+      "cwd": ".",
+      "start_utc": "2026-10-20T17:42:14.423558+00:00",
+      "end_utc": "2026-10-20T17:42:15.269449+00:00",
+      "elapsed_seconds": 0.846,
+      "exit_code": 0
+    },
+    {
+      "name": "frontend",
+      "command": [
+        "npm",
+        "test"
+      ],
+      "cwd": "frontend",
+      "start_utc": "2026-10-20T17:42:15.269606+00:00",
+      "end_utc": "2026-10-20T17:42:16.502581+00:00",
+      "elapsed_seconds": 1.233,
+      "exit_code": 0
+    },
+    {
+      "name": "check-config",
+      "command": [
+        "python3",
+        "engine/tools/ipo_screen.py",
+        "check-config"
+      ],
+      "cwd": ".",
+      "start_utc": "2026-10-20T17:42:16.502792+00:00",
+      "end_utc": "2026-10-20T17:42:16.752272+00:00",
+      "elapsed_seconds": 0.249,
+      "exit_code": 0
+    }
+  ]
+}

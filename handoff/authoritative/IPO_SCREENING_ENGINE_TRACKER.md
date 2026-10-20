@@ -1065,3 +1065,31 @@ Reconciled against the remote repository (`ramkivs/ipo-screening-engine`), all b
   schemas, fixtures, decision records and historical artifacts are unchanged.
   main remains untouched; PR #6 must remain OPEN / UNMERGED. Remote commit/content
   verification is performed after push and reported in the completion response.
+
+### Runtime tested-tree identity and test convergence — 2026-10-20
+
+- **Verified target:** e7b588cffb8a2155c9a0041b2134d34144b371fd; runtime implementation
+  41f2f86909fa4495b3c9d735d897c00bb20843b4 includes A24/A25 parser, party coverage,
+  disclosed-negative semantics and page-read observability. Initial tree clean.
+- **Previous full run applicable:** recovered actual full_a24.log records 1288
+  collected/passed, 0 failed/skipped, no xfail/xpass reported, 25 warnings,
+  1272.03 s, EXIT=0. Corroborated with contemporaneous d1be6d2 tracker/RUNBOOK,
+  commit/reflog timing and unchanged Git trees for engine/frontend/config/schema/
+  fixtures/evidence/dependencies/harness. Original log lacks a HEAD header; that
+  limitation is explicitly documented rather than disguised as original attestation.
+- **Intervening coverage:** changed paths are docs, one test name/docstring and
+  17 audit checks. Normalized AST of the older test module is identical; current
+  collection is 1305 = 1288 + 17. Full backend deliberately not redundantly rerun.
+- **Executed now:** focused backend 122 passed in 0.27 s (0 failures/skips, no warnings
+  reported); frontend npm test 90 passed, 0 failures/skips/cancelled/todo in
+  656.435112 ms; check-config valid True, all 10 profiles 100 points. Collection
+  1305 tests in 0.56 s, with existing Starlette/httpx deprecation warning. No full
+  1305-pass claim is made. Exact commands, UTC timings, logs and object IDs are in
+  docs/investigation/runtime-verification-2026-10-20/REPORT.md and adjacent artifacts.
+- **Progress/failures:** initial update before investigation, equivalence update
+  before tests, plugin milestones through 122/122, and completion update. No stalls,
+  failures, runtime corrections or weakened tests; no long suite started this pass.
+- **Preservation:** no scoring, knockout, evidence-policy, config, schema, fixture or
+  historical-evaluation change. Existing A26/A27/A8-R authority boundaries remain.
+  Only evidence artifacts and this append-only tracker entry are published; remote
+  verification follows push. main stays untouched; PR #6 OPEN/UNMERGED is required.
