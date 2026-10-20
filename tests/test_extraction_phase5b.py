@@ -231,7 +231,14 @@ def test_evidence_provenance_and_auditability():
 
     assert "_evidence" in canonical
     evidence = canonical["_evidence"]
-    assert len(evidence) >= 10
+    # D-5: the floor used to be 10 because the extraction *always* emitted a
+    # "governance.sebi_ed_action_active" record whose quotation -- "No active
+    # SEBI or ED regulatory proceedings" -- appears in no filing.  That
+    # unevidenced record is gone, so nine evidenced fields remain: a lower count
+    # of real provenance, not a loss of it.  Its absence is the point of the
+    # change, so it is asserted rather than tolerated.
+    assert len(evidence) >= 9
+    assert "governance.sebi_ed_action_active" not in evidence
 
     # Ensure crucial financial and governance fields carry traceable provenance
     for field in [
