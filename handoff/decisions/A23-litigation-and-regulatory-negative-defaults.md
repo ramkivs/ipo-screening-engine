@@ -10,7 +10,7 @@
 - **Baseline identity:** branch `arena/ae4d04e8-ipo-screening-engine` at remotely verified commit `2d52baa56cbb4b82061649106745f79d04d9fce6` (`main` `01ba66c`, PR #6 open/unmerged).
 - **Scope:** `extraction/sections.py::extract_governance` and its new classifiers; `extraction/builder.py::_build_governance`; `extraction/toc.py` litigation section pattern; the tests named below.
 - **Implementation authority:** granted for this correction only. No new scored category, formula, weight, threshold, knockout semantic, schema or config change is authorized.
-- **Publication status:** see the publication block in the authoritative tracker.
+- **Publication status:** implemented in `9f1666c4999fa2e1f59365e03eaafcb9c2356ebe` (remote-verified; 11 files, 1140 insertions, 48 deletions); publication block in the authoritative tracker. Full backend suite at that commit: **1218 passed, 0 failed, 0 xfailed**, 1211.19 s.
 
 ## Contract facts this decision relies on (verified, unchanged)
 
