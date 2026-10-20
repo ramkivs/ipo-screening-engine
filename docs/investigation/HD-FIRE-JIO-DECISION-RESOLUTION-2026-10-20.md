@@ -487,6 +487,7 @@ Each record is separate. A recommendation is **not** an accepted decision.
 | `pytest tests/test_contingent_liabilities_extraction.py -q` | **9 passed** (29.5 s) |
 | `pytest tests/test_promoter_holding_extraction.py tests/test_auditor_tenure_defaults.py tests/test_going_concern_negative_disclosure.py tests/test_contingent_liabilities_extraction.py tests/test_auditor_evidence_section.py tests/test_rk_fashion_reconciliation.py tests/test_fixture_fallback_isolation.py tests/test_jio_evidence_remediation.py tests/test_overlays_knockouts.py tests/test_core_semantics.py -q` | **106 passed, 1 xfailed** (216.37 s) |
 | `pytest tests -q` (full backend) | see §7.1 |
+| the four touched test files, re-run on the final tree after the docstring edits | **29 passed, 1 xfailed** (32.91 s) |
 
 ### 7.1 Full suite
 
