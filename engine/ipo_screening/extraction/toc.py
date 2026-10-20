@@ -36,7 +36,7 @@ _SECTION_PATTERNS = (
     ("promoters", re.compile(r"\bOUR\s+PROMOTER(?:S|\s+AND\s+PROMOTER\s+GROUP)?\b", re.IGNORECASE)),
     ("restated_financials", re.compile(r"\b(?:RESTATED\s+(?:CONSOLIDATED\s+)?FINANCIAL\s+INFORMATION|(?:RESTATED\s+)?(?:CONSOLIDATED\s+)?FINANCIAL\s+STATEMENTS)\b", re.IGNORECASE)),
     ("financial_indebtedness", re.compile(r"\b(?:FINANCIAL\s+INDEBTEDNESS|CAPITALISATION\s+STATEMENT)\b", re.IGNORECASE)),
-    ("litigation", re.compile(r"\bOUTSTANDING\s+LITIGATION\b", re.IGNORECASE)),
+    ("litigation", re.compile(r"\bOUTSTANDING\s+LITIGATIONS?\b", re.IGNORECASE)),
     ("contingent_liabilities", re.compile(r"\bSUMMARY\s+OF\s+CONTINGENT\s+LIABILITIES\b", re.IGNORECASE)),
     ("related_party", re.compile(r"\bSUMMARY\s+OF\s+RELATED\s+PARTY\b", re.IGNORECASE)),
     ("offer_structure", re.compile(r"\bOFFER\s+STRUCTURE\b", re.IGNORECASE)),

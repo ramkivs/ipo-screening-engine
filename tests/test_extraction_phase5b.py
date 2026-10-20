@@ -116,7 +116,16 @@ def test_fixture_class_b_cyclical_manufacturing_5fy():
     outcome = evaluate(canonical, config, mode="final")
     assert outcome.record.validation["ok"] is True
     assert outcome.record.plan["sector_overlay"] == "cyclical"
-    assert outcome.record.score["final_score"] == 41.0
+    # D-5 / A23: this fixture's only litigation statement is "None of our
+    # Promoters, Directors, or Group Companies are involved in any material
+    # litigation or criminal cases."  A group company is not the issuer, so
+    # the issuer's own status is UNKNOWN; the 4 points of Module D
+    # `litigation` (clean) are no longer awarded from silence.  No scoring
+    # rule changed -- 41.0 -> 37.0 is the corrected input travelling through
+    # the unchanged formula.
+    assert canonical["governance"]["litigation_bucket"] is None
+    assert canonical["governance"]["sebi_ed_action_active"] is None
+    assert outcome.record.score["final_score"] == 37.0
 
 
 # --------------------------------------------------------------------------

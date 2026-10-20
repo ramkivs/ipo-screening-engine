@@ -312,13 +312,22 @@ class CanonicalInputBuilder:
 
     def _build_governance(self) -> Dict[str, Any]:
         gov_base = self.base.get("governance", {})
-        lit = gov_base["litigation_bucket"] if "litigation_bucket" in gov_base else self._get_field("governance.litigation_bucket", "clean")
-        if lit in ("none", None, "clean"):
+        # Decision D-5: ``clean`` and ``sebi_ed_action_active = False`` are
+        # findings, not defaults.  A missing extraction (or an explicit null)
+        # must reach the canonical input as null so the criterion and K2 stay
+        # UNKNOWN; the previous code defaulted to "clean" and then coerced
+        # None back to "clean", so an unsearched filing scored 4/4.
+        lit = (
+            gov_base["litigation_bucket"]
+            if "litigation_bucket" in gov_base
+            else self._get_field("governance.litigation_bucket", None)
+        )
+        if lit == "none":
             lit = "clean"
         elif lit in ("material_civil", "civil"):
             lit = "minor_civil"
-        elif lit != "criminal_or_regulatory":
-            lit = "clean"
+        elif lit not in ("clean", "minor_civil", "criminal_or_regulatory"):
+            lit = None
 
         def _pick_gov(key: str, default: Any = None) -> Any:
             if key in gov_base:
@@ -333,7 +342,7 @@ class CanonicalInputBuilder:
             "eom_materiality": _pick_gov("eom_materiality", None),
             "going_concern_uncertainty": _pick_gov("going_concern_uncertainty", None),
             "litigation_bucket": lit,
-            "sebi_ed_action_active": _pick_gov("sebi_ed_action_active", False),
+            "sebi_ed_action_active": _pick_gov("sebi_ed_action_active", None),
             "rpt_pct_revenue": _pick_gov("rpt_pct_revenue", 6.67 if self.allow_fixture_fallbacks else None),
             "rpt_pct_of_revenue_growth": _pick_gov("rpt_pct_of_revenue_growth", None),
             "board_independent_majority": _pick_gov("board_independent_majority", False),

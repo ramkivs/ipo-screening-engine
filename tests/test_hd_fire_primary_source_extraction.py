@@ -110,28 +110,27 @@ def test_hd_fire_auditor_text_emits_no_going_concern_negative():
     assert "governance.going_concern_uncertainty" not in out
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "litigation_bucket defaults to 'clean' (4/4) when the litigation scan finds no "
-        "marker text at all, and sebi_ed_action_active defaults to False with a synthesised "
-        "quote; correcting either changes a scored governance input, which needs decision D-5"
-    ),
-)
 def test_litigation_bucket_is_not_clean_without_evidence():
+    # D-5 / A23.  This text carries no litigation statement at all.  The field
+    # is emitted as an explicit UNKNOWN (null candidate, no quotation) rather
+    # than omitted, so the scan's provenance survives; what must never appear
+    # is a "clean" verdict.
     out = _governance(HD_FIRE_AUDITOR_TEXT)
-    assert "governance.litigation_bucket" not in out
+    record = out.get("governance.litigation_bucket")
+    if record is not None:
+        assert record.candidate_value is None
+        assert record.is_unknown is True
+        assert record.quote is None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "sebi_ed_action_active is emitted with the quote 'No active SEBI or ED regulatory "
-        "proceedings', which appears nowhere in the source, and without "
-        "quote_is_processing=True; decision D-5 covers it"
-    ),
-)
 def test_sebi_action_default_quote_is_not_presented_as_source_text():
+    # D-5 / A23.  The fabricated "No active SEBI or ED regulatory proceedings"
+    # quotation is gone: with no SEBI/ED statement in the source the record is
+    # UNKNOWN and carries no quote at all.
     out = _governance(HD_FIRE_AUDITOR_TEXT)
     record = out.get("governance.sebi_ed_action_active")
-    assert record is None or record.quote_is_processing
+    if record is not None:
+        assert record.candidate_value is None
+        assert record.is_unknown is True
+        assert record.quote is None
+        assert record.quote_is_processing is False

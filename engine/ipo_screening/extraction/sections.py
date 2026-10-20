@@ -1413,6 +1413,198 @@ class SectionExtractor:
                 break
         return pages
 
+    # --- Litigation and regulatory-action evidence (decision D-5) ----------
+    #
+    # The scored criterion's own definition is "clean / minor_civil /
+    # criminal_or_regulatory across promoters, directors and the company"
+    # (``derived.py::_litigation_bucket``).  These patterns therefore only
+    # emit a value when the filing *says* something: a positive disclosure of
+    # a proceeding, or an explicit negative statement covering each of the
+    # three parties.  A section with no marker text leaves both fields unknown.
+    # "clean" requires an explicit negative statement that names the issuer
+    # AND at least one individual category (promoters or directors).
+    _LIT_NEGATION = re.compile(r"\b(?:no|none|nil|not|without)\b", re.IGNORECASE)
+    _LIT_CRIMINAL = re.compile(
+        r"\bcriminal\s+(?:proceedings?|cases?|complaints?)\b", re.IGNORECASE
+    )
+    _LIT_CIVIL = re.compile(
+        r"\bmaterial\s+civil\s+litigation\b|\bcivil\s+suit\b", re.IGNORECASE
+    )
+    _LIT_RCC = re.compile(r"\br\.?\s*c\.?\s*c\.?\b", re.IGNORECASE)
+    # An affirmative assertion needs a quantity or a live-status word; a bare
+    # heading ("Criminal proceedings filed by the Company") is not a finding.
+    _LIT_ASSERTION = re.compile(
+        r"\b\d+\b|\b(?:pending|involved|convicted|prosecuted|admitted)\b", re.IGNORECASE
+    )
+    # A finding counts only when it names a party the metric covers: our
+    # Company, our Promoters or our Directors.  A proceeding against an
+    # unrelated party is not the issuer's exposure.
+    _LIT_PARTY = re.compile(
+        r"\b(?:our|the)\s+(?:company|promoters?|directors?)\b", re.IGNORECASE
+    )
+    # The ICDR summary table counts proceedings per party in its first data
+    # column ("Against our Directors | 2 | ...").  Accepted only when the same
+    # page carries the table's "Criminal Proceedings" header, because the
+    # column order is what makes the first count the criminal one.
+    _LIT_CRIMINAL_HEADER = re.compile(r"criminal\s+proceedings", re.IGNORECASE)
+    _LIT_DIRECTOR_ROW = re.compile(
+        r"against\s+our\s+directors?\b[^\n]{0,30}?\b([1-9]\d{0,3})\b", re.IGNORECASE
+    )
+    _SEBI_TERM = re.compile(
+        r"\bsebi\b|securities\s+and\s+exchange\s+board|enforcement\s+directorate",
+        re.IGNORECASE,
+    )
+    _SEBI_ACTION = re.compile(
+        r"\b(?:proceedings?|actions?|investigations?|show[-\s]?cause|penalt(?:y|ies)|orders?)\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _litigation_sentences(cls, text: str) -> List[str]:
+        flat = " ".join(text.split())
+        return [s.strip() for s in re.split(r"(?<=[.;])\s+", flat) if s.strip()]
+
+    @staticmethod
+    def _is_disclosure_sentence(sentence: str) -> bool:
+        """True for prose, false for a flattened table blob or a column header.
+
+        A table row ("Against our Company | Nil | Nil ...") is not a
+        statement: its cells are read by the row rules instead, and a header
+        row names every party, so neither may establish a negative finding.
+        """
+        if len(sentence) > 400:
+            return False
+        if sentence.count("|") > 2:
+            return False
+        if re.search(
+            r"category\s+of\s+individuals|aggregate\s+amount\s+involved",
+            sentence,
+            re.IGNORECASE,
+        ):
+            return False
+        return True
+
+    @classmethod
+    def _classify_litigation_text(cls, text: str) -> Tuple[Optional[str], Optional[str]]:
+        """One page's positive litigation finding, if it discloses one."""
+        sentences = cls._litigation_sentences(text)
+        for sentence in sentences:
+            if cls._LIT_NEGATION.search(sentence):
+                continue
+            if not cls._LIT_ASSERTION.search(sentence):
+                continue
+            if not cls._LIT_PARTY.search(sentence):
+                continue
+            if cls._LIT_CRIMINAL.search(sentence) or cls._LIT_RCC.search(sentence):
+                return "criminal_or_regulatory", sentence
+        if cls._LIT_CRIMINAL_HEADER.search(text):
+            row = cls._LIT_DIRECTOR_ROW.search(" ".join(text.split()))
+            if row:
+                return "criminal_or_regulatory", row.group(0)
+        for sentence in sentences:
+            if cls._LIT_NEGATION.search(sentence):
+                continue
+            if not cls._LIT_ASSERTION.search(sentence):
+                continue
+            if not cls._LIT_PARTY.search(sentence):
+                continue
+            if cls._LIT_CIVIL.search(sentence):
+                return "minor_civil", sentence
+        return None, None
+
+    @classmethod
+    def _accumulate_clean_coverage(
+        cls, text: str, state: Dict[str, Any], page: int
+    ) -> None:
+        """Record which parties an explicit negative statement covers.
+
+        A sentence only counts when it negates litigation/proceedings and
+        names the party.  One sentence may cover more than one party ("our
+        Company and our Promoters"), but the possessive "Directors of the
+        Company" describes the individuals, not the issuer, so that phrase is
+        stripped before the issuer is looked for.
+        """
+        for sentence in cls._litigation_sentences(text):
+            if not cls._is_disclosure_sentence(sentence):
+                continue
+            low = sentence.lower()
+            if not re.search(r"\b(?:no|none|nil)\b", low):
+                continue
+            if not re.search(r"litigation|criminal|proceedings?|cases?", low):
+                continue
+            dimensions = set()
+            if "promoter" in low:
+                dimensions.add("promoters")
+            if "director" in low:
+                dimensions.add("directors")
+            # "Directors of the Company" / "Promoters of the Company" is a
+            # statement about the individuals, not a statement about the
+            # issuer, so those possessive phrases are removed before the
+            # issuer is looked for.
+            issuer_text = re.sub(
+                r"(?:directors?|promoters?)\s+of\s+(?:the\s+|our\s+)?company",
+                " ",
+                low,
+            )
+            if "company" in issuer_text or "issuer" in issuer_text:
+                dimensions.add("company")
+            if dimensions:
+                state["dimensions"].update(dimensions)
+                if state["sentence"] is None:
+                    # Keep the first covering sentence as the citation; later
+                    # sentences may add dimensions but not replace the quote.
+                    state["sentence"] = sentence
+                    state["page"] = page
+
+    @classmethod
+    def _classify_sebi_action(cls, text: str) -> Tuple[Optional[bool], Optional[str]]:
+        """An explicit SEBI/ED finding, or an explicit negative covering a party.
+
+        The clause is split at the regulator's name: a negation *before* it
+        ("no outstanding actions by SEBI ...") is a negative finding; an
+        action cue *after* it ("SEBI has initiated proceedings ...") is a
+        positive one.  A sentence that says neither establishes nothing.
+        """
+        for sentence in cls._litigation_sentences(text):
+            if not cls._is_disclosure_sentence(sentence):
+                continue
+            term = cls._SEBI_TERM.search(sentence)
+            if not term or not cls._SEBI_ACTION.search(sentence):
+                continue
+            if not cls._LIT_PARTY.search(sentence):
+                continue
+            pre = sentence[: term.start()].lower()
+            post = sentence[term.start():].lower()
+            # A positive finding needs an assertion, not a column heading:
+            # "penalties imposed by SEBI" is a heading, "SEBI has imposed a
+            # penalty" is a finding.  Each assertion is also checked for a
+            # negation in its own clause ("nor any penalties have been
+            # imposed"), which is not a positive finding.
+            positive = False
+            for match in re.finditer(
+                r"\b(?:has|have|had)\s+(?:\w+\s+){0,4}?"
+                r"(?:initiated|issued|passed|imposed|started|commenced)\b"
+                r"|show[-\s]?cause",
+                post,
+            ):
+                clause = post[max(0, match.start() - 45): match.start()]
+                if re.search(r"\b(?:no|nor|none|not|never|without)\b", clause):
+                    continue
+                positive = True
+                break
+            if not positive and re.search(r"\binvestigations?\b", post):
+                if re.search(r"\b(?:ongoing|pending|underway|under)\b", post) and not (
+                    re.search(r"\b(?:no|nor|none|not|never|without)\b", post)
+                ):
+                    positive = True
+            negated_before = bool(re.search(r"\b(?:no|none|nil|not|without)\b", pre))
+            negated_after = bool(re.search(r"\b(?:no|none|nil|not|without)\b", post))
+            if positive and not negated_before:
+                return True, sentence
+            if negated_before or negated_after:
+                return False, sentence
+        return None, None
+
     def extract_governance(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract auditor opinion, litigation bucket, SEBI action, and board independence."""
         extractions: List[RawExtraction] = []
@@ -1685,49 +1877,113 @@ class SectionExtractor:
                     )
                     break
 
-        # 2. Litigation bucket & SEBI action
+        # 2. Litigation bucket & SEBI action (decision D-5)
+        #
+        # ``clean`` is a scored finding (4/4) and ``sebi_ed_action_active``
+        # gates knockout K2, so neither may be emitted from a default.  The
+        # previous implementation initialised ``lit_bucket = "clean"`` and
+        # ``sebi_active = False`` before the scan and emitted both
+        # unconditionally -- including when every page in the range was
+        # empty -- and attached the quotation "No active SEBI or ED
+        # regulatory proceedings", which appears in no filing.  Both fields
+        # are now evidence-or-UNKNOWN: an explicit statement is required, and
+        # a scan that finds nothing emits a null candidate with no quotation
+        # and ``is_unknown`` set -- never a clean default.
         lit_range = page_ranges.get("litigation") if page_ranges else None
         p_lstart, p_lend = lit_range or (430, min(500, self.page_count))
 
-        lit_bucket = "clean"
-        sebi_active = False
-        found_lit_page = p_lstart
+        lit_bucket: Optional[str] = None
+        lit_quote: Optional[str] = None
+        found_lit_page: Optional[int] = None
+        sebi_active: Optional[bool] = None
+        sebi_quote: Optional[str] = None
+        found_sebi_page: Optional[int] = None
+        seen_clean: Dict[str, Any] = {"dimensions": set(), "sentence": None, "page": None}
 
-        for p in range(p_lstart, p_lend + 1):
+        criminal_hit: Optional[Tuple[int, str]] = None
+        civil_hit: Optional[Tuple[int, str]] = None
+
+        for p in range(p_lstart, min(p_lend, self.page_count) + 1):
             txt = self.extract_page_text(p)
-            if re.search(r'criminal proceedings against our promoters|r\.c\.c\.|criminal complaint', txt, re.IGNORECASE):
-                lit_bucket = "criminal_or_regulatory"
-                found_lit_page = p
-                break
-            elif re.search(r'material civil litigation|civil suit', txt, re.IGNORECASE):
-                lit_bucket = "minor_civil"
-                found_lit_page = p
+            if not txt:
+                continue
+            bucket, sentence = self._classify_litigation_text(txt)
+            if bucket == "criminal_or_regulatory" and criminal_hit is None:
+                criminal_hit = (p, sentence or "")
+            elif bucket == "minor_civil" and civil_hit is None:
+                civil_hit = (p, sentence or "")
+            self._accumulate_clean_coverage(txt, seen_clean, p)
+            sebi_value, sebi_sentence = self._classify_sebi_action(txt)
+            if sebi_value is True and sebi_active is not True:
+                sebi_active, sebi_quote, found_sebi_page = True, sebi_sentence, p
+                # An active SEBI/ED action against our Company, Promoters or
+                # Directors is itself a regulatory proceeding, so it sets the
+                # bucket.  The converse is not true: a criminal proceeding
+                # never establishes an active SEBI/ED action.
+                if criminal_hit is None and sebi_sentence and re.search(
+                    r"\bour\s+(?:company|promoters?|directors?)\b",
+                    sebi_sentence,
+                    re.IGNORECASE,
+                ):
+                    criminal_hit = (p, sebi_sentence)
+            elif sebi_value is False and sebi_active is None:
+                sebi_active, sebi_quote, found_sebi_page = False, sebi_sentence, p
+
+        # A disclosed proceeding outranks a clean statement: if the filing
+        # reports one, the bucket is that category whatever else it says.
+        if criminal_hit is not None:
+            lit_bucket, lit_quote = "criminal_or_regulatory", criminal_hit[1]
+            found_lit_page = criminal_hit[0]
+        elif civil_hit is not None:
+            lit_bucket, lit_quote = "minor_civil", civil_hit[1]
+            found_lit_page = civil_hit[0]
+        elif "company" in seen_clean["dimensions"] and (
+            {"promoters", "directors"} & seen_clean["dimensions"]
+        ):
+            lit_bucket = "clean"
+            lit_quote = seen_clean["sentence"]
+            found_lit_page = seen_clean["page"]
 
         extractions.append(
             RawExtraction(
                 field_path="governance.litigation_bucket",
                 candidate_value=lit_bucket,
-                raw_text=lit_bucket,
-                page=found_lit_page,
+                raw_text=lit_quote or lit_bucket,
+                page=found_lit_page or p_lstart,
                 section="Outstanding Litigation",
                 locator="Outstanding Litigation and Material Developments",
-                quote=f"Litigation bucket classified as: {lit_bucket}",
-                quote_is_processing=True,
+                quote=lit_quote,
+                is_unknown=lit_bucket is None,
+                notes=None
+                if lit_bucket is not None
+                else (
+                    "no explicit statement covering the company, its promoters and its "
+                    "directors was found in the litigation section; absence of a finding "
+                    "is not evidence that no proceeding exists"
+                ),
                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
-                extraction_confidence=0.95,
+                extraction_confidence=0.95 if lit_bucket is not None else 0.90,
             )
         )
         extractions.append(
             RawExtraction(
                 field_path="governance.sebi_ed_action_active",
                 candidate_value=sebi_active,
-                raw_text=str(sebi_active),
-                page=found_lit_page,
+                raw_text=sebi_quote or str(sebi_active),
+                page=found_sebi_page or p_lstart,
                 section="Outstanding Litigation",
                 locator="Disciplinary actions by SEBI or Stock Exchanges",
-                quote="No active SEBI or ED regulatory proceedings",
+                quote=sebi_quote,
+                is_unknown=sebi_active is None,
+                notes=None
+                if sebi_active is not None
+                else (
+                    "the litigation section contains no explicit statement about SEBI or "
+                    "Enforcement Directorate action; an unsearched or silent section is not "
+                    "evidence that no action exists"
+                ),
                 extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
-                extraction_confidence=0.95,
+                extraction_confidence=0.95 if sebi_active is not None else 0.90,
             )
         )
 

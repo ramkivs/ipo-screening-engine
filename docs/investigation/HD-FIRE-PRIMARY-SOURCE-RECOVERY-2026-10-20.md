@@ -362,6 +362,14 @@ off as the original file.
 
 ## 8. Newly established defect — requires a decision (D-5), not a silent fix
 
+> **Superseded 2026-10-20 (D-5 implemented).** This section records the defect as it stood
+> before the decision. It was resolved under decision **A23**
+> (`handoff/decisions/A23-litigation-and-regulatory-negative-defaults.md`); the evidence and
+> measured impact are in `docs/investigation/D5-LITIGATION-REGULATORY-DEFAULTS-2026-10-20.md`.
+> The two strict xfails named below were replaced by passing assertions of the corrected
+> contract. The historical findings in this section are preserved as written, including its
+> pre-implementation score estimate; nothing here is rewritten.
+
 Verifying the governance path against HD Fire exposed a **third favourable-default class**, of
 the same family as D-1 and D-4 but outside their approved scope:
 

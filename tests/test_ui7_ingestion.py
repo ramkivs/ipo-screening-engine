@@ -101,7 +101,11 @@ def test_ingest_document_success_and_coexistence(test_env):
     assert body["ipo_id"] == "AURORA-SYSTEMS-LIMITED"
     assert body["evaluation_mode"] == "FINAL"
     assert body["is_duplicate"] is False
-    assert body["final_score"] == pytest.approx(23.0)
+    # D-5 / A23: complete_sample_rhp.pdf is a 4-page sample with no litigation
+    # section at all.  The pre-D-5 defaults awarded Module D `litigation` 4/4
+    # from the empty scan; the corrected input is UNKNOWN, so the score is 19.0
+    # (D 5.0 -> 1.0).  No scoring rule changed.
+    assert body["final_score"] == pytest.approx(19.0)
     assert body["verdict"] == "INSUFFICIENT_DATA"
     assert body["confidence"] == "Low"
     assert body["result_hash"] is not None
@@ -135,7 +139,7 @@ def test_ingest_document_success_and_coexistence(test_env):
     detail = detail_res.json()
     assert detail["evaluation_id"] == sample_eval_id
     assert detail["company_name"] == "AURORA SYSTEMS LIMITED"
-    assert detail["score"]["final_score"] == pytest.approx(23.0)
+    assert detail["score"]["final_score"] == pytest.approx(19.0)
 
     # Step 7: Verify golden hash for Vishal Nirmiti is strictly preserved
     vishal_detail = client.get(f"/api/v1/evaluations/{test_env['vishal_eval_id']}").json()
