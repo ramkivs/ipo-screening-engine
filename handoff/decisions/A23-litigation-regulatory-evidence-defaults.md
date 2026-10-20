@@ -108,10 +108,12 @@ All deltas are the removal of a 4-point award that had no evidence, or the remov
 | `tests/test_hd_fire_primary_source_extraction.py` | **7 passed, 0 xfailed** — the two strict D-5 xfails are replaced by passing assertions; a new test pins HD Fire's §12 table to `criminal_or_regulatory` with the Directors row quoted verbatim and no regulatory flag |
 | `tests/test_rk_fashion_reconciliation.py` | **5 passed** on re-measured values (45.0 / 48.0 / 69.0 / Module D 6.0 / K2 UNVERIFIED) |
 | `tests/test_ui7_ingestion.py` | passed on re-measured 19.0 and 45.0/48.0/69.0 |
+| `tests/test_extraction_phase5b.py` | **9 passed** — class_* scores unchanged (41.0 / 41.0 / 43.0 / 35.0 / 35.0) and vishal 35.0; the provenance floor moved from 10 to 9 because the unevidenced SEBI/ED record no longer exists, and its absence is asserted |
 | D-1…D-4 suites (going concern, contingent liabilities, promoter holding, auditor tenure/evidence, GMP policy, overlays/knockouts, acceptance matrix, fixture-fallback isolation, golden replay) | **unchanged and passing** |
 | `config/`, `schema/`, `fixtures/` | **no diff**; golden hash intact |
 | Historical evaluation records | not re-run, not edited, not re-hashed |
 | Full backend suite on the published tree | recorded in the investigation record §8 with the progress capture |
+| Expected failures | **0 `pytest.mark.xfail` remain in `tests/`** — the two strict D-5 pins became passing assertions; the deferred §6 items are undecided questions, so they are pinned by fail-closed assertions on today's behaviour rather than by expected failures |
 
 ## 9. Consequences and constraints
 
