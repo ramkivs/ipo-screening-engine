@@ -111,6 +111,7 @@ has to deny unqualified litigation, or litigation **and** the criminal dimension
 or the criminal **and** civil dimensions, before it can answer `clean`;
 otherwise no candidate is emitted (UNKNOWN). This aligns prose with the table
 route that D-5 published; it introduces no new value, no weight and no threshold.
+Measured before/after pairs for the affected synthetic filings are in the §7 addendum.
 *Status.* **RESOLVED for dimension coverage.** **PARTY** coverage — whether a nil
 must reach Company **and** Promoters **and** Directors, or the full ICDR
 population — remains a governed choice; **PROPOSED: option B**, aligned with the
@@ -217,17 +218,21 @@ known coverage gap.
 
 All deltas are the removal of a 4-point award that had no evidence, or the removal of a fabricated negative. **Implementation correction vs semantic change:** every number above comes from the correction class (§3); the deferred items (§6) are the ones that would change a governed meaning.
 
-**Addendum for §6A.1 (continuation pass, measured — the table above is the D-5 record and is not edited retroactively).** One-dimension prose denials no longer earn `clean`, so three of the repository's synthetic filings change on re-measurement (all measured through `evaluate(..., mode="final")` exactly as their tests do):
+**Addendum for §6A.1 (continuation pass — the table above is the D-5 record and is not edited retroactively).** Both columns were measured on this tree and on
+`10b100a` respectively, under identical conditions (`extract_from_pdf(..., allow_fixture_fallbacks=True)` then
+`evaluate(..., mode="final", evaluation_datetime=2026-10-05T12:00:00Z)`, i.e. exactly what the tests do), so the pairs are comparable with each other; the "Before"
+column above reports the D-5 pass's own measurement path and differs for class_a for that reason, not because of this pass.
 
-| Filing | Litigation sentence | Before | After |
+| Filing | Litigation sentence (verbatim substance) | Before (published code) | After (this pass) |
 |---|---|---|---|
-| `class_a_financial_lender.pdf` p. 11 | criminal **and** material civil, named parties | `clean`, 41.0 | `clean`, **unchanged** — the denial covers both halves |
-| `class_b_cyclical_manufacturing.pdf` p. 10 | "material litigation **or criminal cases**" | `clean`, 41.0 | `clean`, **41.0 unchanged** |
-| `class_c_epc_infrastructure.pdf` p. 10 | criminal + SEBI/Stock-Exchange disciplinary only | `clean` | **absent (UNKNOWN)**; 41.0 → **37.0** (available 51.0, Module D 2.0/15 with 10.0 unknown) |
-| `class_d_loss_making_tech.pdf` p. 10 | "No criminal or active regulatory proceedings" only | `clean` | **absent (UNKNOWN)**; no score assertion in the suite pins this filing, so nothing moved on paper (measured 24.0 with fixture fallbacks) |
-| `class_e_modern_complex_rhp.pdf` p. 9 | criminal + SEBI/Stock-Exchange regulatory only | `clean` | **absent (UNKNOWN)**; 43.0 → **39.0** |
-| `complete_sample_rhp(.pdf / _2)` | no absence sentence at all | absent | absent — unchanged |
-| Jio, vishal, R.K. Fashion | adverse rows present | `criminal_or_regulatory` / absent | **unchanged** (re-measured this pass: vishal p. 439 and Jio p. 464 still verbatim, `sebi_ed_action_active` still absent) |
+| `class_a_financial_lender.pdf` p. 11 | criminal **and** material civil, named parties | `clean`; 40.0, available 54.0, Module D 6.0, unknown 2.0 | **identical** — `clean`; 40.0, 54.0, 6.0, 2.0 |
+| `class_b_cyclical_manufacturing.pdf` p. 10 | "material litigation **or criminal cases**" | `clean`; 41.0, 55.0, 6.0, 6.0 | **identical** — `clean`; 41.0, 55.0, 6.0, 6.0 |
+| `class_c_epc_infrastructure.pdf` p. 10 | criminal + SEBI/Stock-Exchange disciplinary **only** | `clean`; 41.0, 55.0, 6.0, 6.0 | **absent (UNKNOWN)**; 37.0, 51.0, 2.0, 10.0 |
+| `class_d_loss_making_tech.pdf` p. 10 | "No criminal or active regulatory proceedings" **only** | `clean`; 28.0, 41.0, 6.0, 6.0 | **absent (UNKNOWN)**; 24.0, 37.0, 2.0, 10.0 |
+| `class_e_modern_complex_rhp.pdf` p. 9 | criminal + SEBI/Stock-Exchange regulatory **only** | `clean`; 43.0, 55.0, 6.0, 6.0 | **absent (UNKNOWN)**; 39.0, 51.0, 2.0, 10.0 |
+| `complete_sample_rhp.pdf` / `_2.pdf` | no absence sentence at all | absent | absent — unchanged |
+| Jio (591 pp.), vishal nirmiti (551 pp.), R.K. Fashion | adverse rows present / unread litigation section | `criminal_or_regulatory` (pp. 464 / 439, verbatim), flag absent; RK fields absent | **unchanged** — re-measured this pass, same pages, same quotes, flag still absent |
+| vishal golden record | — | 35.0, hash `e84f8bc0…` | **35.0, hash `e84f8bc0…` — unchanged** |
 
 Every moved number is −4 points of *earned* score **and** −4 of *available* score: the criterion stops being paid for unevidenced coverage, it does not become an adverse finding. `tests/test_extraction_phase5b.py` was re-measured (not hand-adjusted) and now also pins `canonical["governance"]["litigation_bucket"] is None` for class_c and class_e with the reason in a comment.
 
