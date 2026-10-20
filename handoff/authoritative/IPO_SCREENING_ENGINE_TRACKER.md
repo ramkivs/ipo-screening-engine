@@ -1093,3 +1093,54 @@ Reconciled against the remote repository (`ramkivs/ipo-screening-engine`), all b
   historical-evaluation change. Existing A26/A27/A8-R authority boundaries remain.
   Only evidence artifacts and this append-only tracker entry are published; remote
   verification follows push. main stays untouched; PR #6 OPEN/UNMERGED is required.
+
+### HD Fire reported 7.0 → 3.0 regression investigation — 2026-10-21
+
+- **Baseline/recovery:** remote tip c4d9d5d6b38facde9adfb96898ba5d52a6c2b536.
+  Re-provisioned local HEAD was main's 01ba66c on this working branch with published
+  files mostly untracked. All 410 target files compared byte-identical before
+  staging only matching paths and a normal --ff-only merge restored c4d9d5d.
+  No reset, overwritten file, forced switch, deletion or force push.
+- **Primary finding (evidence-qualified):** earlier documented base10 - receivables3
+  =7 versus current supplied base6 - receivables3 =3 reconciles exactly with D3/A21
+  removing unsupported promoter post-holding4. Preserved HD Fire source shape has
+  pre95.33+4.67, post placeholders; 2ec607c correctly prevents pre→post reuse.
+  Exact old/new payload parity is NOT proved: neither persisted record is present.
+- **Litigation discrepancy remains UNRESOLVED, not explained away as A24/A25:**
+  earlier docs record adverse SCORED0, not clean4. Current summary says UNKNOWN.
+  Existing HD Fire §12 reconstructed table test still yields criminal_or_regulatory
+  for two cases against Directors, even though Company/Promoters say nil and
+  Company-initiated tax3 is not adverse. Positive finding precedes clean coverage
+  gates; missing current page/range/header/read-status prevents identifying the
+  exact current extraction/input predicate. It changes availability, not earned
+  score, on the documented comparison. 27→19 available matches promoter4+litigation4.
+- **Penalties:** no supported prior auditor/CFO applied -3 in the reference run;
+  earlier docs already identify receivables as the applied item and auditor exit
+  UNKNOWN. Current auditor UNKNOWN has zero applied and reserve3, not a clean
+  finding. Receivables -3 was also recorded previously; actual issuer balances,
+  FY pairing/days and provenance are unavailable, so its correctness is UNVERIFIED.
+  Column/FY/stub/threshold contracts tested; not used to certify missing inputs.
+- **Evidence limit:** no full current attachment, old/new evaluation payload/manifest,
+  HD Fire PDF or evaluation-store override found. Only task summary plus preserved
+  investigation/source excerpts available. Full current KO/other-module/penalty/bound
+  details cannot be inspected. Report distinguishes user summary, historical prose,
+  reconstructed primary-source shapes and current code/tests; no history fabricated.
+- **Artifacts:** docs/investigation/hd-fire-regression-2026-10-21/REPORT.md contains
+  executive findings, causal matrix, exact paths/commits, field values and missing
+  values, corrective categories and residual evidence requirements. Raw focused
+  and config logs adjacent. tests/test_receivable_period_contract.py adds eight
+  synthetic layer cases (not a new HD Fire evaluation or historical-score target).
+- **Checks:** initial pytest attempt blocked before collection by missing pytest;
+  isolated .venv installed pinned requirements without manifest changes. Final
+  focused seven-module run: **137 passed, 3 deselected, 0 failed/skipped/xfail,
+  0.44 s, EXIT0**, progress through 137/137. Deselections are unrelated live
+  Jio/Vishal cases. check-config **valid True, 10 profiles**. No full rerun needed
+  for docs/test-only changes. No actual regression test failed; no test weakened.
+- **Disposition:** keep D3/D5/A23/A24/A25. No current runtime defect sufficiently
+  established for a patch; no scoring-policy change. Current score arithmetic
+  explained conditionally; full current result NOT certified merely by green tests.
+  Missing litigation-path and receivables source evidence remain concrete blockers.
+- **Preservation/publication:** no HD Fire evaluation, re-ingestion, source fabrication,
+  runtime/config/schema/golden/history change. Only report/logs/new test/additive
+  tracker entry published on existing branch. Main untouched and PR #6 OPEN/UNMERGED;
+  exact remote commit and content verification follow push in completion response.

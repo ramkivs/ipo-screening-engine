@@ -1,0 +1,19 @@
+[pytest-progress] collected 137 tests; start 19:14:52
+
+.........[pytest-progress]   stage tests/test_receivable_period_contract.py: 8 tests, 0.0s
+.....[pytest-progress]   stage tests/test_penalty_attribution.py: 5 tests, 0.0s
+......[pytest-progress]   stage tests/test_promoter_holding_extraction.py: 6 tests, 0.0s
+....[pytest-progress] |#####.........................|  18.2% of collected 25/137  elapsed 0s  eta 0s (linear-rate estimate)
+...[pytest-progress]   stage tests/test_hd_fire_primary_source_extraction.py: 7 tests, 0.0s
+......................[pytest-progress] |###########...................|  36.5% of collected 50/137  elapsed 0s  eta 0s (linear-rate estimate)
+....................... [ 52%]
+..[pytest-progress] |################..............|  54.7% of collected 75/137  elapsed 0s  eta 0s (linear-rate estimate)
+.........................[pytest-progress] |######################........|  73.0% of collected 100/137  elapsed 0s  eta 0s (linear-rate estimate)
+.................[pytest-progress]   stage tests/test_litigation_regulatory_defaults.py: 89 tests, 0.2s
+........[pytest-progress] |###########################...|  91.2% of collected 125/137  elapsed 0s  eta 0s (linear-rate estimate)
+.[pytest-progress]   stage tests/test_auditor_tenure_defaults.py: 9 tests, 0.0s
+...........[pytest-progress] |##############################| 100.0% of collected 137/137  elapsed 0s  eta 0s (linear-rate estimate)
+.        [100%][pytest-progress]   stage tests/test_financial_statement_column_mapping.py: 13 tests, 0.0s
+[pytest-progress] finished 137/137 tests in 0.3s (passed=137 failed=0 skipped=0), exitstatus=0
+
+137 passed, 3 deselected in 0.44s
