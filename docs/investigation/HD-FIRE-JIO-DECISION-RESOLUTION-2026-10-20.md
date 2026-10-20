@@ -510,9 +510,29 @@ Golden fixture hash and `config/`, `schema/`, `fixtures/` diffs are checked at p
 
 ## 8. Publication record
 
-The implementation commit is recorded in the publication amendment that follows it; this
-section is completed there with the remote SHA, the file list, the executed test counts and
-the PR/main state.
+* **Implementation commit:** `e2ce2c22b638c2eef7be315d2e9f019904baf8ff` on
+  `arena/ae4d04e8-ipo-screening-engine`, pushed and remote-verified (`git ls-remote origin
+  refs/heads/arena/ae4d04e8-ipo-screening-engine` returned the same SHA). **9 files changed,
+  953 insertions, 139 deletions:** this document, the tracker, `sections.py`,
+  `financial_tables.py`, `test_promoter_holding_extraction.py`,
+  `test_auditor_tenure_defaults.py`, `test_going_concern_negative_disclosure.py` (new),
+  `test_contingent_liabilities_extraction.py`, `test_rk_fashion_reconciliation.py`.
+* **Tests at that commit (executed):** full backend **1179 passed, 1 xfailed**, 38 warnings,
+  1542.57 s; focused 10-file battery **106 passed, 1 xfailed**, 216.37 s; contingent-liability
+  file **9 passed**, 29.49 s.
+* **Non-changes:** `git status` after the commit shows no modification under `config/`,
+  `schema/` or `fixtures/`; golden hash `e84f8bc0…` asserted unchanged by the golden tests
+  inside the full suite; no historical evaluation rewritten or re-hashed.
+* **PR #6:** `OPEN`, `mergedAt: null`, head `arena/5dd3fe52-ipo-screening-engine` @
+  `e05c0efbca1ecb3024e52da73a22e180ea171118`, base `arena/573e69a4-ipo-screening-engine` —
+  neither moved nor merged.
+* **`main`:** `01ba66c12ca1195fd7acbd287c3e39a019808094`, untouched.
+* **CI:** no hosted workflows configured (`.github/workflows` absent; Actions workflow count 0).
+* **Remote source check:** 17 branches enumerated this pass; every tree searched; no HD Fire
+  RHP/PDF and no evaluation record in any branch.
+* **Remaining Windows-only acceptance:** the HD Fire RHP, the `…551a7eab` evaluation record,
+  its penalty rows and canonical issue block from the Windows store, and a re-run at
+  `e2ce2c2`. No Windows artefact is claimed as inspected.
 
 ---
 
