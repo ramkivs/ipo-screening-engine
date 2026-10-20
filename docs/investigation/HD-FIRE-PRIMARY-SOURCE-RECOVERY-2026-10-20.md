@@ -450,4 +450,32 @@ implementation unchanged. Those five states are distinct and are not to be confl
 
 ## 12. Publication
 
-<!-- PUBLICATION -->
+### 12.1 Implementation commit
+
+`a2803598b22648524f498c6137d6311a7aec925d` on `arena/ae4d04e8-ipo-screening-engine`,
+pushed as `62bd22b..a280359` and verified with `git ls-remote` (remote returned the same SHA).
+**4 files, 615 insertions, 1 deletion:** this record, the supersession banner on the earlier
+reconciliation record, the tracker entry, and the new test module. **No engine, `config/`,
+`schema/` or `fixtures/` change.**
+
+### 12.2 Tests at that commit
+
+The engine is byte-identical to the tree the full suite ran on (only documentation and one new
+test file changed).
+
+| Run | Result |
+|---|---|
+| Full backend (`pytest tests -q`) | **1196 passed, 2 xfailed**, 38 warnings, 1095.32 s |
+| `tests/test_hd_fire_primary_source_extraction.py` | 4 passed, 2 xfailed (strict) |
+
+### 12.3 PR #6 and `main` (remote-verified)
+
+| Item | Remote value |
+|---|---|
+| PR #6 | `state: open`, `merged: false`, `merged_at: null`, `mergeable: true` |
+| PR #6 head | `e05c0efbca1ecb3024e52da73a22e180ea171118` (`arena/5dd3fe52-ipo-screening-engine`) |
+| PR #6 base | `arena/573e69a4-ipo-screening-engine` |
+| `main` | `01ba66c12ca1195fd7acbd287c3e39a019808094` (unchanged) |
+| CI | no hosted workflows |
+
+PR #6 was neither moved nor merged; there was no force-push, reset, rebase or branch switch.
