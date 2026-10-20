@@ -4,7 +4,7 @@
 - **Title:** litigation bucket and regulatory-action flag are evidence-or-UNKNOWN; two coverage standards remain open
 - **Record type:** **INVESTIGATION plus a recorded correction.** Per `handoff/decisions/CONVENTION.md` rule 4, this record is **not** an approval of the alternatives in §"Open decisions"; it separates Ramki-approved material from v1.5 requirements, Arena analysis, and unresolved proposals.
 - **Decision status:** **RAMKI DECISION REQUIRED** for the two coverage standards (clean's party coverage; a verified regulatory absence). The removal of the unsupported defaults was executed under the existing contract and needed no new rule — see "What needed no approval".
-- **Disposition after the 2026-10-20 continuation pass (§6A):** matters **A** (dimension coverage) and **B** (closed-period denials) produced demonstrated implementation defects and were corrected in `sections.py`; matter **C** was **investigated and found to be no defect** (the §6.3 premise was wrong and is withdrawn); matter **D** needs **no new bucket** (statutory/regulatory already maps; tax-only stays UNKNOWN). The two *coverage standards* — which parties a nil must reach (§6.1) and what search may call a regulatory absence verified (§6.2) — remain **PROPOSED / UNRESOLVED** and are **not** treated as approved authority.
+- **Disposition after the 2026-10-20 continuation pass (§6A):** matters **A** (dimension coverage) and **B** (closed-period denials) produced demonstrated implementation defects and were corrected in `sections.py`; matter **C** was **investigated and found to be no defect** (the §6.3 premise was wrong and is withdrawn); matter **D** needs **no new bucket** (statutory/regulatory already maps; tax-only stays UNKNOWN).  The three open items are now carried by scoped records: **`A24-litigation-party-coverage-standard.md`** (party coverage for `clean`), **`A25-sebi-ed-absence-source-coverage-standard.md`** with the companion **`A8-R-REGULATOR-SOURCE-COVERAGE-DEPENDENCY-REQUEST-2026-10-20.md`** (verified regulatory absence), and **`A26-tax-only-proceedings-classification.md`** (tax-only adverse proceedings). All three are **PROPOSED / UNRESOLVED — RAMKI APPROVAL REQUIRED**; the governance pass that wrote them changed no semantics, schema, config, scoring or fixture.
 - **Decision authority:** RAMKI
 - **Date:** 2026-10-20 (Asia/Calcutta); no decision time is asserted.
 - **Repository:** `ramkivs/ipo-screening-engine`
@@ -72,7 +72,7 @@ From the SEBI-hosted **Abridged Prospectus** (RHP dated 5 October 2026), section
 * **A (current behaviour):** accept the filer's own sentence; the covered parties are recorded in `notes`. *Consequence:* 4/4 stands on partial party coverage; the gap is visible in evidence but not in the score.
 * **B:** require Company **and** Promoters **and** Directors. *Consequence:* filings whose nil names fewer parties move from `SCORED 4/4` to `UNKNOWN` (−4 earned, −4 available) — e.g. it would reduce a favourable award on a partial statement, and would make `clean` mean "the disclosure covered everyone".
 * **C:** require the full ICDR population (Company, Promoters, Directors, KMP, Senior Management), as the summary-table rows do. *Consequence:* prose-only disclosures almost never clear `clean`; most Indian RHPs in this repository move to UNKNOWN, which is defensible but a large availability change.
-This is a change to **what satisfies a governed criterion**, so it is not implemented.
+ This is a change to **what satisfies a governed criterion**, so it is not implemented. → Now proposed as **A24**, which re-tested the options against the criterion's own wording and finds that option A and option B are the *same* standard once that wording is enumerated (`handoff/reference/ipo-config.json:294` and `derived.py:1384` both say promoters, directors and the company), while option C would amend the criterion rather than apply it.
 
 A related limitation recorded now: the ICDR column merges "**SEBI or stock exchanges**", so a stock-exchange-only disciplinary action would set the flag `True`. That is the fail-closed direction (K2 `TRIGGERED` ⇒ `AVOID`, reviewable by a human) and no committed filing exercises it, but it is a reading of the merged column, not a governed definition — resolved by the same §6.2 decision.
 
@@ -80,7 +80,7 @@ A related limitation recorded now: the ICDR column merges "**SEBI or stock excha
 * **A (current behaviour):** only a negative naming both regulators clears it; a SEBI-only negative (the wording real filings actually use, and every ICDR table's promoter-scoped SEBI column) leaves UNKNOWN. *Consequence:* K2 stays UNVERIFIED and verdicts stay `INSUFFICIENT_DATA` for filings that may well be clean.
 * **B:** define a coverage set — litigation section + summary table + "Our Promoters and Promoter Group" + the statutory declarations in "Promoters" — where a nil naming SEBI, the Stock Exchanges **and** the ED (or an explicit ED-free declaration) clears the flag. *Consequence:* `False` becomes an evidenced claim on issuer-drafted text only; K2 can clear without any external register.
 * **C:** require corroboration from a regulator source (SEBI order/press-release retrieval) before `False` may clear K2. *Consequence:* consistent with D-2's "no adverse finding from one document" stance, but needs the retrieval contract, a cutoff rule and an unavailable-source policy (A8 territory) before it is implementable.
-Until this is decided, the asymmetry is deliberate: **True needs a finite act (or a disclosed count); False needs both regulators named; everything else is UNKNOWN.** The asymmetry is directional in the safe sense: a `True` that turns out to be a stock-exchange action rather than a SEBI one is visible and correctable, a `False` that clears K2 without coverage is silent.
+→ Now proposed as **A25**, with the **A8-R** dependency request attached; A25 §3 reports that the approved A8 material is scoped to `market.regime.nifty_trend` only ("or any other metric" is expressly excluded) and contains no regulator-source contract, so option C cannot be built on it. Until this is decided, the asymmetry is deliberate: **True needs a finite act (or a disclosed count); False needs both regulators named; everything else is UNKNOWN.** The asymmetry is directional in the safe sense: a `True` that turns out to be a stock-exchange action rather than a SEBI one is visible and correctable, a `False` that clears K2 without coverage is silent.
 
 **6.3 Display-layer default.** ~~`presentation/ui7.py` renders an UNKNOWN flag as "No active SEBI or ED action"~~ — **this sentence was wrong and is withdrawn; see §6A.3.** The original claim was checked against the repository on 2026-10-20: there is **no** `engine/ipo_screening/presentation/ui7.py` (`ls engine/ipo_screening/presentation/` → `api.py`, `ingestion_activity.py`, `models.py`, `service.py`), `find . -name "*ui7*"` matches only `tests/test_ui7_ingestion.py` (a workstream label, not a module), and `grep -rln "No active SEBI"` matches only `engine/ipo_screening/extraction/sections.py` (a comment) and `tests/test_litigation_regulatory_defaults.py`. No presentation surface renders a governance flag as an all-clear, so there was **no defect to fix**; the investigation and its evidence are in §6A.3.
 
@@ -112,7 +112,7 @@ or the criminal **and** civil dimensions, before it can answer `clean`;
 otherwise no candidate is emitted (UNKNOWN). This aligns prose with the table
 route that D-5 published; it introduces no new value, no weight and no threshold.
 Measured before/after pairs for the affected synthetic filings are in the §7 addendum.
-*Status.* **RESOLVED for dimension coverage.** **PARTY** coverage — whether a nil
+*Status.* **RESOLVED for dimension coverage; the party question is now A24.** **PARTY** coverage — whether a nil
 must reach Company **and** Promoters **and** Directors, or the full ICDR
 population — remains a governed choice; **PROPOSED: option B**, aligned with the
 wording of the criterion's own definition ("across promoters, directors and the
@@ -140,11 +140,21 @@ scope is a closed financial year / period / date window. A rolling window
 ("last five years" — the ICDR disclosure window) and an as-of-the-prospectus
 denial still clear, because both speak to the present; the flag's own word is
 "active". Unavailable / incomplete / failed sources keep their existing
-representation (absent field + `missing_inputs`, and the ingestion lifecycle
-values `AWAITING_SOURCE` / `UNAVAILABLE` / `STALE` / `NOT_FOUND`) — none of them
-maps to `False`.
+representation (absent field + `missing_inputs`, plus the repository's real failure
+vocabulary: `issue_terms.ProviderReport.outcome` `FOUND`/`NOT_FOUND`/`UNAVAILABLE`/`REJECTED`, `ResolutionOutcome.status` `RESOLVED`/`PARTIAL`/`UNPUBLISHED`/`UNAVAILABLE`/
+`CONFLICT`/`UNVERIFIED`, `presentation/ingestion_activity.py` stage and terminal statuses, and `connectors.FreshnessStatus` `FRESH`/`STALE`/`FUTURE`/`MISSING`) — none of them
+maps to `False`. **Corrected 2026-10-20:** an earlier version of this sentence named an
+`AWAITING_SOURCE` lifecycle value; no such identifier exists in the code (it was the only
+place it appeared anywhere in the repository, in these records). The accurate names are
+above; `AWAITING_ISSUE_TERMS` is an API-boundary status in `issue_terms.py`, not an
+extraction state. A25 §3.5 further records that the "each page actually extracted
+successfully" precondition recommended here **cannot be expressed today**
+(`extract_page_text` conflates a failed page with an empty one), and replaces it with the
+C1–C2 prerequisites.
 *Status.* **RESOLVED for the closed-period confusion.** **UNRESOLVED / PROPOSED**
-for the positive standard. Recommended testable wording: `False` may clear K2
+for the positive standard — now A25, with the A8-R dependency request; A25 §3.5 also replaces the
+"each page actually extracted successfully" clause recommended below, which today's code
+cannot express. Recommended testable wording: `False` may clear K2
 only from a present-scope denial naming SEBI, the Stock Exchanges and the ED,
 retrieved from (i) the Outstanding Litigation section, (ii) the ICDR summary
 table, (iii) "Our Promoters and Promoter Group" and (iv) the statutory
@@ -201,7 +211,7 @@ it makes a tax demand equivalent to a criminal case), or add a fourth governed
 bucket, which requires a schema change, a `config_validation` change, an overlay
 mapping and a re-pinned golden fixture — i.e. its own decision record, not this
 one. Until then tax-only exposure stays UNKNOWN and the tracker records it as a
-known coverage gap.
+known coverage gap. → Carried, with the full Option-C impact list and the auditor-bucket textual question, in **A26**; nothing was implemented for it.
 
 ## 7. Measured effect (no historical evaluation re-run)
 
