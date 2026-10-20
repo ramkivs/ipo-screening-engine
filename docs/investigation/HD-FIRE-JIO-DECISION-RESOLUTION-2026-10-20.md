@@ -171,7 +171,11 @@ All amounts ₹ million; columns 30-Jun-2026, 30-Jun-2025, **31-Mar-2026**, 31-M
 | Note prose | — | claims "not likely to have any material effect"; demands "likely to be either deleted or substantially reduced"; no provision considered necessary |
 
 Against net worth 3,359,769 (same units): **15,021 / 3,359,769 = 0.45 %**.
-Including the capital commitment: **105,410 / 3,359,769 = 3.14 %**.
+Including the capital commitment **of the same 31 March 2026 column**: 15,021 + 26,198 =
+**41,219 / 3,359,769 = 1.23 %**. *(Corrected 2026-10-20 in the D-1 … D-4 governance pass:
+the earlier 105,410 / 3.14 % figure added the 30 June 2026 interim commitment (90,389) to the
+31 March 2026 claims column — a period mix. The conclusion is unchanged: both are far below
+50 %.)*
 **Neither crosses 50 %**, so the open question is definitional, not outcome-changing for Jio.
 
 `contingent_liabilities_unquantified` = `None`: zero "unquantif\*" hits in 591 pages, and the
@@ -225,7 +229,7 @@ unchanged 16.0; flag `None` ⇒ K5 **UNVERIFIED**, verdict **INSUFFICIENT_DATA**
 |---|---|---|---|---|
 | **(a) current** | claims / disputed liabilities row only | 15,021 → 0.45 % | no claims row ⇒ UNKNOWN | supported by code and tests, **inconsistent with the K5 label** ("contingent liabilities > 50 % of net worth") and with the field name |
 | **(b) total disclosed contingent liabilities** | sum of section (I) rows, or the note's stated total; commitments (II) excluded | same 0.45 % (one row) | depends on the note; BG/EPCG may not be section (I) | aligns implementation with the existing label; **changes extracted values for multi-row notes** ⇒ semantic decision |
-| **(c) defined subset incl. commitments** | (I) + capital commitments, etc. | 105,410 → 3.14 % | not computable without the note | mixes commitments into a contingent-liability numerator; needs explicit anti-double-count rules |
+| **(c) defined subset incl. commitments** | (I) + capital commitments, etc. | 41,219 → 1.23 % (same 31-Mar-2026 column) | not computable without the note | mixes commitments into a contingent-liability numerator; needs explicit anti-double-count rules |
 
 **Recommendation (not a decision):** adopt **(b)** — the disclosed total of the contingent
 liabilities section, commitments excluded, stated total preferred over summed rows — then
@@ -390,7 +394,7 @@ UNKNOWN; known tenure ⇒ `clean_reputed`.
 |---|---|---|---|---|---|---|---|
 | **D-1** | GC phrase matched regardless of polarity ⇒ false K1 trigger | polarity-blind regex, no negation filter | **Yes** — positive-only emission is already the contract; rejecting negations restores it | 0 points | false **AVOID** prevented; K1 stays UNVERIFIED | No | 8 new + existing controls |
 | **D-2 flag** | "no unquantified claims" set the flag true | polarity-blind unquantified regex | **Yes** — flag must not be raised by a statement of completeness | 0 points | false **AVOID** prevented; K5 stays UNVERIFIED | No | 9 (1 new) |
-| **D-2 numerator** | numerator is one label, not the disclosed total | no defined numerator; schema has no description | **No** — choosing the population changes extracted values | 0 for Jio (both 0.45 % vs 3.14 % < 50 %) | none for Jio; undeterminable for HD Fire | **Yes — open decision** | 9 extraction tests pin current behaviour |
+| **D-2 numerator** | numerator is one label, not the disclosed total | no defined numerator; schema has no description | **No** — choosing the population changes extracted values | 0 for Jio (0.45 % vs 1.23 % < 50 %) | none for Jio; undeterminable for HD Fire | **Yes — open decision** | 9 extraction tests pin current behaviour |
 | **D-3** | combined `Total (A)+(B)+(C)` read as promoter total | prefix regex + A+B addition | **Partly** — the guard removes the wrong row; the A+B definition question stays open | Jio **−4 points** (37 → 33) if re-scored; RK/Vishal 0 | Jio D 8 → 4; K4 stays CLEAR | **Yes** for the A+B definition (xfail pin) | 4 (1 strict xfail) |
 | **D-3b** | post value may be read from a pre-issue table | no table-scope check | **No** — needs a defined rule + the RHP | undeterminable | possibly HD Fire only | **Yes — open** | none (documented) |
 | **D-4** | constant `False` + synthesised quotes ⇒ free `clean_reputed` | unconditional assignment | **Yes** — the bucket already treats unknown as UNKNOWN | up to **−2 points** where the constant applied; Jio/RK 0 | none observed on live filings | No | 9 |
@@ -438,7 +442,7 @@ Each record is separate. A recommendation is **not** an accepted decision.
   commitments)?
 * **Current rule:** claims row only (code), while the K5 label and field name say
   "contingent liabilities"; schema has no description.
-* **Established evidence:** Jio Note 37 — claims 15,021 (0.45 %); commitments 26,198 (3.14 %
+* **Established evidence:** Jio Note 37 — claims 15,021 (0.45 %); commitments 26,198 (1.23 %
   combined); HD Fire — BG 58.50 + EPCG 31.43 = 22.49 % (unverified, category-mismatched).
 * **Options:** (a) claims-only; (b) total section (I), commitments excluded; (c) defined
   subset incl. commitments.

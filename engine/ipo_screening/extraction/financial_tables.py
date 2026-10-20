@@ -565,32 +565,78 @@ class FinancialTableExtractor:
         r"\s*,?\s*(\d{4})",
         re.IGNORECASE,
     )
-    _CL_CLAIMS_LABEL = re.compile(r"claims?\s*(?:/|and)?\s*disputed\s+liabilit", re.IGNORECASE)
+    _CL_COMMITMENTS_HEADING = re.compile(
+        r"^\s*(?:\(?\s*(?:II|2|[Bb])\s*\)?\s*[.):]?\s*)?commitments?\b",
+        re.IGNORECASE,
+    )
+    _CL_NEXT_NOTE = re.compile(r"^\s*\d{1,2}(?:\.\d+)?\s+[A-Z][A-Za-z]")
+    _CL_TOTAL_LABEL = re.compile(r"\btotal\b", re.IGNORECASE)
+    _CL_COMMITMENT_LABEL = re.compile(
+        r"\bcommitments?\b|\bcapital\s+account\b|\bcontracts?\s+remaining\b",
+        re.IGNORECASE,
+    )
+    # Amounts in a note table: grouped (Indian or western) or decimal.  A bare
+    # four-digit year is filtered out later, so period headers are not rows.
+    _CL_AMOUNT = re.compile(
+        r"\(?\s*\d{1,3}(?:,\d{2,3})+(?:\.\d+)?\s*\)?"
+        r"|\(?\s*\d+\.\d+\s*\)?"
+        r"|\(?\s*\d{4,}\s*\)?"
+    )
     _CL_UNQUANTIFIED = re.compile(
         r"\bunquantified\b|\bcannot\s+be\s+quantified\b|\bnot\s+quantifiable\b"
         r"|\bamounts?\s+(?:is|are)\s+not\s+ascertainable\b",
         re.IGNORECASE,
     )
 
+    @classmethod
+    def _cl_row_amounts(cls, line: str) -> Optional[List[float]]:
+        """Amount cells of a table row, or ``None`` when the line is not a row.
+
+        A row *ends* with an amount cell; prose that merely mentions a number
+        in the middle of a sentence does not.  A bare four-digit year in the
+        period header is not an amount.
+        """
+        matches = list(cls._CL_AMOUNT.finditer(line))
+        if not matches:
+            return None
+        if line[matches[-1].end():].strip(" *†‡)(;:"):
+            return None
+        values: List[float] = []
+        for match in matches:
+            token = match.group(0)
+            cleaned = token.replace("(", "").replace(")", "").replace(",", "").strip()
+            try:
+                value = float(cleaned)
+            except ValueError:
+                continue
+            if "," not in token and "." not in token and 1900 <= value <= 2100:
+                continue  # a year, not an amount
+            values.append(-value if token.strip().startswith("(") else value)
+        return values or None
+
     def _extract_contingent_liabilities(
         self,
         page_ranges: Optional[Dict[str, Tuple[int, int]]],
     ) -> Tuple[Optional[int], Optional[float], Optional[bool], str]:
-        """Read the quantified claims figure from the contingent-liability note.
+        """Read the contingent-liability section total from the note.
 
-        Returns ``(page, amount, unquantified, quote)``.
+        Numerator definition (decision D-2, 2026-10-20): the disclosed total
+        of the **contingent-liability section**, excluding capital commitments
+        (``(II) Commitments`` or a commitment-labelled row).
 
-        Selection rule (deterministic, period-consistent with the canonical
-        periods, which are full fiscal years): the disclosed amount under the
-        LATEST fiscal-year column ("31st March, YYYY").  An interim column
-        (30 June) is never mixed with a full-year net worth, and the issuer's
-        own summary percentage is not reused.
+        * a unique ``Total`` row inside the section wins and the constituent
+          rows are ignored, so an aggregate is never added to its own parts;
+        * otherwise the section's rows are summed;
+        * a commitment-labelled row (or a commitments subsection) is excluded;
+        * an unparseable / width-mismatched row, more than one total, or no
+          row at all fails closed to ``None`` -- a quantified subset is not
+          evidence that the whole section is quantified.
 
-        Fails closed (``amount=None``) when the note heading, the period
-        headers, or a numeric row matching the header width cannot be
-        established; the previous implementation returned the first line
-        containing "Total" and a decimal, which is not necessarily a
-        contingent-liability amount.
+        Column selection is unchanged: the latest fiscal-year (31 March)
+        column, never an interim column mixed with a full-year net worth.
+        The unquantified flag is read from the same section with the same
+        polarity rule (a negated statement is not a positive finding) and is
+        never coerced to ``False``.
         """
         ranges: List[Tuple[int, int]] = []
         if page_ranges and page_ranges.get("restated_financials"):
@@ -618,31 +664,39 @@ class FinancialTableExtractor:
                     note_lines.extend(
                         l.strip() for l in self.extract_page_text(extra).splitlines() if l.strip()
                     )
-                row_index = next(
-                    (i for i, line in enumerate(note_lines) if self._CL_CLAIMS_LABEL.search(line)),
+
+                section_end = len(note_lines)
+                for i, line in enumerate(note_lines):
+                    if self._CL_COMMITMENTS_HEADING.match(line):
+                        section_end = i
+                        break
+                    # The next numbered note on the same page is not part of
+                    # this section, even when no commitments subsection exists.
+                    if (
+                        self._CL_NEXT_NOTE.match(line)
+                        and len(line.split()) <= 8
+                        and not self._CL_AMOUNT.search(line)
+                    ):
+                        section_end = i
+                        break
+
+                section = note_lines[:section_end]
+                first_row = next(
+                    (i for i, line in enumerate(section) if self._cl_row_amounts(line)),
                     None,
                 )
-                if row_index is None:
+                if first_row is None:
                     continue
                 # The period headers are the date labels immediately above the
-                # row.  Taking the whole page would blend the note's header
-                # with an adjacent note's identical header (Jio pp. 405-406).
-                header_window = note_lines[max(0, row_index - 30): row_index]
+                # first row.  Taking the whole page would blend the note's
+                # header with an adjacent note's identical header (Jio pp. 405-406).
+                header_window = section[max(0, first_row - 30): first_row]
                 dates: List[Tuple[int, str, int]] = [
                     (int(d), m.capitalize(), int(y))
                     for d, m, y in self._CL_DATE.findall("\n".join(header_window))
                 ]
                 if not dates:
                     continue
-                numbers: List[float] = []
-                label_parts: List[str] = []
-                for line in note_lines[row_index: row_index + 3]:
-                    label_parts.append(line)
-                    numbers.extend(self._extract_row_numbers(line))
-                    if len(numbers) >= len(dates):
-                        break
-                if len(numbers) != len(dates):
-                    continue  # ambiguous row width: never guess a column
                 march_columns = [
                     (index, year)
                     for index, (_, month, year) in enumerate(dates)
@@ -651,26 +705,74 @@ class FinancialTableExtractor:
                 if not march_columns:
                     continue
                 column, _ = max(march_columns, key=lambda item: item[1])
-                amount = numbers[column]
-                # The unquantified-claims statement usually sits just below
-                # the claims row; keep the scan inside the note's own block.
-                note_text = "\n".join(note_lines[max(0, row_index - 30): row_index + 8])
-                # The flag means "some material exposure is unquantified".
-                # A negated statement ("there are no unquantified claims")
-                # contains the keyword but asserts the opposite, so it must
-                # not raise a K5 trigger.  As everywhere else in this
-                # extractor, absence of a positive disclosure stays None --
-                # it is not converted into a favourable False.
+
+                rows: List[Tuple[str, float]] = []
+                ambiguous = False
+                pending: List[str] = []
+                for line in section:
+                    # Period headers and subsection headings are not row labels.
+                    if self._CL_DATE.search(line) or re.match(
+                        r"^\s*(?:as\s+at\b|\(?\s*(?:I|1|[Aa])\s*\)?[.):]?\s*contingent\s+liabilit)",
+                        line,
+                        re.IGNORECASE,
+                    ):
+                        pending = []
+                        continue
+                    amounts = self._cl_row_amounts(line)
+                    if amounts is None:
+                        # Label lines wrap; short lines carry the row label.
+                        if len(line.split()) <= 12:
+                            pending.append(line)
+                            pending = pending[-3:]
+                        else:
+                            pending = []
+                        continue
+                    label_match = self._CL_AMOUNT.search(line)
+                    label = " ".join(pending + ([line[: label_match.start()]] if label_match else []))
+                    # Prose that precedes a total on the same line is not part
+                    # of the row label ("Certain claims are unquantified. Total").
+                    label = re.split(r"(?<=\.)\s+", label)[-1]
+                    pending = []
+                    if len(amounts) > len(dates):
+                        amounts = amounts[-len(dates):]
+                    if len(amounts) < len(dates):
+                        ambiguous = True
+                        continue
+                    rows.append((label, amounts[column]))
+
+                # The unquantified statement usually sits inside the same
+                # section.  A negated statement ("there are no unquantified
+                # claims") contains the keyword but asserts the opposite.
                 unquantified = None
-                m_unquantified = self._CL_UNQUANTIFIED.search(note_text)
+                section_text = "\n".join(section)
+                m_unquantified = self._CL_UNQUANTIFIED.search(section_text)
                 if m_unquantified:
-                    prefix = note_text[max(0, m_unquantified.start() - 80): m_unquantified.start()]
+                    prefix = section_text[max(0, m_unquantified.start() - 80): m_unquantified.start()]
                     prefix = re.split(r"[.;\n]", prefix)[-1]
                     if not re.search(
                         r"\b(?:no|not|nil|none|without)\b", prefix, re.IGNORECASE
                     ):
                         unquantified = True
-                quote = " ".join(" ".join(label_parts).split())
+
+                if ambiguous:
+                    return p, None, unquantified, ""  # a row could not be aligned to the columns
+                contingent = [row for row in rows if not self._CL_COMMITMENT_LABEL.search(row[0])]
+                totals = [row for row in contingent if self._CL_TOTAL_LABEL.search(row[0])]
+                if len(totals) == 1:
+                    amount = totals[0][1]
+                    used = [totals[0]]
+                elif len(totals) > 1:
+                    return p, None, unquantified, ""  # which aggregate is the section total is ambiguous
+                elif contingent and unquantified:
+                    # Some exposure has no amount and the note discloses no
+                    # total: a sum of the quantified rows would understate it.
+                    return p, None, unquantified, ""
+                elif contingent:
+                    amount = sum(value for _, value in contingent)
+                    used = contingent
+                else:
+                    continue
+                quote = " | ".join(" ".join(label.split()) for label, _ in used)
                 return p, amount, unquantified, quote
         return None, None, None, ""
 

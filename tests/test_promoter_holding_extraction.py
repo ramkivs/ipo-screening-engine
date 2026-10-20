@@ -60,11 +60,36 @@ Promoter & Promoter Group 1 5,937,841,645 - - 5,937,841,645 66.43 5,937,841,645 
 (B) Public 103 3,001,189,185 - - 3,001,189,185 33.57 3,001,189,185 33.57
 Total (A)+(B)+(C) 104 8,939,030,830 - - 8,939,030,830 100.00 8,939,030,830 100.00"""
 
-# A layout that does disclose a standalone promoter total.
+# A layout that does disclose a standalone promoter total, with an explicit
+# post-issue column.
 STANDALONE_A = """Shareholding pattern
+Pre-Offer shareholding Post-Offer shareholding as at Allotment
 Total (A) 5,900,000,000 66.43 5,900,000,000 65.00"""
 
+# The ICDR summary layout: (A) is Promoter & Promoter Group, (B) is Public.
 STANDALONE_A_AND_B = """Shareholding pattern
+Pre-Offer shareholding Post-Offer shareholding as at Allotment
+(A) Promoter & Promoter Group
+Total (A) 5,900,000,000 66.43 5,900,000,000 65.00
+(B) Public
+Total (B) 2,980,000,000 33.57 3,176,000,000 35.00"""
+
+# The detailed layout (R.K. Fashion shape): (A) Promoters, (B) Promoter Group.
+PROMOTER_AND_GROUP = """Shareholding pattern
+Pre-Offer shareholding Post-Offer shareholding as at Allotment
+(A) Promoters
+Total (A) 1,12,06,672 99.61 1,12,06,672 72.22
+(B) Promoter Group
+Total (B) 5,100 0.06 5,100 0.03"""
+
+# A pre-issue-only table: every post-issue column is "[●]" (Vishal shape).
+PRE_ONLY_TABLE = """Shareholding pattern
+Pre-Offer shareholding as at the date of this Red Herring Prospectus
+Total (A) 74,27,420 37.51 [●] [●]"""
+
+# No category heading: whether (B) belongs in the promoter total is unknown.
+UNLABELLED_B = """Shareholding pattern
+Pre-Offer shareholding Post-Offer shareholding as at Allotment
 Total (A) 5,900,000,000 66.43 5,900,000,000 65.00
 Total (B) 2,980,000,000 33.57 3,176,000,000 35.00"""
 
@@ -89,17 +114,56 @@ def test_combined_total_row_is_not_the_promoter_holding():
     assert out.get("capital_structure.promoter_post_pct") is None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "the public category total is added to the promoter total (A+B = 100%); "
-        "removing the sum changes R.K. Fashion 99.67 -> 99.61, which is decision D-3"
-    ),
-)
 def test_public_total_is_not_added_to_the_promoter_total():
+    """The public category is not part of the promoter holding (decision D-3)."""
     out = _extract(STANDALONE_A_AND_B)
     assert out.get("capital_structure.promoter_pre_pct") == 66.43
     assert out.get("capital_structure.promoter_post_pct") == 65.0
+
+
+def test_promoter_group_total_is_added_to_the_promoter_total():
+    """In the detailed layout (B) is the promoter group, which belongs in the
+    promoter-and-promoter-group figure (R.K. Fashion shape)."""
+    out = _extract(PROMOTER_AND_GROUP)
+    assert out.get("capital_structure.promoter_pre_pct") == 99.67
+    assert out.get("capital_structure.promoter_post_pct") == 72.25
+
+
+def test_pre_issue_table_does_not_supply_a_post_issue_value():
+    """The row's only numeric percentage is the pre-issue one; the post-issue
+    columns are "[●]", so the post-issue holding is unknown (D-3b)."""
+    out = _extract(PRE_ONLY_TABLE)
+    assert out.get("capital_structure.promoter_pre_pct") == 37.51
+    assert out.get("capital_structure.promoter_post_pct") is None
+
+
+def test_unlabelled_b_total_leaves_the_promoter_holding_unknown():
+    """Without a category heading, whether (B) is the promoter group or the
+    public cannot be established, so neither value is guessed."""
+    out = _extract(UNLABELLED_B)
+    assert out.get("capital_structure.promoter_pre_pct") is None
+    assert out.get("capital_structure.promoter_post_pct") is None
+
+
+def test_live_vishal_pre_issue_table_is_not_read_as_post_issue():
+    """Vishal's section 11 table is a pre-issue table whose post-issue cells
+    are "[●]"; the extracted post-issue holding must be UNKNOWN, not the
+    pre-issue Total (A) of 37.51 %."""
+    from pathlib import Path
+
+    from ipo_screening.extraction.pdf_source import load_pdf_source
+
+    pdf = (
+        Path(__file__).resolve().parents[1]
+        / "handoff/reference/U01122MH1994PLC185445-vishal nirmiti.pdf"
+    )
+    if not pdf.exists():  # pragma: no cover - reference filing absent
+        pytest.skip("reference Vishal RHP is not present")
+    doc, reader = load_pdf_source(pdf)
+    ex = SectionExtractor(doc, reader, text_cache={})
+    out = {r.field_path: r.candidate_value for r in ex.extract_capital_structure({})}
+    assert out.get("capital_structure.promoter_pre_pct") == 73.42
+    assert out.get("capital_structure.promoter_post_pct") is None
 
 
 def test_live_jio_shareholding_pattern_is_not_fabricated():

@@ -640,6 +640,64 @@ class SectionExtractor:
     # keeps that summary row out of the promoter fallback.
     _TOTAL_A_LABEL = re.compile(r"total\s*\(\s*a\s*\)(?!\s*[+(])", re.IGNORECASE)
 
+    # Category headings inside a shareholding table.  In the ICDR summary
+    # layout (A) is "Promoter & Promoter Group" and (B) is "Public"; in the
+    # detailed layout (A) is "Promoters" and (B) is "Promoter Group".  The
+    # label above the (B) total decides whether it belongs in the promoter
+    # figure, so the public category is never added to the promoter holding.
+    _PROMOTER_CATEGORY_LABEL = re.compile(
+        r"^\s*(?:\(?\s*[A-Za-z0-9]{1,3}\s*\)?\s*[.):]?\s*)?"
+        r"(promoter\s*(?:&|and)\s*promoter\s*group|promoters?|promoter\s*group"
+        r"|public(?:\s+shareholders?)?|non[-\s]?promoter[^\n]*)\s*:?\s*$",
+        re.IGNORECASE,
+    )
+    # A post-issue column is used only when the table says so explicitly.
+    _POST_ISSUE_CONTEXT = re.compile(
+        r"post\s*[-\s]?\s*(?:offer|issue)|after\s+the\s+(?:offer|issue)|on\s+allotment",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _promoter_category_before(cls, lines: List[str], idx: int, window: int = 60) -> Optional[str]:
+        """The nearest category heading above a total row, if any."""
+        for k in range(idx - 1, max(-1, idx - window - 1), -1):
+            match = cls._PROMOTER_CATEGORY_LABEL.match(lines[k])
+            if match:
+                return match.group(1).strip().lower()
+        return None
+
+    @staticmethod
+    def _category_kind(label: Optional[str]) -> Optional[str]:
+        """``promoter`` / ``other`` / ``None`` (unknown) for a category label."""
+        if not label:
+            return None
+        if "non-promoter" in label or "non promoter" in label:
+            return "other"
+        if "public" in label:
+            return "other"
+        if "promoter" in label:
+            return "promoter"
+        return None
+
+    @staticmethod
+    def _row_percentages(lines: List[str], idx: int) -> List[float]:
+        """Decimal percentage cells in one total row.
+
+        A wrapped row continues on the next line only when that line is a
+        short numeric continuation; a following category heading or total
+        belongs to the next section and is never folded into this row.
+        """
+        window = lines[idx]
+        if idx + 1 < len(lines):
+            nxt = lines[idx + 1]
+            if (
+                len(nxt.split()) <= 5
+                and not re.search(r"total\s*\(|promoter|public", nxt, re.IGNORECASE)
+            ):
+                window = f"{window} {nxt}"
+        values = [float(x) for x in re.findall(r"[0-9]+\.[0-9]+", window)]
+        return [v for v in values if 0.0 <= v <= 100.0]
+
     def extract_capital_structure(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract promoter pre/post holding %, pledge %, and lock-in."""
         extractions: List[RawExtraction] = []
@@ -688,22 +746,33 @@ class SectionExtractor:
         # public category into the promoter category is a separate question
         # (decision D-3) that changes an existing filing's extracted value.
         if pre_pct is None:
-            tot_a_pre = None
-            tot_b_pre = None
+            a_values: List[float] = []
+            b_values: List[float] = []
+            b_found = False
+            b_category: Optional[str] = None
             for idx, l in enumerate(cap_lines):
-                if self._TOTAL_A_LABEL.search(l):
-                    c_text = l
-                    for j in range(idx + 1, min(idx + 3, len(cap_lines))):
-                        c_text += " " + cap_lines[j]
-                    floats = [float(x) for x in re.findall(r'[0-9]+\.[0-9]+', c_text)]
-                    if len(floats) >= 2:
-                        tot_a_pre = floats[0]
-                if re.search(r'Total\s*\(\s*B\s*\)', l, re.IGNORECASE):
-                    floats = [float(x) for x in re.findall(r'[0-9]+\.[0-9]+', l)]
-                    if len(floats) >= 2:
-                        tot_b_pre = floats[0]
-            if tot_a_pre is not None:
-                pre_pct = round(tot_a_pre + (tot_b_pre or 0.0), 2)
+                if not a_values and self._TOTAL_A_LABEL.search(l):
+                    a_values = self._row_percentages(cap_lines, idx)
+                    for j in range(idx + 1, min(idx + 200, len(cap_lines))):
+                        if re.search(r'Total\s*\(\s*B\s*\)', cap_lines[j], re.IGNORECASE):
+                            b_found = True
+                            b_values = self._row_percentages(cap_lines, j)
+                            b_category = self._promoter_category_before(cap_lines, j)
+                            break
+            if a_values:
+                if not b_found:
+                    pre_pct = round(a_values[0], 2)
+                else:
+                    kind = self._category_kind(b_category)
+                    if kind == "promoter" and b_values:
+                        pre_pct = round(a_values[0] + b_values[0], 2)
+                    elif kind == "other":
+                        pre_pct = round(a_values[0], 2)
+                    else:
+                        # (B) is not labelled, or is a promoter group without a
+                        # value: whether it belongs in the promoter total cannot
+                        # be established, so the field stays unknown.
+                        pre_pct = None
 
         if pre_pct is not None:
             extractions.append(
@@ -726,26 +795,52 @@ class SectionExtractor:
         # is unchanged; the label guard only stops the combined summary row
         # from being read as the promoter total.
         if post_pct is None:
-            a_pct = None
-            b_pct = None
+            # A post-issue value is read only from a row that carries a
+            # post-issue column: the table must say "Post-Offer"/"Post-Issue"
+            # (or "after the Offer"/"on Allotment") and the row must hold a
+            # numeric percentage in more than one column.  A row whose other
+            # columns are "[●]" discloses a pre-issue figure only, and a
+            # pre-issue-only table must not be read as post-issue.
+            a_values: List[float] = []
+            b_values: List[float] = []
+            b_found = False
+            b_category: Optional[str] = None
+            saw_unusable_row = False
             for idx, l in enumerate(cap_lines):
-                if self._TOTAL_A_LABEL.search(l):
-                    c_text = l
-                    for j in range(idx + 1, min(idx + 3, len(cap_lines))):
-                        c_text += " " + cap_lines[j]
-                    nums = re.findall(r'[0-9,]+(?:\.[0-9]+)?', c_text)
-                    pcts = [parse_indian_number(x) for x in nums if parse_indian_number(x) is not None]
-                    pcts = [x for x in pcts if 10.0 <= x <= 100.0]
-                    if pcts:
-                        a_pct = pcts[-1]
-                if re.search(r'Total\s*\(\s*B\s*\)', l, re.IGNORECASE):
-                    nums = re.findall(r'[0-9,]+(?:\.[0-9]+)?', l)
-                    pcts = [parse_indian_number(x) for x in nums if parse_indian_number(x) is not None]
-                    pcts = [x for x in pcts if 0.0 <= x < 10.0]
-                    if pcts:
-                        b_pct = pcts[-1]
-            if a_pct is not None:
-                post_pct = round(a_pct + (b_pct or 0.0), 2)
+                if not a_values and self._TOTAL_A_LABEL.search(l):
+                    values = self._row_percentages(cap_lines, idx)
+                    if len(values) < 2:
+                        saw_unusable_row = True
+                        continue
+                    has_post_context = any(
+                        self._POST_ISSUE_CONTEXT.search(x)
+                        for x in cap_lines[max(0, idx - 120): idx]
+                    )
+                    if not has_post_context:
+                        saw_unusable_row = True
+                        continue
+                    a_values = values
+                    for j in range(idx + 1, min(idx + 200, len(cap_lines))):
+                        if re.search(r'Total\s*\(\s*B\s*\)', cap_lines[j], re.IGNORECASE):
+                            b_found = True
+                            b_values = self._row_percentages(cap_lines, j)
+                            b_category = self._promoter_category_before(cap_lines, j)
+                            break
+            if a_values:
+                if not b_found:
+                    post_pct = round(a_values[-1], 2)
+                else:
+                    kind = self._category_kind(b_category)
+                    if kind == "promoter" and len(b_values) >= 2:
+                        post_pct = round(a_values[-1] + b_values[-1], 2)
+                    elif kind == "other":
+                        post_pct = round(a_values[-1], 2)
+                    else:
+                        # (B) unlabelled or its post value is not disclosed:
+                        # the promoter total cannot be established.
+                        post_pct = None
+            elif saw_unusable_row:
+                post_pct = None
 
         if post_pct is not None:
             extractions.append(

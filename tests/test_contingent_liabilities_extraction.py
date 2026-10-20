@@ -11,15 +11,26 @@ Observed before the change (Jio RHP, SHA-256 ``72480c2e…1b6d``):
 * `financials.contingent_liabilities_unquantified` had no extraction path at
   all, so the second K5 leaf could never be established.
 
-The reader now anchors on the note's own heading, reads the period headers
-immediately above the claims row, selects the **latest fiscal-year column
+The reader anchors on the note's own heading, reads the period headers
+immediately above the first row, selects the **latest fiscal-year column
 (31 March)** so the amount is period-consistent with the full-year net worth
-it is divided by, and fails closed on any width or header ambiguity.  The
-unquantified flag is set only from a positive unquantified disclosure; an
-absent disclosure leaves it unknown (never False).
+it is divided by, and fails closed on any width or header ambiguity.
 
-K5 still cannot be cleared: it requires both the quantified ratio and the
-unquantified flag, and the source contains no unquantified statement.
+Numerator definition (decision D-2, 2026-10-20): the disclosed total of the
+**contingent-liability section**.  A unique ``Total`` row wins and its
+constituent rows are ignored (no double counting); otherwise the section's
+rows are summed.  Capital commitments -- a ``(II) Commitments`` subsection or
+a commitment-labelled row -- are excluded, because a contractual commitment
+is not a contingent liability.  A quantified subset is not evidence that the
+whole section is quantified: an unparseable row, more than one total, or an
+unquantified exposure without a disclosed total leaves the amount unknown.
+
+The unquantified flag is set only from a positive unquantified disclosure; a
+negated statement leaves it unknown (never False), and an absent disclosure
+leaves it unknown too.
+
+K5 still cannot be cleared on Jio: it requires both the quantified ratio and
+the unquantified flag, and the source contains no unquantified statement.
 """
 
 from __future__ import annotations
@@ -125,7 +136,10 @@ def test_unquantified_disclosure_is_flagged_but_absence_is_not_false():
         "Certain claims are unquantified. The claims/disputed liabilities are not likely to have any",
     )
     _, amount, unquantified, _ = _read({405: flagged})
-    assert amount == 15021.0
+    # An unquantified exposure and no disclosed section total: the total is
+    # not established, so the amount is unknown (D-2).  The flag still
+    # suppresses any CLEAR of K5.
+    assert amount is None
     assert unquantified is True
     assert _read({405: JIO_NOTE_37})[2] is None
 
@@ -140,6 +154,121 @@ def test_negated_unquantified_statement_does_not_trigger_k5():
     _, amount, unquantified, _ = _read({405: note})
     assert amount == 15021.0
     assert unquantified is None
+
+
+CL_HEADER = """Notes to the Restated Consolidated Financial Information
+(All amounts are Rs. in crore unless otherwise stated)
+37 Contingent Liabilities and Commitments
+As at 31st March, 2026 As at 31st March, 2025 As at 31st March, 2024
+"""
+
+
+def _section(body: str) -> str:
+    return CL_HEADER + body
+
+
+def test_guarantees_are_counted_without_a_claims_row():
+    """A note that itemises guarantees/EPCG but has no claims label is still
+    the contingent-liability section; the claims row is not the numerator."""
+    note = _section(
+        """(I) Contingent Liabilities
+Bank guarantees secured on fixed deposits 5,850.00 4,100.00 3,000.00
+Unfulfilled EPCG export obligations 3,143.00 2,900.00 2,500.00
+(II) Commitments
+Estimated amount of contracts remaining to be executed on capital account not provided for 1,200.00 900.00 800.00
+"""
+    )
+    _, amount, unquantified, _ = _read({405: note})
+    assert amount == 8993.0
+    assert unquantified is None
+
+
+def test_multiple_categories_within_the_section_are_summed():
+    note = _section(
+        """(I) Contingent Liabilities
+Claims / disputed liabilities against the Company not acknowledged as debts 1,000.00 900.00 800.00
+Bank guarantees secured on fixed deposits 5,850.00 4,100.00 3,000.00
+"""
+    )
+    _, amount, _, _ = _read({405: note})
+    assert amount == 6850.0
+
+
+def test_disclosed_total_is_not_added_to_its_constituent_rows():
+    """Aggregate plus components must not double count."""
+    note = _section(
+        """(I) Contingent Liabilities
+Bank guarantees 5,850.00 4,100.00 3,000.00
+Unfulfilled EPCG export obligations 3,143.00 2,900.00 2,500.00
+Total contingent liabilities 8,993.00 7,000.00 5,500.00
+"""
+    )
+    _, amount, _, quote = _read({405: note})
+    assert amount == 8993.0
+    assert quote == "Total contingent liabilities"
+
+
+def test_commitments_are_excluded_from_the_numerator():
+    """Capital commitments are a contractual obligation, not a contingent
+    liability, even when the reader sees them (D-2)."""
+    note = _section(
+        """(I) Contingent Liabilities
+Bank guarantees 5,850.00 4,100.00 3,000.00
+(II) Commitments
+Capital commitments 1,200.00 900.00 800.00
+"""
+    )
+    _, amount, _, _ = _read({405: note})
+    assert amount == 5850.0
+
+
+def test_two_disclosed_totals_leave_the_amount_unknown():
+    note = _section(
+        """(I) Contingent Liabilities
+Bank guarantees 5,850.00 4,100.00 3,000.00
+Total 5,850.00 4,100.00 3,000.00
+Total 6,450.00 4,500.00 3,300.00
+"""
+    )
+    _, amount, _, _ = _read({405: note})
+    assert amount is None
+
+
+def test_unquantified_exposure_without_a_total_leaves_the_amount_unknown():
+    note = _section(
+        """(I) Contingent Liabilities
+Bank guarantees 5,850.00 4,100.00 3,000.00
+Certain claims are unquantified.
+"""
+    )
+    _, amount, unquantified, _ = _read({405: note})
+    assert amount is None
+    assert unquantified is True
+
+
+def test_unquantified_exposure_with_a_disclosed_total_keeps_the_total():
+    note = _section(
+        """(I) Contingent Liabilities
+Bank guarantees 5,850.00 4,100.00 3,000.00
+Certain claims are unquantified.
+Total 6,450.00 4,500.00 3,300.00
+"""
+    )
+    _, amount, unquantified, _ = _read({405: note})
+    assert amount == 6450.0
+    assert unquantified is True
+
+
+def test_next_numbered_note_on_the_same_page_is_not_part_of_the_section():
+    note = _section(
+        """(I) Contingent Liabilities
+Bank guarantees 5,850.00 4,100.00 3,000.00
+38 Capital Management
+Borrowings 707.00 650.00 600.00
+"""
+    )
+    _, amount, _, _ = _read({405: note})
+    assert amount == 5850.0
 
 
 def test_no_note_fails_closed():
