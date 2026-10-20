@@ -953,3 +953,52 @@ Reconciled against the remote repository (`ramkivs/ipo-screening-engine`), all b
   K2's basis field and every retrieval decision are still Ramki's, and A8-R §7 states why the
   K2 field should follow R-S1 rather than precede it); A24's Option C (KMP / Senior Management)
   is not adopted; `main` and PR #6 are untouched by design.
+
+### A26 / A27 / A8-R decision preparation (read-only; no status changed) — 2026-10-20
+
+- **What was done.** A read-only evidence pass to prepare, not decide, the three
+  open governance questions. It produced
+  `docs/investigation/A26-A27-A8R-DECISION-PREPARATION-2026-10-20.md`, labelled
+  **PROPOSED / FOR RAMKI REVIEW**, with per-question answers, an options
+  evaluation, an inventory of declared-but-unconsumed governance inputs, a
+  provision-by-provision A8-R assessment (R-S1…R-S10), one cross-cutting decision
+  matrix, 15 numbered questions for Ramki, and seven proposed amendments to
+  existing records — **none of which was applied**.
+- **Authority honoured.** A26, A27 and A8-R are untouched and remain
+  `PROPOSED / UNRESOLVED` and `UNRESOLVED`; no option was adopted; no bucket,
+  mapping, coverage basis, config version, schema change, golden re-pin or
+  extraction change was made. The A24/A25 implementation published at `41f2f86`
+  is unaltered. `main` and PR #6 (open, unmerged) are untouched.
+- **Findings worth the tracker's attention (details in the report).**
+  (1) *Tax*: v1.5 never gave tax a scored state anywhere — §4.3 `:253` collects
+  it, §11 (`:547-558`) does not mention it, and a sweep of all 30 criteria finds
+  **no criterion consuming contingent liabilities**, so K5 prices magnitude as a
+  binary knockout and the `eom_caro` penalty (from reviewer-supplied
+  `eom_materiality`) prices severity; the "disputed tax" wording in both shipped
+  configs is v1.3/v1.4 inheritance, i.e. stale text, not a dropped v1.5 rule.
+  (2) *CARO*: `caro_remarks` is declared at `ipo-input.v1.5.schema.json:659` with
+  **no consumer, no extractor and no test** — the only "CARO" in engine code is
+  inside the auditor formula *string* — so §11's `EOM/CARO only` state is
+  unreachable for an unqualified-plus-CARO filing, which scores `clean_reputed`;
+  `eom_only` today fires on auditor *reputation* (the RK reconciliation's "label is
+  semantic misnomer"). A wording fix still costs a config version and a golden
+  re-baseline, because the formula string is inside `config_fingerprint` and inside
+  `fixtures/vishal_nirmiti/expected_derived.json:34`.
+  (3) *A8-R*: five governance fields are declared with no consumer
+  (`eom_count_3y`, `auditor_change_count_3y`, `caro_remarks`, `regulatory_actions`,
+  `independent_director_count`); the governed carriers for external evidence
+  already exist (`_sources`/`_evidence`/`_cross_checks` with
+  `CROSS_SOURCE_DIVERGENCE`, `supplemental-enrichment.v1` with dual timestamps and
+  content hashes), so "no new fields" is a real option; `RUNBOOK.md` §9 states the
+  engine "never makes a network call" and `issue_terms` is imported only by the
+  presentation layer, so any retrieval belongs upstream of `evaluate`; a K2
+  coverage-basis *field* is not the minimum change — the open decision is whether
+  any basis may clear K2 at all; and a proposed **R-S11** (SEBI and ED coverage
+  must be established independently) is missing from the current provision list.
+- **Validation run and why.** `python3 -m pytest tests/test_litigation_regulatory_defaults.py
+  tests/test_hd_fire_primary_source_extraction.py -q` → **96/96 passed, 0.21 s**, and
+  `python3 engine/tools/ipo_screen.py check-config` → `valid True`, 10 profiles.
+  Both are read-only confirmations that the behaviour quoted in the report is the
+  behaviour of the published tree. The full suite was **not** re-run: nothing in
+  this pass changes implementation, so a full run could not validate anything new
+  (the last published full run remains 1288/1288 passed at `41f2f86`).
