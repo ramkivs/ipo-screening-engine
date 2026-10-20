@@ -127,7 +127,11 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     # contains no establishable opinion language, so the opinion is honestly
     # unknown -- the previous "unqualified" value was an unsupported default.
     assert canonical["governance"]["auditor_opinion"] is None
-    assert canonical["governance"]["auditor_changed_3y"] is False
+    # Tenure/change is emitted only on a positive three-year tenure statement;
+    # this filing carries none, so the field is unknown (it used to be a
+    # constant False).  The auditor criterion was already UNKNOWN because the
+    # opinion is unknown, so the score is unchanged.
+    assert canonical["governance"]["auditor_changed_3y"] is None
     assert canonical["governance"]["auditor_reputed"] is False
     assert canonical["governance"]["litigation_bucket"] == "clean"
     assert canonical["governance"]["sebi_ed_action_active"] is False

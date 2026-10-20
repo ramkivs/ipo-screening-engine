@@ -130,6 +130,18 @@ def test_unquantified_disclosure_is_flagged_but_absence_is_not_false():
     assert _read({405: JIO_NOTE_37})[2] is None
 
 
+def test_negated_unquantified_statement_does_not_trigger_k5():
+    """'There are no unquantified claims' contains the keyword but asserts the
+    opposite.  It must leave the flag unknown, not raise a K5 trigger."""
+    note = JIO_NOTE_37.replace(
+        "The claims/disputed liabilities are not likely to have any",
+        "There are no unquantified claims. The claims/disputed liabilities are not likely to have any",
+    )
+    _, amount, unquantified, _ = _read({405: note})
+    assert amount == 15021.0
+    assert unquantified is None
+
+
 def test_no_note_fails_closed():
     assert _read({405: "Profit and loss statement without the note."})[1] is None
 

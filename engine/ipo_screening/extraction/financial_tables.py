@@ -655,7 +655,21 @@ class FinancialTableExtractor:
                 # The unquantified-claims statement usually sits just below
                 # the claims row; keep the scan inside the note's own block.
                 note_text = "\n".join(note_lines[max(0, row_index - 30): row_index + 8])
-                unquantified = True if self._CL_UNQUANTIFIED.search(note_text) else None
+                # The flag means "some material exposure is unquantified".
+                # A negated statement ("there are no unquantified claims")
+                # contains the keyword but asserts the opposite, so it must
+                # not raise a K5 trigger.  As everywhere else in this
+                # extractor, absence of a positive disclosure stays None --
+                # it is not converted into a favourable False.
+                unquantified = None
+                m_unquantified = self._CL_UNQUANTIFIED.search(note_text)
+                if m_unquantified:
+                    prefix = note_text[max(0, m_unquantified.start() - 80): m_unquantified.start()]
+                    prefix = re.split(r"[.;\n]", prefix)[-1]
+                    if not re.search(
+                        r"\b(?:no|not|nil|none|without)\b", prefix, re.IGNORECASE
+                    ):
+                        unquantified = True
                 quote = " ".join(" ".join(label_parts).split())
                 return p, amount, unquantified, quote
         return None, None, None, ""

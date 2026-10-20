@@ -633,6 +633,13 @@ class SectionExtractor:
 
         return extractions
 
+    # Category-total labels in the ICDR shareholding pattern.  The summary row
+    # "Total (A)+(B)+(C)" is the whole company; a prefix match on "Total (A)"
+    # read it as the promoter category and produced 100% (observed on the Jio
+    # RHP p.107: 66.43% promoter, 33.57% public).  The trailing lookahead
+    # keeps that summary row out of the promoter fallback.
+    _TOTAL_A_LABEL = re.compile(r"total\s*\(\s*a\s*\)(?!\s*[+(])", re.IGNORECASE)
+
     def extract_capital_structure(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract promoter pre/post holding %, pledge %, and lock-in."""
         extractions: List[RawExtraction] = []
@@ -673,12 +680,18 @@ class SectionExtractor:
                 if pre_pct is not None:
                     break
 
-        # Check if Total (A) and Total (B) exist for promoter pre-holding:
+        # Check if a genuine Total (A) row exists for promoter pre-holding.
+        # A combined "Total (A)+(B)+(C)" summary row is the whole company, not
+        # the promoter category: a prefix match on "Total (A)" read it as the
+        # promoter total and returned 100% (Jio RHP p.107 states 66.43%).
+        # The category-total arithmetic itself is unchanged: combining the
+        # public category into the promoter category is a separate question
+        # (decision D-3) that changes an existing filing's extracted value.
         if pre_pct is None:
             tot_a_pre = None
             tot_b_pre = None
             for idx, l in enumerate(cap_lines):
-                if re.search(r'Total\s*\(\s*A\s*\)', l, re.IGNORECASE):
+                if self._TOTAL_A_LABEL.search(l):
                     c_text = l
                     for j in range(idx + 1, min(idx + 3, len(cap_lines))):
                         c_text += " " + cap_lines[j]
@@ -709,12 +722,14 @@ class SectionExtractor:
                 )
             )
 
-        # Post-issue promoter holding fallback scan
+        # Post-issue promoter holding fallback scan.  The category arithmetic
+        # is unchanged; the label guard only stops the combined summary row
+        # from being read as the promoter total.
         if post_pct is None:
             a_pct = None
             b_pct = None
             for idx, l in enumerate(cap_lines):
-                if re.search(r'Total\s*\(\s*A\s*\)', l, re.IGNORECASE):
+                if self._TOTAL_A_LABEL.search(l):
                     c_text = l
                     for j in range(idx + 1, min(idx + 3, len(cap_lines))):
                         c_text += " " + cap_lines[j]
@@ -1194,6 +1209,51 @@ class SectionExtractor:
         re.IGNORECASE,
     )
 
+    # Negations that turn the standard uncertainty phrase into a statement of
+    # its absence.  Kept as an explicit list rather than a bare "no" so that
+    # an unrelated word in the same sentence ("No doubt, there is a material
+    # uncertainty ...") does not suppress a genuine disclosure.
+    _GOING_CONCERN_NEGATION = re.compile(
+        r"\bthere\s+(?:is|are|was|were)\s+(?:no|not)\b"
+        r"|\b(?:do|does|did|has|have|had)\s+not\s+"
+        r"(?:identify|identified|report|reported|find|found|note|noted|exist|arise)\b"
+        r"|\bno\s+(?:material\s+|significant\s+)?uncertainty\b"
+        r"|\bno\s*$"
+        r"|\bwithout\s+(?:any\s+)?(?:material\s+)?uncertainty\b"
+        r"|\bnone\b",
+        re.IGNORECASE,
+    )
+    _GOING_CONCERN_POST_NEGATION = re.compile(
+        r"\b(?:does|do|did|has|have|had)\s+not\s+(?:exist|been\s+identified|identified)\b"
+        r"|\bno\s+such\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _going_concern_uncertainty_match(cls, text: str) -> Optional[re.Match]:
+        """A *positive* going-concern uncertainty statement.
+
+        "There is no material uncertainty related to going concern" and "we
+        did not identify any material uncertainty ..." contain the standard
+        phrase but assert its absence.  Emitting True for them triggered K1
+        on the opposite of the disclosed fact.  The absence of a positive
+        statement is still not a negative confirmation: callers must leave
+        the field unknown.
+        """
+        for match in cls._GOING_CONCERN_UNCERTAINTY.finditer(text):
+            prefix = text[max(0, match.start() - 120): match.start()]
+            cut = max(prefix.rfind("."), prefix.rfind("\n"), prefix.rfind(";"))
+            if cut != -1:
+                prefix = prefix[cut + 1:]
+            if cls._GOING_CONCERN_NEGATION.search(prefix):
+                continue
+            end = text.find(".", match.end())
+            sentence_tail = text[match.start(): end if end != -1 else len(text)]
+            if cls._GOING_CONCERN_POST_NEGATION.search(sentence_tail):
+                continue
+            return match
+        return None
+
     @classmethod
     def _has_positive_emphasis_of_matter(cls, text: str) -> bool:
         """True only for a positive Emphasis of Matter statement.
@@ -1416,11 +1476,19 @@ class SectionExtractor:
             ]
             is_reputed = any(rf in auditor_name.lower() for rf in reputed_firms)
 
-            # Check tenure: if same auditor audited all 3 FYs
-            aud_changed_3y = False
+            # Tenure: "no change in the last three years" is established only
+            # by a positive statement that the same auditor audited all three
+            # fiscal years.  The previous implementation assigned False before
+            # the scan and assigned False again in both branches, so the value
+            # was a constant and cleared ``clean_reputed`` without evidence.
+            # No match now leaves the field unknown (schema boolean|null) and
+            # the criterion UNKNOWN; the quote is the matched source sentence.
+            aud_changed_3y = None
+            tenure_quote = ""
+            tenure_page = found_opinion_page
             for p in scan_pages:
                 txt = self.extract_page_text(p)
-                if re.search(
+                m_tenure = re.search(
                     r'financial year ended (?:March 31|31st March)[^\n]*?2026[^\n]*?2025[^\n]*?2024[^\n]*?audited by',
                     txt,
                     re.IGNORECASE,
@@ -1428,24 +1496,29 @@ class SectionExtractor:
                     r'audited by[^\n]*?for the (?:period|financial year)[^\n]*?2026[^\n]*?2025[^\n]*?2024',
                     txt,
                     re.IGNORECASE,
-                ):
+                )
+                if m_tenure:
                     aud_changed_3y = False
+                    tenure_page = p
+                    tenure_quote = self._opinion_sentence(
+                        txt, re.escape(m_tenure.group(0))
+                    ) or " ".join(m_tenure.group(0).split())
                     break
 
-            extractions.append(
-                RawExtraction(
-                    field_path="governance.auditor_changed_3y",
-                    candidate_value=aud_changed_3y,
-                    raw_text=str(aud_changed_3y),
-                    page=found_opinion_page,
-                    section="Financial Information",
-                    locator="Auditor Tenure and Examination Report",
-                    quote=f"Auditor {auditor_name} unchanged across audited fiscal years",
-                    quote_is_processing=True,
-                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
-                    extraction_confidence=0.95,
+            if aud_changed_3y is not None:
+                extractions.append(
+                    RawExtraction(
+                        field_path="governance.auditor_changed_3y",
+                        candidate_value=aud_changed_3y,
+                        raw_text=tenure_quote,
+                        page=tenure_page,
+                        section="Financial Information",
+                        locator="Auditor Tenure and Examination Report",
+                        quote=tenure_quote,
+                        extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                        extraction_confidence=0.95,
+                    )
                 )
-            )
             extractions.append(
                 RawExtraction(
                     field_path="governance.auditor_reputed",
@@ -1460,19 +1533,34 @@ class SectionExtractor:
                     extraction_confidence=0.95,
                 )
             )
-            extractions.append(
-                RawExtraction(
-                    field_path="governance.repeated_eom",
-                    candidate_value=False,
-                    raw_text="False",
-                    page=found_opinion_page,
-                    section="Financial Information",
-                    locator="Auditor Opinion Notes",
-                    quote="No repeated Emphasis of Matter noted",
-                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
-                    extraction_confidence=0.95,
-                )
+            # A repeated Emphasis of Matter cannot be inferred from a single
+            # report.  The field is emitted only on an explicit negative
+            # statement in the auditors' report ("there are no Emphasis of
+            # Matter ..."); otherwise it stays unknown.  The previous
+            # implementation emitted False with a quote ("No repeated Emphasis
+            # of Matter noted") that appears nowhere in the source.
+            negative_eom = re.search(
+                r"\b(?:no|nil|without)\s+(?:any\s+)?emphasis\s+of\s+matters?\b",
+                section_text,
+                re.IGNORECASE,
             )
+            if negative_eom and not self._has_positive_emphasis_of_matter(section_text):
+                eom_quote = self._opinion_sentence(
+                    section_text, r"\b(?:no|nil|without)\s+(?:any\s+)?emphasis\s+of\s+matters?\b"
+                ) or " ".join(negative_eom.group(0).split())
+                extractions.append(
+                    RawExtraction(
+                        field_path="governance.repeated_eom",
+                        candidate_value=False,
+                        raw_text=eom_quote,
+                        page=found_opinion_page,
+                        section="Financial Information",
+                        locator="Auditor Opinion Notes",
+                        quote=eom_quote,
+                        extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                        extraction_confidence=0.90,
+                    )
+                )
 
         # Going concern is established ONLY by positive going-concern
         # uncertainty language in the auditors' report.  It is never emitted
@@ -1485,7 +1573,7 @@ class SectionExtractor:
         # K1 input.
         if report_pages:
             for p in report_pages:
-                m = self._GOING_CONCERN_UNCERTAINTY.search(self.extract_page_text(p))
+                m = self._going_concern_uncertainty_match(self.extract_page_text(p))
                 if m:
                     extractions.append(
                         RawExtraction(
