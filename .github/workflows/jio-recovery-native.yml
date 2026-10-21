@@ -4,6 +4,8 @@ on:
     branches: [arena/95234306-ipo-screening-engine]
     paths:
       - .github/workflows/jio-recovery-native.yml
+      - docs/investigation/jio-recovery/native_api.py
+      - docs/investigation/jio-recovery/source_inventory.py
   workflow_dispatch:
 permissions:
   contents: read
