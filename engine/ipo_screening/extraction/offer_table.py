@@ -69,6 +69,8 @@ def component_columns(page, page_number):
         # merely starting somewhere inside the column. No cell stitching into
         # a financial assertion: each run is parsed separately by the caller.
         members = [c for c in members if abs(c.x-header.x) <= 3]
+        ambiguous = [c for c in members if '\n' in c.text or '\r' in c.text]
+        members = [c for c in members if c not in ambiguous]
         columns.append({'component': field, 'page': page_number,
-                        'header': asdict(header), 'body_bounds': list(bounds[field]), 'cells': [asdict(c) for c in members]})
+                        'header': asdict(header), 'body_bounds': list(bounds[field]), 'ambiguous_text_runs': [asdict(c) for c in ambiguous], 'cells': [asdict(c) for c in members]})
     return columns

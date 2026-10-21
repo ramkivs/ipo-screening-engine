@@ -158,3 +158,19 @@ def test_unrelated_later_page_is_not_an_offer_summary():
     r = parse_official_rhp(raw, 'https://www.nseindia.com/rhp.pdf')
     assert r.fresh_issue_amount is None
     assert 12 not in r.metadata['native_read_scope']['amount_pages_considered']
+
+
+def test_multiline_visitor_chunk_is_not_reconstructed_into_cells():
+    # pypdf callbacks can group multiple text operators. Do not split a
+    # grouped chunk and pretend each line's geometry has been established.
+    class Page:
+        def extract_text(self, visitor_text, visitor_operand_before):
+            cm=[1,0,0,1,0,0]
+            for x,title in [(25,'Fresh Issue Size'),(205,'Offer for Sale Size'),(385,'Total Issue Size')]:
+                visitor_operand_before(b're',[x-5,690,180,30],cm,cm)
+                visitor_operand_before(b're',[x-5,550,180,140],cm,cm)
+                visitor_text(title,cm,[1,0,0,1,x,700],None,9)
+            visitor_text('aggregating up to Rs. 240 million\nNot applicable',cm,[1,0,0,1,25,650],None,9)
+    columns=component_columns(Page(),1)
+    assert not columns[0]['cells']
+    assert columns[0]['ambiguous_text_runs']
