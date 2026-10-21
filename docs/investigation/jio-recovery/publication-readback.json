@@ -1,0 +1,444 @@
+{
+  "verified_at": "2026-10-21T16:58:45.346969+00:00",
+  "published_sha": "6db86b388048f737870d69f65fcd567b7b1517c7",
+  "required_baseline": "0d1d48ba2c04f9a7b306e53c330dd3701559820e",
+  "baseline_is_ancestor": true,
+  "main_sha": "01ba66c12ca1195fd7acbd287c3e39a019808094",
+  "pr6": {
+    "state": "open",
+    "merged": false,
+    "head": "e05c0efbca1ecb3024e52da73a22e180ea171118",
+    "base": "arena/573e69a4-ipo-screening-engine"
+  },
+  "all_remote_tree_blob_ids_match": 543,
+  "changed_blobs_individually_fetched": [
+    {
+      "path": ".github/workflows/bse-source-contract.yml",
+      "blob": "701993631c0634a02db1347238cdde78c69064fd",
+      "sha256": "207cfcf8180fbc654c70dc4bd2181e9f00afbe5379e50d6644195ccf971c6ac2"
+    },
+    {
+      "path": ".github/workflows/jio-anchor-review.yml",
+      "blob": "75e78efcd02aae4f84a968ca55997e4abea045b8",
+      "sha256": "eeee86e4e34f9303a385d71c371e0ee571749f22c9aa7618a7516ff5fd26f903"
+    },
+    {
+      "path": ".github/workflows/jio-recovery-native.yml",
+      "blob": "71477a054d331309d803b6e6fb6ce81474a9a689",
+      "sha256": "93462167bfb6557932a50952ab36a141f5296503fe382db285982c17581f4260"
+    },
+    {
+      "path": ".github/workflows/official-discovery-live.yml",
+      "blob": "2774e803e31379220ea9c3a7d26af92d893fddf4",
+      "sha256": "1edc2c70738d25c204c493e3515925f7dc56f26b33e2739793e4eeab7ca84d58"
+    },
+    {
+      "path": "README.md",
+      "blob": "13ab3a09f9981737218cdf074c33d937874825a0",
+      "sha256": "bd6b91f52149e9f4accb0526bc26154c53c504915ea514cc45d483484db67104"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/REPORT.md",
+      "blob": "cdd8706cc1b769513a79f4775b0acf9fa57f756b",
+      "sha256": "76421e5281036a99204a4af2e44b0d53332d491435cff0f04aa965193e215ea9"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/additional-official-documents.json",
+      "blob": "bbc043bbeecfa072a95e9cf43a0366f892f3c8c0",
+      "sha256": "5534bd4a0aa8a082a7e947c1da5b8d270bad8038c40da4e3375899ca548c11be"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/anchor-review.json",
+      "blob": "9500ab2cbf3ac003b4f6a4351527c6209b56c980",
+      "sha256": "7b3b159e9938357e26163692f0890ae36682c9c0275bbb1e050a869193e8e2de"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/anchor_review.py",
+      "blob": "17a0e018e5f836d943e6940caa47be32b5777dbc",
+      "sha256": "30577fe22db850bdde3c7f42b397d226ebd099ad31fe2e0f605ce5d291afe9bd"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/baseline-api-result.json",
+      "blob": "b60f2426d0aff8ea191b0c237ed5cf7284685b0b",
+      "sha256": "d2c14d3749101f975e2d3cd893fef5204b584d9a5576b15552cb275b321c6e89"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/bse_source_contract.py",
+      "blob": "7a3f0dd224906fa6efb3b1e930863ff080516e4e",
+      "sha256": "2f1d13b42c040e5aa7cff71822e9512e9f9645c9830c02b721b3050a42d3c419"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/extra_doc_inventory.py",
+      "blob": "23179fc13066c6ecd9da7e39a4c4532d9bec7230",
+      "sha256": "6385fd20ceff7879efc8eb9664312e49fe6f32b05002428eeac929f129241e4d"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/independent-source-audit.json",
+      "blob": "19fdb17337bc42bee926e92c32a2b8d8adb2fb52",
+      "sha256": "85076165e57273bfc8d9f1b33d1bd1dc53f1f7b1cc52e8d015189950451c8c70"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/latest-api-result.json",
+      "blob": "1334db56c89ab41851e8ce1a130cd1fb88ae17bc",
+      "sha256": "8c94a6c6896b4748a0722aa1e2d6ab97b7539e0c5bb6a994be3ee398e66843dc"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/native_api.py",
+      "blob": "149480001b026ef0c36a387bc70e39c0847ffb81",
+      "sha256": "831fc5788ded33c602e7bd97fcb6daa27451bc770cd1439144fc4824da85bec5"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/review/37fdc7302439-operative-offer-clause.png",
+      "blob": "104e4000b6f022f274fc3dbb5e1e3453147690ef",
+      "sha256": "2d6177640a872262c2295090e989fa8e32ddfe9e555a76c7437b20434239f3a8"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/review/37fdc7302439-page-1-top.png",
+      "blob": "c332bbebc46ce97a7e09ab6af4a4a90e9249846e",
+      "sha256": "bff076de508220c7f12b041ec10b5e75a7863709e73b028f18dc17f8353f484d"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/review/4882a03ab626-operative-offer-clause.png",
+      "blob": "21f190e1e0f31c9e1715c6343e1c6cb8f244bac3",
+      "sha256": "f9860f2050325c9b8fce649a1075cdf3409a5ad22add99c81ebd4460ca45d626"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/review/4882a03ab626-page-1-top.png",
+      "blob": "cab90be3c80095a6980330ac9032505be464231f",
+      "sha256": "5f163bdf4c597d15a6c2c06de694419eeb9db7e5c86cd695f241317d446dbab3"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/review/anchor-page-01.png",
+      "blob": "a8a5ce6d71d424ce1d5bd8b279a1d6a8fdfb28aa",
+      "sha256": "4c0117e8854ffa4f67e0756fae2029cfe2564066b1e6418dd6bb67ca86696f21"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/review/anchor-page-02.png",
+      "blob": "cd5f02802902b56602885379c0e55c7ff70f41f8",
+      "sha256": "6001bb9774b7cd8a07797f132e172261a537dc8e6817d9aa4bffb80466cc7a18"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/review/e4feb7a9c4ce-operative-offer-clause.png",
+      "blob": "1b844b410e805587c2b33c85605b4968cf5a43ba",
+      "sha256": "d508ba3b9d93c09c8fbd5a84d0fd8437b957aed4b358bc74cbf279170215bcc6"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/review/e4feb7a9c4ce-page-1-top.png",
+      "blob": "ae7ed0c7117b198f6e68b38b1f743268ef31427a",
+      "sha256": "f3f6b5e5b1b20c5b20ec2fa0c3a1e5cb8ee9d8d64ba1a86b4141b20e3b4a606b"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/rhp-all-pages-inventory.json",
+      "blob": "639191181fc77a198331fef5a81144c923647bd4",
+      "sha256": "59b23d727626ea7571287dd22b9858d717dc801035bace4d8e2c42f6d7f8df46"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/source_inventory.py",
+      "blob": "e46d6a3364d210c2aae779faff824d9c15202dfb",
+      "sha256": "8aa113c6f92bdadd18118f6aa09a3779a97481ff20eb3c260e27330903ecbde2"
+    },
+    {
+      "path": "docs/investigation/jio-recovery/verify_publication.py",
+      "blob": "f38b610665c8191f9c1413ecb65b5693956230b6",
+      "sha256": "25438fc7923afea10d3244c4f6cddbe1a8467154b777578e29bb43b9b0f1c30e"
+    },
+    {
+      "path": "engine/ipo_screening/extraction/official_notice_ocr.py",
+      "blob": "bf2f537d1a6d57362f72138f61f89ffb7e90dc9b",
+      "sha256": "4c6d24610c266e4c25fd253d4e482800b7919055469a85fe041cad0d980045d7"
+    },
+    {
+      "path": "engine/ipo_screening/issue_term_fields.py",
+      "blob": "52ba1abee5462ebe921c95002d5e2cb81cf02bba",
+      "sha256": "06cc37bd56962e136923d3bb550305d61afa698913de16a157ba9f6e08c2325c"
+    },
+    {
+      "path": "engine/ipo_screening/issue_terms.py",
+      "blob": "cc929f33f7a4a9a6bf3e311e2912062adaa00686",
+      "sha256": "53aead2bfc5124eebf117538be951b358a6c49ad67c6aaad14f13aa7ec5e90b1"
+    },
+    {
+      "path": "engine/ipo_screening/official_issue_sources.py",
+      "blob": "b9c9192938b3599af3039b649e80ace8aebe753a",
+      "sha256": "1c96c22db7872aeaf70b8283d85393913eb9dde93cedeea7108bb58f378673d4"
+    },
+    {
+      "path": "engine/ipo_screening/presentation/ingestion_activity.py",
+      "blob": "29a201ddcd183a8f803fcf2c9c91b0c0560f3231",
+      "sha256": "7ba8d27e7f191fb0cb2a28580cff61d50479a74a65d500b7a0ad74caa581f200"
+    },
+    {
+      "path": "engine/ipo_screening/presentation/service.py",
+      "blob": "24a56a3cc2786dc65124af917811366083771ccf",
+      "sha256": "84c6387c2926e7e76adb8cf25788f51f9f8aa83e8149cae8809c5392e332f749"
+    },
+    {
+      "path": "frontend/app.js",
+      "blob": "472d2e7d75f4a8113bd411201a8f6df25952a52c",
+      "sha256": "797735241569e75568c04ba2609cc3ff646f20b2eb5fcc7f140613be6d3bfc95"
+    },
+    {
+      "path": "frontend/test/ingestion-activity.test.js",
+      "blob": "e74dbbb42a907d6514bb382e39d28e1270efe52c",
+      "sha256": "7946fbb107272439a0eb30045ff4fe84af7f0c0954c97424eb5bc480d460b1ea"
+    },
+    {
+      "path": "handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md",
+      "blob": "c4753ea3f9247d6eb50e9f8a57cdc83a82d5ea7a",
+      "sha256": "4429ceedfa0b9f5d7933586d468369e54fa590b2ed01e6432294147a45003f0e"
+    },
+    {
+      "path": "tests/test_bse_current_listing.py",
+      "blob": "69b3c8c9a2641394187247c4ad6093fbc5b4616a",
+      "sha256": "726313e942f922fef8d275e32a63a96642217ffc9cad127697f0e606ae6af33c"
+    },
+    {
+      "path": "tests/test_ingestion_activity.py",
+      "blob": "29d07b9f43d8cbe306e77ab2feee474a0de1dab7",
+      "sha256": "f39c7488780aff517904ded5044ecdc5ddfe2c2d96681f6aa94da7ef5a905555"
+    }
+  ],
+  "protected_paths_unchanged": [
+    "config",
+    "schema",
+    "fixtures",
+    "handoff/decisions",
+    "engine/ipo_screening/extraction/price_band_notice.py",
+    "engine/ipo_screening/extraction/prospectus_terms.py"
+  ],
+  "actual_api": {
+    "head_sha": "62bad2c33464f7e8c7cc3c35368d97cff1295486",
+    "check_ids": [
+      119350592318
+    ],
+    "decoded_sha256": "f863d18b6aac07f2d7515c08b191c120cdce8f14c9456fb0d710cdb176284e8b",
+    "local_json_matches": true
+  },
+  "independent_sources": {
+    "head_sha": "0f5e226e830433f9f083129c047443b5ef79c100",
+    "check_ids": [
+      119349296158
+    ],
+    "decoded_sha256": "520a9f73f85b5a21cb3a2dfe9b5be886b86b2e342dfdadfa42124d5427a7d916",
+    "local_json_matches": true
+  },
+  "additional_documents": {
+    "head_sha": "3d53cb0801762a7805442bdaa6c5084ddb04334f",
+    "check_ids": [
+      119352683028,
+      119352695545,
+      119352703128,
+      119352711956,
+      119352720384,
+      119352729071,
+      119352737464,
+      119352744850,
+      119352751718,
+      119352759008,
+      119352767516,
+      119352775802,
+      119352783968,
+      119352791849,
+      119352799406,
+      119352806537,
+      119352813386,
+      119352820406,
+      119352826987
+    ],
+    "decoded_sha256": "f6b413125c68c3a985b9fa9179700f5fb400e5434175c8eb3c5cbd5c586ae2ad",
+    "local_json_matches": true
+  },
+  "anchor_review": {
+    "head_sha": "f5e5e8074da8d586f3aff533f217924f84e2c05a",
+    "check_ids": [
+      119356551609,
+      119356559487,
+      119356566097,
+      119356571836,
+      119356578794,
+      119356586059,
+      119356592484,
+      119356598935,
+      119356604292,
+      119356611128,
+      119356618072,
+      119356627108,
+      119356635680,
+      119356642377,
+      119356650599,
+      119356656999,
+      119356662890,
+      119356669835,
+      119356677523,
+      119356682850,
+      119356692173,
+      119356703131,
+      119356713326,
+      119356720300,
+      119356728522,
+      119356735437,
+      119356741836,
+      119356747596,
+      119356753755,
+      119356759887,
+      119356767278,
+      119356774358,
+      119356782440,
+      119356790101,
+      119356796401,
+      119356803507,
+      119356811335,
+      119356818949,
+      119356827250,
+      119356836263,
+      119356844548,
+      119356851136,
+      119356858118,
+      119356868387,
+      119356874770,
+      119356882266,
+      119356888236,
+      119356896247,
+      119356903604,
+      119356909850,
+      119356916526,
+      119356923611,
+      119356930811,
+      119356938723,
+      119356946369,
+      119356954043,
+      119356965248,
+      119356973833,
+      119356981473,
+      119356988353,
+      119356995460,
+      119357002708,
+      119357010156,
+      119357017703,
+      119357024998,
+      119357031122,
+      119357039338,
+      119357047104,
+      119357052901,
+      119357057836,
+      119357063847,
+      119357069525,
+      119357075370,
+      119357081563,
+      119357089533,
+      119357096399,
+      119357102863,
+      119357109023,
+      119357115431,
+      119357123271,
+      119357132727,
+      119357140675,
+      119357148428,
+      119357156321,
+      119357163070,
+      119357170317,
+      119357176824
+    ],
+    "decoded_sha256": "e09f38e7c19f3850adaee138c60cc92aa91cce3c815330aa5714726a4d466d50",
+    "local_json_matches": true
+  },
+  "native_job": {
+    "id": 119347179710,
+    "conclusion": "success",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-21T16:35:52Z",
+        "completed_at": "2026-10-21T16:35:52Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-21T16:35:52Z",
+        "completed_at": "2026-10-21T16:36:00Z"
+      },
+      {
+        "name": "Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-21T16:36:00Z",
+        "completed_at": "2026-10-21T16:36:01Z"
+      },
+      {
+        "name": "Run python -m pip install -r requirements.txt",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-21T16:36:01Z",
+        "completed_at": "2026-10-21T16:36:33Z"
+      },
+      {
+        "name": "Focused activity, conflict and explicit NIL safety checks only",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-21T16:36:33Z",
+        "completed_at": "2026-10-21T16:36:40Z"
+      },
+      {
+        "name": "Focused terminal activity UI checks (no build or unrelated suite)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-10-21T16:36:40Z",
+        "completed_at": "2026-10-21T16:36:45Z"
+      },
+      {
+        "name": "Actual HTTP upload, terminal GET, durable restart and conditional duplicate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-21T16:36:45Z",
+        "completed_at": "2026-10-21T16:42:13Z"
+      },
+      {
+        "name": "Run actions/upload-artifact@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-10-21T16:42:13Z",
+        "completed_at": "2026-10-21T16:42:16Z"
+      },
+      {
+        "name": "Post Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-10-21T16:42:16Z",
+        "completed_at": "2026-10-21T16:42:16Z"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16,
+        "started_at": "2026-10-21T16:42:16Z",
+        "completed_at": "2026-10-21T16:42:18Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17,
+        "started_at": "2026-10-21T16:42:18Z",
+        "completed_at": "2026-10-21T16:42:18Z"
+      }
+    ]
+  },
+  "terminal_id": "ing-75d3241aa25f40c0",
+  "terminal_after_restart_identical": true,
+  "no_evaluation_before_or_after_restart": true,
+  "success_idempotency": "NOT_RUN: authoritative fresh cash unresolved",
+  "acceptance": "B: restoration incomplete; source/evidence boundary, no fabricated evaluation"
+}
