@@ -17,8 +17,10 @@ applicable, ``details`` (sanitized, bounded), ``duration_ms``,
 
 Safety: details are sanitized before persistence -- keys that could
 carry credentials/cookies/tokens are dropped, strings are truncated,
-and nesting/collections are bounded.  No uploaded document content and
-no raw source response bodies are recorded.
+and nesting/collections are bounded. No full uploaded documents or raw source
+response bodies are recorded. Selected issue-field evidence quotations may be
+retained as bounded, numbered parts for lossless diagnostic readback; they do
+not constitute evaluation artifacts or upgrade a candidate's verification.
 """
 
 from __future__ import annotations

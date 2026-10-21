@@ -436,3 +436,79 @@ def test_windows_trace_pattern_is_unavailable_through_the_api(tmp_path, monkeypa
     assert not (tmp_path / "evaluations").exists() or not any(
         (tmp_path / "evaluations").iterdir()
     )
+
+
+def test_blocked_api_readback_keeps_zero_ofs_and_lossless_field_evidence(tmp_path, golden_input, monkeypatch):
+    """Controlled extraction, actual activity store/API; not live acceptance."""
+    import hashlib
+    doc = _jio_doc(golden_input)
+    doc['issue']['ofs'] = 0.0
+    doc['issue']['fresh_issue'] = None
+    quote = 'Offer for Sale Size: Not Applicable\n' + ('exact source text ' * 90)
+    digest = hashlib.sha256(b'controlled filing bytes').hexdigest()
+    doc['_sources'] = [{'source_id': 'SRC-FILING-TEST', 'source_type': 'RHP',
+                        'uri': 'controlled-filing.pdf', 'content_hash': digest}]
+    doc['_evidence']['issue.ofs'] = {'source_id': 'SRC-FILING-TEST', 'page': 1,
+        'quote': quote, 'extraction_method': 'DETERMINISTIC_PDF', 'extraction_confidence': 1.0}
+    _patch_extractor(monkeypatch, doc)
+    service = _service(tmp_path, doc, [])
+    rec = service.activity_store.new_recorder(filename='controlled.pdf', mode='final')
+    with pytest.raises(IngestionAwaitingIssueTermsError):
+        service.ingest_document(b'%PDF-1.4 controlled', 'controlled.pdf', recorder=rec)
+    # New service and GET read durable state, not the recorder's memory.
+    restarted = PresentationService(service.config)
+    response = _client(restarted).get('/api/v1/ingestions/' + rec.ingestion_id)
+    assert response.status_code == 200
+    record = response.json()
+    assert record['status'] == 'BLOCKED'
+    assert not record['evaluation_run'] and not record['persisted']
+    facts = [e['details'] for e in record['events'] if e['event_type'] == 'field_evidence'
+             and e['details']['field'] == 'issue.ofs']
+    assert len(facts) == 1
+    fact = facts[0]
+    assert fact['value'] == 0.0 and fact['content_hash'] == digest and fact['page'] == 1
+    assert fact['confidence'] == 1.0
+    parts = [e['details'] for e in record['events'] if e['event_type'] == 'field_evidence_part'
+             and e['details']['evidence_key'] == fact['evidence_key'] and e['details']['key'] == 'quote']
+    reconstructed = ''.join(p['text'] for p in sorted(parts, key=lambda p: p['part']))
+    assert reconstructed == quote
+    assert all(p['sha256'] == hashlib.sha256(quote.encode()).hexdigest() for p in parts)
+    assert all(len(p['text']) <= 500 for p in parts)
+    assert 'Retry after the official Price Band Notice is published' not in record['error_message']
+    assert restarted.eval_store.list_evaluations() == []
+
+
+def test_conflicting_verified_terms_remain_blocked_with_both_candidates_in_api(tmp_path, golden_input, monkeypatch):
+    """Authored exchange data; HTTP/record safety, never live conflict evidence."""
+    from ipo_screening.issue_terms import NoticeCandidate, ProviderReport
+    from ipo_screening.extraction.exchange_issue_page import ExchangeIssuePageParser
+    doc = _jio_doc(golden_input)
+    doc['issue']['fresh_issue'] = None
+    doc['issue']['ofs'] = 0.0
+    _patch_extractor(monkeypatch, doc)
+
+    class AuthoredProvider:
+        def __init__(self, band):
+            self.name = 'controlled-' + band
+            raw = (f'<h1>{doc["company_name"]}</h1><p>Price Band {band}</p><p>Market Lot 50</p>').encode()
+            uri = 'https://www.nseindia.com/controlled-' + band
+            result = ExchangeIssuePageParser().parse(raw, url=uri)
+            self.item = NoticeCandidate(result, self.name, uri, '2026-10-21T00:00:00Z', verified=True)
+
+        def find(self, company_name, ipo_id):
+            return self.item, ProviderReport(self.name, 'FOUND')
+
+    service = _service(tmp_path, doc, [AuthoredProvider('100 - 120'), AuthoredProvider('105 - 125')])
+    rec = service.activity_store.new_recorder(filename='controlled.pdf', mode='final')
+    with pytest.raises(IngestionAwaitingIssueTermsError) as exc:
+        service.ingest_document(b'%PDF-1.4 controlled', 'controlled.pdf', recorder=rec)
+    assert exc.value.resolution['status'] == 'CONFLICT'
+    record = _client(PresentationService(service.config)).get('/api/v1/ingestions/' + rec.ingestion_id).json()
+    candidates = [e for e in record['events'] if e['event_type'] == 'field_evidence'
+                  and e['details']['field'] == 'issue.price_band_high']
+    assert {e['details']['value'] for e in candidates} == {120, 125}
+    assert all(e['details']['state'] == 'CONFLICT' and e['status'] == 'BLOCKED' for e in candidates)
+    assert all(e['details']['verification'] == 'VERIFIED' and e['details']['content_hash'] for e in candidates)
+    assert all(e['details']['confidence'] == 0.95 for e in candidates)
+    assert record['status'] == 'BLOCKED' and not record['persisted'] and not record['evaluation_run']
+    assert service.eval_store.list_evaluations() == []

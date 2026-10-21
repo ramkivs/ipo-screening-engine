@@ -72,6 +72,7 @@ def resolve_fields(resolver, outcome, candidates, company_name, ipo_id, missing_
                      "source_timestamp": src.get("source_timestamp") or None,
                      "locator": obj.get("locator"), "page": obj.get("page"),
                      "quote": obj.get("quote"), "extraction_method": obj.get("extraction_method"),
+                     "confidence": obj.get("confidence"),
                      "validation": "VALID" if valid else "MALFORMED_OR_AMBIGUOUS",
                      "verification": "VERIFIED" if verified else "UNVERIFIED"}
             by_field[name].append((candidate, obj, entry, valid, verified))

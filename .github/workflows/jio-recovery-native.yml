@@ -6,6 +6,11 @@ on:
       - .github/workflows/jio-recovery-native.yml
       - docs/investigation/jio-recovery/native_api.py
       - docs/investigation/jio-recovery/source_inventory.py
+      - engine/ipo_screening/presentation/service.py
+      - engine/ipo_screening/presentation/ingestion_activity.py
+      - engine/ipo_screening/issue_term_fields.py
+      - tests/test_ingestion_activity.py
+      - tests/test_issue_terms_multisource.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +28,10 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m pip install -r requirements.txt
+      - name: Focused activity, conflict and explicit NIL safety checks only
+        env:
+          PYTHONPATH: engine
+        run: python -m pytest -q tests/test_ingestion_activity.py tests/test_issue_terms_multisource.py tests/test_ofs_nil_binding.py
       - name: Actual HTTP upload, terminal GET, durable restart and conditional duplicate
         env:
           PYTHONPATH: engine

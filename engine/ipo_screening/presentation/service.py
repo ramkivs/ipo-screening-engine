@@ -1307,6 +1307,40 @@ class PresentationService:
             if act is not None:
                 act.emit(stage, event_type, status, message, **kw)
 
+        def _emit_term_evidence(field, origin, state, index, candidate):
+            # Preserve selected field evidence even when another field blocks
+            # evaluation. Flat events respect the existing depth/item limits.
+            # Long quotations are lossless numbered parts, never a silently
+            # truncated assertion. These are diagnostics, not new authority.
+            evidence_key = f"{origin}:issue.{field}:{index}"
+            keys = ("value", "unit", "source_id", "document_class", "uri",
+                    "content_hash", "page", "locator", "extraction_method",
+                    "confidence", "verification", "quote", "retrieved_at")
+            details = {"field": "issue." + field, "origin": origin,
+                       "state": state, "evidence_key": evidence_key}
+            long_values = {}
+            for key in keys:
+                value = candidate.get(key)
+                if isinstance(value, str) and len(value) > 500:
+                    long_values[key] = value
+                else:
+                    details[key] = value
+            evidence_status = ("SUCCEEDED" if origin == "filing" or
+                               (state == "VERIFIED" and candidate.get("verification") == "VERIFIED")
+                               else "BLOCKED")
+            _emit("term_resolution", "field_evidence", evidence_status,
+                  f"Recorded evidence candidate for issue.{field}; field state: {state}.",
+                  details=details)
+            for key, value in long_values.items():
+                count = (len(value) + 499) // 500
+                digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+                for part in range(count):
+                    _emit("term_resolution", "field_evidence_part", evidence_status,
+                          f"Evidence {key} part {part + 1}/{count} for issue.{field}.",
+                          details={"evidence_key": evidence_key, "key": key,
+                                   "part": part, "parts": count, "sha256": digest,
+                                   "text": value[part * 500:(part + 1) * 500]})
+
         _emit("upload", "received", "SUCCEEDED",
               "File received by the ingestion service.",
               details={"filename": filename, "size_bytes": len(file_bytes) if file_bytes else 0, "mode": mode})
@@ -1461,6 +1495,18 @@ class PresentationService:
                            "state": "extracted" if _filing_issue.get(_f) is not None else "missing",
                            "origin": "filing"})
 
+            if _filing_issue.get(_f) is not None:
+                spec = (canonical_dict.get("_evidence") or {}).get("issue." + _f) or {}
+                source = next((src for src in canonical_dict.get("_sources", [])
+                               if src.get("source_id") == spec.get("source_id")), {})
+                _emit_term_evidence(_f, "filing", "extracted", 0, {
+                    **spec, "value": _filing_issue[_f],
+                    "unit": (canonical_dict.get("financials") or {}).get("reporting_unit")
+                            if _f in ("ofs", "fresh_issue") else None,
+                    "uri": source.get("uri"), "content_hash": source.get("content_hash"),
+                    "confidence": spec.get("extraction_confidence"),
+                })
+
         # Peer rows enter the canonical input here and are schema-bound
         # (roe_pct and the sibling percentage fields share the contract's
         # pct bounds). The full document gate runs at evaluation time;
@@ -1518,6 +1564,10 @@ class PresentationService:
                 issue_context=issue,
             )
             resolution_dict = outcome.to_dict()
+            for field, diagnostic in resolution_dict.get("fields", {}).items():
+                for index, candidate in enumerate(diagnostic.get("candidates", [])):
+                    _emit_term_evidence(field, "official_discovery", diagnostic.get("state"),
+                                        index, candidate)
             for _rep in outcome.provider_reports:
                 _emit("official_discovery", "source_attempt",
                       "SUCCEEDED" if _rep.outcome == "FOUND" else ("BLOCKED" if _rep.outcome in ("NOT_FOUND",) else "FAILED"),
@@ -1856,9 +1906,10 @@ class PresentationService:
                 + ", ".join(f"issue.{field}" for field in unresolved)
                 + f". The uploaded filing does not disclose them and {reason}. "
                 "No evaluation was produced, no values were assumed, and nothing was persisted. "
-                "Retry after the official Price Band Notice is published, upload a filing that "
-                "discloses these terms, or supply every required term through the bounded "
-                "manual issue-term entry (recorded as MANUAL_ENTRY and never source-verified).",
+                "Retry automatic official discovery or upload an applicable authoritative filing "
+                "that establishes the unresolved fields. A retrieved price band alone does not "
+                "establish a missing fresh-issue monetary amount; missing evidence is not proof "
+                "that a notice has not been published.",
                 missing_fields=unresolved,
                 resolution=resolution_payload,
             )
