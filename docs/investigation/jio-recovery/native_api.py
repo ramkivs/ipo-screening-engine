@@ -22,6 +22,28 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 
 def serve(port):
+    # Read-only observation: original production transport still performs every
+    # request with its original timeout, session, retries and return bytes.
+    import ipo_screening.issue_terms as terms
+    original_fetch = terms._default_http_fetch
+    sources = OUT / 'sources'
+    sources.mkdir(exist_ok=True)
+
+    def observed_fetch(url, timeout_seconds, **kwargs):
+        row = {'url': url, 'timeout_seconds': timeout_seconds}
+        try:
+            raw = original_fetch(url, timeout_seconds, **kwargs)
+            digest = hashlib.sha256(raw).hexdigest()
+            (sources / (digest + '.bin')).write_bytes(raw)
+            row.update(sha256=digest, bytes=len(raw))
+            return raw
+        except Exception:
+            row['traceback'] = traceback.format_exc()
+            raise
+        finally:
+            with (sources / 'requests.jsonl').open('a', encoding='utf-8') as handle:
+                handle.write(json.dumps(row) + '\n')
+    terms._default_http_fetch = observed_fetch
     from ipo_screening.presentation.api import create_app
     from ipo_screening.presentation.service import PresentationConfig, PresentationService
     import uvicorn
@@ -69,8 +91,10 @@ def main():
     process = None
 
     def start():
+        child_env = dict(os.environ)
+        child_env.pop('LIVE_CHECK_TOKEN', None)
         proc = subprocess.Popen([sys.executable, __file__, 'serve', str(port)],
-                                cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+                                cwd=ROOT, env=child_env, stdout=log, stderr=subprocess.STDOUT)
         deadline = time.monotonic() + 90
         while time.monotonic() < deadline:
             if proc.poll() is not None:
@@ -136,6 +160,24 @@ def main():
                 result['duplicate'] = duplicate
                 assert duplicate['evaluation_id'] == terminal['evaluation_id']
                 assert terminal['evaluation_run'] and terminal['persisted']
+                from ipo_screening.evaluation import EvaluationStore
+                store = EvaluationStore(OUT / 'evaluations')
+                result['independent_hash_verification'] = store.verify_hashes(terminal['evaluation_id'])
+                assert result['independent_hash_verification']['result_hash_matches']
+                assert not result['independent_hash_verification']['artifact_mismatches']
+                stored = store.read_full(terminal['evaluation_id'])
+                canonical = stored['input_snapshot']['input']
+                result['persisted_issue'] = canonical['issue']
+                result['persisted_sources'] = canonical.get('_sources', [])
+                result['persisted_issue_evidence'] = {
+                    k: v for k, v in canonical.get('_evidence', {}).items() if k.startswith('issue.')}
+                for field in ('price_band_low', 'price_band_high', 'lot_size',
+                              'fresh_issue', 'ofs', 'open_date', 'close_date'):
+                    assert canonical['issue'].get(field) is not None
+                    assert canonical.get('_evidence', {}).get('issue.' + field), field
+                response = client.get('/api/v1/evaluations/' + terminal['evaluation_id'])
+                response.raise_for_status()
+                result['GET_evaluation_after_restart'] = response.json()
                 result['accepted'] = True
             else:
                 assert not terminal['persisted'] and terminal['evaluation_id'] is None
@@ -149,6 +191,11 @@ def main():
             process.wait(timeout=30)
         log.close()
         result['server_log'] = (OUT / 'server.log').read_text(encoding='utf-8', errors='replace')
+        requests = OUT / 'sources' / 'requests.jsonl'
+        if requests.exists():
+            result['actual_source_requests'] = [json.loads(line) for line in requests.read_text(encoding='utf-8').splitlines()]
+            from source_inventory import inspect_sources
+            result['source_inventory'] = inspect_sources(OUT / 'sources', OUT / 'review')
         publish(result)
     if 'diagnostic_traceback' in result:
         raise RuntimeError('Native API diagnostic failed; see retained full traceback')
