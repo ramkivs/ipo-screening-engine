@@ -1,0 +1,24 @@
+name: Live official exchange discovery investigation
+on:
+  push:
+    branches: [arena/95234306-ipo-screening-engine]
+    paths: [.github/workflows/official-discovery-live.yml]
+permissions:
+  contents: read
+jobs:
+  actual-exchange-http:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          clean: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements.txt
+      - name: Actual production HTTP exchange response probe
+        env:
+          PYTHONPATH: engine
+        run: python -u docs/investigation/automatic-official-discovery-2026-10-21/probe_live.py
