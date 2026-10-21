@@ -130,6 +130,9 @@ class IngestionIssueTermConflictError(IngestionError):
         self.conflicts = list(conflicts)
 
 
+from ..aggregator_issue_terms import authority_warnings
+
+
 class PresentationConfig:
     """Configuration paths for PresentationService."""
 
@@ -141,6 +144,7 @@ class PresentationConfig:
         analytics_path: Optional[str | Path] = "build/analytics/analytics.json",
         proposal_path: Optional[str | Path] = "config/calibration-proposal.v1.6.0.json",
         issue_terms_resolver: Optional[Any] = None,
+        aggregator_issue_terms_resolver: Optional[Any] = None,
     ) -> None:
         self.store_root = Path(store_root)
         self.config_dir = Path(config_dir)
@@ -148,6 +152,7 @@ class PresentationConfig:
         self.analytics_path = Path(analytics_path) if analytics_path else None
         self.proposal_path = Path(proposal_path) if proposal_path else None
         self.issue_terms_resolver = issue_terms_resolver
+        self.aggregator_issue_terms_resolver = aggregator_issue_terms_resolver
 
 
 class PresentationService:
@@ -159,6 +164,9 @@ class PresentationService:
             from ..issue_terms import build_resolver_from_env
 
             self.config.issue_terms_resolver = build_resolver_from_env()
+        if self.config.aggregator_issue_terms_resolver is None:
+            from ..aggregator_issue_terms import build_from_env
+            self.config.aggregator_issue_terms_resolver = build_from_env()
         self.eval_store = EvaluationStore(self.config.store_root)
         self.lifecycle_mgr = LifecycleManager(self.config.store_root, active_config_hash=ACTIVE_RATIFIED_CONFIG_HASH)
         # Ingestion diagnostics live beside (never inside) the immutable
@@ -544,6 +552,7 @@ class PresentationService:
         ]
 
         return EvaluationDetail(
+            authority_warnings=authority_warnings(rec),
             evaluation_id=eval_id,
             ipo_id=rec.get("ipo_id", ""),
             company_name=rec.get("company_name", ""),
@@ -758,7 +767,9 @@ class PresentationService:
                 host = uri.split("://", 1)[1].split("/", 1)[0].lower()
             from ..issue_terms import OFFICIAL_HOSTS
 
-            if item.get("extraction_method") == "DERIVED" or source_type == "DERIVED":
+            if str(source_id or "").startswith("SRC-AGG-"):
+                verification = "THIRD_PARTY_AGGREGATOR_OVERRIDE"
+            elif item.get("extraction_method") == "DERIVED" or source_type == "DERIVED":
                 verification = "DERIVED"
             elif not source_entry:
                 verification = "UNVERIFIED"
@@ -1325,7 +1336,7 @@ class PresentationService:
                     long_values[key] = value
                 else:
                     details[key] = value
-            evidence_status = ("SUCCEEDED" if origin == "filing" or
+            evidence_status = ("SUCCEEDED" if origin in ("filing", "THIRD_PARTY_AGGREGATOR_OVERRIDE") or
                                (state == "VERIFIED" and candidate.get("verification") == "VERIFIED")
                                else "BLOCKED")
             _emit("term_resolution", "field_evidence", evidence_status,
@@ -1723,6 +1734,45 @@ class PresentationService:
                 # terms the deferred raise fires unchanged before evaluation.
                 pending_awaiting = (unresolved, resolution_dict, reason)
 
+        # PA-authorized third-party fallback is a separate authority path,
+        # never passed through the official enrichment verification gate.
+        fallback = self.config.aggregator_issue_terms_resolver
+        if (fallback is not None and pending_awaiting is not None
+                and not (resolution_dict or {}).get("conflicts")
+                and (resolution_dict or {}).get("status") != "CONFLICT"
+                and not (resolution_dict or {}).get("assembly_error")):
+            from ..aggregator_issue_terms import apply_override, TAG
+            _emit("aggregator_fallback", "started", "RUNNING",
+                  "Official discovery incomplete; checking PA-authorized third-party issue data.")
+            try:
+                override = fallback.resolve(company_name=str(canonical_dict.get("company_name", "")),
+                    ipo_id=str(canonical_dict.get("ipo_id", "")), issue_context=canonical_dict.get("issue", {}),
+                    missing_fields=pending_awaiting[0])
+                canonical_dict = apply_override(canonical_dict, override, pending_awaiting[0])
+            except Exception as exc:
+                override = {"authority": TAG, "verified": False, "applied_fields": [],
+                            "error": f"{type(exc).__name__}: {exc}"}
+            for attempt in override.get("attempts", []):
+                _emit("aggregator_fallback", "source_attempt", "SUCCEEDED" if attempt.get("content_hash") else "FAILED",
+                      "Third-party fallback source: " + attempt.get("outcome", "UNKNOWN"),
+                      details=attempt, source_reference=attempt.get("uri"))
+            for field in override.get("applied_fields", []):
+                sid = canonical_dict["_evidence"]["issue." + field]["source_id"]
+                item = next(item for item in override["fields"][field] if item["source_id"] == sid)
+                _emit_term_evidence(field, TAG, TAG, 0, {**item, "value": canonical_dict["issue"][field],
+                    "unit": ((canonical_dict.get("financials") or {}).get("reporting_unit") if field in ("fresh_issue", "ofs") else item["unit"]),
+                    "document_class": "THIRD_PARTY_IPO_TABLE"})
+            _emit("aggregator_fallback", "completed", "SUCCEEDED" if override.get("applied_fields") else "BLOCKED",
+                  "PA-authorized aggregator fallback processed; never official verification.",
+                  details={"authority": TAG, "verified": False, "fields": override.get("applied_fields", []),
+                           "conflicts": override.get("conflicts", []), "error": override.get("error")})
+            issue_terms_report = dict(resolution_dict or {})
+            issue_terms_report["aggregator_override"] = override
+            remaining = [f for f in pending_awaiting[0] if canonical_dict.get("issue", {}).get(f) is None]
+            issue_terms_report["remaining_required_fields"] = ["issue." + f for f in remaining]
+            issue_terms_report["ready"] = not remaining
+            pending_awaiting = (remaining, issue_terms_report, pending_awaiting[2]) if remaining else None
+
         # --- Step 5: bounded manual issue-term entry ---------------------
         # Runs after verified-official resolution. Manual values never
         # upgrade provenance: they are recorded as MANUAL_ENTRY against a
@@ -2038,7 +2088,9 @@ class PresentationService:
             verdict=str(verdict_str),
             confidence=str(outcome.score.confidence),
             is_duplicate=False,
-            message="Filing successfully ingested, extracted, and evaluated.",
+            message=("Filing evaluated using THIRD_PARTY_AGGREGATOR_OVERRIDE; third-party terms are NOT official disclosures."
+                     if (issue_terms_report or {}).get("aggregator_override", {}).get("applied_fields") else
+                     "Filing successfully ingested, extracted, and evaluated."),
             evaluation_url=f"/#evaluations/{eval_id_to_return}",
             evaluation=eval_detail,
             issue_terms=issue_terms_report,
@@ -2063,6 +2115,7 @@ class PresentationService:
         supersedes = lc.supersedes if lc else None
 
         return EvaluationSummary(
+            authority_warnings=authority_warnings(rec),
             evaluation_id=eval_id,
             ipo_id=rec.get("ipo_id", ""),
             company_name=rec.get("company_name", ""),

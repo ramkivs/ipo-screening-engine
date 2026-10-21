@@ -61,6 +61,7 @@ class IpoListResponse(BaseModel):
 
 
 class EvaluationSummary(BaseModel):
+    authority_warnings: List[str] = Field(default_factory=list)
     model_config = ConfigDict(extra="ignore")
     evaluation_id: str
     ipo_id: str
@@ -191,6 +192,7 @@ class MarketBlockState(BaseModel):
 
 
 class EvaluationDetail(BaseModel):
+    authority_warnings: List[str] = Field(default_factory=list)
     model_config = ConfigDict(extra="ignore")
     evaluation_id: str
     ipo_id: str

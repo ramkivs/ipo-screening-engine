@@ -44,6 +44,24 @@ def serve(port):
             with (sources / 'requests.jsonl').open('a', encoding='utf-8') as handle:
                 handle.write(json.dumps(row) + '\n')
     terms._default_http_fetch = observed_fetch
+    # Observe actual third-party requests without substituting any bytes.
+    from ipo_screening import aggregator_issue_terms as aggregator
+    original_aggregator_fetch = aggregator.fetch_public
+    def observed_aggregator_fetch(url):
+        row = {'url': url, 'authority': aggregator.TAG}
+        try:
+            raw = original_aggregator_fetch(url)
+            digest = hashlib.sha256(raw).hexdigest()
+            (sources / (digest + '.bin')).write_bytes(raw)
+            row.update(sha256=digest, bytes=len(raw))
+            return raw
+        except Exception:
+            row['traceback'] = traceback.format_exc()
+            raise
+        finally:
+            with (sources / 'requests.jsonl').open('a', encoding='utf-8') as handle:
+                handle.write(json.dumps(row) + '\n')
+    aggregator.fetch_public = observed_aggregator_fetch
     from ipo_screening.extraction import official_notice_ocr as ocr
     original_ocr = ocr.parse_if_scanned
 
@@ -186,9 +204,6 @@ def main():
             assert result['terminal_after_restart'] == terminal
             result['evaluations_after_restart'] = client.get('/api/v1/evaluations').json()
             if terminal.get('status') == 'SUCCEEDED':
-                _, duplicate = upload(client)
-                result['duplicate'] = duplicate
-                assert duplicate['evaluation_id'] == terminal['evaluation_id']
                 assert terminal['evaluation_run'] and terminal['persisted']
                 from ipo_screening.evaluation import EvaluationStore
                 store = EvaluationStore(OUT / 'evaluations')
@@ -198,16 +213,29 @@ def main():
                 stored = store.read_full(terminal['evaluation_id'])
                 canonical = stored['input_snapshot']['input']
                 result['persisted_issue'] = canonical['issue']
-                result['persisted_sources'] = canonical.get('_sources', [])
+                result['persisted_sources'] = stored.get('provenance', {}).get('sources', [])
                 result['persisted_issue_evidence'] = {
-                    k: v for k, v in canonical.get('_evidence', {}).items() if k.startswith('issue.')}
+                    item['evidence_id']: item for item in stored.get('evidence', {}).get('evidence', [])
+                    if item.get('evidence_id', '').startswith('EV-issue')}
                 for field in ('price_band_low', 'price_band_high', 'lot_size',
                               'fresh_issue', 'ofs', 'open_date', 'close_date'):
                     assert canonical['issue'].get(field) is not None
-                    assert canonical.get('_evidence', {}).get('issue.' + field), field
+                    assert any(item.get('evidence_id') in ('EV-issue.' + field, 'EV-issue-' + field) for item in stored.get('evidence', {}).get('evidence', [])), field
                 response = client.get('/api/v1/evaluations/' + terminal['evaluation_id'])
                 response.raise_for_status()
                 result['GET_evaluation_after_restart'] = response.json()
+                assert response.json()['result_hash'] == stored['result_hash']
+                assert len(stored['score']['modules']) == 6
+                if os.getenv('IPO_ALLOW_AGGREGATOR_ISSUE_TERMS') == '1':
+                    assert response.json()['authority_warnings']
+                    assert any(src['source_id'].startswith('SRC-AGG-') for src in result['persisted_sources'])
+                    assert any('THIRD_PARTY_AGGREGATOR_OVERRIDE' in item.get('note', '') for item in result['persisted_issue_evidence'].values())
+                    assert result['GET_evaluation/evidence']['status'] == 200
+                    assert any(item.get('verification') == 'THIRD_PARTY_AGGREGATOR_OVERRIDE' for item in result['GET_evaluation/evidence']['body']['items'])
+                _, duplicate = upload(client)
+                result['duplicate'] = duplicate
+                assert duplicate['evaluation_id'] == terminal['evaluation_id']
+                assert duplicate['is_duplicate']
                 result['accepted'] = True
             else:
                 assert not terminal['persisted'] and terminal['evaluation_id'] is None
@@ -224,6 +252,9 @@ def main():
         requests = OUT / 'sources' / 'requests.jsonl'
         if requests.exists():
             result['actual_source_requests'] = [json.loads(line) for line in requests.read_text(encoding='utf-8').splitlines()]
+            result['aggregator_source_bytes'] = [
+                dict(url=row['url'], sha256=row['sha256'], raw_zlib_base64=base64.b64encode(zlib.compress((OUT / 'sources' / (row['sha256'] + '.bin')).read_bytes(), 9)).decode())
+                for row in result['actual_source_requests'] if row.get('authority') == 'THIRD_PARTY_AGGREGATOR_OVERRIDE' and row.get('sha256')]
             from source_inventory import inspect_sources
             result['source_inventory'] = inspect_sources(OUT / 'sources', OUT / 'review')
             ocr_log = OUT / 'sources' / 'ocr.jsonl'

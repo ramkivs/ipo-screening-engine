@@ -596,6 +596,7 @@ export class App {
         <div class="scorecard-banner">
           <div class="scorecard-meta">
             <h2>${this.escape(evaluation.company_name)}</h2>
+            ${this.renderAuthorityWarnings(evaluation)}
             <div class="meta-tags">
               <span class="meta-tag">IPO ID: ${this.escape(evaluation.ipo_id)}</span>
               <span class="meta-tag">MODE: ${this.escape(evaluation.evaluation_mode)}</span>
@@ -3249,6 +3250,12 @@ export class App {
     if (target && target.classList) target.classList.add('active');
   }
 
+  renderAuthorityWarnings(evaluation) {
+    return (evaluation.authority_warnings || []).map(warning =>
+      `<div class="state-box" role="note"><strong>Third-party authority override</strong><p>${this.escape(warning)}</p></div>`
+    ).join('');
+  }
+
   renderEvaluationsTableHtml(evaluations) {
     if (!evaluations || evaluations.length === 0) {
       return `<div class="state-box"><p>No evaluations recorded yet.</p></div>`;
@@ -3272,7 +3279,7 @@ export class App {
             ${evaluations.map(e => `
               <tr>
                 <td><code>${this.escape(e.evaluation_id)}</code></td>
-                <td><strong>${this.escape(e.company_name)}</strong></td>
+                <td><strong>${this.escape(e.company_name)}</strong>${this.renderAuthorityWarnings(e)}</td>
                 <td><span class="meta-tag">${this.escape(e.evaluation_mode)}</span></td>
                 <td><strong>${e.final_score !== null ? e.final_score.toFixed(1) : '—'}</strong></td>
                 <td>${this.renderVerdictBadge(e.verdict)}</td>

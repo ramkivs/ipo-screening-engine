@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: aggregator warning is visible and HTML-escaped, never official
+ok 1 - aggregator warning is visible and HTML-escaped, never official
+  ---
+  duration_ms: 2.042991
+  type: 'test'
+  ...
+# Subtest: official evaluations without override have no warning banner
+ok 2 - official evaluations without override have no warning banner
+  ---
+  duration_ms: 0.174062
+  type: 'test'
+  ...
+# Subtest: Activity flow - panel is locatable before submission (visible shell)
+ok 3 - Activity flow - panel is locatable before submission (visible shell)
+  ---
+  duration_ms: 1.541545
+  type: 'test'
+  ...
+# Subtest: Activity flow - submission displays panel with real backend events (failed ingestion)
+ok 4 - Activity flow - submission displays panel with real backend events (failed ingestion)
+  ---
+  duration_ms: 2.622237
+  type: 'test'
+  ...
+# Subtest: Activity ApiClient - startIngestion posts FormData to the start endpoint
+ok 5 - Activity ApiClient - startIngestion posts FormData to the start endpoint
+  ---
+  duration_ms: 32.263892
+  type: 'test'
+  ...
+# Subtest: Activity ApiClient - getIngestionEvents forwards after_sequence
+ok 6 - Activity ApiClient - getIngestionEvents forwards after_sequence
+  ---
+  duration_ms: 0.405771
+  type: 'test'
+  ...
+# Subtest: Activity App - renders ordered backend events with terminal summary
+ok 7 - Activity App - renders ordered backend events with terminal summary
+  ---
+  duration_ms: 0.589325
+  type: 'test'
+  ...
+# Subtest: Activity App - untrusted diagnostic text is escaped, never raw HTML
+ok 8 - Activity App - untrusted diagnostic text is escaped, never raw HTML
+  ---
+  duration_ms: 0.174491
+  type: 'test'
+  ...
+# Subtest: Activity App - the Windows failure pattern renders UNAVAILABLE and never UNPUBLISHED
+ok 9 - Activity App - the Windows failure pattern renders UNAVAILABLE and never UNPUBLISHED
+  ---
+  duration_ms: 0.293445
+  type: 'test'
+  ...
+# Subtest: Activity App - fresh-only blocker is not described as unpublished pricing or manual recovery
+ok 10 - Activity App - fresh-only blocker is not described as unpublished pricing or manual recovery
+  ---
+  duration_ms: 0.191271
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 230.352696
