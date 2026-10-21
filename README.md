@@ -55,3 +55,14 @@ The browser UI is static JavaScript and needs no npm install. Python test/API de
 - This repository intentionally does not add authentication/RBAC, multi-user support, PostgreSQL, enterprise architecture, or production deployment requirements.
 
 See [`docs/RUNBOOK.md`](docs/RUNBOOK.md) for CLI, persistence, replay, and analytical workflows. The current personal-use operating boundary is recorded in [`handoff/decisions/A16-personal-use-operating-scope-and-gate-disposition.md`](handoff/decisions/A16-personal-use-operating-scope-and-gate-disposition.md).
+
+### Jio recovery status — 21 October 2026
+
+**Incomplete (evidence/access blocker), not end-to-end restored.** The corrected
+native Windows API upload `ing-75d3241aa25f40c0` verifies the price band, lot,
+dates and explicit OFS zero, but remains BLOCKED on `issue.fresh_issue` (cash).
+No evaluation was produced or persisted. Examined official RHP/forms retain
+monetary placeholders; reservations/anchor allocations are not fresh cash.
+The corrected current BSE public feed still returns HTTP 403. Neither failure
+nor missing evidence proves that no other notice exists. See the
+[focused recovery report and independent evidence](docs/investigation/jio-recovery/REPORT.md).
