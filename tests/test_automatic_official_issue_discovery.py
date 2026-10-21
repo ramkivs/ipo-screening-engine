@@ -373,3 +373,16 @@ def test_draft_offer_document_is_never_promoted_to_current_rhp_authority():
     from ipo_screening.extraction.official_offer_amounts import parse_official_rhp
     with pytest.raises(ValueError, match='Draft Red Herring Prospectus cannot be promoted'):
         parse_official_rhp(('Draft ' + RHP).encode(), 'https://www.nseindia.com/draft.pdf')
+
+
+def test_ocr_prices_require_own_currency_token_not_face_value_multiples_or_other_provider_values():
+    from ipo_screening.extraction.official_notice_ocr import _has_explicit_price_currency
+    from ipo_screening.extraction.price_band_notice import PriceBandField
+    def check(value, quote):
+        return _has_explicit_price_currency(PriceBandField('price_band_low', value, quote=quote))
+    assert not check(10.5, 'FLOOR PRICE IS 10.50 TIMES FACE VALUE Rs 10')
+    assert not check(1055, 'lower end 1,055: at upper end 1,119')
+    assert not check(100, 'Cap Price Rs 120')
+    assert check(100, 'Floor Price Rs 100 per Equity Share')
+    assert check(101, 'Floor Price INR 101 per Equity Share')  # no comparison/override against API 100
+    assert check(1065, 'Price Band ₹1,065 to ₹1,119 per Equity Share')

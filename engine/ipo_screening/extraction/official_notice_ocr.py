@@ -130,6 +130,15 @@ def _primary_issuer_header(pages):
     return next(iter(found.values()), None)
 
 
+def _has_explicit_price_currency(obj):
+    # A face-value multiple or a currency-free OCR chart number is not an INR
+    # price. Require the captured assertion to contain its own matching money
+    # token. Never compare against another provider or repair OCR digits.
+    from .exchange_issue_page import _number
+    return any(_number(m.group(1)) == obj.value for m in re.finditer(
+        r'(?:₹|\bRs\.?|\bINR)\s*(\d[\d,]*(?:\.\d+)?)', obj.quote or '', re.I))
+
+
 def parse_if_scanned(raw, url):
     """None means native text exists; errors mean OCR/parse failure, not absence."""
     if not raw.startswith(b'%PDF-'):
@@ -179,8 +188,14 @@ def parse_if_scanned(raw, url):
             if '[UNREADABLE_OCR_LINE]' in (obj.quote or ''):
                 setattr(result, name, None)
             else:
+                verified = obj.verification
+                if name in ('price_band_low', 'price_band_high') and not _has_explicit_price_currency(obj):
+                    verified = 'UNVERIFIED'
+                    result.metadata.setdefault('ocr_price_validation', {})[name] = (
+                        'Captured OCR assertion lacks an explicit matching INR/Rs/rupee token; '
+                        'face-value multiples and currency-free chart numbers are not verified prices')
                 setattr(result, name, replace(obj, extraction_method='OCR', confidence=.95,
-                    locator='Offline OCR; original PDF page ' + str(obj.page) + '; ' + (obj.locator or 'notice')))
+                    verification=verified, locator='Offline OCR; original PDF page ' + str(obj.page) + '; ' + (obj.locator or 'notice')))
     result.metadata['ocr'] = {'engine': 'rapidocr-3.10.0 bundled PP-OCRv6 ONNX',
         'identity_strategy': 'full-width first-page header; financial fields from original crops only',
         'minimum_line_confidence': .95, 'inference_threads': _INFERENCE_THREADS, 'segments': len(pages),
