@@ -20,7 +20,9 @@ out.mkdir(parents=True, exist_ok=True)
 rows = []
 queue = [('https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P', None)]
 seen = set()
-api_base = None
+# Public service namespace independently exercised in the prior retained
+# investigation. Only endpoint paths found in the actual current JS are used.
+api_base = 'https://api.bseindia.com/BseIndiaAPI/api'
 pattern = re.compile(r'public.?issue|\bipo\b|GetPublicIssue|Pubissues|GetMkt_ISSUE', re.I)
 for _ in range(12):
     if not queue:
@@ -36,7 +38,7 @@ for _ in range(12):
         (out / (digest + '.txt')).write_bytes(raw)
         text = raw.decode('utf-8', errors='replace')
         row.update(sha256=digest, bytes=len(raw))
-        if raw.lstrip().startswith((b'{', b'[')) and len(raw) <= 100000:
+        if raw.lstrip().startswith((b'{', b'[')) and len(raw) <= 2000000:
             row['public_json'] = json.loads(raw)
         matches = list(pattern.finditer(text))
         row['keyword_count'] = len(matches)
@@ -51,8 +53,17 @@ for _ in range(12):
         else:
             # Lazy route asset names near an IPO/public-issue route. These
             # are the publisher's actual import literals, not guessed paths.
+            imports = re.findall(r'import\s*\{[^}]+\}\s*from\s*["\'][^"\']+["\']', text)
+            row['module_imports'] = imports[:40]
+            for statement in imports:
+                if re.search(r'\bas\s+I\b', statement):
+                    match = re.search(r'from\s*["\']([^"\']+)["\']', statement)
+                    if match:
+                        targets.append(match.group(1))
+            row['public_service_urls'] = list(dict.fromkeys(re.findall(
+                r'https://[^"\'\s<>]*bseindia\.com[^"\'\s<>]*', text)))[:50]
             row['contract_contexts'] = []
-            for term in ('GetPublicIssue_par_updated', 'GetMkt_ISSUE', 'DisplayIPO',
+            for term in ('IS_INTERNATIONAL', 'BseIndiaAPI', 'GetPublicIssue_par_updated', 'GetMkt_ISSUE', 'DisplayIPO',
                          'BSE_Domain_APIUrl', 'IPO_HomePageDetail'):
                 row['contract_contexts'].extend(text[max(0, m.start()-450):m.end()+1600]
                     for m in list(re.finditer(re.escape(term), text, re.I))[:8])
