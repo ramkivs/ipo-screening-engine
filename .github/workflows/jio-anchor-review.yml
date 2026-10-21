@@ -1,0 +1,35 @@
+name: Focused actual Jio anchor report review
+on:
+  push:
+    branches: [arena/95234306-ipo-screening-engine]
+    paths:
+      - .github/workflows/jio-anchor-review.yml
+      - docs/investigation/jio-recovery/anchor_review.py
+permissions:
+  contents: read
+  checks: write
+jobs:
+  anchor-original-pages:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements.txt
+      - name: Read original anchor PDF pages without promoting any values
+        env:
+          PYTHONPATH: engine
+          PYTHONUNBUFFERED: '1'
+          JIO_RECOVERY_OUTPUT: ${{ runner.temp }}/anchor-review
+          LIVE_CHECK_TOKEN: ${{ github.token }}
+        run: python docs/investigation/jio-recovery/anchor_review.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jio-anchor-original-page-review
+          path: ${{ runner.temp }}/anchor-review
