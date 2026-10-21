@@ -104,7 +104,7 @@ def test_native_read_expands_but_reports_bound():
 def test_qualified_rhp_extracts_page_twelve_with_original_hash_and_page():
     import hashlib
     cover = 'Red Herring Prospectus Dated: October 21, 2026\nACME FORGE LIMITED\nU12345MH2020PLC123456'
-    raw = pdf([run(cover.replace('\n', ' '),25,700)] + [run('Other material',25,700)]*10 + [run('Fresh Issue aggregating up to Rs. 240 million',25,700)])
+    raw = pdf([run(cover.replace('\n', ' '),25,700)] + [run('Other material',25,700)]*10 + [run('THE ISSUE',25,730)+run('Fresh Issue aggregating up to Rs. 240 million',25,700)])
     r = parse_official_rhp(raw, 'https://www.nseindia.com/rhp.pdf')
     assert r.fresh_issue_amount.value == 240 and r.fresh_issue_amount.page == 12
     assert r.source_ref.content_hash == hashlib.sha256(raw).hexdigest()
@@ -150,3 +150,11 @@ def test_page_read_failure_is_incomplete_not_placeholder(monkeypatch):
     assert document_pages(b'%PDF-controlled', max_pages=30, diagnostics=scope) == []
     assert scope['complete_document'] is False
     assert scope['page_read_errors'] == [{'page': 1, 'error': 'unreadable stream'}]
+
+
+def test_unrelated_later_page_is_not_an_offer_summary():
+    cover = 'Red Herring Prospectus Dated: October 21, 2026 ACME FORGE LIMITED U12345MH2020PLC123456'
+    raw = pdf([run(cover,25,700)] + [run('Other material',25,700)]*10 + [run('Fresh Issue aggregating up to Rs. 999 million',25,700)])
+    r = parse_official_rhp(raw, 'https://www.nseindia.com/rhp.pdf')
+    assert r.fresh_issue_amount is None
+    assert 12 not in r.metadata['native_read_scope']['amount_pages_considered']

@@ -153,7 +153,15 @@ def parse_official_rhp(raw, url):
                     columns.extend(component_columns(reader.pages[number-1], number))
                 except Exception as exc:
                     read_scope.setdefault('layout_read_errors', []).append({'page': number, 'error': str(exc)})
+    table_pages = {column['page'] for column in columns}
+    # Beyond the original cover window, only explicit offer-summary sections
+    # or established component tables may supply terms. A historical/example
+    # mention elsewhere in the first 30 pages is not an issue summary.
+    summary = re.compile(r'^\s*(?:THE\s+(?:ISSUE|OFFER)|DETAILS\s+OF\s+THE\s+(?:ISSUE|OFFER)\s+TO\s+THE\s+PUBLIC|ISSUE\s+(?:DETAILS|STRUCTURE))\s*$', re.I | re.M)
+    eligible_pages = [(number, text) for number, text in pages
+                      if number <= 5 or number in table_pages or summary.search(text)]
+    read_scope['amount_pages_considered'] = [number for number, _ in eligible_pages]
     result.metadata['native_read_scope'] = read_scope
     result.metadata['offer_table_columns'] = columns
     result.metadata['linear_text_excluded_table_pages'] = sorted({column['page'] for column in columns})
-    return explicit_amounts(result, pages, columns)
+    return explicit_amounts(result, eligible_pages, columns)
