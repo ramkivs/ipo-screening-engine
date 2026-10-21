@@ -50,6 +50,9 @@ jobs:
           env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(pathlib.Path('engine').resolve()), str(diagnostic)]))
           for attempt in range(int(os.environ['REPEATS'])):
               print('ATTEMPT', attempt + 1, flush=True)
-              result = subprocess.run([sys.executable, '-m', 'pytest', '-p', 'trace_activity_io', '-q', 'tests/test_ingestion_worker_lifecycle.py'], env=env)
+              result = subprocess.run([sys.executable, '-m', 'pytest', '-p', 'trace_activity_io', '-q', 'tests/test_ingestion_worker_lifecycle.py'], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+              print(result.stdout, flush=True)
               if result.returncode:
+                  message = result.stdout[-55000:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print('::error title=Published lifecycle reproduction::' + message, flush=True)
                   sys.exit(result.returncode)
