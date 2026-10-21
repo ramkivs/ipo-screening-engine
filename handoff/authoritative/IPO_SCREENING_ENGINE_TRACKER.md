@@ -1257,3 +1257,53 @@ Reconciled against the remote repository (`ramkivs/ipo-screening-engine`), all b
   PR #6 OPEN/unmerged, existing head/base unchanged. Final commit/push and independent
   remote byte/SHA/tracker/main/PR/worktree verification follow this append-only
   entry; exact publication SHA appears in the completion response.
+
+
+## 2026-10-21 — Published worker Windows regression corrected (separate from live stall)
+
+- **Scope:** reported c32e3a7 genuine-evaluation/API-history lifecycle failure
+  (user Windows cherry-pick f4b3174). Earlier PID 11272/live-ingestion stall cause
+  remains OPEN; this correction does not claim to diagnose that incident.
+- **Native reproduction:** hosted Windows/Python 3.11 run 39599814603 explicitly
+  checked out c32e3a7 and reproduced the exact terminal helper line-21 NoneType
+  failure: 1 failed/12 passed. Logged actual Path.read_text PermissionError(13,
+  'Permission denied'), winerror=None, swallowed by store.get's broad catch as
+  missing. Hosted Linux baseline passed five repetitions of the unchanged 13
+  cases. This is actual Windows-runner evidence, not access to the user's G: drive.
+- **Correction:** implementation b6230bb421153c75b9e1010d16bb89860d5dcc1c;
+  same-store save/get/history/prune serialized with RLock to prevent read/open
+  overlap with destination replacement. get maps only FileNotFoundError to None;
+  actual I/O/JSON faults propagate. Worker terminal reconciliation logs read
+  failure then uses existing trusted-snapshot durable recovery, no reevaluation
+  or fabricated success. Lock is process/instance local, not cross-process or a
+  cure for external/permanent storage denial. No kernel handle trace collected.
+- **Regression coverage:** original 13 lifecycle tests/helper, 2-second deadline,
+  actual evaluation persistence and API/event assertions unchanged. Four new
+  portability cases failed before correction, passed afterward; blocked-writer
+  get/history readers wait and observe durable terminal state, unreadable/corrupt
+  differs from genuine absence. Two isolated read-error recovery checks pass,
+  verifying logging, exact durable BLOCKED snapshot, no duplicate finalization.
+- **Validation:** focused Linux 27 passed/3 deprecation warnings/1.86 s. Native
+  corrected CI run 39600318064 on implementation SHA: Windows 20 x 27 = 540
+  successful case executions; hosted Linux 5 x 27 = 135, both jobs SUCCESS.
+  Full applicable Linux backend: **1,372 passed, 0 failed/skipped, 25 deprecation
+  warnings, 1162.60 s, EXIT 0**, one complete run. Python syntax and correct CLI
+  config check EXIT 0 (ten profiles). Initial wrong CLI module invocation failed,
+  retained and disclosed; not counted as success. No current frontend/type/build
+  result claimed; prior report's results/blockers remain historical.
+- **Preservation:** no scoring/weights/thresholds/knockouts, authority/issue-term
+  fail-closed logic, schema/config, golden, frontend, production evaluation/history
+  or runtime-logs changes. 212-path tested manifest unchanged after full run;
+  SHA256 526b2a7d083de82f0af41ae1a7c333e89ac693b84320cfd834520c5f03e44cd9.
+  This entry appends without changing any prior tracker bytes.
+- **Evidence:** docs/investigation/activity-storage-windows-2026-10-21/REPORT.md,
+  native baseline traceback/check annotations and pinned workflow, corrected CI
+  metadata/success annotations, before/focused/full logs, supplemental recovery
+  script/log and frozen tested-tree.json. Baseline CI log-download redirect was
+  inaccessible; allowed GitHub API check annotations retain the exact traceback.
+- **Publication:** only existing arena/95234306-ipo-screening-engine. Main remains
+  01ba66c12ca1195fd7acbd287c3e39a019808094; PR #6 OPEN/unmerged with existing
+  arena/5dd3fe52-ipo-screening-engine head e05c0efbca1ecb3024e52da73a22e180ea171118
+  and arena/573e69a4-ipo-screening-engine base. Final evidence commit SHA and
+  independent remote source/artifact/tracker/main/PR/worktree verification follow
+  in completion response. No reset/clean/amend/force-push/merge/retarget used.

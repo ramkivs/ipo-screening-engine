@@ -1,0 +1,161 @@
+[pytest-progress] collected 4 tests; start 12:30:28
+
+FFF[pytest-progress] |##############################| 100.0% of collected 4/4  elapsed 0s  eta 0s (linear-rate estimate)  FAILURES=4
+F                                                                     [100%][pytest-progress]   stage tests/test_activity_storage_portability.py: 4 tests, 0.0s
+[pytest-progress] finished 4/4 tests in 0.0s (passed=0 failed=4 skipped=0), exitstatus=1
+
+=================================== FAILURES ===================================
+___________ test_unreadable_existing_record_is_not_reported_missing ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-1/test_unreadable_existing_recor0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f862c92cb10>
+
+    def test_unreadable_existing_record_is_not_reported_missing(tmp_path, monkeypatch):
+        store = IngestionActivityStore(tmp_path)
+        rec = store.new_recorder(filename='test.pdf', mode='final')
+        original = Path.read_text
+        def denied(path, *args, **kw):
+            if path == store._path(rec.ingestion_id):
+                raise PermissionError(13, 'synthetic Windows CRT sharing denial')
+            return original(path, *args, **kw)
+        monkeypatch.setattr(Path, 'read_text', denied)
+>       with pytest.raises(PermissionError):
+E       Failed: DID NOT RAISE PermissionError
+
+tests/test_activity_storage_portability.py:24: Failed
+_____________ test_corrupt_existing_record_is_not_reported_missing _____________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-1/test_corrupt_existing_record_i0')
+
+    def test_corrupt_existing_record_is_not_reported_missing(tmp_path):
+        store = IngestionActivityStore(tmp_path)
+        rec = store.new_recorder(filename='test.pdf', mode='final')
+        store._path(rec.ingestion_id).write_text('{not valid JSON', encoding='utf-8')
+>       with pytest.raises(json.JSONDecodeError):
+E       Failed: DID NOT RAISE JSONDecodeError
+
+tests/test_activity_storage_portability.py:32: Failed
+_________ test_reader_cannot_open_destination_during_publication[get] __________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-1/test_reader_cannot_open_destin0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f862c935c50>
+reader = 'get'
+
+    @pytest.mark.parametrize('reader', ['get', 'list_recent'])
+    def test_reader_cannot_open_destination_during_publication(tmp_path, monkeypatch, reader):
+        store = IngestionActivityStore(tmp_path)
+        rec = store.new_recorder(filename='test.pdf', mode='final')
+        path = store._path(rec.ingestion_id)
+        writing = threading.Event()
+        publish = threading.Event()
+        entered = threading.Event()
+        done = threading.Event()
+        failures = []
+        result = []
+        original_replace = Path.replace
+        original_read = Path.read_text
+        def replace(src, target):
+            if Path(target) == path:
+                writing.set()
+                if not publish.wait(3):
+                    raise AssertionError('test publication barrier timed out')
+            return original_replace(src, target)
+        def read(src, *args, **kw):
+            if src == path and writing.is_set() and not publish.is_set():
+                raise PermissionError(13, 'modeled Windows destination handle denial')
+            return original_read(src, *args, **kw)
+        monkeypatch.setattr(Path, 'replace', replace)
+        monkeypatch.setattr(Path, 'read_text', read)
+        def writer():
+            try:
+                rec.finish('FAILED', error_code='SYNTHETIC_PROCESSING_FAILURE')
+            except BaseException as exc:
+                failures.append(exc)
+        def poller():
+            entered.set()
+            try:
+                result.append(store.get(rec.ingestion_id) if reader == 'get' else store.list_recent()[0])
+            except BaseException as exc:
+                failures.append(exc)
+            finally:
+                done.set()
+        worker = threading.Thread(target=writer)
+        polling = threading.Thread(target=poller)
+        worker.start()
+        try:
+            assert writing.wait(2)
+            polling.start()
+            assert entered.wait(2)
+            # The writer owns publication; a reader must wait, not return None,
+            # omit history, expose an OS error, or consume an old terminal state.
+>           assert not done.wait(.05)
+E           assert not True
+E            +  where True = wait(0.05)
+E            +    where wait = <threading.Event at 0x7f862c936110: set>.wait
+
+tests/test_activity_storage_portability.py:84: AssertionError
+_____ test_reader_cannot_open_destination_during_publication[list_recent] ______
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-1/test_reader_cannot_open_destin1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f862c970ed0>
+reader = 'list_recent'
+
+    @pytest.mark.parametrize('reader', ['get', 'list_recent'])
+    def test_reader_cannot_open_destination_during_publication(tmp_path, monkeypatch, reader):
+        store = IngestionActivityStore(tmp_path)
+        rec = store.new_recorder(filename='test.pdf', mode='final')
+        path = store._path(rec.ingestion_id)
+        writing = threading.Event()
+        publish = threading.Event()
+        entered = threading.Event()
+        done = threading.Event()
+        failures = []
+        result = []
+        original_replace = Path.replace
+        original_read = Path.read_text
+        def replace(src, target):
+            if Path(target) == path:
+                writing.set()
+                if not publish.wait(3):
+                    raise AssertionError('test publication barrier timed out')
+            return original_replace(src, target)
+        def read(src, *args, **kw):
+            if src == path and writing.is_set() and not publish.is_set():
+                raise PermissionError(13, 'modeled Windows destination handle denial')
+            return original_read(src, *args, **kw)
+        monkeypatch.setattr(Path, 'replace', replace)
+        monkeypatch.setattr(Path, 'read_text', read)
+        def writer():
+            try:
+                rec.finish('FAILED', error_code='SYNTHETIC_PROCESSING_FAILURE')
+            except BaseException as exc:
+                failures.append(exc)
+        def poller():
+            entered.set()
+            try:
+                result.append(store.get(rec.ingestion_id) if reader == 'get' else store.list_recent()[0])
+            except BaseException as exc:
+                failures.append(exc)
+            finally:
+                done.set()
+        worker = threading.Thread(target=writer)
+        polling = threading.Thread(target=poller)
+        worker.start()
+        try:
+            assert writing.wait(2)
+            polling.start()
+            assert entered.wait(2)
+            # The writer owns publication; a reader must wait, not return None,
+            # omit history, expose an OS error, or consume an old terminal state.
+>           assert not done.wait(.05)
+E           assert not True
+E            +  where True = wait(0.05)
+E            +    where wait = <threading.Event at 0x7f862c973f90: set>.wait
+
+tests/test_activity_storage_portability.py:84: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_activity_storage_portability.py::test_unreadable_existing_record_is_not_reported_missing
+FAILED tests/test_activity_storage_portability.py::test_corrupt_existing_record_is_not_reported_missing
+FAILED tests/test_activity_storage_portability.py::test_reader_cannot_open_destination_during_publication[get]
+FAILED tests/test_activity_storage_portability.py::test_reader_cannot_open_destination_during_publication[list_recent]
+4 failed in 0.32s

@@ -1,0 +1,25 @@
+{
+  "implementation_sha": "b6230bb421153c75b9e1010d16bb89860d5dcc1c",
+  "environment": "Arena Linux; hosted Windows and Linux focused CI separately recorded",
+  "full_backend": {
+    "command": "PYTHONPATH=engine .venv/bin/python -u -m pytest tests -q",
+    "passed": 1372,
+    "failed": 0,
+    "skipped": 0,
+    "warnings": 25,
+    "seconds": 1162.6,
+    "exit_code": 0
+  },
+  "local_focused": {
+    "passed": 27,
+    "warnings": 3,
+    "seconds": 1.86
+  },
+  "native_corrected_ci_run": 39600318064,
+  "windows_focused_repetitions": 20,
+  "linux_focused_repetitions": 5,
+  "cases_per_ci_repetition": 27,
+  "isolated_terminal_read_recovery_checks": 2,
+  "frozen_paths": 212,
+  "source_unchanged_after_full_suite": true
+}

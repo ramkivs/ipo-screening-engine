@@ -1,0 +1,3 @@
+PermissionError : logged, exact terminal snapshot durably recovered; no false success
+JSONDecodeError : logged, exact terminal snapshot durably recovered; no false success
+2 isolated worker terminal-read recovery checks passed

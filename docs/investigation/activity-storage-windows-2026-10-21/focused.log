@@ -1,0 +1,21 @@
+[pytest-progress] collected 27 tests; start 12:31:11
+
+.....[pytest-progress]   stage tests/test_activity_storage_portability.py: 4 tests, 0.1s
+.............[pytest-progress]   stage tests/test_ingestion_worker_lifecycle.py: 13 tests, 0.5s
+......[pytest-progress] |############################..|  92.6% of collected 25/27  elapsed 1s  eta 0s (linear-rate estimate)
+..[pytest-progress] |##############################| 100.0% of collected 27/27  elapsed 1s  eta 0s (linear-rate estimate)
+.                                              [100%][pytest-progress]   stage tests/test_ingestion_activity.py: 10 tests, 0.8s
+[pytest-progress] finished 27/27 tests in 1.5s (passed=27 failed=0 skipped=0), exitstatus=0
+
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_ingestion_activity.py::test_api_error_correlates_to_recoverable_history
+tests/test_ingestion_activity.py::test_windows_trace_pattern_is_unavailable_through_the_api
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/fastapi/routing.py:360: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    return await dependant.call(**values)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+27 passed, 3 warnings in 1.86s
