@@ -492,7 +492,10 @@ class HttpNoticeProvider:
                 handle.write(raw)
                 temp_path = Path(handle.name)
             try:
-                result = PriceBandNoticeParser().parse_from_file(temp_path)
+                from .extraction.official_notice_ocr import parse_if_scanned
+                result = parse_if_scanned(raw, url)
+                if result is None:
+                    result = PriceBandNoticeParser().parse_from_file(temp_path)
             finally:
                 _best_effort_unlink(temp_path)
         except Exception as exc:
@@ -909,6 +912,7 @@ class OfficialDiscoveryProvider:
                         found.append(NoticeCandidate(result, self.name, uri,
                             _utcnow().isoformat().replace("+00:00", "Z"), verified=True))
                         continue
+                    rejected = []
                     for provider_cls in (HttpNoticeProvider, HttpProspectusProvider):
                         provider = provider_cls({ipo_id: uri}, fetcher=lambda _url, data=member: data,
                             allowed_hosts=self.allowed_hosts, timeout_seconds=self.timeout_seconds)
@@ -918,8 +922,9 @@ class OfficialDiscoveryProvider:
                                 candidate.result = explicit_amounts(candidate.result, document_pages(member))
                             found.append(candidate)
                             break
+                        rejected.append(f"{report.provider}: {report.detail}")
                     else:
-                        reasons.append(f"{uri}: attachment rejected; {report.detail}")
+                        reasons.append(f"{uri}: attachment rejected; " + "; ".join(rejected))
             except Exception as exc:
                 reasons.append(f"{url}: official attachment retrieval/decoding failed ({type(exc).__name__}: {exc})")
         return found, reasons
@@ -1115,7 +1120,10 @@ class NoticeSnapshotCache:
                 handle.write(bin_path.read_bytes())
                 temp_path = Path(handle.name)
             try:
-                result = PriceBandNoticeParser().parse_from_file(temp_path)
+                from .extraction.official_notice_ocr import parse_if_scanned
+                result = parse_if_scanned(bin_path.read_bytes(), meta.get("uri", ""))
+                if result is None:
+                    result = PriceBandNoticeParser().parse_from_file(temp_path)
             finally:
                 _best_effort_unlink(temp_path)
         except Exception:

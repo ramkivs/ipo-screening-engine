@@ -366,11 +366,11 @@ def test_windows_trace_pattern_is_unavailable_end_to_end(tmp_path, monkeypatch, 
     # No listing was really read, so none may be claimed as searched.
     assert resolution["providers"][0]["searched_listings"] == []
     # Every unusable source is reported with its own reason -- all
-    # four listing URLs, including the NSE response that produced no
+    # all configured listing URLs (now including the NSE public feed), including the NSE response that produced no
     # note at all before the repair (it was silently counted as a
     # searched listing).
     notes = resolution["providers"][0]["notes"]
-    assert len(notes) == 4
+    assert len(notes) == len(OfficialDiscoveryProvider.LISTING_URLS)
     assert any("nseindia.com" in n and "no issue entries" in n for n in notes)
     assert sum("shell" in n for n in notes) == 2
     assert any("sebi.gov.in" in n and "HTTPError" in n for n in notes)
@@ -398,7 +398,7 @@ def test_windows_trace_pattern_is_unavailable_end_to_end(tmp_path, monkeypatch, 
         if e["stage"] == "official_discovery"
         and e["message"].startswith(tuple(OfficialDiscoveryProvider.LISTING_URLS))
     ]
-    assert len(source_events) == 4
+    assert len(source_events) == len(OfficialDiscoveryProvider.LISTING_URLS)
     for url in OfficialDiscoveryProvider.LISTING_URLS:
         assert len([e for e in source_events if e["message"].startswith(url)]) == 1, url
     stages = [(e["stage"], e["status"]) for e in record["events"]]
@@ -427,7 +427,7 @@ def test_windows_trace_pattern_is_unavailable_through_the_api(tmp_path, monkeypa
     assert detail["resolution"]["providers"][0]["outcome"] == "UNAVAILABLE"
     assert detail["resolution"]["providers"][0]["listing_searched"] is False
     assert detail["resolution"]["providers"][0]["searched_listings"] == []
-    assert len(detail["resolution"]["providers"][0]["sources"]) == 4
+    assert len(detail["resolution"]["providers"][0]["sources"]) == len(OfficialDiscoveryProvider.LISTING_URLS)
     assert "UNPUBLISHED" not in json.dumps(detail)
     # the ingestion stays blocked and nothing was evaluated or persisted
     hist = client.get(f"/api/v1/ingestions/{detail['ingestion_id']}").json()

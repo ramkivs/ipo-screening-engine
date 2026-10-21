@@ -251,3 +251,66 @@ def test_cookie_and_parent_referer_sequence_over_real_http_socket(monkeypatch):
         server.shutdown()
         server.server_close()
         worker.join(2)
+
+
+def test_general_information_examples_never_become_official_pricing():
+    from ipo_screening.issue_terms import HttpNoticeProvider
+    body = '''GENERAL INFORMATION DOCUMENT FOR INVESTING IN PUBLIC ISSUES
+INITIAL PUBLIC OFFERING OF ACME FORGE LIMITED
+An illustration: the floor price is Rs 20 and the cap price is Rs 24.
+The price band of Rs 20 to Rs 24 illustrates book building for investors.
+'''
+    candidate, report = HttpNoticeProvider({'ACME': 'https://www.bseindia.com/gid.pdf'},
+        fetcher=lambda url: body.encode()).find(NAME, 'ACME')
+    assert candidate is None and report.outcome == 'REJECTED'
+    assert 'General Information Document' in report.detail
+
+
+def test_graphical_rhp_title_uses_cover_role_and_actual_issuer_cin_not_a_fabricated_date():
+    from pathlib import Path
+    from conftest import REPO_ROOT
+    from ipo_screening.extraction.official_offer_amounts import parse_official_rhp
+    raw = (REPO_ROOT / 'evidence/non-authoritative/jio/U72900GJ2019PLC110816_JIO.pdf').read_bytes()
+    result = parse_official_rhp(raw, 'https://www.nseindia.com/discovered-archive.zip#member=rhp.pdf')
+    assert result.company_name == 'JIO PLATFORMS LIMITED'
+    assert result.cin == 'U72900GJ2019PLC110816'
+    assert result.ofs_amount.value == 0
+    assert result.fresh_issue_amount is None  # monetary placeholder, not shares * cap
+    assert result.source_ref.source_timestamp is None
+
+
+@pytest.mark.slow
+def test_image_only_official_notice_uses_real_offline_ocr_and_preserves_original_pdf_hash():
+    import textwrap
+    from PIL import Image, ImageDraw, ImageFont
+    from ipo_screening.issue_terms import HttpNoticeProvider
+    text = '''PRICE BAND ADVERTISEMENT
+INITIAL PUBLIC OFFERING OF ACME FORGE LIMITED
+NOTICE TO INVESTORS
+The Floor Price is Rs 100 per Equity Share and the Cap Price is Rs 120 per Equity Share.
+The Price Band is Rs 100 to Rs 120 per Equity Share.
+Bids can be made for a minimum of 50 Equity Shares and in multiples of 50 Equity Shares thereafter.
+Fresh Issue aggregating up to Rs 240 million
+Offer for Sale Size: Not Applicable
+'''
+    image = Image.new('RGB', (1800, 1000), 'white')
+    try:
+        font = ImageFont.truetype('DejaVuSans.ttf', 28)
+    except OSError:
+        font = ImageFont.truetype('arial.ttf', 28)
+    ImageDraw.Draw(image).multiline_text((40, 40), '\n'.join(textwrap.fill(line, width=90) for line in text.splitlines()),
+        fill='black', font=font, spacing=15)
+    buffer = io.BytesIO()
+    image.save(buffer, format='PDF', resolution=160)
+    image.close()
+    raw = buffer.getvalue()
+    candidate, report = HttpNoticeProvider({'ACME': 'https://www.bseindia.com/notice.pdf'},
+        fetcher=lambda url: raw).find(NAME, 'ACME')
+    assert candidate is not None, report.detail
+    assert candidate.values['price_band_low'] == 100
+    assert candidate.values['price_band_high'] == 120 and candidate.values['lot_size'] == 50
+    assert candidate.result.fresh_issue_amount.value == 240
+    assert candidate.result.price_band_high.extraction_method == 'OCR'
+    assert candidate.result.fresh_issue_amount.extraction_method == 'OCR'
+    assert candidate.result.source_ref.content_hash == hashlib.sha256(raw).hexdigest()
+    assert candidate.result.metadata['ocr']['numeric_repair'] is False

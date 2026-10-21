@@ -35,7 +35,7 @@ def explicit_amounts(result, pages):
                 if not amount:
                     continue
                 before = segment[:amount.start()]
-                if re.search(r'offer\s+for\s+sale|fresh\s+(?:issue|offer)|reservation|employee|shareholder|[●]', before, re.I):
+                if re.search(r'offer\s+for\s+sale|fresh\s+(?:issue|offer)|reservation|employee|shareholder|UNREADABLE_OCR_LINE|[●]', before, re.I):
                     continue  # another component, reservation, or a placeholder intervened
                 from .exchange_issue_page import _number
                 value = _number(amount.group(1))
@@ -82,8 +82,14 @@ def parse_official_rhp(raw, url):
     pages = document_pages(raw)
     cover = '\n'.join(t for _, t in pages[:2])
     # A dated document title, not a mention of an RHP elsewhere in a notice.
-    if not re.search(r'(?:Draft\s+)?Red\s+Herring\s+Prospectus\s*\n?\s*(?:Dated|Date)\s*:', cover, re.I):
-        raise ValueError('not a dated RHP/DRHP title')
+    dated = re.search(r'(?:Draft\s+)?Red\s+Herring\s+Prospectus\s*\n?\s*(?:Dated|Date)\s*:', cover, re.I)
+    # Some filed RHP covers have a graphical (non-text) dated title. Their
+    # explicit issuer responsibility statement and complete offer-table header
+    # establish the document role without inventing a publication date.
+    cover_role = (re.search(r'this\s+Red\s+Herring\s+Prospectus\s+c\s*ontains\s+all\s+information', cover, re.I)
+                  and re.search(r'FRESH\s+ISSUE\s+SIZE\s+OFFER\s+FOR\s+SALE\s+SIZE\s+TOTAL\s+ISSUE\s+SIZE', cover, re.I))
+    if not (dated or cover_role) or re.search(r'GENERAL\s+INFORMATION\s+DOCUMENT', cover[:1500], re.I):
+        raise ValueError('RHP title or issuer responsibility/offer-table role not established')
     cin = re.search(r'\b[LU]\d{5}[A-Z]{2}\d{4}PLC\d{6}\b', cover)
     name = ProspectusTermsParser._extract_company_name(cover)
     if not cin or not name:

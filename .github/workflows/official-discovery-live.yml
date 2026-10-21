@@ -22,6 +22,10 @@ jobs:
         env:
           PYTHONPATH: engine
         run: python -m pytest -q tests/test_automatic_official_issue_discovery.py tests/test_official_discovery.py tests/test_issue_terms_windows_retrieval.py -m "not slow"
+      - name: Cross-platform real offline OCR regression
+        env:
+          PYTHONPATH: engine
+        run: python -m pytest -q tests/test_automatic_official_issue_discovery.py -k image_only
       - name: Actual production HTTP exchange response probe
         env:
           PYTHONPATH: engine
