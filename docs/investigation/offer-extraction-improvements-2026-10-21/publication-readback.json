@@ -1,0 +1,92 @@
+{
+  "verified_at": "2026-10-21T18:28:18.162202+00:00",
+  "published_sha": "d605b55c76e7d85d884b2f5d9ae65fabcaef0a89",
+  "implementation_runtime": "e416b1f808d09bf96b8446430ea86c93d3071557",
+  "remote_tree_matches": 551,
+  "changed_blobs_fetched": [
+    {
+      "path": ".github/workflows/jio-recovery-native.yml",
+      "blob": "9ae22bbf8367ff3f2de4808f2bf0b8aed8544cf4",
+      "sha256": "0fb417d022d8f9e6ae5b8368d11b7f193415524065cec035f9e25a0d6d906106"
+    },
+    {
+      "path": "README.md",
+      "blob": "1253c38958c66767a58672334111ec37ea542fa4",
+      "sha256": "13274abce64704b96af04bced2645df644fe56a209cae668698c7ecfa3e413c1"
+    },
+    {
+      "path": "docs/investigation/offer-extraction-improvements-2026-10-21/README.md",
+      "blob": "6c02ee9fad2bd36b183f4ae0f0c9ef6211a062a1",
+      "sha256": "0242dbf196426df9a078341d292f7f7718e69ed690ff17f147103859f8e361cd"
+    },
+    {
+      "path": "docs/investigation/offer-extraction-improvements-2026-10-21/focused.log",
+      "blob": "258d24488fa8c2cbb7f82ba673c1eeb4d25018b5",
+      "sha256": "c2b2d2bac5817259c2ff8b66f31f2b38f829e040c0aabd78f71108ae403e9a70"
+    },
+    {
+      "path": "docs/investigation/offer-extraction-improvements-2026-10-21/jio-native-text.json",
+      "blob": "7d98bd9a74613520f303fac3f34ea0a57809e301",
+      "sha256": "fbb7903eab99dfa11c9aad14600fc1d62dabd69a85a3b911d282a222a7941db1"
+    },
+    {
+      "path": "docs/investigation/offer-extraction-improvements-2026-10-21/native-api-result.json",
+      "blob": "13a5a6f86f2d5673f2de76c4ed419fbdf0c37941",
+      "sha256": "5af4c4fe51ad3d806cb67d203064f681357a6233de9599cd461e44c1ab6d8377"
+    },
+    {
+      "path": "docs/investigation/offer-extraction-improvements-2026-10-21/verify_publication.py",
+      "blob": "cf21a0ab6acf3a2fb267da1171f4d96ee4550be0",
+      "sha256": "f9c30f907ddd1b129115c464fc5ae25088ffdb636c110699e0a03562a7bdd642"
+    },
+    {
+      "path": "engine/ipo_screening/extraction/offer_table.py",
+      "blob": "ff47fe70d4e04b6e5e94ffd2ae88bfad8882b375",
+      "sha256": "97fe8ece41bf50bff514f64acd346d6b9dc1fe481f6848bdf6151e402bc64f11"
+    },
+    {
+      "path": "engine/ipo_screening/extraction/official_offer_amounts.py",
+      "blob": "3221883c3ba40c3bc5b2176c9518ab6b2f78cea8",
+      "sha256": "dd4719a390f51750ad357ebf89eaeab4311c5a98d0a5e3ba7e1e2d237ce09db3"
+    },
+    {
+      "path": "handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md",
+      "blob": "20ffdd0f481d26411de66080fed25b1729d62504",
+      "sha256": "5c0e754660a0da5f6618e41d5a2d9d312577f70be4210c60683ae17b63cc6b90"
+    },
+    {
+      "path": "tests/test_offer_table_boundaries.py",
+      "blob": "4ced9726c3812514534d3168a443b0e308a03631",
+      "sha256": "d29fb98b40aaa25ae3b1d74336e0ad337c32a0ae80f891ed509a05eec23bc7eb"
+    }
+  ],
+  "native_check_ids": [
+    119405084138
+  ],
+  "decoded_native_sha256": "aa4d2546a7014cdaa2796e2aa12bea6dcc484fda3c39e9d407b9f2af8798d41c",
+  "native_job_conclusion": "success",
+  "native_artifact_matches": true,
+  "terminal_id": "ing-e5c0c436c8564ef5",
+  "terminal_status": "BLOCKED",
+  "missing_fields": [
+    "issue.fresh_issue"
+  ],
+  "durable_restart_equal": true,
+  "no_evaluation_or_persistence": true,
+  "success_idempotency": "NOT_RUN: fresh cash unresolved",
+  "protected_paths_unchanged": [
+    "config",
+    "schema",
+    "fixtures",
+    "handoff/decisions",
+    "engine/ipo_screening/extraction/price_band_notice.py",
+    "engine/ipo_screening/extraction/prospectus_terms.py"
+  ],
+  "main": "01ba66c12ca1195fd7acbd287c3e39a019808094",
+  "pr6": {
+    "state": "open",
+    "merged": false,
+    "head": "e05c0efbca1ecb3024e52da73a22e180ea171118",
+    "base": "arena/573e69a4-ipo-screening-engine"
+  }
+}
