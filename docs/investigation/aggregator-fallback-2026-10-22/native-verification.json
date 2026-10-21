@@ -1,0 +1,307 @@
+{
+  "runtime_commit": "ba7a0694db4714d0f6a53ef1aad48a28330675ca",
+  "native_accepted": true,
+  "evaluation_id": "JIO-PLATFORMS-LIMITED-20261021-201943Z-final-840c0a14",
+  "duplicate_ingestion_id": "ing-5b3000f86e2d42aa",
+  "first_ingestion_id": "ing-85264e8a401045de",
+  "persisted_issue": {
+    "close_date": "2026-10-23",
+    "fresh_issue": 302130.0,
+    "fresh_shares": 270000000,
+    "lot_size": 12,
+    "ofs": 0.0,
+    "ofs_sellers": [],
+    "open_date": "2026-10-21",
+    "post_issue_eps": 32.63,
+    "post_issue_shares": 9209030830,
+    "pre_issue_shares": 8939030830,
+    "price_band_high": 1119.0,
+    "price_band_low": 1065.0
+  },
+  "authority_warnings": [
+    "THIRD_PARTY_AGGREGATOR_OVERRIDE: issue.fresh_issue used PA-authorized third-party data, NOT official disclosure."
+  ],
+  "source": {
+    "content_hash": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+    "retrieval_timestamp": "2026-10-21T20:19:43.817744Z",
+    "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+    "source_type": "MARKET_DATA",
+    "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/"
+  },
+  "fresh_quote": "27,00,00,000 shares (agg. up to \u20b930,213 Cr)",
+  "qualified_assertions": [
+    {
+      "raw_sha256": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+      "assertion_identity": "SRC-AGG-AB6F20DC33FD66BE"
+    },
+    {
+      "raw_sha256": "0ab4ba192e3d97d69e49384fc2b724f3b49a030d42fdf3d840afa0dedab1eff3",
+      "assertion_identity": "SRC-AGG-AB6F20DC33FD66BE"
+    }
+  ],
+  "original_ofs_evidence": {
+    "evidence_id": "EV-issue-ofs",
+    "extraction_confidence": 1.0,
+    "extraction_method": "DETERMINISTIC_PDF",
+    "locator": "Cover page, Offer for Sale Size",
+    "page": 1,
+    "quoted_text": "OFFER FOR SALE SIZE TOTAL ISSUE SIZE ELIGIBILITY AND SHARE RESERVATION \nFresh Issue Up to  \n270,000,000 \nEquity Shares of \nface value of \u20b910 \neach for cash at a \nprice of \u20b9[\u25cf] each \n(including a \nsecurities \npremium of \u20b9[\u25cf] \nper Equity Share) \naggregating up to \n\u20b9[\u25cf] million \nNot applicable",
+    "section": "Cover",
+    "source_id": "RHP-FILING-72480c2e"
+  },
+  "independent_hash_verification": {
+    "evaluation_id": "JIO-PLATFORMS-LIMITED-20261021-201943Z-final-840c0a14",
+    "stored_result_hash": "840c0a149d7483fd0ffaed4e5fe107a74afd05617c316c026d35d1fe502df339",
+    "recomputed_result_hash": "840c0a149d7483fd0ffaed4e5fe107a74afd05617c316c026d35d1fe502df339",
+    "result_hash_matches": true,
+    "artifact_mismatches": [],
+    "artifacts_verified": 7
+  },
+  "module_scores": {
+    "A": 17.0,
+    "B": 1.0,
+    "C": 11.0,
+    "D": 4.0,
+    "E": 0.0,
+    "F": 0.0
+  },
+  "final_score": 33.0,
+  "verdict": {
+    "band_score": "AVOID",
+    "insufficient_data": true,
+    "mode_label": "final",
+    "uncertain": true,
+    "verdict": "INSUFFICIENT_DATA"
+  },
+  "official_first_both_uploads": true,
+  "all_three_papers_OCR_both_uploads": true,
+  "duplicate_returns_original_evaluation": true,
+  "duplicate_evaluation_run": true,
+  "scope": "Repository Jio PDF; user upload identity not established",
+  "unimplemented_optional_trace_probe_status": 404,
+  "negative_fail_closed": "Focused controlled API/parser tests; not an induced live-publisher failure",
+  "workflow": {
+    "conclusion": "success",
+    "databaseId": 39667791831,
+    "headSha": "ba7a0694db4714d0f6a53ef1aad48a28330675ca",
+    "jobs": [
+      {
+        "completedAt": "2026-10-21T20:29:13Z",
+        "conclusion": "success",
+        "databaseId": 119457317604,
+        "name": "actual-api",
+        "startedAt": "2026-10-21T20:09:08Z",
+        "status": "completed",
+        "steps": [
+          {
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/setup-python@v5",
+            "number": 3,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run python -m pip install -r requirements.txt",
+            "number": 4,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Focused activity, conflict and explicit NIL safety checks only",
+            "number": 5,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Focused terminal activity UI checks (no build or unrelated suite)",
+            "number": 6,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Actual HTTP upload, terminal GET, durable restart and conditional duplicate",
+            "number": 7,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v4",
+            "number": 8,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/setup-python@v5",
+            "number": 15,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 16,
+            "status": "completed"
+          },
+          {
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 17,
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/ramkivs/ipo-screening-engine/actions/runs/39667791831/job/119457317604"
+      },
+      {
+        "completedAt": "2026-10-21T20:29:13Z",
+        "conclusion": "success",
+        "databaseId": 119467485638,
+        "name": "Jio native API evidence 0",
+        "startedAt": "2026-10-21T20:29:08Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467485638"
+      },
+      {
+        "completedAt": "2026-10-21T20:29:13Z",
+        "conclusion": "success",
+        "databaseId": 119467491697,
+        "name": "Jio native API evidence 1",
+        "startedAt": "2026-10-21T20:29:09Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467491697"
+      },
+      {
+        "completedAt": "2026-10-21T20:29:13Z",
+        "conclusion": "success",
+        "databaseId": 119467497442,
+        "name": "Jio native API evidence 2",
+        "startedAt": "2026-10-21T20:29:09Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467497442"
+      },
+      {
+        "completedAt": "2026-10-21T20:29:13Z",
+        "conclusion": "success",
+        "databaseId": 119467503048,
+        "name": "Jio native API evidence 3",
+        "startedAt": "2026-10-21T20:29:10Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467503048"
+      },
+      {
+        "completedAt": "2026-10-21T20:29:13Z",
+        "conclusion": "success",
+        "databaseId": 119467508762,
+        "name": "Jio native API evidence 4",
+        "startedAt": "2026-10-21T20:29:11Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467508762"
+      },
+      {
+        "completedAt": "2026-10-21T20:29:13Z",
+        "conclusion": "success",
+        "databaseId": 119467514949,
+        "name": "Jio native API evidence 5",
+        "startedAt": "2026-10-21T20:29:11Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467514949"
+      },
+      {
+        "completedAt": "2026-10-21T20:29:13Z",
+        "conclusion": "success",
+        "databaseId": 119467521465,
+        "name": "Jio native API evidence 6",
+        "startedAt": "2026-10-21T20:29:12Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467521465"
+      },
+      {
+        "completedAt": "2026-10-21T20:29:13Z",
+        "conclusion": "success",
+        "databaseId": 119467527252,
+        "name": "Jio native API evidence 7",
+        "startedAt": "2026-10-21T20:29:13Z",
+        "status": "completed",
+        "steps": [],
+        "url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467527252"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/ramkivs/ipo-screening-engine/actions/runs/39667791831"
+  },
+  "independently_retrieved_evidence_checks": [
+    {
+      "id": 119467527252,
+      "name": "Jio native API evidence 7",
+      "head_sha": "ba7a0694db4714d0f6a53ef1aad48a28330675ca",
+      "conclusion": "success",
+      "html_url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467527252"
+    },
+    {
+      "id": 119467521465,
+      "name": "Jio native API evidence 6",
+      "head_sha": "ba7a0694db4714d0f6a53ef1aad48a28330675ca",
+      "conclusion": "success",
+      "html_url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467521465"
+    },
+    {
+      "id": 119467514949,
+      "name": "Jio native API evidence 5",
+      "head_sha": "ba7a0694db4714d0f6a53ef1aad48a28330675ca",
+      "conclusion": "success",
+      "html_url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467514949"
+    },
+    {
+      "id": 119467508762,
+      "name": "Jio native API evidence 4",
+      "head_sha": "ba7a0694db4714d0f6a53ef1aad48a28330675ca",
+      "conclusion": "success",
+      "html_url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467508762"
+    },
+    {
+      "id": 119467503048,
+      "name": "Jio native API evidence 3",
+      "head_sha": "ba7a0694db4714d0f6a53ef1aad48a28330675ca",
+      "conclusion": "success",
+      "html_url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467503048"
+    },
+    {
+      "id": 119467497442,
+      "name": "Jio native API evidence 2",
+      "head_sha": "ba7a0694db4714d0f6a53ef1aad48a28330675ca",
+      "conclusion": "success",
+      "html_url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467497442"
+    },
+    {
+      "id": 119467491697,
+      "name": "Jio native API evidence 1",
+      "head_sha": "ba7a0694db4714d0f6a53ef1aad48a28330675ca",
+      "conclusion": "success",
+      "html_url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467491697"
+    },
+    {
+      "id": 119467485638,
+      "name": "Jio native API evidence 0",
+      "head_sha": "ba7a0694db4714d0f6a53ef1aad48a28330675ca",
+      "conclusion": "success",
+      "html_url": "https://github.com/ramkivs/ipo-screening-engine/runs/119467485638"
+    }
+  ]
+}

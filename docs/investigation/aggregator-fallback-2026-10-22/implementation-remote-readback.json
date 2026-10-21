@@ -1,0 +1,115 @@
+{
+  "implementation_commit": "ba7a0694db4714d0f6a53ef1aad48a28330675ca",
+  "remote_branch_matches": true,
+  "all_tracked_blob_paths_verified": 567,
+  "changed_blobs_independently_downloaded": [
+    {
+      "path": ".github/workflows/jio-recovery-native.yml",
+      "git_blob": "d83e07240a9f8a58d50e98a77812ac6362a58a5b",
+      "sha256": "a2cdc08571bb664271e2047a99ad6aafcdf92f2baa95c6f2bb56691e787e94a3",
+      "bytes": 2744
+    },
+    {
+      "path": "docs/investigation/aggregator-fallback-2026-10-22/README.md",
+      "git_blob": "2868d7b043beb923ae4cad5de589883882352ca4",
+      "sha256": "23d37236112e975e9834dc37bdb67835ea9bbcb51c3b318ed84fa6e39cee4b8d",
+      "bytes": 5195
+    },
+    {
+      "path": "docs/investigation/aggregator-fallback-2026-10-22/focused-tests.log",
+      "git_blob": "b689bb9b483a312d026916e7a977f1269db48568",
+      "sha256": "7ff6789c392cb819eae4f121665240e6f2b23557cfa731eab1c5dcceb9b098c0",
+      "bytes": 3042
+    },
+    {
+      "path": "docs/investigation/aggregator-fallback-2026-10-22/frontend-tests.log",
+      "git_blob": "adb32e696bc943bfe9db7110e46fd79bf11265a0",
+      "sha256": "7eb3b1a3c9127412e41f4960233b7a54ec67144cd9c8859c0ab83a6f565680a2",
+      "bytes": 2274
+    },
+    {
+      "path": "docs/investigation/aggregator-fallback-2026-10-22/native-first-duplicate-failure.json",
+      "git_blob": "f00ed0b90bf23a9348965739aa1c9eaa3bfad1ea",
+      "sha256": "0eae4eec817e0e174f2de61c4db4cfff7c699ecdcac36215185f094555a657ca",
+      "bytes": 1453678
+    },
+    {
+      "path": "docs/investigation/aggregator-fallback-2026-10-22/read-model-tests.log",
+      "git_blob": "f6c39c8ae9d61e7acdb149898280f2a0b2b7cfbd",
+      "sha256": "b079fd832218044fa2cc909b093b1c8d15518ac0b5bde717ebec0eaabdfb408f",
+      "bytes": 945
+    },
+    {
+      "path": "docs/investigation/aggregator-fallback-2026-10-22/source-research.json",
+      "git_blob": "4f39c1f64d23227172481b6d6bfae82a081bb718",
+      "sha256": "4337611ba1e4d36c1f9a685800bd3045756fa6f309af2d54c1d1dafc017ddc3b",
+      "bytes": 489745
+    },
+    {
+      "path": "docs/investigation/jio-recovery/native_api.py",
+      "git_blob": "965d3c256bd412ca0f0498e39e536d6c532edf7f",
+      "sha256": "fb05408f0f84a4cf21b646d97d760187fa307bed02b4a7d775263d51ae2f0ab3",
+      "bytes": 14388
+    },
+    {
+      "path": "docs/openapi/presentation-api-v1.yaml",
+      "git_blob": "2be25da8a3980775f5e6f646cde028e26c716ab1",
+      "sha256": "96cc9ece117248029441105b717a239a50972d1be1a527520626e2ef25b2bbd6",
+      "bytes": 47725
+    },
+    {
+      "path": "engine/ipo_screening/aggregator_issue_terms.py",
+      "git_blob": "0c96ef1cfcd07ff764535324a307d20cfca52082",
+      "sha256": "091e484f2f85766f9bb272193dbd7ecc3d5f2c54d5dd61c1b76b8d77c90f1fae",
+      "bytes": 16120
+    },
+    {
+      "path": "engine/ipo_screening/presentation/models.py",
+      "git_blob": "4ad3712cb127db358515505b36c16dda59109220",
+      "sha256": "858e17df4322ef05d219315819cb00a6fb2bc1d052d099b61040711688530125",
+      "bytes": 13266
+    },
+    {
+      "path": "engine/ipo_screening/presentation/service.py",
+      "git_blob": "6f8eebd7709548a3088d94c621d059fdd3d792e1",
+      "sha256": "d19a58220446eaf9c7f81d5c31713c4d2945016e430d988788a811629b78e27e",
+      "bytes": 108058
+    },
+    {
+      "path": "frontend/app.js",
+      "git_blob": "30d4bbe258313703253e2f994fd5fa8e4d658340",
+      "sha256": "172bb2918b4c46e62992bd050026043ffdfedf5970c494695c698fed566d8f6d",
+      "bytes": 206843
+    },
+    {
+      "path": "frontend/test/aggregator-authority.test.js",
+      "git_blob": "dfd3cd7a5c2c00eb9bd2830e45d42aed1cc66eec",
+      "sha256": "646a4ffd3f4d6d03a958af6eed87be458ac2f4e5cb5382a0e5bf6ca746d10fb8",
+      "bytes": 702
+    },
+    {
+      "path": "handoff/decisions/2026-10-22-pa-aggregator-issue-terms.md",
+      "git_blob": "26d94924051015d4b081495ceaef2cef1d04b678",
+      "sha256": "66ab4776467b3981c2b2afd9a4a240b06b12530a25bb340d366dc718286b010d",
+      "bytes": 3308
+    },
+    {
+      "path": "tests/test_aggregator_issue_terms.py",
+      "git_blob": "9114241ba1f7af78e0d80e07c97f7719b2b29255",
+      "sha256": "2f222f040c9b4dd96067e74f324c2d0af2f822609c19e73f736cad22d2c7bb27",
+      "bytes": 10767
+    }
+  ],
+  "main_unchanged": true,
+  "pr6": {
+    "baseRefName": "arena/573e69a4-ipo-screening-engine",
+    "headRefOid": "e05c0efbca1ecb3024e52da73a22e180ea171118",
+    "mergedAt": null,
+    "state": "OPEN"
+  },
+  "native_acceptance": {
+    "run_id": 39667791831,
+    "accepted": true,
+    "evidence": "native-verification.json"
+  }
+}
