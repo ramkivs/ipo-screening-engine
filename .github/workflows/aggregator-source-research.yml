@@ -1,0 +1,32 @@
+name: Focused aggregator source research
+on:
+  push:
+    branches: [arena/95234306-ipo-screening-engine]
+    paths:
+      - .github/workflows/aggregator-source-research.yml
+      - docs/investigation/aggregator-fallback-2026-10-22/source_probe.py
+permissions:
+  contents: read
+  checks: write
+jobs:
+  public-sources:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Follow actual issuer links on public aggregator listings
+        env:
+          JIO_RECOVERY_OUTPUT: ${{ runner.temp }}/aggregator-source-probe
+          LIVE_CHECK_TOKEN: ${{ github.token }}
+        run: python docs/investigation/aggregator-fallback-2026-10-22/source_probe.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aggregator-source-research
+          path: ${{ runner.temp }}/aggregator-source-probe
