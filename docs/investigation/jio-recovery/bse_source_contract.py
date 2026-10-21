@@ -14,11 +14,19 @@ from urllib.parse import urljoin, urlparse
 import urllib.request
 import zlib
 from ipo_screening.issue_terms import _default_http_fetch
+from ipo_screening.official_issue_sources import NSE_LISTING, nse_issue_links
+from ipo_screening.extraction.official_offer_amounts import parse_official_rhp
 
 out = Path(os.environ['JIO_RECOVERY_OUTPUT'])
 out.mkdir(parents=True, exist_ok=True)
 rows = []
 queue = [('https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P', None)]
+# Independently re-fetch actual raw NSE records/detail for byte/hash and
+# quote verification against the API run; do not seed any financial values.
+root = Path(__file__).resolve().parents[3]
+issuer = parse_official_rhp((root / 'evidence/non-authoritative/jio/U72900GJ2019PLC110816_JIO.pdf').read_bytes(),
+                            'repository-copy-identity-only').company_name
+queue.append((NSE_LISTING, 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo'))
 seen = set()
 # Public service namespace independently exercised in the prior retained
 # investigation. Only endpoint paths found in the actual current JS are used.
@@ -40,6 +48,10 @@ for _ in range(12):
         row.update(sha256=digest, bytes=len(raw))
         if raw.lstrip().startswith((b'{', b'[')) and len(raw) <= 2000000:
             row['public_json'] = json.loads(raw)
+            row['public_response_zlib_base64'] = base64.b64encode(zlib.compress(raw)).decode()
+            if url == NSE_LISTING:
+                for page, api in nse_issue_links(raw, issuer):
+                    queue.append((api, page))
         matches = list(pattern.finditer(text))
         row['keyword_count'] = len(matches)
         row['contexts'] = [text[max(0, m.start()-350):m.end()+900] for m in matches[:60]]
@@ -91,7 +103,7 @@ for _ in range(12):
         row['traceback'] = traceback.format_exc()
     rows.append(row)
     print(json.dumps(row), flush=True)
-result = {'scope': 'Actual public first-party SPA contract research, not verified issue terms', 'requests': rows}
+result = {'scope': 'Actual public BSE SPA contract research and independent raw NSE source audit; not ingestion acceptance', 'requests': rows}
 (out / 'bse-source-contract.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
 packed = base64.b64encode(zlib.compress(json.dumps(result).encode())).decode()
 for index, offset in enumerate(range(0, len(packed), 55000)):
