@@ -1226,7 +1226,12 @@ class PresentationService:
             if snapshot["status"] in TERMINAL_STATUSES:
                 # Memory is not proof of durability: finish mutates the record
                 # before its atomic filesystem write, which can itself fail.
-                saved = self.activity_store.get(recorder.ingestion_id)
+                try:
+                    saved = self.activity_store.get(recorder.ingestion_id)
+                except (OSError, ValueError):
+                    logger.exception("Ingestion %s terminal activity could not be read",
+                                     recorder.ingestion_id)
+                    saved = None  # retry the trusted worker snapshot below
                 if saved != snapshot:
                     try:
                         self.activity_store.save(snapshot)

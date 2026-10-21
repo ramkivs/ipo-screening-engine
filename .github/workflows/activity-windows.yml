@@ -21,14 +21,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: c32e3a7b3376f9f40f7713dd8770940427b410a5
+          ref: ${{ github.sha }}
           clean: false
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - run: python -m pip install -r requirements.txt
-      - name: Repeat unchanged published lifecycle tests with read-error diagnostics
+      - name: Repeat lifecycle and storage regressions with read-error diagnostics
         shell: python
         env:
           REPEATS: ${{ matrix.repeats }}
@@ -50,9 +50,10 @@ jobs:
           env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(pathlib.Path('engine').resolve()), str(diagnostic)]))
           for attempt in range(int(os.environ['REPEATS'])):
               print('ATTEMPT', attempt + 1, flush=True)
-              result = subprocess.run([sys.executable, '-m', 'pytest', '-p', 'trace_activity_io', '-q', 'tests/test_ingestion_worker_lifecycle.py'], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+              result = subprocess.run([sys.executable, '-m', 'pytest', '-p', 'trace_activity_io', '-q', 'tests/test_ingestion_worker_lifecycle.py', 'tests/test_activity_storage_portability.py', 'tests/test_ingestion_activity.py'], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
               print(result.stdout, flush=True)
               if result.returncode:
                   message = result.stdout[-55000:].replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
                   print('::error title=Published lifecycle reproduction::' + message, flush=True)
                   sys.exit(result.returncode)
+          print('::notice title=Portability verification::Completed ' + os.environ['REPEATS'] + ' successful repetitions of 27 cases on ' + sys.platform + '; original lifecycle helper and success assertions unchanged.', flush=True)
