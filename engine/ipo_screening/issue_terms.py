@@ -57,16 +57,16 @@ DISCOVERABLE_TERMS = REQUIRED_ISSUE_TERMS + ("fresh_issue", "open_date", "close_
 OFFICIAL_HOSTS = {
     "nseindia.com",
     "www.nseindia.com",
-    # Exchange archive URLs are exposed by issuer-matched NSE issueInfo records.
-    "nsearchives.nseindia.com",
     "bseindia.com",
     "www.bseindia.com",
-    # Official document host linked by issuer-matched BSE DisplayIPO pages.
-    "listing.bseindia.com",
     "sebi.gov.in",
     "www.sebi.gov.in",
 }
 
+
+# Archive hosts are eligible only in the issuer-matched discovery pathway.
+# Preserve the existing direct notice/final-Prospectus URL allowlists.
+DISCOVERY_HOSTS = OFFICIAL_HOSTS | {'nsearchives.nseindia.com', 'listing.bseindia.com'}
 
 _BROWSER_HEADERS = {
     "User-Agent": (
@@ -127,7 +127,8 @@ def _warm_up_session(url: str, timeout_seconds: float) -> None:
         pass  # best-effort; the real fetch and its validation decide
 
 
-def _default_http_fetch(url: str, timeout_seconds: float, *, referer: Optional[str] = None) -> bytes:
+def _default_http_fetch(url: str, timeout_seconds: float, *, referer: Optional[str] = None,
+                        eligible_redirect_hosts: Optional[set[str]] = None) -> bytes:
     """Default retrieval for official documents.
 
     Exchange/SEBI document servers commonly reject bare library user
@@ -159,7 +160,8 @@ def _default_http_fetch(url: str, timeout_seconds: float, *, referer: Optional[s
                 final_url = response.geturl() if hasattr(response, "geturl") else url
                 final_host = (urlparse(final_url).hostname or "").lower()
                 original_host = (urlparse(url).hostname or "").lower()
-                allowed_redirects = OFFICIAL_HOSTS if original_host in OFFICIAL_HOSTS else {original_host}
+                eligible = eligible_redirect_hosts if eligible_redirect_hosts is not None else OFFICIAL_HOSTS
+                allowed_redirects = eligible if original_host in eligible else {original_host}
                 if final_host not in allowed_redirects or urlparse(final_url).scheme != parsed.scheme:
                     raise ValueError("retrieval redirected outside eligible source hosts")
                 return response.read()
@@ -773,7 +775,7 @@ class OfficialDiscoveryProvider:
         max_candidates: int = 6,
         timeout_seconds: float = 60.0,
     ):
-        self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(OFFICIAL_HOSTS)
+        self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(DISCOVERY_HOSTS)
         self._requires_https = allowed_hosts is None
         self.listing_urls = list(listing_urls) if listing_urls is not None else list(self.LISTING_URLS)
         self.max_candidates = max_candidates
@@ -783,7 +785,8 @@ class OfficialDiscoveryProvider:
     def _fetch(self, url: str, referer: Optional[str] = None) -> bytes:
         if self._fetcher is not None:
             return self._fetcher(url)
-        return _default_http_fetch(url, self.timeout_seconds, referer=referer)
+        return _default_http_fetch(url, self.timeout_seconds, referer=referer,
+                                   eligible_redirect_hosts=self.allowed_hosts)
 
     def _candidate_links(self, listing_bytes: bytes, base_url: str, company_name: str) -> List[str]:
         # Served HTML encodes query separators as &amp; in hrefs;

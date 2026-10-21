@@ -354,3 +354,15 @@ def test_ocr_primary_issuer_header_excludes_newspaper_masthead_without_letter_re
     assert _primary_issuer_header([(1, '[UNREADABLE_OCR_LINE]\nRegistered Office: Mumbai')]) is None
     with pytest.raises(ValueError, match='conflicting standalone primary issuer'):
         _primary_issuer_header([(1, 'ACME FORGE LIMITED\nCIN: x\nOTHER COMPANY LIMITED\nCIN: y')])
+
+
+def test_archive_hosts_are_scoped_to_issuer_matched_discovery_not_direct_prospectus_urls():
+    from ipo_screening.issue_terms import HttpNoticeProvider, HttpProspectusProvider, OfficialDiscoveryProvider
+    archive = 'https://nsearchives.nseindia.com/content/ipo/issuer.pdf'
+    assert 'nsearchives.nseindia.com' in OfficialDiscoveryProvider().allowed_hosts
+    assert 'listing.bseindia.com' in OfficialDiscoveryProvider().allowed_hosts
+    def forbidden_fetch(url):
+        raise AssertionError('direct provider must reject before any fetch')
+    for cls in (HttpNoticeProvider, HttpProspectusProvider):
+        candidate, report = cls({'ACME': archive}, fetcher=forbidden_fetch).find(NAME, 'ACME')
+        assert candidate is None and report.outcome == 'REJECTED'
