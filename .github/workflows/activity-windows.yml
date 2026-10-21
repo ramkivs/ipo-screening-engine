@@ -1,0 +1,55 @@
+name: Activity storage portability regression
+on:
+  push:
+    branches: [arena/95234306-ipo-screening-engine]
+    paths:
+      - .github/workflows/activity-windows.yml
+permissions:
+  contents: read
+jobs:
+  focused:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            repeats: 20
+          - os: ubuntu-latest
+            repeats: 5
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c32e3a7b3376f9f40f7713dd8770940427b410a5
+          clean: false
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements.txt
+      - name: Repeat unchanged published lifecycle tests with read-error diagnostics
+        shell: python
+        env:
+          REPEATS: ${{ matrix.repeats }}
+        run: |
+          import os, pathlib, subprocess, sys, tempfile
+          diagnostic = pathlib.Path(os.environ['RUNNER_TEMP']) / 'activity-diagnostics'
+          diagnostic.mkdir(exist_ok=True)
+          (diagnostic / 'trace_activity_io.py').write_text('''import pathlib, sys
+          original = pathlib.Path.read_text
+          def traced(self, *args, **kwargs):
+              try:
+                  return original(self, *args, **kwargs)
+              except Exception as exc:
+                  if self.parent.name == 'ingestion-activity':
+                      print('ACTIVITY_READ_ERROR', type(exc).__name__, repr(exc), 'winerror=', getattr(exc, 'winerror', None), file=sys.stderr, flush=True)
+                  raise
+          pathlib.Path.read_text = traced
+          ''')
+          env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(pathlib.Path('engine').resolve()), str(diagnostic)]))
+          for attempt in range(int(os.environ['REPEATS'])):
+              print('ATTEMPT', attempt + 1, flush=True)
+              result = subprocess.run([sys.executable, '-m', 'pytest', '-p', 'trace_activity_io', '-q', 'tests/test_ingestion_worker_lifecycle.py'], env=env)
+              if result.returncode:
+                  sys.exit(result.returncode)
