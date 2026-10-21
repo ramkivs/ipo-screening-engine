@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/bse-source-contract.yml
       - docs/investigation/jio-recovery/bse_source_contract.py
+      - docs/investigation/jio-recovery/extra_doc_inventory.py
 permissions:
   contents: read
   checks: write
@@ -21,6 +22,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m pip install -r requirements.txt
+      - run: python -m pip install xlrd==2.0.2
       - name: Follow actual public HTML and route-asset references
         env:
           PYTHONPATH: engine

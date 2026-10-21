@@ -52,6 +52,15 @@ for _ in range(12):
             if url == NSE_LISTING:
                 for page, api in nse_issue_links(raw, issuer):
                     queue.append((api, page))
+            elif urlparse(url).path == '/api/ipo-detail':
+                for item in row['public_json'].get('issueInfo', {}).get('dataList', []):
+                    title, value = str(item.get('title') or ''), item.get('value')
+                    if (re.search(r'Security Parameters|Anchor Allocation|Sample Application Forms', title, re.I)
+                            and isinstance(value, str) and urlparse(value).hostname == 'nsearchives.nseindia.com'):
+                        queue.append((value, url))
+        if raw.startswith((b'PK\x03\x04', b'%PDF-')):
+            from extra_doc_inventory import inspect
+            row['additional_official_documents'] = inspect(raw, url, out)
         matches = list(pattern.finditer(text))
         row['keyword_count'] = len(matches)
         row['contexts'] = [text[max(0, m.start()-350):m.end()+900] for m in matches[:60]]
