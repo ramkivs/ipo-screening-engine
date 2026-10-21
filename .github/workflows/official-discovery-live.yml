@@ -2,7 +2,15 @@ name: Live official exchange discovery investigation
 on:
   push:
     branches: [arena/95234306-ipo-screening-engine]
-    paths: [.github/workflows/official-discovery-live.yml]
+    paths:
+      - .github/workflows/official-discovery-live.yml
+      - engine/ipo_screening/official_issue_sources.py
+      - engine/ipo_screening/issue_terms.py
+      - engine/ipo_screening/extraction/official_offer_amounts.py
+      - engine/ipo_screening/extraction/official_notice_ocr.py
+      - tests/test_automatic_official_issue_discovery.py
+      - requirements.txt
+      - docs/investigation/automatic-official-discovery-2026-10-21/*.py
 permissions:
   contents: read
 jobs:
