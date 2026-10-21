@@ -1,0 +1,7 @@
+[pytest-progress] collected 1 tests; start 15:11:33
+[pytest-progress] |##############################| 100.0% of collected 1/1  elapsed 6s  eta 0s (linear-rate estimate)
+
+.                                                                        [100%][pytest-progress]   stage tests/test_automatic_official_issue_discovery.py: 1 tests, 0.0s
+[pytest-progress] finished 1/1 tests in 5.6s (passed=1 failed=0 skipped=0), exitstatus=0
+
+1 passed, 24 deselected in 5.65s

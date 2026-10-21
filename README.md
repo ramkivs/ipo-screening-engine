@@ -50,7 +50,7 @@ The browser UI is static JavaScript and needs no npm install. Python test/API de
 
 - Use evidence-backed input and preserve `UNKNOWN`; never substitute zero or infer source qualification.
 - Official source/event/freshness contracts remain incomplete for some market, subscription, GMP, and peer metrics. Missing required evidence remains visibly unresolved; the app does not invent data or policy.
-- Exchange connectors are not live streaming feeds; the personal workflow uses supplied files, fixtures, or manually sourced evidence.
+- Exchange connectors are not live streaming feeds. On-demand official IPO discovery attempts issuer-matched NSE/BSE issue sources and linked documents; generic page shells, retrieval failures and unreadable documents are not evidence of non-publication. Required unresolved terms remain fail-closed, without invented values or a manual-entry workaround for discovery defects.
 - v1.5 remains the active scoring configuration. v1.6 is inactive; this README does not authorize its activation or any scoring change.
 - This repository intentionally does not add authentication/RBAC, multi-user support, PostgreSQL, enterprise architecture, or production deployment requirements.
 

@@ -1,0 +1,153 @@
+[
+  {
+    "uri": "https://nsearchives.nseindia.com/content/ipo/RATIOS_JPL.zip#zip-member=RATIOS_JPL%2FET.pdf",
+    "bytes": 7905316,
+    "sha256": "e4feb7a9c4ce0b80087e9c4b38446c1cbd17d93c0b10b7e10d575488c0504229",
+    "notice_values": null,
+    "notice_report": "retrieved notice names a different issuer",
+    "first_page_prefix": "",
+    "rhp_error": "ValueError: RHP title or issuer responsibility/offer-table role not established",
+    "offer_excerpts": []
+  },
+  {
+    "url": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+    "at": "2026-10-21T13:39:31.493592+00:00",
+    "transport": "production _default_http_fetch; actual public HTTP, no fixture",
+    "bytes": 312084,
+    "sha256": "016ab7fff57627dacf75f14b8a4df4df46bd2c68a01989c618ee52c8d389261a",
+    "classification": "empty",
+    "response_not_in_annotation": "compressed response exceeds bounded annotation size"
+  },
+  {
+    "uri": "https://nsearchives.nseindia.com/content/ipo/RATIOS_JPL.zip#zip-member=RATIOS_JPL%2FMT.pdf",
+    "bytes": 8234355,
+    "sha256": "37fdc73024395fded5f60393391b02cc036a7354bc62962e2055858cb0213a3c",
+    "notice_values": null,
+    "notice_report": "retrieved notice names a different issuer",
+    "first_page_prefix": "",
+    "rhp_error": "ValueError: RHP title or issuer responsibility/offer-table role not established",
+    "offer_excerpts": []
+  },
+  {
+    "uri": "https://nsearchives.nseindia.com/content/ipo/RATIOS_JPL.zip#zip-member=RATIOS_JPL%2FTOI.pdf",
+    "bytes": 8104999,
+    "sha256": "4882a03ab6264f7fedfa3ba9c438876185a3b41fe73c8aabcc2602e8f8970526",
+    "notice_values": null,
+    "notice_report": "retrieved notice names a different issuer",
+    "first_page_prefix": "",
+    "rhp_error": "ValueError: RHP title or issuer responsibility/offer-table role not established",
+    "offer_excerpts": []
+  },
+  {
+    "url": "https://www.nseindia.com/api/all-upcoming-issues?category=ipo",
+    "at": "2026-10-21T13:39:32.509079+00:00",
+    "transport": "production _default_http_fetch; actual public HTTP, no fixture",
+    "bytes": 417,
+    "sha256": "24fe1b1ec7e70f731cfd6bfdd46992283d86c1a7aa5a6f62e2994d19e0a1c804",
+    "classification": "empty",
+    "public_response_chunks": 1
+  },
+  {
+    "url": "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
+    "at": "2026-10-21T13:39:41.242409+00:00",
+    "transport": "production _default_http_fetch; actual public HTTP, no fixture",
+    "bytes": 14287,
+    "sha256": "7e4904994cfef3e8e2ec2b72ee3153b9f6a9c868b4eef44dd25febb266f0fb2a",
+    "classification": "shell",
+    "public_response_chunks": 3
+  },
+  {
+    "url": "https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0",
+    "at": "2026-10-21T13:39:33.144608+00:00",
+    "transport": "production _default_http_fetch; actual public HTTP, no fixture",
+    "error_type": "HTTPError",
+    "error": "HTTP Error 404: 404",
+    "state": "RETRIEVAL_FAILED_NOT_NONPUBLICATION"
+  },
+  {
+    "url": "https://www.bseindia.com/publicissue.html",
+    "at": "2026-10-21T13:39:42.796380+00:00",
+    "transport": "production _default_http_fetch; actual public HTTP, no fixture",
+    "bytes": 14287,
+    "sha256": "7e4904994cfef3e8e2ec2b72ee3153b9f6a9c868b4eef44dd25febb266f0fb2a",
+    "classification": "shell",
+    "response_already_retained_by_hash": true
+  },
+  {
+    "url": "https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4894&type=IPO&idtype=1&status=L&IPONo=8047&startdt=21/10/2026",
+    "at": "2026-10-21T13:39:43.734460+00:00",
+    "transport": "production _default_http_fetch; actual public HTTP, no fixture",
+    "bytes": 14287,
+    "sha256": "7e4904994cfef3e8e2ec2b72ee3153b9f6a9c868b4eef44dd25febb266f0fb2a",
+    "classification": "shell",
+    "response_already_retained_by_hash": true
+  },
+  {
+    "url": "https://www.bseindia.com/markets/publicissues/ipoissues?id=1&Type=P",
+    "at": "2026-10-21T13:39:44.189815+00:00",
+    "transport": "production _default_http_fetch; actual public HTTP, no fixture",
+    "bytes": 14287,
+    "sha256": "7e4904994cfef3e8e2ec2b72ee3153b9f6a9c868b4eef44dd25febb266f0fb2a",
+    "classification": "shell",
+    "response_already_retained_by_hash": true
+  },
+  {
+    "url": "https://www.bseindia.com/markets/publicissues/displayipo?id=4894&type=IPO&idtype=1&status=L&IPONo=8047&startdt=21/10/2026",
+    "at": "2026-10-21T13:39:44.665282+00:00",
+    "transport": "production _default_http_fetch; actual public HTTP, no fixture",
+    "bytes": 14287,
+    "sha256": "7e4904994cfef3e8e2ec2b72ee3153b9f6a9c868b4eef44dd25febb266f0fb2a",
+    "classification": "shell",
+    "response_already_retained_by_hash": true
+  },
+  {
+    "url": "https://listing.bseindia.com/Download/8888888/PreAnchor/JioPlatformsPBAdNewspaperClippings_20261015185329.zip",
+    "at": "2026-10-21T13:39:45.160961+00:00",
+    "transport": "production _default_http_fetch; actual public HTTP, no fixture",
+    "error_type": "URLError",
+    "error": "<urlopen error timed out>",
+    "state": "RETRIEVAL_FAILED_NOT_NONPUBLICATION"
+  },
+  {
+    "url": "https://www.nseindia.com/api/ipo-detail?symbol=JPL",
+    "at": "2026-10-21T13:39:35.029206+00:00",
+    "transport": "production _default_http_fetch; actual public HTTP, no fixture",
+    "bytes": 34828,
+    "sha256": "6dd90082c35315150d89b956ae1119ccca2c93879663794a6981bbcafa17bdb4",
+    "classification": "empty",
+    "public_response_chunks": 5
+  },
+  {
+    "uri": "https://nsearchives.nseindia.com/content/ipo/RHP_JPL.zip#zip-member=RHP_JPL%2FJIO%20Platforms%20GID.pdf",
+    "bytes": 1798274,
+    "sha256": "05d3158b7b194c9d185ea4a73d0fa2f1818c9f97ec6358c775f48beaf377df36",
+    "notice_values": null,
+    "notice_report": "retrieved document is not a parseable Price Band Notice: General Information Document examples are not issuer issue terms",
+    "first_page_prefix": " \nGENERAL INFORMATION DOCUMENT FOR INVESTING IN PUBLIC ISSUES \nThis General Information Document highlights certain key rules, processes and procedures applicable to the public Issue \nin accordance with the provisions of the Companies Act, 2013 the Securities Contracts (Regulation) Act, 1956 (\u201cSCRA\u201d), the \nSecurities Contracts (Regulation) Rules, 1957 (\u201c SCRR\u201d), the Securities and Exchange Board of India ( Issue of Capital and \nDisclosure Requ ir",
+    "rhp_error": "ValueError: RHP title or issuer responsibility/offer-table role not established",
+    "offer_excerpts": [
+      " carefully read the Red Herring Prospectus before investing ",
+      " on the date of the Red Herring Prospectus. ",
+      "to form part of the Red Herring Prospectus. Additionally, SEBI "
+    ]
+  },
+  {
+    "uri": "https://nsearchives.nseindia.com/content/ipo/RHP_JPL.zip#zip-member=RHP_JPL%2FJio%20Platforms%20Limited_RHP.pdf",
+    "bytes": 11630670,
+    "sha256": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+    "notice_values": null,
+    "notice_report": "retrieved document is not a parseable Price Band Notice: Conflicting open dates: ['2026-10-19', '2026-10-21', '2020-05-20']",
+    "first_page_prefix": " \n \n \nA \nMPLS \n \n \n \nJIO PLATFORMS LIMITED \nCORPORATE IDENTITY NUMBER: U72900GJ2019PLC110816  \n \nREGISTERED OFFICE CORPORATE OFFICE CONTACT PERSON(S) E-MAIL AND TELEPHONE WEBSITE \nOffice - 101, Saffron, Nr. Centre Point, \nPanchwati 5 Rasta, Ambawadi, \nAhmedabad 380 006, Gujarat, India \nTC-22, 5 th Floor, A Wing, Reliance \nCorporate Park, Thane Belapur Road, \nGhansoli, Navi Mumbai  \n400 701, Maharashtra, India \nMs. Savithri Parekh  \nCompany Secret",
+    "rhp": {
+      "company": "JIO PLATFORMS LIMITED",
+      "ofs": 0.0,
+      "fresh": null
+    },
+    "offer_excerpts": [
+      "TYPE FRESH ISSUE SIZE OFFER FOR SALE SIZE TOTAL ISSUE SIZE ELIGIBILITY AND SHARE RESERVATION ",
+      "Fresh Issue Up to  ",
+      "aggregating up to ",
+      "aggregating up to "
+    ]
+  }
+]

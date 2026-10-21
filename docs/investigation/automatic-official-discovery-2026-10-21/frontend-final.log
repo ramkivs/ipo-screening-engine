@@ -1,0 +1,554 @@
+
+> ipo-screening-engine-ui@1.0.0 test
+> node --test test/*.test.js
+
+TAP version 13
+# Subtest: ApiClient - Initialisation and scoped action surface
+ok 1 - ApiClient - Initialisation and scoped action surface
+  ---
+  duration_ms: 1.179195
+  type: 'test'
+  ...
+# Subtest: ApiClient - System endpoints (getHealth, getMeta, getConfigurationStatus)
+ok 2 - ApiClient - System endpoints (getHealth, getMeta, getConfigurationStatus)
+  ---
+  duration_ms: 1.875944
+  type: 'test'
+  ...
+# Subtest: ApiClient - listIpos builds query parameters accurately
+ok 3 - ApiClient - listIpos builds query parameters accurately
+  ---
+  duration_ms: 0.827704
+  type: 'test'
+  ...
+# Subtest: ApiClient - listEvaluations builds query parameters accurately
+ok 4 - ApiClient - listEvaluations builds query parameters accurately
+  ---
+  duration_ms: 0.481954
+  type: 'test'
+  ...
+# Subtest: ApiClient - Detail endpoints encode URL parameters correctly
+ok 5 - ApiClient - Detail endpoints encode URL parameters correctly
+  ---
+  duration_ms: 0.499683
+  type: 'test'
+  ...
+# Subtest: ApiClient - handles 404 and API error schemas
+ok 6 - ApiClient - handles 404 and API error schemas
+  ---
+  duration_ms: 0.584242
+  type: 'test'
+  ...
+# Subtest: ApiClient - handles network disconnection error cleanly
+ok 7 - ApiClient - handles network disconnection error cleanly
+  ---
+  duration_ms: 0.274486
+  type: 'test'
+  ...
+# Subtest: ApiClient - rejects empty or missing IDs in getIpo and getEvaluation
+ok 8 - ApiClient - rejects empty or missing IDs in getIpo and getEvaluation
+  ---
+  duration_ms: 0.191939
+  type: 'test'
+  ...
+# Subtest: App - Formatting helpers produce valid accessible HTML markup
+ok 9 - App - Formatting helpers produce valid accessible HTML markup
+  ---
+  duration_ms: 1.029773
+  type: 'test'
+  ...
+# Subtest: App - Zero Score Calculation Invariant: source files contain no arithmetic weighting or scoring formulas
+ok 10 - App - Zero Score Calculation Invariant: source files contain no arithmetic weighting or scoring formulas
+  ---
+  duration_ms: 1.478676
+  type: 'test'
+  ...
+# Subtest: App - Governance Invariant: no policy activation or modification controls in frontend
+ok 11 - App - Governance Invariant: no policy activation or modification controls in frontend
+  ---
+  duration_ms: 1.083849
+  type: 'test'
+  ...
+# Subtest: App - Fail-Closed Invariant: missing/null values never default to zero
+ok 12 - App - Fail-Closed Invariant: missing/null values never default to zero
+  ---
+  duration_ms: 0.15292
+  type: 'test'
+  ...
+# Subtest: Penalty rendering distinguishes an unevaluated penalty from a cleared one
+ok 13 - Penalty rendering distinguishes an unevaluated penalty from a cleared one
+  ---
+  duration_ms: 0.328612
+  type: 'test'
+  ...
+# Subtest: Penalty rendering handles an empty list
+ok 14 - Penalty rendering handles an empty list
+  ---
+  duration_ms: 0.086283
+  type: 'test'
+  ...
+# Subtest: Governance metric rendering keeps UNKNOWN distinct from a verified absence
+ok 15 - Governance metric rendering keeps UNKNOWN distinct from a verified absence
+  ---
+  duration_ms: 0.271707
+  type: 'test'
+  ...
+# Subtest: UI-5 ApiClient - Backtest datasets and analytics endpoints
+ok 16 - UI-5 ApiClient - Backtest datasets and analytics endpoints
+  ---
+  duration_ms: 0.856168
+  type: 'test'
+  ...
+# Subtest: UI-5 App - Backtest Distinction Banner separating population analysis vs individual performance vs calibration
+ok 17 - UI-5 App - Backtest Distinction Banner separating population analysis vs individual performance vs calibration
+  ---
+  duration_ms: 0.585463
+  type: 'test'
+  ...
+# Subtest: UI-5 App - Executive Analytics Summary KPI section rendering
+ok 18 - UI-5 App - Executive Analytics Summary KPI section rendering
+  ---
+  duration_ms: 0.183262
+  type: 'test'
+  ...
+# Subtest: UI-5 App - Fail-Closed Invariant: missing metrics render UNAVAILABLE and never default to zero
+ok 19 - UI-5 App - Fail-Closed Invariant: missing metrics render UNAVAILABLE and never default to zero
+  ---
+  duration_ms: 0.174233
+  type: 'test'
+  ...
+# Subtest: UI-5 App - Decile analysis handles insufficient sample size cleanly without fabricating deciles
+ok 20 - UI-5 App - Decile analysis handles insufficient sample size cleanly without fabricating deciles
+  ---
+  duration_ms: 0.136059
+  type: 'test'
+  ...
+# Subtest: UI-5 App - Decile analysis renders populated buckets when provided by authoritative API
+ok 21 - UI-5 App - Decile analysis renders populated buckets when provided by authoritative API
+  ---
+  duration_ms: 1.160415
+  type: 'test'
+  ...
+# Subtest: UI-5 App - Vintage and Holdout sections report NOT EXPOSED without synthesizing fake data
+ok 22 - UI-5 App - Vintage and Holdout sections report NOT EXPOSED without synthesizing fake data
+  ---
+  duration_ms: 0.214244
+  type: 'test'
+  ...
+# Subtest: UI-5 App - Point-in-Time Leakage Audit and Cryptographic Provenance panel
+ok 23 - UI-5 App - Point-in-Time Leakage Audit and Cryptographic Provenance panel
+  ---
+  duration_ms: 0.125501
+  type: 'test'
+  ...
+# Subtest: UI-5 App - Calibration Governance Boundary preserves firewall against automated activation
+ok 24 - UI-5 App - Calibration Governance Boundary preserves firewall against automated activation
+  ---
+  duration_ms: 0.251141
+  type: 'test'
+  ...
+# Subtest: UI-5 App - Zero browser-side analytical/return calculations and zero credential leakage
+ok 25 - UI-5 App - Zero browser-side analytical/return calculations and zero credential leakage
+  ---
+  duration_ms: 1.411941
+  type: 'test'
+  ...
+# Subtest: UI-6 ApiClient - Calibration proposal retrieval protocol
+ok 26 - UI-6 ApiClient - Calibration proposal retrieval protocol
+  ---
+  duration_ms: 1.065732
+  type: 'test'
+  ...
+# Subtest: UI-6 App - Governance Lifecycle Chain preserves firewall against automated activation
+ok 27 - UI-6 App - Governance Lifecycle Chain preserves firewall against automated activation
+  ---
+  duration_ms: 0.850369
+  type: 'test'
+  ...
+# Subtest: UI-6 App - Active Baseline (v1.5.0) presentation is strictly EXECUTABLE and clearly distinguished from candidate
+ok 28 - UI-6 App - Active Baseline (v1.5.0) presentation is strictly EXECUTABLE and clearly distinguished from candidate
+  ---
+  duration_ms: 0.247489
+  type: 'test'
+  ...
+# Subtest: UI-6 App - Candidate Proposal (v1.6.0-draft) presentation is strictly INACTIVE and promotion gated
+ok 29 - UI-6 App - Candidate Proposal (v1.6.0-draft) presentation is strictly INACTIVE and promotion gated
+  ---
+  duration_ms: 1.298598
+  type: 'test'
+  ...
+# Subtest: UI-6 App - Current vs Proposed module weight shift comparison renders exact authoritative deltas
+ok 30 - UI-6 App - Current vs Proposed module weight shift comparison renders exact authoritative deltas
+  ---
+  duration_ms: 0.31175
+  type: 'test'
+  ...
+# Subtest: UI-6 App - Non-regression audit and downside protection checks rendering
+ok 31 - UI-6 App - Non-regression audit and downside protection checks rendering
+  ---
+  duration_ms: 0.191272
+  type: 'test'
+  ...
+# Subtest: UI-6 App - Cryptographic Provenance panel displays all SHA-256 digests with copy controls
+ok 32 - UI-6 App - Cryptographic Provenance panel displays all SHA-256 digests with copy controls
+  ---
+  duration_ms: 0.156721
+  type: 'test'
+  ...
+# Subtest: UI-6 App - Zero in-browser activation controls and zero mutation handlers
+ok 33 - UI-6 App - Zero in-browser activation controls and zero mutation handlers
+  ---
+  duration_ms: 1.367094
+  type: 'test'
+  ...
+# Subtest: UI-6 App - Zero browser-side calculation authority and zero credential leakage
+ok 34 - UI-6 App - Zero browser-side calculation authority and zero credential leakage
+  ---
+  duration_ms: 1.513118
+  type: 'test'
+  ...
+# Subtest: Evidence inspector - recorded filing list evidence is not UNKNOWN/UNVERIFIED
+ok 35 - Evidence inspector - recorded filing list evidence is not UNKNOWN/UNVERIFIED
+  ---
+  duration_ms: 0.753604
+  type: 'test'
+  ...
+# Subtest: Evidence inspector - genuinely absent evidence stays UNKNOWN/UNVERIFIED
+ok 36 - Evidence inspector - genuinely absent evidence stays UNKNOWN/UNVERIFIED
+  ---
+  duration_ms: 1.076746
+  type: 'test'
+  ...
+# Subtest: Evidence inspector - derived value without quote stays DERIVED
+ok 37 - Evidence inspector - derived value without quote stays DERIVED
+  ---
+  duration_ms: 0.166464
+  type: 'test'
+  ...
+# Subtest: UI-3 ApiClient - getEvidence and getEvaluationEvidence protocols
+ok 38 - UI-3 ApiClient - getEvidence and getEvaluationEvidence protocols
+  ---
+  duration_ms: 1.164425
+  type: 'test'
+  ...
+# Subtest: UI-3 ApiClient - rejects missing evidence identifiers
+ok 39 - UI-3 ApiClient - rejects missing evidence identifiers
+  ---
+  duration_ms: 0.645233
+  type: 'test'
+  ...
+# Subtest: UI-3 App - Provenance & Cryptographic Audit Panel formatting
+ok 40 - UI-3 App - Provenance & Cryptographic Audit Panel formatting
+  ---
+  duration_ms: 0.433907
+  type: 'test'
+  ...
+# Subtest: UI-3 App - Contract Guidance & Distinction between Source Evidence vs Derived Values
+ok 41 - UI-3 App - Contract Guidance & Distinction between Source Evidence vs Derived Values
+  ---
+  duration_ms: 0.362787
+  type: 'test'
+  ...
+# Subtest: UI-3 App - Verbatim Quote Preservation and Fail-Closed Unknown Semantics
+ok 42 - UI-3 App - Verbatim Quote Preservation and Fail-Closed Unknown Semantics
+  ---
+  duration_ms: 0.165766
+  type: 'test'
+  ...
+# Subtest: UI-3 App - Source document, page, and locator presentation security
+ok 43 - UI-3 App - Source document, page, and locator presentation security
+  ---
+  duration_ms: 1.266463
+  type: 'test'
+  ...
+# Subtest: UI-3 App - Scorecard-to-evidence navigation integration
+ok 44 - UI-3 App - Scorecard-to-evidence navigation integration
+  ---
+  duration_ms: 0.727154
+  type: 'test'
+  ...
+# Subtest: UI-3 App - Evidence Detail Inspector dialog structure
+ok 45 - UI-3 App - Evidence Detail Inspector dialog structure
+  ---
+  duration_ms: 1.390924
+  type: 'test'
+  ...
+# Subtest: UI-3 App - Unverified retained source is never presented as verified
+ok 46 - UI-3 App - Unverified retained source is never presented as verified
+  ---
+  duration_ms: 0.999085
+  type: 'test'
+  ...
+# Subtest: UI-3 App - Processing summaries and non-scalar value summaries are not shown as quotations
+ok 47 - UI-3 App - Processing summaries and non-scalar value summaries are not shown as quotations
+  ---
+  duration_ms: 1.217348
+  type: 'test'
+  ...
+# Subtest: Market Data State panel distinguishes missing/stale from an observed negative signal
+ok 48 - Market Data State panel distinguishes missing/stale from an observed negative signal
+  ---
+  duration_ms: 1.353572
+  type: 'test'
+  ...
+# Subtest: UI-7 ApiClient - ingestDocument builds FormData and transmits to endpoint
+ok 49 - UI-7 ApiClient - ingestDocument builds FormData and transmits to endpoint
+  ---
+  duration_ms: 15.736021
+  type: 'test'
+  ...
+# Subtest: UI-7 ApiClient - ingestDocument handles validation errors and payload limits
+ok 50 - UI-7 ApiClient - ingestDocument handles validation errors and payload limits
+  ---
+  duration_ms: 0.576743
+  type: 'test'
+  ...
+# Subtest: UI-7 ApiClient - ingestDocument does not expose or send reference_base_path or fallback parameters
+ok 51 - UI-7 ApiClient - ingestDocument does not expose or send reference_base_path or fallback parameters
+  ---
+  duration_ms: 0.283806
+  type: 'test'
+  ...
+# Subtest: UI-7 App - Ingestion View layout and Distinction Banner rendering
+ok 52 - UI-7 App - Ingestion View layout and Distinction Banner rendering
+  ---
+  duration_ms: 0.473172
+  type: 'test'
+  ...
+# Subtest: UI-7 App - Idempotency handling preserves existing evaluations without errors
+ok 53 - UI-7 App - Idempotency handling preserves existing evaluations without errors
+  ---
+  duration_ms: 0.248302
+  type: 'test'
+  ...
+# Subtest: UI-7 App - Helper formatBytes formats file sizes correctly
+ok 54 - UI-7 App - Helper formatBytes formats file sizes correctly
+  ---
+  duration_ms: 0.136506
+  type: 'test'
+  ...
+# Subtest: UI-7 App - UI submission path invokes initialized ApiClient.ingestDocument without wiring errors
+ok 55 - UI-7 App - UI submission path invokes initialized ApiClient.ingestDocument without wiring errors
+  ---
+  duration_ms: 0.909285
+  type: 'test'
+  ...
+# Subtest: UI-7 App - Zero client-side scoring / calculation invariant
+ok 56 - UI-7 App - Zero client-side scoring / calculation invariant
+  ---
+  duration_ms: 1.452495
+  type: 'test'
+  ...
+# Subtest: UI-7 ApiClient - ingestDocument preserves AWAITING_ISSUE_TERMS diagnostics from FastAPI detail
+ok 57 - UI-7 ApiClient - ingestDocument preserves AWAITING_ISSUE_TERMS diagnostics from FastAPI detail
+  ---
+  duration_ms: 0.651927
+  type: 'test'
+  ...
+# Subtest: Activity flow - panel is locatable before submission (visible shell)
+ok 58 - Activity flow - panel is locatable before submission (visible shell)
+  ---
+  duration_ms: 1.293793
+  type: 'test'
+  ...
+# Subtest: Activity flow - submission displays panel with real backend events (failed ingestion)
+ok 59 - Activity flow - submission displays panel with real backend events (failed ingestion)
+  ---
+  duration_ms: 2.604667
+  type: 'test'
+  ...
+# Subtest: Activity ApiClient - startIngestion posts FormData to the start endpoint
+ok 60 - Activity ApiClient - startIngestion posts FormData to the start endpoint
+  ---
+  duration_ms: 20.854246
+  type: 'test'
+  ...
+# Subtest: Activity ApiClient - getIngestionEvents forwards after_sequence
+ok 61 - Activity ApiClient - getIngestionEvents forwards after_sequence
+  ---
+  duration_ms: 0.305018
+  type: 'test'
+  ...
+# Subtest: Activity App - renders ordered backend events with terminal summary
+ok 62 - Activity App - renders ordered backend events with terminal summary
+  ---
+  duration_ms: 0.427536
+  type: 'test'
+  ...
+# Subtest: Activity App - untrusted diagnostic text is escaped, never raw HTML
+ok 63 - Activity App - untrusted diagnostic text is escaped, never raw HTML
+  ---
+  duration_ms: 0.127872
+  type: 'test'
+  ...
+# Subtest: Activity App - the Windows failure pattern renders UNAVAILABLE and never UNPUBLISHED
+ok 64 - Activity App - the Windows failure pattern renders UNAVAILABLE and never UNPUBLISHED
+  ---
+  duration_ms: 0.229681
+  type: 'test'
+  ...
+# Subtest: Step5 ApiClient - ingestManualTerms posts terms/explanation to the manual-terms endpoint
+ok 65 - Step5 ApiClient - ingestManualTerms posts terms/explanation to the manual-terms endpoint
+  ---
+  duration_ms: 19.053727
+  type: 'test'
+  ...
+# Subtest: Step5 ApiClient - an explicit OFS of 0 is preserved and absent fields are never fabricated
+ok 66 - Step5 ApiClient - an explicit OFS of 0 is preserved and absent fields are never fabricated
+  ---
+  duration_ms: 0.639122
+  type: 'test'
+  ...
+# Subtest: Step5 ApiClient - conflict and awaiting payloads surface structured details
+ok 67 - Step5 ApiClient - conflict and awaiting payloads surface structured details
+  ---
+  duration_ms: 0.734973
+  type: 'test'
+  ...
+# Subtest: Step5 App - manual panel offers all five enterable terms and marks non-enterable blockers
+ok 68 - Step5 App - manual panel offers all five enterable terms and marks non-enterable blockers
+  ---
+  duration_ms: 0.667738
+  type: 'test'
+  ...
+# Subtest: Step5 ApiClient - ingestManualTerms posts the fresh-issue amount including explicit 0
+ok 69 - Step5 ApiClient - ingestManualTerms posts the fresh-issue amount including explicit 0
+  ---
+  duration_ms: 0.639703
+  type: 'test'
+  ...
+# Subtest: Step5 App - OFS unit label follows the reporting unit from the awaiting payload
+ok 70 - Step5 App - OFS unit label follows the reporting unit from the awaiting payload
+  ---
+  duration_ms: 0.19517
+  type: 'test'
+  ...
+# Subtest: Step5 App - five-field submission posts the fresh-issue amount and shows it as manual
+ok 71 - Step5 App - five-field submission posts the fresh-issue amount and shows it as manual
+  ---
+  duration_ms: 0.777533
+  type: 'test'
+  ...
+# Subtest: Step5 App - four-field submission posts every supplied term including OFS
+ok 72 - Step5 App - four-field submission posts every supplied term including OFS
+  ---
+  duration_ms: 0.981992
+  type: 'test'
+  ...
+# Subtest: Step5 App - conflict blocks until explicitly confirmed, then proceeds unpromoted
+ok 73 - Step5 App - conflict blocks until explicitly confirmed, then proceeds unpromoted
+  ---
+  duration_ms: 0.674473
+  type: 'test'
+  ...
+# Subtest: Step5 App - manual panel requires values and an explanation before submitting
+ok 74 - Step5 App - manual panel requires values and an explanation before submitting
+  ---
+  duration_ms: 0.445056
+  type: 'test'
+  ...
+# Subtest: Step5 App - awaiting panel surfaces official-source resolution diagnostics
+ok 75 - Step5 App - awaiting panel surfaces official-source resolution diagnostics
+  ---
+  duration_ms: 0.326905
+  type: 'test'
+  ...
+# Subtest: Step5 App - official-source diagnostics show UNAVAILABLE for the Windows failure pattern
+ok 76 - Step5 App - official-source diagnostics show UNAVAILABLE for the Windows failure pattern
+  ---
+  duration_ms: 0.20173
+  type: 'test'
+  ...
+# Subtest: Step5 App - every official source is shown with whether its listing was really searched
+ok 77 - Step5 App - every official source is shown with whether its listing was really searched
+  ---
+  duration_ms: 0.207537
+  type: 'test'
+  ...
+# Subtest: Step5 ApiClient - ingestManualTerms errors preserve the audit-log correlation ids
+ok 78 - Step5 ApiClient - ingestManualTerms errors preserve the audit-log correlation ids
+  ---
+  duration_ms: 0.311779
+  type: 'test'
+  ...
+# Subtest: Step5 App - successful manual submission registers and displays the audit record
+ok 79 - Step5 App - successful manual submission registers and displays the audit record
+  ---
+  duration_ms: 0.761527
+  type: 'test'
+  ...
+# Subtest: Step5 App - rejected manual submission shows its audit reference
+ok 80 - Step5 App - rejected manual submission shows its audit reference
+  ---
+  duration_ms: 0.425206
+  type: 'test'
+  ...
+# Subtest: Step5 App - conflict response carries its audit reference
+ok 81 - Step5 App - conflict response carries its audit reference
+  ---
+  duration_ms: 0.316651
+  type: 'test'
+  ...
+# Subtest: Step5 App - failures without an audit id keep the established unavailable wording
+ok 82 - Step5 App - failures without an audit id keep the established unavailable wording
+  ---
+  duration_ms: 0.40579
+  type: 'test'
+  ...
+# Subtest: UI-4 ApiClient - Post-listing and performance presentation endpoints
+ok 83 - UI-4 ApiClient - Post-listing and performance presentation endpoints
+  ---
+  duration_ms: 1.034819
+  type: 'test'
+  ...
+# Subtest: UI-4 App - formatReturnPct preserves fail-closed semantics (never converts null to 0.00%)
+ok 84 - UI-4 App - formatReturnPct preserves fail-closed semantics (never converts null to 0.00%)
+  ---
+  duration_ms: 0.308736
+  type: 'test'
+  ...
+# Subtest: UI-4 App - Performance Summary KPI strip rendering
+ok 85 - UI-4 App - Performance Summary KPI strip rendering
+  ---
+  duration_ms: 0.919335
+  type: 'test'
+  ...
+# Subtest: UI-4 App - Deterministic Performance Timeline rendering
+ok 86 - UI-4 App - Deterministic Performance Timeline rendering
+  ---
+  duration_ms: 0.356369
+  type: 'test'
+  ...
+# Subtest: UI-4 App - Multi-horizon observation cards and corporate action adjustment factor
+ok 87 - UI-4 App - Multi-horizon observation cards and corporate action adjustment factor
+  ---
+  duration_ms: 1.268083
+  type: 'test'
+  ...
+# Subtest: UI-4 App - Backtest & Calibration Governance Boundaries
+ok 88 - UI-4 App - Backtest & Calibration Governance Boundaries
+  ---
+  duration_ms: 0.299857
+  type: 'test'
+  ...
+# Subtest: UI-4 App - Scorecard and Evidence Navigation integration
+ok 89 - UI-4 App - Scorecard and Evidence Navigation integration
+  ---
+  duration_ms: 0.832251
+  type: 'test'
+  ...
+# Subtest: UI-4 App - Zero client-side return calculations and zero credential leakage
+ok 90 - UI-4 App - Zero client-side return calculations and zero credential leakage
+  ---
+  duration_ms: 1.444996
+  type: 'test'
+  ...
+1..90
+# tests 90
+# suites 0
+# pass 90
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 730.199226

@@ -1,0 +1,97 @@
+{
+  "conclusion": "failure",
+  "headSha": "961f718775dbe21692814f241fcf63423ea20533",
+  "jobs": [
+    {
+      "completedAt": "2026-10-21T13:58:17Z",
+      "conclusion": "failure",
+      "databaseId": 119264609343,
+      "name": "actual-exchange-http",
+      "startedAt": "2026-10-21T13:56:56Z",
+      "status": "completed",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4",
+          "number": 2,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run actions/setup-python@v5",
+          "number": 3,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run python -m pip install -r requirements.txt",
+          "number": 4,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Focused automatic discovery regressions",
+          "number": 5,
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "Cross-platform real offline OCR regression",
+          "number": 6,
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "Actual production HTTP exchange response probe",
+          "number": 7,
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "Actual BSE public page and archive behaviour",
+          "number": 8,
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "Inspect actual discovered official document parsing",
+          "number": 9,
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "Real Jio PDF and live official discovery through evaluation gates",
+          "number": 10,
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "Post Run actions/setup-python@v5",
+          "number": 19,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4",
+          "number": 20,
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 21,
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/ramkivs/ipo-screening-engine/actions/runs/39612462531/job/119264609343"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/ramkivs/ipo-screening-engine/actions/runs/39612462531"
+}

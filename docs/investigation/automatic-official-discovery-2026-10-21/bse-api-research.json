@@ -1,0 +1,18 @@
+{
+  "role": "Research-only endpoint investigation, not canonical financial evidence and not production-fetch verification",
+  "date": "2026-10-21",
+  "method": "Public GitHub code/catalog search supplied endpoint-name leads only. No third-party financial values, inferred fields or catalog authority rules were consumed. fetch_page then attempted the official URLs.",
+  "attempts": [
+    {
+      "requested": "https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue/w",
+      "returned_url": "https://www.bseindia.com/members/showinterest",
+      "observed": "Rendered Show Interest contact form, not a JSON issue feed"
+    },
+    {
+      "requested": "https://api.bseindia.com/BseIndiaAPI/api/GetMkt_ISSUE_BBS_IPO/w?IPO_NO=8047",
+      "returned_url": "https://www.bseindia.com/members/showinterest?IPO_NO=8047",
+      "observed": "Rendered Show Interest contact form, not issuer issue data"
+    }
+  ],
+  "boundary": "No registration/contact form was submitted, credentials requested, CAPTCHA bypassed or access controls circumvented. These research results are not proof of native Windows API behavior or term non-publication. Actual native classic BSE detail routes are separately retained as shell responses. A JSON adapter inferred only from third-party example schemas would not establish actual official retrieval. BSE transport remains un-restored."
+}

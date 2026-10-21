@@ -1,0 +1,59 @@
+{
+  "verified_at_utc": "2026-10-21T15:25:29.435835+00:00",
+  "source_commit": "a3279506b6cee66482135324528a56b6264826a9",
+  "github_commit": "a3279506b6cee66482135324528a56b6264826a9",
+  "github_tree": "b65721d0156003597dac2781a614fe134f9406ed",
+  "matched_sha256_and_remote_blobs": 291,
+  "broad_backend": {
+    "snapshot": "tested-tree-backend.json",
+    "candidate": "dab7b7604af5367ae1d1bb38a20546f1f61229fc",
+    "passed": 1395,
+    "warnings": 25,
+    "seconds": 1210.12
+  },
+  "post_full_delta": [
+    "engine/ipo_screening/extraction/official_notice_ocr.py",
+    "engine/ipo_screening/extraction/official_offer_amounts.py",
+    "tests/test_automatic_official_issue_discovery.py"
+  ],
+  "final_focused": {
+    "passed": 124,
+    "deselected": 6,
+    "warnings": 3,
+    "seconds": 4.29
+  },
+  "real_offline_ocr": {
+    "passed": 1,
+    "deselected": 24,
+    "seconds": 5.65
+  },
+  "frontend_passed": 90,
+  "native_check": {
+    "id": 119308926882,
+    "head_sha": "a3279506b6cee66482135324528a56b6264826a9",
+    "conclusion": "neutral",
+    "terminal": {
+      "kind": "terminal",
+      "ingestion_id": "ing-a166a462042145f0",
+      "status": "BLOCKED",
+      "error_code": "AWAITING_ISSUE_TERMS",
+      "finished_at": "2026-10-21T15:24:10.302542Z",
+      "evaluation_run": false,
+      "evaluation_id": null,
+      "persisted": false
+    },
+    "remaining_fields": [
+      "fresh_issue"
+    ],
+    "conflicts": []
+  },
+  "main": "01ba66c12ca1195fd7acbd287c3e39a019808094",
+  "pr6": {
+    "state": "open",
+    "merged": false,
+    "head_ref": "arena/5dd3fe52-ipo-screening-engine",
+    "head_sha": "e05c0efbca1ecb3024e52da73a22e180ea171118",
+    "base_ref": "arena/573e69a4-ipo-screening-engine",
+    "base_sha": "9e8c260576b85fad66484c19eec04fe328e1575f"
+  }
+}
