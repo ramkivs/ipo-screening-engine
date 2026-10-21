@@ -349,6 +349,7 @@ def test_ocr_primary_issuer_header_excludes_newspaper_masthead_without_letter_re
     from ipo_screening.extraction.official_notice_ocr import _primary_issuer_header
     assert _primary_issuer_header([(1, 'DAILY NEWSPAPER\nACME FORGE LIMITED\nCIN: U12345MH2020PLC123456\nRegistered Office: Mumbai')]) == ('ACME FORGE LIMITED', 'ACME FORGE LIMITED')
     assert _primary_issuer_header([(1, 'DAILY NEWSPAPER\nACMEFORGELIMITED\nREGISTEREDOFFICE: Mumbai')]) == ('ACMEFORGE LIMITED', 'ACMEFORGELIMITED')
+    assert _primary_issuer_header([(1, 'ACMEFORGELIMITED\n(TO BE LISTED ON THE STOCK EXCHANGES)')]) == ('ACMEFORGE LIMITED', 'ACMEFORGELIMITED')
     assert _primary_issuer_header([(1, 'Other company Limited\nBook running lead manager')]) is None
     assert _primary_issuer_header([(2, 'Other company Limited\nRegistered Office: Mumbai')]) is None
     assert _primary_issuer_header([(1, '[UNREADABLE_OCR_LINE]\nRegistered Office: Mumbai')]) is None

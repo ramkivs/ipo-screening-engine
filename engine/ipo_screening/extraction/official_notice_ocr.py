@@ -47,6 +47,7 @@ def _ocr_pages(raw):
     # can trigger unlimited rendering. Tiles are separate parsing segments so
     # adjoining columns/crops cannot fabricate one combined monetary assertion.
     output = []
+    identity_pages = []
     with _LOCK, pdfium.PdfDocument(raw) as doc:
         if len(doc) > 6:
             raise ValueError('image-only official notice exceeds six-page OCR limit')
@@ -57,6 +58,19 @@ def _ocr_pages(raw):
             bitmap = page.render(scale=scale)
             image = bitmap.to_pil().convert('RGB')
             try:
+                if index == 0:
+                    # Read the actual complete heading image, never stitch
+                    # issuer fragments from different crops. This result is
+                    # identity-only: its financial text is never parsed.
+                    header = image.crop((0, 0, image.width, min(1600, image.height)))
+                    try:
+                        detected = engine(np.asarray(header))
+                        texts = getattr(detected, 'txts', None) or ()
+                        scores = getattr(detected, 'scores', None) or ()
+                        identity_pages.append((1, '\n'.join(t if score >= .95 else '[UNREADABLE_OCR_LINE]'
+                            for t, score in zip(texts, scores))))
+                    finally:
+                        header.close()
                 for left in range(0, image.width, 1480):
                     for top in range(0, image.height, 1480):
                         crop = image.crop((left, top, min(left + 1600, image.width), min(top + 1600, image.height)))
@@ -78,7 +92,7 @@ def _ocr_pages(raw):
                 image.close()
                 bitmap.close()
                 page.close()
-    return output
+    return {'pages': output, 'identity_pages': identity_pages}
 
 
 def reject_general_information(pages):
@@ -107,7 +121,7 @@ def _primary_issuer_header(pages):
             if not match:
                 continue
             context = '\n'.join(lines[i + 1:i + 6])
-            if not re.search(r'CORPORATE\s*IDENTITY\s*NUMBER|\bCIN\b|REGISTERED\s*OFFICE', context, re.I):
+            if not re.search(r'CORPORATE\s*IDENTITY\s*NUMBER|\bCIN\b|REGISTERED\s*OFFICE|TO\s*BE\s*LISTED\s*ON', context, re.I):
                 continue
             name = match.group(1).strip() + ' LIMITED'
             found[re.sub(r'[^A-Z0-9]', '', name.upper())] = (name, line.strip())
@@ -140,7 +154,9 @@ def parse_if_scanned(raw, url):
             raise ValueError('official image notice OCR exceeded bounded 180-second read budget') from exc
     if proc.returncode:
         raise ValueError('official image notice OCR failed: ' + proc.stderr.decode('utf-8', errors='replace')[-500:])
-    pages = json.loads(proc.stdout)
+    decoded = json.loads(proc.stdout)
+    pages = decoded['pages']
+    identity_pages = decoded['identity_pages']
     if sum(len(text) for _, text in pages) > 120000:
         raise ValueError('OCR text exceeds bounded official notice size')
     reject_general_information(pages)
@@ -150,11 +166,11 @@ def parse_if_scanned(raw, url):
     source = SourceDocument(source_id='SRC-PBN-' + digest[:8].upper(), source_type='EXCHANGE',
                             uri=url, content_hash=digest, file_size_bytes=len(raw))
     result = PriceBandNoticeParser().parse_document(source, pages)
-    header = _primary_issuer_header(pages)
+    header = _primary_issuer_header(identity_pages) or _primary_issuer_header(pages)
     if header:
         result.company_name = header[0]
         result.metadata['ocr_primary_issuer_quote'] = header[1]
-    result.metadata['ocr_header_excerpt'] = pages[0][1][:650] if pages else ''
+    result.metadata['ocr_header_excerpt'] = (identity_pages[0][1] if identity_pages else pages[0][1] if pages else '')[:650]
     result = explicit_amounts(result, pages)
     for name in ('price_band_low', 'price_band_high', 'lot_size', 'open_date', 'close_date',
                  'fresh_issue_amount', 'ofs_amount'):
@@ -166,6 +182,7 @@ def parse_if_scanned(raw, url):
                 setattr(result, name, replace(obj, extraction_method='OCR', confidence=.95,
                     locator='Offline OCR; original PDF page ' + str(obj.page) + '; ' + (obj.locator or 'notice')))
     result.metadata['ocr'] = {'engine': 'rapidocr-3.10.0 bundled PP-OCRv6 ONNX',
+        'identity_strategy': 'full-width first-page header; financial fields from original crops only',
         'minimum_line_confidence': .95, 'inference_threads': _INFERENCE_THREADS, 'segments': len(pages),
         'pages': sorted({number for number, _ in pages}), 'numeric_repair': False, 'normalization': 'fixed structural heading whitespace only'}
     return result
