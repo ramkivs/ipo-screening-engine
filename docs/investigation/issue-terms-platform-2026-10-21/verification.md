@@ -1,0 +1,25 @@
+# Verification and preservation ledger
+
+## Run identity / intermediate failures
+
+The completed intermediate full run collected 1,335 tests: **1,320 passed, 15 failed, 28 warnings, 1499.12 seconds, EXIT 1**. Its original runtime identity is `intermediate-tested-tree.json`, its durable output is `intermediate-failed-backend.log`. It is not acceptance of the final tree.
+
+The fifteen failures were investigated, not suppressed:
+
+- Nine were frozen-core/governance checks exposing the edited `price_band_notice.py`. That file is restored byte-for-byte to baseline SHA-256 `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4`. Extended monetary fields/payload handling now live in `ExchangeIssueTermsResult`, a subclass in the unfrozen exchange-page parser. No pin/hash/config/golden is updated to conceal a change.
+- Four were old mocked notice bodies whose October 6–8 issue window contradicted the real uploaded Vishal RHP's September 30–October 5 programme. The synthetic transport bodies in three tests are explicitly aligned to the unchanged filing's cover programme. These are not new authentic-source claims. Retained-copy rejection and all canonical values/provenance/manual-precedence assertions remain; independent stale/similar-issuer rejection is tested in the new multisource suite. The actual `fixtures/notices/clean_notice.txt`, filing PDFs, goldens and history remain unchanged.
+- One partial-prospectus test expected assembly to throw away all partial pricing facts because lot was missing. The stronger new contract retains low/high, truthfully reports OFS as not directly sourced by discovery, permits the existing seller-share OFS derivation, and still blocks final readiness solely on lot. The test now checks this boundary explicitly instead of requiring the old assembly error.
+- One Jio regression expected only missing pricing in the early gate even though its monetary fresh amount was also absent. Its assertion now additionally requires `fresh_issue` to stay blocked, consistent with existing schema requirements. No missing monetary value is invented.
+
+Before the final run, all fifteen failures are re-executed explicitly; see `corrected-failures.log`. A fast correction check also passed 102 tests / 3 deselected in 2.72 seconds (resolver, official discovery, frozen-core line endings and v1.6 verification). The final expanded multisource suite has 42 deterministic cases, including monetary-unit equivalence, field-specific official conflicts, invalid signs/grouping, exact source provenance, amount-only official pages, access/rate/HTTP/timeout classification, malformed labelled platform detail, and honest third-party source/field classification. Seven additional regression cases first failed (see `json-date-regression-before.log`), then passed after rejected nonfinite diagnostics were made strict-JSON-safe and date-only public pages were retained as unverified candidates. No nonfinite value is replaced with zero or accepted canonically. The prior in-progress full run was stopped for these corrections; its log/manifest are retained as `interrupted-before-json-date-fix-*`, not counted as a completed pass.
+
+## Unchanged boundaries
+
+- `main` remains `01ba66c12ca1195fd7acbd287c3e39a019808094`.
+- PR #6 remains OPEN/unmerged. Its actual head is `arena/5dd3fe52-ipo-screening-engine` at `e05c0efbca1ecb3024e52da73a22e180ea171118`; its base is `arena/573e69a4-ipo-screening-engine`, not main. It is not a PR from this session's branch. No PR retarget/head change or merge is performed. No existing PR was found for the current session branch during verification.
+- No scoring formula/weight/threshold/knockout/taxonomy/config/schema/golden/pin or historical evaluation file is changed. Existing frozen-core and golden-result tests remain authoritative.
+- No HD Fire production ingestion/evaluation or evidence/history mutation is performed. Synthetic tests continue to cover the shared layers without invoking an HD Fire production flow.
+
+## Final acceptance
+
+Final frozen-tree manifest SHA-256: `26581f84734a80d49502193bb8d6f4eb9b84472e7f968cad131b0bb46e87b599` (209 files). Final focused result: **82 passed, 3 deselected, 31.89 seconds**. The three excluded integration cases remain in the complete backend run. Final complete backend result: **1,355 passed, 0 failed, 0 skipped, 25 warnings, 1614.73 seconds (26:54.73), EXIT 0**, finished 2026-10-21T09:49:04Z. All 209 manifest entries were rehashed after completion with zero mismatches. The warning classes are existing Starlette/httpx and HTTP 422 deprecations. No runtime/test edits follow this run. Publication/remote checks are performed after committing the final report/tracker; their actual SHA/outcome are supplied in the completion response. Frontend log records 90/90 passing tests on unchanged frontend bytes; config check is valid for all ten 100-point profiles. Research citations/transport restrictions and current site-format limitations are in `live-evidence.md` and `README.md`; green deterministic tests are not substituted for live acceptance.

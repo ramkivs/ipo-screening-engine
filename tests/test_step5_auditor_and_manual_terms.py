@@ -564,7 +564,10 @@ def test_manual_entry_never_displaces_officially_verified_values(tmp_path):
     MANUAL_ENTRY provenance is recorded for them."""
     from ipo_screening.issue_terms import HttpNoticeProvider
 
-    notice_bytes = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes()
+    # Synthetic transport only: match the unchanged RHP cover issue window.
+    notice_bytes = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes().replace(
+        b"Tuesday, October 06, 2026", b"Wednesday, September 30, 2026"
+    ).replace(b"Thursday, October 08, 2026", b"Monday, October 05, 2026")
     resolver = IssueTermsResolver(
         providers=[
             HttpNoticeProvider(

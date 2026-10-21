@@ -1,0 +1,122 @@
+[
+  {
+    "url": "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
+    "attempted_at": "2026-10-21T09:28:47.986498+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4894&type=IPO&idtype=1&status=L&IPONo=8047&startdt=21/10/2026",
+    "attempted_at": "2026-10-21T09:28:49.653502+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://listing.bseindia.com/Download/8888888/PreAnchor/JioPlatformsPBAdNewspaperClippings_20261015185329.zip",
+    "attempted_at": "2026-10-21T09:28:51.261677+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://www.bseindia.com/downloads/UploadDocs/Notices/20261019-46/20261019-46.pdf",
+    "attempted_at": "2026-10-21T09:28:53.632210+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://www.sebi.gov.in/sebi_data/attachdocs/oct-2026/1792045029108.pdf",
+    "attempted_at": "2026-10-21T09:28:55.230364+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+    "attempted_at": "2026-10-21T09:28:56.825293+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://www.nseindia.com/market-data/issue-information?symbol=JPL&series=EQ&type=Active",
+    "attempted_at": "2026-10-21T09:28:58.452411+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4894&type=IPO&status=F",
+    "attempted_at": "2026-10-21T09:29:00.088677+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://www.sebi.gov.in/filings/public-issues/oct-2026/jio-platforms-limited-rhp_105274.html",
+    "attempted_at": "2026-10-21T09:29:01.686129+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://dhan.co/ipo/",
+    "attempted_at": "2026-10-21T09:29:03.730933+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://dhan.co/ipo/jio-platforms-ipo/",
+    "attempted_at": "2026-10-21T09:29:05.399121+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://groww.in/ipo",
+    "attempted_at": "2026-10-21T09:29:07.017446+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://www.angelone.in/ipo/reliance-jio-ipo",
+    "attempted_at": "2026-10-21T09:29:08.699791+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://www.indmoney.com/ipo/reliance-jio-ipo",
+    "attempted_at": "2026-10-21T09:29:10.341701+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  },
+  {
+    "url": "https://myjiostatic.cdn.jio.com/cms/assets/iv3/Red%20Herring%20Prospectus.pdf",
+    "attempted_at": "2026-10-21T09:29:11.966837+00:00",
+    "transport": "production _default_http_fetch, 3 second per-request timeout, existing bounded retries",
+    "status": "RETRIEVAL_FAILED_NOT_PUBLICATION_EVIDENCE",
+    "error_type": "URLError",
+    "error": "<urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+  }
+]

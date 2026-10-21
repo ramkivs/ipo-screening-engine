@@ -606,7 +606,10 @@ def test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice(tmp_path, go
     baseline = evaluate(golden_input, config, mode="final", evaluation_datetime=EVAL_AT, store=store)
     historical_id = baseline.record.evaluation_id
 
-    notice_bytes = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes()
+    # Synthetic transport only: match the unchanged RHP cover issue window.
+    notice_bytes = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes().replace(
+        b"Tuesday, October 06, 2026", b"Wednesday, September 30, 2026"
+    ).replace(b"Thursday, October 08, 2026", b"Monday, October 05, 2026")
     resolver = IssueTermsResolver(
         providers=[
             HttpNoticeProvider(

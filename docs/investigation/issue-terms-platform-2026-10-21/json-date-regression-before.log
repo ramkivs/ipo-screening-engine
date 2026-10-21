@@ -1,0 +1,359 @@
+[pytest-progress] collected 7 tests; start 09:21:11
+
+FFFFFF[pytest-progress] |##############################| 100.0% of collected 7/7  elapsed 0s  eta 0s (linear-rate estimate)  FAILURES=7
+F                                                                  [100%][pytest-progress]   stage tests/test_issue_terms_multisource.py: 7 tests, 0.1s
+[pytest-progress] finished 7/7 tests in 0.2s (passed=0 failed=7 skipped=0), exitstatus=1
+
+=================================== FAILURES ===================================
+______ test_rejected_nonfinite_diagnostics_are_strict_json_api_safe[nan] _______
+
+value = nan
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_rejected_nonfinite_diagnostics_are_strict_json_api_safe(value):
+        import json
+        from starlette.responses import JSONResponse
+        item = candidate(text='<p>Price Band 100 - 120</p>')
+        item.result.lot_size = PriceBandField(name='lot_size', value=value)
+        out = resolve([item])
+>       response = JSONResponse(out.to_dict())
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_issue_terms_multisource.py:253: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.11/site-packages/starlette/responses.py:197: in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+.venv/lib/python3.11/site-packages/starlette/responses.py:46: in __init__
+    self.body = self.render(content)
+                ^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.11/site-packages/starlette/responses.py:200: in render
+    return json.dumps(
+/usr/lib/python3.11/json/__init__.py:238: in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+/usr/lib/python3.11/json/encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.encoder.JSONEncoder object at 0x7f14d9c86290>
+o = {'status': 'PARTIAL', 'fields': {'price_band_low': {'state': 'VERIFIED', 'candidates': [{'canonical_field': 'issue.pri...ation date may be unavailable'}, ...}, 'verified': True, 'resolved_fields': ['price_band_low', 'price_band_high'], ...}
+_one_shot = True
+
+    def iterencode(self, o, _one_shot=False):
+        """Encode the given object and yield each string
+        representation as available.
+    
+        For example::
+    
+            for chunk in JSONEncoder().iterencode(bigobject):
+                mysocket.write(chunk)
+    
+        """
+        if self.check_circular:
+            markers = {}
+        else:
+            markers = None
+        if self.ensure_ascii:
+            _encoder = encode_basestring_ascii
+        else:
+            _encoder = encode_basestring
+    
+        def floatstr(o, allow_nan=self.allow_nan,
+                _repr=float.__repr__, _inf=INFINITY, _neginf=-INFINITY):
+            # Check for specials.  Note that this type of test is processor
+            # and/or platform-specific, so do tests which don't depend on the
+            # internals.
+    
+            if o != o:
+                text = 'NaN'
+            elif o == _inf:
+                text = 'Infinity'
+            elif o == _neginf:
+                text = '-Infinity'
+            else:
+                return _repr(o)
+    
+            if not allow_nan:
+                raise ValueError(
+                    "Out of range float values are not JSON compliant: " +
+                    repr(o))
+    
+            return text
+    
+    
+        if (_one_shot and c_make_encoder is not None
+                and self.indent is None):
+            _iterencode = c_make_encoder(
+                markers, self.default, _encoder, self.indent,
+                self.key_separator, self.item_separator, self.sort_keys,
+                self.skipkeys, self.allow_nan)
+        else:
+            _iterencode = _make_iterencode(
+                markers, self.default, _encoder, self.indent, floatstr,
+                self.key_separator, self.item_separator, self.sort_keys,
+                self.skipkeys, _one_shot)
+>       return _iterencode(o, 0)
+               ^^^^^^^^^^^^^^^^^
+E       ValueError: Out of range float values are not JSON compliant
+
+/usr/lib/python3.11/json/encoder.py:258: ValueError
+______ test_rejected_nonfinite_diagnostics_are_strict_json_api_safe[inf] _______
+
+value = inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_rejected_nonfinite_diagnostics_are_strict_json_api_safe(value):
+        import json
+        from starlette.responses import JSONResponse
+        item = candidate(text='<p>Price Band 100 - 120</p>')
+        item.result.lot_size = PriceBandField(name='lot_size', value=value)
+        out = resolve([item])
+>       response = JSONResponse(out.to_dict())
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_issue_terms_multisource.py:253: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.11/site-packages/starlette/responses.py:197: in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+.venv/lib/python3.11/site-packages/starlette/responses.py:46: in __init__
+    self.body = self.render(content)
+                ^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.11/site-packages/starlette/responses.py:200: in render
+    return json.dumps(
+/usr/lib/python3.11/json/__init__.py:238: in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+/usr/lib/python3.11/json/encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.encoder.JSONEncoder object at 0x7f14d9a6e890>
+o = {'status': 'PARTIAL', 'fields': {'price_band_low': {'state': 'VERIFIED', 'candidates': [{'canonical_field': 'issue.pri...ation date may be unavailable'}, ...}, 'verified': True, 'resolved_fields': ['price_band_low', 'price_band_high'], ...}
+_one_shot = True
+
+    def iterencode(self, o, _one_shot=False):
+        """Encode the given object and yield each string
+        representation as available.
+    
+        For example::
+    
+            for chunk in JSONEncoder().iterencode(bigobject):
+                mysocket.write(chunk)
+    
+        """
+        if self.check_circular:
+            markers = {}
+        else:
+            markers = None
+        if self.ensure_ascii:
+            _encoder = encode_basestring_ascii
+        else:
+            _encoder = encode_basestring
+    
+        def floatstr(o, allow_nan=self.allow_nan,
+                _repr=float.__repr__, _inf=INFINITY, _neginf=-INFINITY):
+            # Check for specials.  Note that this type of test is processor
+            # and/or platform-specific, so do tests which don't depend on the
+            # internals.
+    
+            if o != o:
+                text = 'NaN'
+            elif o == _inf:
+                text = 'Infinity'
+            elif o == _neginf:
+                text = '-Infinity'
+            else:
+                return _repr(o)
+    
+            if not allow_nan:
+                raise ValueError(
+                    "Out of range float values are not JSON compliant: " +
+                    repr(o))
+    
+            return text
+    
+    
+        if (_one_shot and c_make_encoder is not None
+                and self.indent is None):
+            _iterencode = c_make_encoder(
+                markers, self.default, _encoder, self.indent,
+                self.key_separator, self.item_separator, self.sort_keys,
+                self.skipkeys, self.allow_nan)
+        else:
+            _iterencode = _make_iterencode(
+                markers, self.default, _encoder, self.indent, floatstr,
+                self.key_separator, self.item_separator, self.sort_keys,
+                self.skipkeys, _one_shot)
+>       return _iterencode(o, 0)
+               ^^^^^^^^^^^^^^^^^
+E       ValueError: Out of range float values are not JSON compliant
+
+/usr/lib/python3.11/json/encoder.py:258: ValueError
+______ test_rejected_nonfinite_diagnostics_are_strict_json_api_safe[-inf] ______
+
+value = -inf
+
+    @pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+    def test_rejected_nonfinite_diagnostics_are_strict_json_api_safe(value):
+        import json
+        from starlette.responses import JSONResponse
+        item = candidate(text='<p>Price Band 100 - 120</p>')
+        item.result.lot_size = PriceBandField(name='lot_size', value=value)
+        out = resolve([item])
+>       response = JSONResponse(out.to_dict())
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_issue_terms_multisource.py:253: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.11/site-packages/starlette/responses.py:197: in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+.venv/lib/python3.11/site-packages/starlette/responses.py:46: in __init__
+    self.body = self.render(content)
+                ^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.11/site-packages/starlette/responses.py:200: in render
+    return json.dumps(
+/usr/lib/python3.11/json/__init__.py:238: in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+/usr/lib/python3.11/json/encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.encoder.JSONEncoder object at 0x7f14d9d6c550>
+o = {'status': 'PARTIAL', 'fields': {'price_band_low': {'state': 'VERIFIED', 'candidates': [{'canonical_field': 'issue.pri...ation date may be unavailable'}, ...}, 'verified': True, 'resolved_fields': ['price_band_low', 'price_band_high'], ...}
+_one_shot = True
+
+    def iterencode(self, o, _one_shot=False):
+        """Encode the given object and yield each string
+        representation as available.
+    
+        For example::
+    
+            for chunk in JSONEncoder().iterencode(bigobject):
+                mysocket.write(chunk)
+    
+        """
+        if self.check_circular:
+            markers = {}
+        else:
+            markers = None
+        if self.ensure_ascii:
+            _encoder = encode_basestring_ascii
+        else:
+            _encoder = encode_basestring
+    
+        def floatstr(o, allow_nan=self.allow_nan,
+                _repr=float.__repr__, _inf=INFINITY, _neginf=-INFINITY):
+            # Check for specials.  Note that this type of test is processor
+            # and/or platform-specific, so do tests which don't depend on the
+            # internals.
+    
+            if o != o:
+                text = 'NaN'
+            elif o == _inf:
+                text = 'Infinity'
+            elif o == _neginf:
+                text = '-Infinity'
+            else:
+                return _repr(o)
+    
+            if not allow_nan:
+                raise ValueError(
+                    "Out of range float values are not JSON compliant: " +
+                    repr(o))
+    
+            return text
+    
+    
+        if (_one_shot and c_make_encoder is not None
+                and self.indent is None):
+            _iterencode = c_make_encoder(
+                markers, self.default, _encoder, self.indent,
+                self.key_separator, self.item_separator, self.sort_keys,
+                self.skipkeys, self.allow_nan)
+        else:
+            _iterencode = _make_iterencode(
+                markers, self.default, _encoder, self.indent, floatstr,
+                self.key_separator, self.item_separator, self.sort_keys,
+                self.skipkeys, _one_shot)
+>       return _iterencode(o, 0)
+               ^^^^^^^^^^^^^^^^^
+E       ValueError: Out of range float values are not JSON compliant
+
+/usr/lib/python3.11/json/encoder.py:258: ValueError
+_____ test_date_only_platform_page_retained_as_unverified_candidate[dhan] ______
+
+name = 'dhan'
+
+    @pytest.mark.parametrize('name', list(PLATFORM_LISTINGS))
+    def test_date_only_platform_page_retained_as_unverified_candidate(name):
+        root = PLATFORM_LISTINGS[name]
+        def fetch(url):
+            return (b'<a href="/ipo/acme">Acme Forge IPO</a>' if url == root else
+                    b'<html><h1>Acme Forge IPO</h1><p>Issue Period 21 October 2026 to 23 October 2026</p></html>')
+        item, report = PublicPlatformProvider(name, fetcher=fetch).find('ACME FORGE LIMITED', 'ACME')
+>       assert item is not None and not item.verified, report
+E       AssertionError: ProviderReport(provider='dhan', outcome='UNAVAILABLE', detail='Public candidate discovery exhausted; not official veri...://dhan.co/ipo/acme', classification='NOT_DISCLOSED_IN_EXAMINED_CONTENT', searched=False, issue_entries=0, detail='')])
+E       assert (None is not None)
+
+tests/test_issue_terms_multisource.py:268: AssertionError
+_____ test_date_only_platform_page_retained_as_unverified_candidate[groww] _____
+
+name = 'groww'
+
+    @pytest.mark.parametrize('name', list(PLATFORM_LISTINGS))
+    def test_date_only_platform_page_retained_as_unverified_candidate(name):
+        root = PLATFORM_LISTINGS[name]
+        def fetch(url):
+            return (b'<a href="/ipo/acme">Acme Forge IPO</a>' if url == root else
+                    b'<html><h1>Acme Forge IPO</h1><p>Issue Period 21 October 2026 to 23 October 2026</p></html>')
+        item, report = PublicPlatformProvider(name, fetcher=fetch).find('ACME FORGE LIMITED', 'ACME')
+>       assert item is not None and not item.verified, report
+E       AssertionError: ProviderReport(provider='groww', outcome='UNAVAILABLE', detail='Public candidate discovery exhausted; not official ver...//groww.in/ipo/acme', classification='NOT_DISCLOSED_IN_EXAMINED_CONTENT', searched=False, issue_entries=0, detail='')])
+E       assert (None is not None)
+
+tests/test_issue_terms_multisource.py:268: AssertionError
+___ test_date_only_platform_page_retained_as_unverified_candidate[angelone] ____
+
+name = 'angelone'
+
+    @pytest.mark.parametrize('name', list(PLATFORM_LISTINGS))
+    def test_date_only_platform_page_retained_as_unverified_candidate(name):
+        root = PLATFORM_LISTINGS[name]
+        def fetch(url):
+            return (b'<a href="/ipo/acme">Acme Forge IPO</a>' if url == root else
+                    b'<html><h1>Acme Forge IPO</h1><p>Issue Period 21 October 2026 to 23 October 2026</p></html>')
+        item, report = PublicPlatformProvider(name, fetcher=fetch).find('ACME FORGE LIMITED', 'ACME')
+>       assert item is not None and not item.verified, report
+E       AssertionError: ProviderReport(provider='angelone', outcome='UNAVAILABLE', detail='Public candidate discovery exhausted; not official ...ngelone.in/ipo/acme', classification='NOT_DISCLOSED_IN_EXAMINED_CONTENT', searched=False, issue_entries=0, detail='')])
+E       assert (None is not None)
+
+tests/test_issue_terms_multisource.py:268: AssertionError
+___ test_date_only_platform_page_retained_as_unverified_candidate[indmoney] ____
+
+name = 'indmoney'
+
+    @pytest.mark.parametrize('name', list(PLATFORM_LISTINGS))
+    def test_date_only_platform_page_retained_as_unverified_candidate(name):
+        root = PLATFORM_LISTINGS[name]
+        def fetch(url):
+            return (b'<a href="/ipo/acme">Acme Forge IPO</a>' if url == root else
+                    b'<html><h1>Acme Forge IPO</h1><p>Issue Period 21 October 2026 to 23 October 2026</p></html>')
+        item, report = PublicPlatformProvider(name, fetcher=fetch).find('ACME FORGE LIMITED', 'ACME')
+>       assert item is not None and not item.verified, report
+E       AssertionError: ProviderReport(provider='indmoney', outcome='UNAVAILABLE', detail='Public candidate discovery exhausted; not official ...dmoney.com/ipo/acme', classification='NOT_DISCLOSED_IN_EXAMINED_CONTENT', searched=False, issue_entries=0, detail='')])
+E       assert (None is not None)
+
+tests/test_issue_terms_multisource.py:268: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_issue_terms_multisource.py::test_rejected_nonfinite_diagnostics_are_strict_json_api_safe[nan]
+FAILED tests/test_issue_terms_multisource.py::test_rejected_nonfinite_diagnostics_are_strict_json_api_safe[inf]
+FAILED tests/test_issue_terms_multisource.py::test_rejected_nonfinite_diagnostics_are_strict_json_api_safe[-inf]
+FAILED tests/test_issue_terms_multisource.py::test_date_only_platform_page_retained_as_unverified_candidate[dhan]
+FAILED tests/test_issue_terms_multisource.py::test_date_only_platform_page_retained_as_unverified_candidate[groww]
+FAILED tests/test_issue_terms_multisource.py::test_date_only_platform_page_retained_as_unverified_candidate[angelone]
+FAILED tests/test_issue_terms_multisource.py::test_date_only_platform_page_retained_as_unverified_candidate[indmoney]
+7 failed, 35 deselected in 0.22s

@@ -124,7 +124,7 @@ def test_prospectus_carries_only_stated_fresh_amount():
     assert result.fresh_issue_amount is None  # placeholder never establishes an amount
 
 
-def test_jio_without_official_source_fails_closed_on_pricing_only(tmp_path, jio_canonical, monkeypatch):
+def test_jio_without_official_source_fails_closed_on_all_missing_required_terms(tmp_path, jio_canonical, monkeypatch):
     monkeypatch.setattr(
         DocumentExtractor,
         "extract_from_pdf",
@@ -138,8 +138,9 @@ def test_jio_without_official_source_fails_closed_on_pricing_only(tmp_path, jio_
     service = PresentationService(cfg)
     with pytest.raises(IngestionAwaitingIssueTermsError) as excinfo:
         service.ingest_document(file_bytes=b"%PDF-1.4 test", filename="jio.pdf", mode="final")
-    # OFS is filing-established (fresh-only); only pricing remains open.
-    assert excinfo.value.missing_fields == ["price_band_low", "price_band_high", "lot_size"]
+    # Explicit no-OFS is filing-established; monetary fresh amount is still
+    # a placeholder and must enter the same required-term gate as pricing.
+    assert excinfo.value.missing_fields == ["price_band_low", "price_band_high", "lot_size", "fresh_issue"]
 
 
 def test_jio_completes_via_verified_prospectus_pathway(tmp_path):

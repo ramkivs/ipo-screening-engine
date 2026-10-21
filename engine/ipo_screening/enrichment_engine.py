@@ -49,6 +49,7 @@ Key Architectural Invariants:
 from __future__ import annotations
 
 import copy
+import math
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from enum import Enum
@@ -210,6 +211,7 @@ class EnrichmentEngine:
         peer_snapshot: Optional[Mapping[str, Any]] = None,
         analyst_assessment: Optional[Mapping[str, Any]] = None,
         mode: str = "final",
+        partial_issue_terms: bool = False,
         as_of: Optional[str] = None,
         allow_manual_override: bool = False,
     ) -> EnrichmentResult:
@@ -241,7 +243,11 @@ class EnrichmentEngine:
         # ------------------------------------------------------------------
         pbn_data, pbn_source_ref = cls._extract_pbn_payload(price_band_notice)
 
-        if pbn_source_ref and pbn_source_ref.get("source_id") not in existing_source_ids:
+        all_pbn_sources = (price_band_notice.get("sources", [])
+                           if isinstance(price_band_notice, Mapping) else [pbn_source_ref])
+        for pbn_source_ref in all_pbn_sources:
+            if not pbn_source_ref or pbn_source_ref.get("source_id") in existing_source_ids:
+                continue
             # The canonical _sources schema is closed: register only the
             # fields it permits. The enrichment-document payload may carry
             # extra annotations (e.g. "note": "PRICE_BAND_NOTICE") that must
@@ -267,7 +273,7 @@ class EnrichmentEngine:
             pbn_data,
             pbn_source_ref,
             supplemental,
-            mode,
+            "preliminary" if partial_issue_terms else mode,
             findings,
             traceability,
         )
@@ -374,6 +380,10 @@ class EnrichmentEngine:
             if isinstance(fresh_amount, dict):
                 price_band = dict(price_band)
                 price_band["_fresh_issue_amount"] = fresh_amount
+            ofs_amount = enrichment_dict.get("ofs_amount") if isinstance(pbn, PriceBandNoticeResult) else pbn_dict.get("ofs_amount")
+            if isinstance(ofs_amount, dict):
+                price_band = dict(price_band)
+                price_band["_ofs_amount"] = ofs_amount
             return price_band, source_ref
 
         # Mapping / dict shape
@@ -386,6 +396,10 @@ class EnrichmentEngine:
             if isinstance(fresh_amount, dict):
                 price_band = dict(price_band)
                 price_band["_fresh_issue_amount"] = fresh_amount
+            ofs_amount = enrichment_dict.get("ofs_amount") if isinstance(pbn, PriceBandNoticeResult) else pbn_dict.get("ofs_amount")
+            if isinstance(ofs_amount, dict):
+                price_band = dict(price_band)
+                price_band["_ofs_amount"] = ofs_amount
             return price_band, source_ref
         elif "price_band_high" in pbn_dict or "price_band_low" in pbn_dict:
             # Flat dictionary shape
@@ -417,36 +431,29 @@ class EnrichmentEngine:
         # converted from its stated unit into the canonical reporting
         # unit -- with the document's own provenance. Never derived from
         # price x shares: only the amount the document establishes.
-        fresh_amount = (pbn_data or {}).get("_fresh_issue_amount")
-        if issue.get("fresh_issue") is None and isinstance(fresh_amount, dict):
-            stated_value = fresh_amount.get("value")
-            stated_unit = str(fresh_amount.get("unit") or "")
-            reporting_unit = (
-                canonical.get("financials", {}).get("reporting_unit", "INR_LAKHS")
-            )
-            stated_multiplier = cls._UNIT_MULTIPLIERS.get(stated_unit)
-            target_multiplier = cls._UNIT_MULTIPLIERS.get(reporting_unit, 100_000)
-            if (
-                isinstance(stated_value, (int, float))
-                and stated_value > 0
-                and stated_multiplier
-            ):
-                converted = float(stated_value) * stated_multiplier / target_multiplier
-                issue["fresh_issue"] = round(converted, 6)
-                evidence["issue.fresh_issue"] = {
-                    "source_id": fresh_amount.get("source_id"),
-                    "locator": fresh_amount.get("locator")
-                    or "Official document — Fresh Issue amount",
-                    "extraction_method": fresh_amount.get(
-                        "extraction_method", ExtractionMethod.DETERMINISTIC_PDF.value
-                    ),
-                    "note": (
-                        "Fresh-issue aggregating amount as stated in the "
-                        f"verified official document ({stated_value} {stated_unit}); "
-                        f"carried in canonical reporting unit {reporting_unit}."
-                    ),
-                }
-                traceability["fresh_issue"] = FieldDisposition.ASSEMBLED.value
+        for field_name in ("fresh_issue", "ofs"):
+            amount = (pbn_data or {}).get("_" + field_name + "_amount")
+            if not isinstance(amount, dict):
+                continue
+            value, unit = amount.get("value"), amount.get("unit")
+            reporting_unit = canonical.get("financials", {}).get("reporting_unit", "INR_LAKHS")
+            source_multiplier = cls._UNIT_MULTIPLIERS.get(unit)
+            target_multiplier = cls._UNIT_MULTIPLIERS.get(reporting_unit)
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or value < 0 or not source_multiplier or not target_multiplier
+                    or amount.get("verification") != "VERIFIED"):
+                continue
+            converted = round(value * source_multiplier / target_multiplier, 6)
+            existing = issue.get(field_name)
+            if existing is not None and abs(float(existing) - converted) > 1e-6:
+                raise EnrichmentConflictError(f"issue.{field_name}: filing and official stated amount conflict")
+            if existing is None:
+                issue[field_name] = converted
+                evidence["issue." + field_name] = {
+                    key: amount[key] for key in ("source_id", "locator", "page", "quote", "extraction_method")
+                    if amount.get(key) is not None}
+                evidence["issue." + field_name]["note"] = f"Explicit stated amount {value} {unit}; normalized to {reporting_unit}"
+                traceability[field_name] = FieldDisposition.ASSEMBLED.value
 
         # 1. Price Band High (Cap)
         cap_val, cap_ev = cls._resolve_pricing_field("price_band_high", issue, pbn_data, pbn_source_ref, supplemental)

@@ -1451,7 +1451,7 @@ class PresentationService:
         issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
         missing_issue_fields = [
             field
-            for field in ("price_band_low", "price_band_high", "lot_size", "ofs")
+            for field in ("price_band_low", "price_band_high", "lot_size", "ofs", "fresh_issue", "open_date", "close_date")
             if issue.get(field) is None
         ]
         if missing_issue_fields:
@@ -1466,6 +1466,7 @@ class PresentationService:
                 company_name=str(canonical_dict.get("company_name", "")),
                 ipo_id=str(canonical_dict.get("ipo_id", "")),
                 missing_fields=missing_issue_fields,
+                issue_context=issue,
             )
             resolution_dict = outcome.to_dict()
             for _rep in outcome.provider_reports:
@@ -1529,8 +1530,8 @@ class PresentationService:
                     # URL + retrieval timestamp) into the canonical source
                     # manifest so the persisted record identifies the
                     # actual disclosure document, not a local filename.
-                    notice_payload = outcome.notice.to_enrichment_dict()
-                    if notice_payload.get("sources"):
+                    notice_payload = outcome.enrichment_payload or outcome.notice.to_enrichment_dict()
+                    if outcome.enrichment_payload is None and notice_payload.get("sources"):
                         source_ref = dict(notice_payload["sources"][0])
                         if outcome.source_uri:
                             source_ref["uri"] = outcome.source_uri
@@ -1541,6 +1542,7 @@ class PresentationService:
                         base_input=canonical_dict,
                         price_band_notice=notice_payload,
                         mode=mode_clean,
+                        partial_issue_terms=True,  # retain partial facts; readiness gate below remains mandatory
                     )
                     canonical_dict = assembled.canonical_input
                 except Exception as exc:
@@ -1586,7 +1588,9 @@ class PresentationService:
                 # final Prospectus or the bounded manual entry; fail closed
                 # with that precise field rather than a schema failure.
                 still_missing = ["fresh_issue"]
-            if outcome.notice is not None and not still_missing:
+            resolution_dict["remaining_required_fields"] = ["issue." + f for f in still_missing]
+            resolution_dict["ready"] = not still_missing
+            if not still_missing:
                 issue_terms_report = resolution_dict
             else:
                 unresolved = still_missing or list(missing_issue_fields)

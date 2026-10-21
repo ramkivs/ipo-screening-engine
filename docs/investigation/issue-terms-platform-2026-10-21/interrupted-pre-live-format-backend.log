@@ -1,0 +1,31 @@
+START_UTC=2026-10-21T08:36:50Z
+BASE_HEAD=4e7cb27aefd5aa7bacc99172f56af103b914d2d6; runtime manifest=tested-tree.json
+COMMAND=.venv/bin/python -u -m pytest tests/ -q
+[pytest-progress] collected 1334 tests; start 08:36:53
+
+........................[pytest-progress] |#.............................|   1.9% of collected 25/1334  elapsed 0s  eta 8s (linear-rate estimate)
+........................[pytest-progress]   stage tests/test_a17_gmp_policy.py: 47 tests, 0.6s
+.[pytest-progress] |#.............................|   3.7% of collected 50/1334  elapsed 1s  eta 16s (linear-rate estimate)
+....................... [  5%]
+..[pytest-progress] |##............................|   5.6% of collected 75/1334  elapsed 1s  eta 14s (linear-rate estimate)
+.........................[pytest-progress] |##............................|   7.5% of collected 100/1334  elapsed 5s  eta 62s (linear-rate estimate)
+....[pytest-progress]   stage tests/test_acceptance_matrix.py: 55 tests, 4.5s
+.....................[pytest-progress] |###...........................|   9.4% of collected 125/1334  elapsed 5s  eta 50s (linear-rate estimate)
+...................[pytest-progress]   stage tests/test_analytics_phase6c.py: 40 tests, 0.8s
+. [ 10%]
+.....[pytest-progress] |###...........................|  11.2% of collected 150/1334  elapsed 6s  eta 47s (linear-rate estimate)
+...[pytest-progress]   stage tests/test_auditor_evidence_section.py: 9 tests, 34.3s
+.........[pytest-progress]   stage tests/test_auditor_tenure_defaults.py: 9 tests, 0.0s
+.............[pytest-progress] |####..........................|  13.1% of collected 175/1334  elapsed 40s  eta 267s (linear-rate estimate)
+.........................[pytest-progress] |####..........................|  15.0% of collected 200/1334  elapsed 41s  eta 231s (linear-rate estimate)
+................. [ 16%]
+.[pytest-progress]   stage tests/test_calibration_phase6d.py: 56 tests, 2.1s
+.......[pytest-progress] |#####.........................|  16.9% of collected 225/1334  elapsed 42s  eta 209s (linear-rate estimate)
+..[pytest-progress]   stage tests/test_cfo_pat_determinism.py: 9 tests, 0.4s
+..............[pytest-progress]   stage tests/test_cli.py: 14 tests, 8.6s
+.........[pytest-progress] |######........................|  18.7% of collected 250/1334  elapsed 55s  eta 238s (linear-rate estimate)
+..............[pytest-progress]   stage tests/test_cli_phase5i.py: 23 tests, 7.5s
+...........[pytest-progress] |######........................|  20.6% of collected 275/1334  elapsed 59s  eta 227s (linear-rate estimate)
+....[pytest-progress]   stage tests/test_connectors.py: 15 tests, 0.0s
+.......... [ 21%]
+.....

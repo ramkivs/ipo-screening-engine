@@ -24,6 +24,8 @@ Semantics preserved:
 from __future__ import annotations
 
 import hashlib
+import copy
+import math
 import http.cookiejar
 import json
 from html import unescape as html_unescape
@@ -46,10 +48,12 @@ from .extraction.prospectus_terms import ProspectusTermsParser
 
 PRICING_TERMS = ("price_band_low", "price_band_high", "lot_size")
 REQUIRED_ISSUE_TERMS = PRICING_TERMS + ("ofs",)
+DISCOVERABLE_TERMS = REQUIRED_ISSUE_TERMS + ("fresh_issue", "open_date", "close_date")
 
 # Source hierarchy: official exchange/SEBI/issuer documents retrieved
 # directly outrank retained copies of the same official documents; both
-# outrank anything else, which this resolver does not consult at all.
+# outrank other evidence. Optional platform candidates are retained but
+# never acquire official verification authority.
 OFFICIAL_HOSTS = {
     "nseindia.com",
     "www.nseindia.com",
@@ -146,6 +150,12 @@ def _default_http_fetch(url: str, timeout_seconds: float) -> bytes:
     for attempt in range(3):
         try:
             with urllib.request.urlopen(request, timeout=timeout_seconds) as response:  # noqa: S310 (allow-listed hosts only)
+                final_url = response.geturl() if hasattr(response, "geturl") else url
+                final_host = (urlparse(final_url).hostname or "").lower()
+                original_host = (urlparse(url).hostname or "").lower()
+                allowed_redirects = OFFICIAL_HOSTS if original_host in OFFICIAL_HOSTS else {original_host}
+                if final_host not in allowed_redirects or urlparse(final_url).scheme != parsed.scheme:
+                    raise ValueError("retrieval redirected outside eligible source hosts")
                 return response.read()
         except urllib.error.HTTPError as exc:
             last_exc = exc
@@ -224,13 +234,13 @@ def _notice_values(result: PriceBandNoticeResult) -> Dict[str, Any]:
 
 def _values_valid(values: Mapping[str, Any]) -> Optional[str]:
     low, high, lot = (values.get(k) for k in PRICING_TERMS)
-    if low is not None and (not isinstance(low, (int, float)) or low <= 0):
+    if low is not None and (isinstance(low, bool) or not isinstance(low, (int, float)) or not math.isfinite(low) or low <= 0):
         return "price_band_low is not a positive number"
-    if high is not None and (not isinstance(high, (int, float)) or high <= 0):
+    if high is not None and (isinstance(high, bool) or not isinstance(high, (int, float)) or not math.isfinite(high) or high <= 0):
         return "price_band_high is not a positive number"
     if low is not None and high is not None and high < low:
         return "price_band_high is below price_band_low"
-    if lot is not None and (not isinstance(lot, (int, float)) or int(lot) <= 0):
+    if lot is not None and (isinstance(lot, bool) or not isinstance(lot, (int, float)) or not math.isfinite(lot) or lot <= 0 or int(lot) != lot):
         return "lot_size is not a positive integer"
     return None
 
@@ -253,6 +263,7 @@ class NoticeCandidate:
     from_cache: bool = False
     raw_bytes: Optional[bytes] = None
     verified: bool = False
+    components: List[Any] = field(default_factory=list)
 
     @property
     def values(self) -> Dict[str, Any]:
@@ -305,6 +316,21 @@ class ProviderReport:
         return [attempt.url for attempt in self.sources if attempt.searched]
 
 
+def _json_safe_diagnostics(value: Any) -> Any:
+    """Keep rejected nonfinite evidence legible without emitting illegal JSON.
+
+    This is reporting only: candidate validation/selection uses the original
+    numbers, and no rejected value is coerced to zero or canonical input.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return repr(value)
+    if isinstance(value, dict):
+        return {key: _json_safe_diagnostics(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_diagnostics(item) for item in value]
+    return copy.deepcopy(value)
+
+
 @dataclass
 class ResolutionOutcome:
     status: str  # RESOLVED | PARTIAL | UNPUBLISHED | UNAVAILABLE | CONFLICT | UNVERIFIED
@@ -322,10 +348,13 @@ class ResolutionOutcome:
     # carried truthfully into reports; a Prospectus is never labelled a
     # Price Band Notice.
     document_class: Optional[str] = None
+    field_diagnostics: Dict[str, Any] = field(default_factory=dict)
+    enrichment_payload: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "status": self.status,
+            "fields": _json_safe_diagnostics(self.field_diagnostics),
             "verified": self.verified,
             "resolved_fields": list(self.resolved_fields),
             "unresolved_fields": list(self.unresolved_fields),
@@ -429,6 +458,7 @@ class HttpNoticeProvider:
     ):
         self.urls_by_ipo = dict(urls_by_ipo)
         self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(OFFICIAL_HOSTS)
+        self._requires_https = allowed_hosts is None
         self.timeout_seconds = timeout_seconds
         self._fetcher = fetcher
 
@@ -442,8 +472,8 @@ class HttpNoticeProvider:
         if not url:
             return None, ProviderReport(self.name, "UNAVAILABLE", "no official notice URL configured for this issuer")
         host = (urlparse(url).hostname or "").lower()
-        if host not in self.allowed_hosts:
-            return None, ProviderReport(self.name, "REJECTED", f"host {host or '?'} is not an official source host")
+        if host not in self.allowed_hosts or (self._requires_https and urlparse(url).scheme != "https"):
+            return None, ProviderReport(self.name, "REJECTED", f"host {host or '?'} is not an HTTPS official source host")
         try:
             raw = self._fetch(url)
         except Exception as exc:
@@ -498,6 +528,7 @@ class HttpProspectusProvider:
     ):
         self.urls_by_ipo = dict(urls_by_ipo)
         self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(OFFICIAL_HOSTS)
+        self._requires_https = allowed_hosts is None
         self.timeout_seconds = timeout_seconds
         self._fetcher = fetcher
 
@@ -511,8 +542,8 @@ class HttpProspectusProvider:
         if not url:
             return None, ProviderReport(self.name, "UNAVAILABLE", "no official prospectus URL configured for this issuer")
         host = (urlparse(url).hostname or "").lower()
-        if host not in self.allowed_hosts:
-            return None, ProviderReport(self.name, "REJECTED", f"host {host or '?'} is not an official source host")
+        if host not in self.allowed_hosts or (self._requires_https and urlparse(url).scheme != "https"):
+            return None, ProviderReport(self.name, "REJECTED", f"host {host or '?'} is not an HTTPS official source host")
         try:
             raw = self._fetch(url)
         except Exception as exc:
@@ -732,6 +763,7 @@ class OfficialDiscoveryProvider:
         timeout_seconds: float = 60.0,
     ):
         self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(OFFICIAL_HOSTS)
+        self._requires_https = allowed_hosts is None
         self.listing_urls = list(listing_urls) if listing_urls is not None else list(self.LISTING_URLS)
         self.max_candidates = max_candidates
         self.timeout_seconds = timeout_seconds
@@ -821,7 +853,7 @@ class OfficialDiscoveryProvider:
             return None, f"{url}: issue page could not be parsed ({type(exc).__name__})"
         if _norm_name(result.company_name) != _norm_name(company_name):
             return None, f"{url}: issue page names a different issuer"
-        if result.price_band_low is None and result.lot_size is None:
+        if not any(getattr(result, f + "_amount" if f in ("fresh_issue", "ofs") else f, None) is not None for f in DISCOVERABLE_TERMS):
             return None, f"{url}: issue page has no labelled Price Band or Market Lot"
         return NoticeCandidate(
             result=result,
@@ -840,43 +872,19 @@ class OfficialDiscoveryProvider:
         keep their own quotes/locators; sources are recorded."""
         if len(candidates) == 1:
             return candidates[0]
-        # A final Prospectus is the richest primary (it can also carry
-        # the stated fresh-issue amount); otherwise first discovered.
-        primary = next(
-            (c for c in candidates if getattr(c.result, "document_class", "") == "OFFICIAL_PROSPECTUS"),
-            candidates[0],
-        )
-        # Never merge disagreeing disclosures: surface the conflict
-        # instead of arbitrarily preferring one source.
+        primary = copy.deepcopy(candidates[0])
+        primary.components = list(candidates)
         for other in candidates[1:]:
-            for field_name in ("price_band_low", "price_band_high", "lot_size"):
-                left = getattr(primary.result, field_name, None)
-                right = getattr(other.result, field_name, None)
-                if left is not None and right is not None and float(left.value) != float(right.value):
-                    raise ValueError(
-                        f"conflicting official values for {field_name}: {left.value} ({primary.uri}) vs {right.value} ({other.uri})"
-                    )
-        merged_from = [primary.uri]
-        for other in (c for c in candidates if c is not primary):
-            filled = False
-            for field_name in ("price_band_low", "price_band_high", "lot_size", "open_date", "close_date"):
-                if getattr(primary.result, field_name, None) is None and getattr(other.result, field_name, None) is not None:
-                    setattr(primary.result, field_name, getattr(other.result, field_name))
-                    filled = True
-            # A final Prospectus additionally carries the stated
-            # fresh-issue amount; keep it reachable for enrichment.
-            if getattr(other.result, "fresh_issue_amount", None) is not None and getattr(primary.result, "fresh_issue_amount", None) is None:
-                primary.result.fresh_issue_amount = other.result.fresh_issue_amount  # type: ignore[attr-defined]
-            if filled:
-                merged_from.append(other.uri)
-        if len(merged_from) > 1 and hasattr(primary.result, "metadata"):
-            primary.result.metadata["merged_from"] = merged_from
+            for name in PRICING_TERMS + ("open_date", "close_date"):
+                if getattr(primary.result, name, None) is None:
+                    setattr(primary.result, name, getattr(other.result, name, None))
         return primary
 
     def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
         reached = False
         notes: List[str] = []
         attempts: List[ListingAttempt] = []
+        all_candidates: List[NoticeCandidate] = []
 
         def note(text: str) -> None:
             if text and text not in notes and len(notes) < 6:
@@ -953,17 +961,13 @@ class OfficialDiscoveryProvider:
                     note(f"{link}: {sub_report.detail}")
             if collected:
                 attempt.detail += "; issuer-matched official document found"
-                try:
-                    merged = self._merge_candidates(collected)
-                except ValueError as exc:
-                    return None, ProviderReport(
-                        self.name, "REJECTED", str(exc), sources=list(attempts)
-                    )
-                return merged, ProviderReport(
-                    self.name, "FOUND", f"discovered official document via {listing_url}: {merged.uri}",
-                    sources=list(attempts),
-                )
-            attempt.detail += "; no issuer-matched official document found in it"
+                all_candidates.extend(collected)
+            else:
+                attempt.detail += "; no issuer-matched official document found in it"
+        if all_candidates:
+            merged = self._merge_candidates(all_candidates)
+            return merged, ProviderReport(self.name, "FOUND", "examined all configured listings; issuer-matched documents found",
+                                          notes=list(notes), sources=list(attempts))
         if reached:
             searched = [a.url for a in attempts if a.searched]
             detail = (
@@ -1075,7 +1079,7 @@ class IssueTermsResolver:
         self.providers = list(providers)
         self.cache = cache
 
-    def resolve(self, *, company_name: str, ipo_id: str, missing_fields: Sequence[str]) -> ResolutionOutcome:
+    def resolve(self, *, company_name: str, ipo_id: str, missing_fields: Sequence[str], issue_context: Optional[Mapping[str, Any]] = None) -> ResolutionOutcome:
         missing = [f for f in missing_fields if f in PRICING_TERMS]
         outcome = ResolutionOutcome(status="UNPUBLISHED", unresolved_fields=list(missing_fields))
 
@@ -1095,12 +1099,17 @@ class IssueTermsResolver:
                     ProviderReport("snapshot-cache", "UNAVAILABLE", f"cached snapshot from {cached.retrieved_at} is stale; refresh required")
                 )
 
-        if not candidates:
-            for provider in self.providers:
+        # A cache is evidence, not permission to skip remaining configured sources.
+        for provider in self.providers:
+            try:
                 candidate, report = provider.find(company_name, ipo_id)
-                outcome.provider_reports.append(report)
-                if candidate is not None:
-                    candidates.append(candidate)
+            except Exception as exc:
+                candidate = None
+                report = ProviderReport(getattr(provider, "name", type(provider).__name__),
+                                        "UNAVAILABLE", f"provider failed: {type(exc).__name__}: {exc}")
+            outcome.provider_reports.append(report)
+            if candidate is not None:
+                candidates.extend(candidate.components or [candidate])
 
         if not candidates:
             # A NOT_FOUND provider report becomes UNPUBLISHED only when
@@ -1122,70 +1131,13 @@ class IssueTermsResolver:
                 for r in outcome.provider_reports
             )
             outcome.status = "UNPUBLISHED" if searched else "UNAVAILABLE"
+            outcome.field_diagnostics = {f: {"state": "NOT_DISCLOSED_IN_EXAMINED_SOURCES" if searched else "SOURCE_UNAVAILABLE",
+                                           "candidates": [], "detail": "Eligible providers exhausted; listing silence is not proof of non-publication."}
+                                         for f in missing_fields}
             return outcome
 
-        # Provenance gate: only documents retrieved from allow-listed
-        # official hosts count as verified disclosures. Retained copies
-        # (including any file shipped or staged locally) are reported so
-        # the operator can act, but they never resolve canonical terms.
-        verified_candidates = [c for c in candidates if c.verified]
-        if not verified_candidates:
-            outcome.status = "UNVERIFIED"
-            for candidate in candidates:
-                outcome.provider_reports.append(
-                    ProviderReport(
-                        candidate.provider,
-                        "UNVERIFIED",
-                        f"issuer-matched notice at {candidate.uri} is a retained copy whose "
-                        "official provenance is not established; not used for evaluation",
-                    )
-                )
-            return outcome
-        candidates = verified_candidates
-
-        # Conflict detection: never arbitrarily select between disclosures.
-        conflicts: List[str] = []
-        baseline = candidates[0].values
-        for other in candidates[1:]:
-            for field_name in PRICING_TERMS:
-                left, right = baseline.get(field_name), other.values.get(field_name)
-                if left is not None and right is not None and float(left) != float(right):
-                    conflicts.append(f"issue.{field_name}: {left} ({candidates[0].provider}) vs {right} ({other.provider})")
-        if conflicts:
-            outcome.status = "CONFLICT"
-            outcome.conflicts = conflicts
-            return outcome
-
-        chosen = candidates[0]
-        invalid = _values_valid(chosen.values)
-        if invalid:
-            outcome.status = "UNAVAILABLE"
-            outcome.provider_reports.append(ProviderReport(chosen.provider, "REJECTED", f"unsupported value: {invalid}"))
-            return outcome
-
-        resolved = [f for f in missing if chosen.values.get(f) is not None]
-        outcome.resolved_fields = resolved
-        outcome.unresolved_fields = [f for f in missing_fields if f not in resolved and f != "ofs"]
-        outcome.notice = chosen.result
-        outcome.document_class = getattr(chosen.result, "document_class", "PRICE_BAND_NOTICE")
-        outcome.from_cache = from_cache
-        outcome.source_uri = chosen.uri
-        outcome.verified = True
-        outcome.provider = chosen.provider
-        outcome.retrieved_at = chosen.retrieved_at
-        outcome.status = "RESOLVED" if len(resolved) == len(missing) else "PARTIAL"
-
-        if (
-            self.cache is not None
-            and not from_cache
-            and chosen.verified
-            and chosen.raw_bytes is not None
-            and outcome.document_class == "PRICE_BAND_NOTICE"
-        ):
-            # The snapshot cache re-parses with the notice parser; only
-            # notice-class documents are cached.
-            self.cache.put(ipo_id, chosen)
-        return outcome
+        from .issue_term_fields import resolve_fields
+        return resolve_fields(self, outcome, candidates, company_name, ipo_id, missing_fields, from_cache, issue_context or {})
 
 
 class ConfigurationDiagnosticProvider:
@@ -1259,6 +1211,13 @@ def build_resolver_from_env() -> IssueTermsResolver:
         providers.append(HttpProspectusProvider(prospectus_urls))
     if os.getenv("IPO_OFFICIAL_DISCOVERY", "1").strip().lower() not in ("0", "false", "no"):
         providers.append(OfficialDiscoveryProvider())
+    from .issue_platforms import PublicPlatformProvider, PLATFORM_LISTINGS
+    enabled = {x.strip().lower() for x in os.getenv("IPO_TERM_PLATFORM_PROVIDERS", "").split(",") if x.strip()}
+    for name in sorted(enabled):
+        if name in PLATFORM_LISTINGS:
+            providers.append(PublicPlatformProvider(name))
+        else:
+            providers.append(ConfigurationDiagnosticProvider(name, "unknown platform provider"))
     dirs = [d for d in os.getenv("IPO_PRICE_BAND_NOTICE_DIR", "").split(os.pathsep) if d]
     if dirs:
         providers.append(RetainedNoticeProvider(dirs))

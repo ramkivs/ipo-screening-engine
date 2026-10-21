@@ -1,0 +1,33 @@
+Re-running all 15 failures from completed intermediate full run
+COMMAND: /home/user/ipo-screening-engine/.venv/bin/python -u -m pytest -q --tb=short tests/test_cross_ipo_issue_term_provenance.py::test_verified_notice_canonical_values_reach_evidence_api tests/test_cross_ipo_issue_term_provenance.py::test_retained_fixture_notice_is_unverified_and_fails_closed tests/test_d_peer_1_no_synthetic_peers.py::test_frozen_core_unchanged tests/test_frozen_core_line_endings.py::test_frozen_core_accepts_lf_files tests/test_frozen_core_line_endings.py::test_frozen_core_accepts_crlf_files tests/test_frozen_core_line_endings.py::test_frozen_core_rejects_real_content_change tests/test_issue_terms_runtime_path.py::test_partial_prospectus_fails_closed_on_missing_term_only tests/test_jio_rhp_issue_terms.py::test_jio_without_official_source_fails_closed_on_all_missing_required_terms tests/test_presentation_api.py::test_configuration_status_governance_invariants tests/test_step5_auditor_and_manual_terms.py::test_manual_entry_never_displaces_officially_verified_values tests/test_ui7_ingestion.py::test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice tests/test_v16_implementation.py::test_t7_29_cli_config_verify tests/test_v16_implementation.py::test_t7_34_frozen_core_verification tests/test_v16_implementation.py::test_t7_39_provenance_chain_verification tests/test_v16_implementation.py::test_t7_42_end_to_end_v15_v16_workflow
+[pytest-progress] collected 15 tests; start 09:06:45
+
+...[pytest-progress]   stage tests/test_cross_ipo_issue_term_provenance.py: 2 tests, 37.5s
+.[pytest-progress]   stage tests/test_d_peer_1_no_synthetic_peers.py: 1 tests, 0.0s
+...[pytest-progress]   stage tests/test_frozen_core_line_endings.py: 3 tests, 0.1s
+.[pytest-progress]   stage tests/test_issue_terms_runtime_path.py: 1 tests, 31.8s
+.[pytest-progress]   stage tests/test_jio_rhp_issue_terms.py: 1 tests, 0.6s
+.[pytest-progress]   stage tests/test_presentation_api.py: 1 tests, 75.0s
+.[pytest-progress]   stage tests/test_step5_auditor_and_manual_terms.py: 1 tests, 72.9s
+.[pytest-progress]   stage tests/test_ui7_ingestion.py: 1 tests, 0.3s
+..[pytest-progress] |##############################| 100.0% of collected 15/15  elapsed 292s  eta 0s (linear-rate estimate)
+.                                                          [100%][pytest-progress]   stage tests/test_v16_implementation.py: 4 tests, 0.1s
+[pytest-progress] finished 15/15 tests in 292.2s (passed=15 failed=0 skipped=0), exitstatus=0
+[pytest-progress]   slow test    75.0s  tests/test_step5_auditor_and_manual_terms.py::test_manual_entry_never_displaces_officially_verified_values
+[pytest-progress]   slow test    73.9s  tests/test_cross_ipo_issue_term_provenance.py::test_verified_notice_canonical_values_reach_evidence_api
+[pytest-progress]   slow test    72.9s  tests/test_ui7_ingestion.py::test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice
+[pytest-progress]   slow test    37.5s  tests/test_cross_ipo_issue_term_provenance.py::test_retained_fixture_notice_is_unverified_and_fails_closed
+
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_cross_ipo_issue_term_provenance.py::test_retained_fixture_notice_is_unverified_and_fails_closed
+tests/test_issue_terms_runtime_path.py::test_partial_prospectus_fails_closed_on_missing_term_only
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/fastapi/routing.py:360: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    return await dependant.call(**values)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+15 passed, 3 warnings in 293.00s (0:04:53)
+EXIT=0

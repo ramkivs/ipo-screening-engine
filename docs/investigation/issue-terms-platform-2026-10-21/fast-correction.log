@@ -1,0 +1,16 @@
+[pytest-progress] collected 102 tests; start 09:06:01
+
+.......................[pytest-progress]   stage tests/test_issue_terms_multisource.py: 22 tests, 0.0s
+.[pytest-progress] |#######.......................|  24.5% of collected 25/102  elapsed 0s  eta 0s (linear-rate estimate)
+.......[pytest-progress]   stage tests/test_issue_terms_resolver.py: 8 tests, 0.0s
+..................[pytest-progress] |###############...............|  49.0% of collected 50/102  elapsed 0s  eta 0s (linear-rate estimate)
+......[pytest-progress]   stage tests/test_official_discovery.py: 24 tests, 0.0s
+...[pytest-progress]   stage tests/test_frozen_core_line_endings.py: 3 tests, 0.0s
+.............. [ 70%]
+..[pytest-progress] |######################........|  73.5% of collected 75/102  elapsed 0s  eta 0s (linear-rate estimate)
+.........................[pytest-progress] |#############################.|  98.0% of collected 100/102  elapsed 2s  eta 0s (linear-rate estimate)
+..[pytest-progress] |##############################| 100.0% of collected 102/102  elapsed 2s  eta 0s (linear-rate estimate)
+.                                           [100%][pytest-progress]   stage tests/test_v16_implementation.py: 45 tests, 2.4s
+[pytest-progress] finished 102/102 tests in 2.5s (passed=102 failed=0 skipped=0), exitstatus=0
+
+102 passed, 3 deselected in 2.72s

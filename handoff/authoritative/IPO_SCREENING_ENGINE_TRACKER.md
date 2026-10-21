@@ -1144,3 +1144,60 @@ Reconciled against the remote repository (`ramkivs/ipo-screening-engine`), all b
   runtime/config/schema/golden/history change. Only report/logs/new test/additive
   tracker entry published on existing branch. Main untouched and PR #6 OPEN/UNMERGED;
   exact remote commit and content verification follow push in completion response.
+
+
+## 2026-10-21 — Platform-wide issue-term discovery/resolution implementation
+
+- **Scope:** shared runtime across IPOs; Jio is regression/research evidence only.
+  Traverse every configured provider/listing even after cache success; isolate
+  provider exceptions; independently normalize/select/conflict price floor/cap,
+  lot, fresh/OFS monetary amounts and issue dates. Preserve original field source
+  IDs/quotes/URLs/times; do not misattribute a merged fact to a primary document.
+- **Authority/readiness:** platform candidates remain UNVERIFIED/MARKET_DATA;
+  opt-in public Dhan/Groww/Angel One/INDmoney adapters follow actual matching
+  listing/detail links, never guessed private APIs. Existing official authority
+  governs selection. Invalid fields do not discard other valid fields. Canonical
+  assembly retains partial facts, but actual required fields (including monetary
+  fresh amount/dates) are checked before normal evaluation. No scoring/validation
+  bypass or new provisional-evaluation semantics. Legacy pricing-stage RESOLVED
+  is not readiness; service reports remaining_required_fields/ready separately.
+- **Correctness:** reject bad/nonfinite/fractional lots and malformed amounts;
+  reject explicit other-issue windows; retain official conflicts and unverified
+  disagreements; compare explicit monetary units using existing multipliers.
+  Strict JSON diagnostics render rejected nonfinite values as strings, never as
+  zero/canonical facts. Date-only public detail candidates remain unverified.
+- **Frozen preservation:** the first implementation touched the frozen notice
+  parser and correctly failed hash checks. That file was restored byte-for-byte
+  (SHA-256 779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4);
+  new exchange-page payload fields live in an unfrozen subclass. No pin, scorer,
+  threshold, weight, knockout, config/schema, golden/hash or history is rewritten.
+  Synthetic notice windows in integration tests now match the unchanged real RHP
+  programme, while stale-window rejection/manual precedence assertions remain.
+- **Tests:** intermediate full run 1,320 passed/15 failed, 28 warnings, 1499.12 s;
+  all fifteen failures explicitly rechecked: 15 passed/3 warnings/293.00 s.
+  Two in-progress full runs were stopped for demonstrated format/JSON/date-only
+  gaps; retained logs are NOT passes. Final focused: 82 passed, 3 deselected,
+  31.89 s. Final complete backend: **1,355 passed, 0 failed/skipped, 25 deprecation
+  warnings, 1614.73 s, EXIT 0**; includes excluded focused integrations. Frontend
+  **90 passed/0 failed**. Config **valid True, 10 profiles, 100 points each**.
+  Final 209-file source/test manifest rehashed unchanged after full completion;
+  SHA-256 26581f84734a80d49502193bb8d6f4eb9b84472e7f968cad131b0bb46e87b599.
+- **Live boundary:** official NSE/full-query BSE detail corroborate research-tool
+  price/lot/dates; platforms disagree on dates. Read-only engine transport failed
+  all fifteen actual URLs with TLS EOF; research-tool access is not runtime live
+  verification. The BSE price-band advertisement ZIP was discovered, not declared
+  unpublished; tool retrieval returned HTTP 500, ZIP extraction is unsupported,
+  and listing.bseindia.com is not silently added to official authority. Other
+  current markup/alias limits and the unverified monetary fresh amount remain
+  explicit. No Jio live readiness/evaluation is certified; no real IPO evaluation
+  was persisted for this investigation, and no HD Fire production action occurred.
+- **Artifacts:** docs/investigation/issue-terms-platform-2026-10-21/ contains the
+  architecture/readiness report, exact live citations/quotes/conflicts, final and
+  intermediate test logs/manifests, config/frontend checks and reproducible
+  read-only transport probe/results. README and verification ledger distinguish
+  implementation from outstanding live/provider/archive acceptance.
+- **Publication boundary:** existing branch arena/95234306-ipo-screening-engine;
+  main still 01ba66c12ca1195fd7acbd287c3e39a019808094 at pre-publication check.
+  PR #6 OPEN/unmerged and head/base unchanged (it is on another existing branch,
+  not this session branch). Commit/push and remote byte/SHA/main/PR/worktree
+  verification follow this append-only entry; actual SHA is in completion response.

@@ -1,0 +1,182 @@
+START_UTC=2026-10-21T09:22:09Z
+26581f84734a80d49502193bb8d6f4eb9b84472e7f968cad131b0bb46e87b599  docs/investigation/issue-terms-platform-2026-10-21/tested-tree.json
+COMMAND=.venv/bin/python -u -m pytest tests/ -q
+[pytest-progress] collected 1355 tests; start 09:22:11
+
+........................[pytest-progress] |#.............................|   1.8% of collected 25/1355  elapsed 0s  eta 7s (linear-rate estimate)
+........................[pytest-progress]   stage tests/test_a17_gmp_policy.py: 47 tests, 0.6s
+.[pytest-progress] |#.............................|   3.7% of collected 50/1355  elapsed 1s  eta 16s (linear-rate estimate)
+....................... [  5%]
+..[pytest-progress] |##............................|   5.5% of collected 75/1355  elapsed 1s  eta 14s (linear-rate estimate)
+.........................[pytest-progress] |##............................|   7.4% of collected 100/1355  elapsed 5s  eta 62s (linear-rate estimate)
+....[pytest-progress]   stage tests/test_acceptance_matrix.py: 55 tests, 4.4s
+.....................[pytest-progress] |###...........................|   9.2% of collected 125/1355  elapsed 5s  eta 49s (linear-rate estimate)
+...................[pytest-progress]   stage tests/test_analytics_phase6c.py: 40 tests, 0.7s
+. [ 10%]
+.....[pytest-progress] |###...........................|  11.1% of collected 150/1355  elapsed 6s  eta 46s (linear-rate estimate)
+...[pytest-progress]   stage tests/test_auditor_evidence_section.py: 9 tests, 32.0s
+.........[pytest-progress]   stage tests/test_auditor_tenure_defaults.py: 9 tests, 0.0s
+.............[pytest-progress] |####..........................|  12.9% of collected 175/1355  elapsed 38s  eta 255s (linear-rate estimate)
+.........................[pytest-progress] |####..........................|  14.8% of collected 200/1355  elapsed 38s  eta 221s (linear-rate estimate)
+................. [ 15%]
+.[pytest-progress]   stage tests/test_calibration_phase6d.py: 56 tests, 1.9s
+.......[pytest-progress] |#####.........................|  16.6% of collected 225/1355  elapsed 40s  eta 199s (linear-rate estimate)
+..[pytest-progress]   stage tests/test_cfo_pat_determinism.py: 9 tests, 0.4s
+..............[pytest-progress]   stage tests/test_cli.py: 14 tests, 7.5s
+.........[pytest-progress] |######........................|  18.5% of collected 250/1355  elapsed 51s  eta 224s (linear-rate estimate)
+..............[pytest-progress]   stage tests/test_cli_phase5i.py: 23 tests, 6.9s
+...........[pytest-progress] |######........................|  20.3% of collected 275/1355  elapsed 54s  eta 213s (linear-rate estimate)
+....[pytest-progress]   stage tests/test_connectors.py: 15 tests, 0.0s
+.......... [ 21%]
+.......[pytest-progress]   stage tests/test_contingent_liabilities_extraction.py: 17 tests, 32.2s
+....[pytest-progress] |#######.......................|  22.1% of collected 300/1355  elapsed 87s  eta 304s (linear-rate estimate)
+.........................[pytest-progress] |#######.......................|  24.0% of collected 325/1355  elapsed 87s  eta 275s (linear-rate estimate)
+..[pytest-progress]   stage tests/test_core_semantics.py: 31 tests, 78.9s
+....[pytest-progress]   stage tests/test_cross_ipo_issue_term_provenance.py: 4 tests, 60.9s
+...................[pytest-progress] |########......................|  25.8% of collected 350/1355  elapsed 226s  eta 650s (linear-rate estimate)
+........... [ 26%]
+..............[pytest-progress] |########......................|  27.7% of collected 375/1355  elapsed 226s  eta 592s (linear-rate estimate)
+.........................[pytest-progress] |#########.....................|  29.5% of collected 400/1355  elapsed 227s  eta 542s (linear-rate estimate)
+................[pytest-progress]   stage tests/test_d1_d3_gmp_source_policy.py: 85 tests, 1.4s
+.........[pytest-progress] |#########.....................|  31.4% of collected 425/1355  elapsed 229s  eta 500s (linear-rate estimate)
+..[pytest-progress]   stage tests/test_d_peer_1_no_synthetic_peers.py: 11 tests, 0.9s
+...... [ 31%]
+.................[pytest-progress] |##########....................|  33.2% of collected 450/1355  elapsed 229s  eta 460s (linear-rate estimate)
+.......[pytest-progress]   stage tests/test_dataset_phase6b.py: 30 tests, 41.1s
+...[pytest-progress]   stage tests/test_derived_evidence_registration.py: 3 tests, 155.7s
+.............[pytest-progress]   stage tests/test_enrichment_contract.py: 13 tests, 0.0s
+..[pytest-progress] |###########...................|  35.1% of collected 475/1355  elapsed 426s  eta 788s (linear-rate estimate)
+.............[pytest-progress]   stage tests/test_enrichment_engine.py: 15 tests, 0.0s
+............[pytest-progress] |###########...................|  36.9% of collected 500/1355  elapsed 430s  eta 736s (linear-rate estimate)
+..... [ 37%]
+..........[pytest-progress]   stage tests/test_evaluation_lifecycle.py: 27 tests, 6.7s
+..........[pytest-progress] |############..................|  38.7% of collected 525/1355  elapsed 435s  eta 688s (linear-rate estimate)
+.......[pytest-progress]   stage tests/test_evaluation_record_v1.py: 17 tests, 6.9s
+............[pytest-progress]   stage tests/test_extraction.py: 12 tests, 117.3s
+......[pytest-progress] |############..................|  40.6% of collected 550/1355  elapsed 594s  eta 869s (linear-rate estimate)
+...[pytest-progress]   stage tests/test_extraction_phase5b.py: 9 tests, 37.5s
+..............[pytest-progress]   stage tests/test_financial_statement_column_mapping.py: 14 tests, 32.8s
+........[pytest-progress]   stage tests/test_fixture_fallback_isolation.py: 8 tests, 52.7s
+[pytest-progress] |#############.................|  42.4% of collected 575/1355  elapsed 679s  eta 922s (linear-rate estimate)
+.. [ 42%]
+.............[pytest-progress]   stage tests/test_four_field_manual_terms.py: 15 tests, 35.5s
+..........[pytest-progress] |#############.................|  44.3% of collected 600/1355  elapsed 751s  eta 945s (linear-rate estimate)
+..[pytest-progress]   stage tests/test_fresh_issue_manual_entry.py: 12 tests, 36.5s
+...[pytest-progress]   stage tests/test_frozen_core_line_endings.py: 3 tests, 0.0s
+.......[pytest-progress]   stage tests/test_generic_issue_terms_extraction.py: 7 tests, 0.2s
+.............[pytest-progress] |##############................|  46.1% of collected 625/1355  elapsed 755s  eta 882s (linear-rate estimate)
+...................[pytest-progress]   stage tests/test_gmp_evidence_linkage.py: 32 tests, 7.7s
+..... [ 47%]
+.[pytest-progress] |##############................|  48.0% of collected 650/1355  elapsed 759s  eta 823s (linear-rate estimate)
+..[pytest-progress]   stage tests/test_going_concern_negative_disclosure.py: 8 tests, 0.0s
+.................[pytest-progress]   stage tests/test_governance_contract_audit.py: 17 tests, 0.0s
+......[pytest-progress] |###############...............|  49.8% of collected 675/1355  elapsed 759s  eta 765s (linear-rate estimate)
+.[pytest-progress]   stage tests/test_hd_fire_primary_source_extraction.py: 7 tests, 0.0s
+..........[pytest-progress]   stage tests/test_ingestion_activity.py: 10 tests, 0.9s
+..............[pytest-progress] |###############...............|  51.7% of collected 700/1355  elapsed 760s  eta 711s (linear-rate estimate)
+..................... [ 53%]
+....[pytest-progress] |################..............|  53.5% of collected 725/1355  elapsed 760s  eta 661s (linear-rate estimate)
+...[pytest-progress]   stage tests/test_issue_terms_multisource.py: 42 tests, 0.0s
+........[pytest-progress]   stage tests/test_issue_terms_resolver.py: 8 tests, 8.1s
+............[pytest-progress]   stage tests/test_issue_terms_runtime_path.py: 12 tests, 46.1s
+..[pytest-progress] |#################.............|  55.4% of collected 750/1355  elapsed 814s  eta 657s (linear-rate estimate)
+......[pytest-progress]   stage tests/test_issue_terms_windows_retrieval.py: 8 tests, 69.2s
+.[pytest-progress]   stage tests/test_jio_evidence_remediation.py: 1 tests, 33.2s
+.......[pytest-progress]   stage tests/test_jio_rhp_issue_terms.py: 7 tests, 35.4s
+.[pytest-progress]   stage tests/test_jio_score_bridge.py: 1 tests, 0.0s
+..........[pytest-progress] |#################.............|  57.2% of collected 775/1355  elapsed 952s  eta 713s (linear-rate estimate)
+.................. [ 58%]
+.......[pytest-progress] |##################............|  59.0% of collected 800/1355  elapsed 952s  eta 661s (linear-rate estimate)
+.........................[pytest-progress] |##################............|  60.9% of collected 825/1355  elapsed 952s  eta 612s (linear-rate estimate)
+.........................[pytest-progress] |###################...........|  62.7% of collected 850/1355  elapsed 952s  eta 566s (linear-rate estimate)
+....[pytest-progress]   stage tests/test_litigation_regulatory_defaults.py: 89 tests, 0.7s
+........... [ 63%]
+.[pytest-progress]   stage tests/test_manual_terms_audit_log.py: 12 tests, 2.8s
+......[pytest-progress]   stage tests/test_market_data_presentation.py: 6 tests, 1.2s
+...[pytest-progress] |###################...........|  64.6% of collected 875/1355  elapsed 957s  eta 525s (linear-rate estimate)
+........................[pytest-progress]   stage tests/test_official_discovery.py: 27 tests, 102.0s
+.[pytest-progress] |####################..........|  66.4% of collected 900/1355  elapsed 1059s  eta 535s (linear-rate estimate)
+..............[pytest-progress]   stage tests/test_official_prospectus_pathway.py: 15 tests, 1.3s
+.........[pytest-progress]   stage tests/test_ofs_nil_binding.py: 9 tests, 0.0s
+..[pytest-progress] |####################..........|  68.3% of collected 925/1355  elapsed 1060s  eta 493s (linear-rate estimate)
+............ [ 69%]
+.........[pytest-progress]   stage tests/test_overlays_knockouts.py: 23 tests, 0.1s
+....[pytest-progress] |#####################.........|  70.1% of collected 950/1355  elapsed 1060s  eta 452s (linear-rate estimate)
+.............[pytest-progress]   stage tests/test_peer_row_mapping_and_bounds.py: 17 tests, 1.2s
+.....[pytest-progress]   stage tests/test_penalty_attribution.py: 5 tests, 0.3s
+...[pytest-progress]   stage tests/test_penalty_presentation.py: 3 tests, 0.6s
+....[pytest-progress] |######################........|  72.0% of collected 975/1355  elapsed 1063s  eta 414s (linear-rate estimate)
+......................[pytest-progress]   stage tests/test_phase5j_hardening.py: 26 tests, 0.9s
+...[pytest-progress] |######################........|  73.8% of collected 1000/1355  elapsed 1063s  eta 378s (linear-rate estimate)
+......... [ 74%]
+............[pytest-progress]   stage tests/test_post_listing_phase6a.py: 24 tests, 0.8s
+....[pytest-progress] |#######################.......|  75.6% of collected 1025/1355  elapsed 1067s  eta 344s (linear-rate estimate)
+.................[pytest-progress]   stage tests/test_presentation_api.py: 21 tests, 13.0s
+........[pytest-progress] |#######################.......|  77.5% of collected 1050/1355  elapsed 1077s  eta 313s (linear-rate estimate)
+............[pytest-progress]   stage tests/test_price_band_notice.py: 20 tests, 0.0s
+........[pytest-progress]   stage tests/test_promoter_holding_extraction.py: 8 tests, 8.7s
+.....[pytest-progress] |########################......|  79.3% of collected 1075/1355  elapsed 1086s  eta 283s (linear-rate estimate)
+...[pytest-progress]   stage tests/test_receivable_period_contract.py: 8 tests, 0.0s
+... [ 79%]
+...................[pytest-progress] |########################......|  81.2% of collected 1100/1355  elapsed 1094s  eta 254s (linear-rate estimate)
+..........[pytest-progress]   stage tests/test_reproducibility_store.py: 32 tests, 11.9s
+.....[pytest-progress]   stage tests/test_rk_fashion_reconciliation.py: 5 tests, 76.3s
+..........[pytest-progress] |#########################.....|  83.0% of collected 1125/1355  elapsed 1240s  eta 254s (linear-rate estimate)
+.[pytest-progress]   stage tests/test_rpt_extraction.py: 11 tests, 66.1s
+........................[pytest-progress]   stage tests/test_sector_overlays.py: 24 tests, 0.2s
+[pytest-progress] |#########################.....|  84.9% of collected 1150/1355  elapsed 1240s  eta 221s (linear-rate estimate)
+... [ 85%]
+................[pytest-progress]   stage tests/test_step5_auditor_and_manual_terms.py: 19 tests, 205.5s
+......[pytest-progress] |##########################....|  86.7% of collected 1175/1355  elapsed 1446s  eta 221s (linear-rate estimate)
+.....[pytest-progress]   stage tests/test_strict_evaluation_json.py: 11 tests, 0.1s
+.......[pytest-progress]   stage tests/test_ui2_frontend.py: 7 tests, 0.0s
+........[pytest-progress]   stage tests/test_ui3_evidence.py: 8 tests, 0.4s
+.....[pytest-progress] |###########################...|  88.6% of collected 1200/1355  elapsed 1447s  eta 187s (linear-rate estimate)
+...[pytest-progress]   stage tests/test_ui4_performance.py: 8 tests, 0.4s
+........[pytest-progress]   stage tests/test_ui5_backtest.py: 8 tests, 0.4s
+........[pytest-progress]   stage tests/test_ui6_calibration.py: 8 tests, 1.1s
+...... [ 90%]
+[pytest-progress] |###########################...|  90.4% of collected 1225/1355  elapsed 1452s  eta 154s (linear-rate estimate)
+..............[pytest-progress]   stage tests/test_ui7_ingestion.py: 20 tests, 159.9s
+...........[pytest-progress] |############################..|  92.3% of collected 1250/1355  elapsed 1608s  eta 135s (linear-rate estimate)
+.........................[pytest-progress] |############################..|  94.1% of collected 1275/1355  elapsed 1610s  eta 101s (linear-rate estimate)
+.........[pytest-progress]   stage tests/test_v16_implementation.py: 45 tests, 2.2s
+............. [ 95%]
+...[pytest-progress] |#############################.|  95.9% of collected 1300/1355  elapsed 1610s  eta 68s (linear-rate estimate)
+.........................[pytest-progress] |#############################.|  97.8% of collected 1325/1355  elapsed 1610s  eta 36s (linear-rate estimate)
+.[pytest-progress]   stage tests/test_validation_gates.py: 42 tests, 0.1s
+...................[pytest-progress]   stage tests/test_vishal_golden.py: 19 tests, 0.0s
+....[pytest-progress]   stage tests/test_vishal_historical_reconciliation.py: 4 tests, 0.3s
+.[pytest-progress] |##############################|  99.6% of collected 1350/1355  elapsed 1611s  eta 6s (linear-rate estimate)
+.....[pytest-progress] |##############################| 100.0% of collected 1355/1355  elapsed 1612s  eta 0s (linear-rate estimate)
+.              [100%][pytest-progress]   stage tests/test_workstream2_evidence_presentation.py: 8 tests, 1.5s
+[pytest-progress] finished 1355/1355 tests in 1612.4s (passed=1355 failed=0 skipped=0), exitstatus=0
+[pytest-progress]   slow test   115.7s  tests/test_derived_evidence_registration.py::test_reupload_after_evidence_fix_creates_new_evaluation_not_stale_duplicate
+[pytest-progress]   slow test    82.3s  tests/test_ui7_ingestion.py::test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice
+[pytest-progress]   slow test    81.8s  tests/test_step5_auditor_and_manual_terms.py::test_vishal_real_filing_three_terms_keep_ofs_awaiting
+[pytest-progress]   slow test    81.1s  tests/test_step5_auditor_and_manual_terms.py::test_manual_entry_never_displaces_officially_verified_values
+[pytest-progress]   slow test    78.6s  tests/test_cross_ipo_issue_term_provenance.py::test_verified_notice_canonical_values_reach_evidence_api
+[pytest-progress]   slow test    44.7s  tests/test_ui7_ingestion.py::test_ingest_vishal_rhp_undisclosed_issue_terms_fail_precisely
+[pytest-progress]   slow test    41.9s  tests/test_cross_ipo_issue_term_provenance.py::test_retained_fixture_notice_is_unverified_and_fails_closed
+[pytest-progress]   slow test    41.5s  tests/test_step5_auditor_and_manual_terms.py::test_vishal_real_filing_four_field_manual_entry_completes_evaluation
+
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_cross_ipo_issue_term_provenance.py: 1 warning
+tests/test_four_field_manual_terms.py: 8 warnings
+tests/test_fresh_issue_manual_entry.py: 3 warnings
+tests/test_ingestion_activity.py: 2 warnings
+tests/test_issue_terms_runtime_path.py: 3 warnings
+tests/test_manual_terms_audit_log.py: 2 warnings
+tests/test_step5_auditor_and_manual_terms.py: 3 warnings
+tests/test_ui7_ingestion.py: 2 warnings
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/fastapi/routing.py:360: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    return await dependant.call(**values)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+1355 passed, 25 warnings in 1614.73s (0:26:54)
+END_UTC=2026-10-21T09:49:04Z
+EXIT=0

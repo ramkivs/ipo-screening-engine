@@ -740,9 +740,8 @@ def test_every_configured_source_produces_a_visible_attempt():
     provider = OfficialDiscoveryProvider(fetcher=fetch)
     _candidate, report = provider.find("Jio Platforms Limited", "JIO-PLATFORMS-LIMITED")
     assert report.outcome == "FOUND"
-    assert [a.url for a in report.sources] == [
-        OfficialDiscoveryProvider.LISTING_URLS[0], OfficialDiscoveryProvider.LISTING_URLS[1],
-    ]
+    assert [a.url for a in report.sources] == list(OfficialDiscoveryProvider.LISTING_URLS)
+    assert all(a.classification == "failed" for a in report.sources[2:])
     assert report.sources[0].classification == "failed"
     assert report.sources[0].searched is False
     assert report.sources[1].classification == "ok"

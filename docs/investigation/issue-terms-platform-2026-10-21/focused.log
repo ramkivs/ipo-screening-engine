@@ -1,0 +1,15 @@
+[pytest-progress] collected 82 tests; start 09:21:25
+
+........................[pytest-progress] |#########.....................|  30.5% of collected 25/82  elapsed 0s  eta 0s (linear-rate estimate)
+...................[pytest-progress]   stage tests/test_issue_terms_multisource.py: 42 tests, 0.1s
+......[pytest-progress] |##################............|  61.0% of collected 50/82  elapsed 0s  eta 0s (linear-rate estimate)
+..[pytest-progress]   stage tests/test_issue_terms_resolver.py: 8 tests, 0.0s
+..................... [ 87%]
+..[pytest-progress] |###########################...|  91.5% of collected 75/82  elapsed 0s  eta 0s (linear-rate estimate)
+.[pytest-progress]   stage tests/test_official_discovery.py: 24 tests, 0.0s
+......[pytest-progress] |##############################| 100.0% of collected 82/82  elapsed 32s  eta 0s (linear-rate estimate)
+.                                                               [100%][pytest-progress]   stage tests/test_issue_terms_windows_retrieval.py: 8 tests, 31.7s
+[pytest-progress] finished 82/82 tests in 31.8s (passed=82 failed=0 skipped=0), exitstatus=0
+[pytest-progress]   slow test    31.2s  tests/test_issue_terms_windows_retrieval.py::test_genuine_pdf_bytes_rejected_as_non_prospectus
+
+82 passed, 3 deselected in 31.89s

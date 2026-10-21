@@ -1,0 +1,562 @@
+START_UTC=2026-10-21T08:40:32Z
+30d46c7397f34b95b761c0af9a26f79dd9517fbf83c3c37effc467c18b8bcf5d  docs/investigation/issue-terms-platform-2026-10-21/tested-tree.json
+COMMAND=.venv/bin/python -u -m pytest tests/ -q
+[pytest-progress] collected 1335 tests; start 08:40:35
+
+........................[pytest-progress] |#.............................|   1.9% of collected 25/1335  elapsed 0s  eta 8s (linear-rate estimate)
+........................[pytest-progress]   stage tests/test_a17_gmp_policy.py: 47 tests, 0.6s
+.[pytest-progress] |#.............................|   3.7% of collected 50/1335  elapsed 1s  eta 17s (linear-rate estimate)
+....................... [  5%]
+..[pytest-progress] |##............................|   5.6% of collected 75/1335  elapsed 1s  eta 15s (linear-rate estimate)
+.........................[pytest-progress] |##............................|   7.5% of collected 100/1335  elapsed 5s  eta 61s (linear-rate estimate)
+....[pytest-progress]   stage tests/test_acceptance_matrix.py: 55 tests, 4.4s
+.....................[pytest-progress] |###...........................|   9.4% of collected 125/1335  elapsed 5s  eta 49s (linear-rate estimate)
+...................[pytest-progress]   stage tests/test_analytics_phase6c.py: 40 tests, 0.7s
+. [ 10%]
+.....[pytest-progress] |###...........................|  11.2% of collected 150/1335  elapsed 6s  eta 45s (linear-rate estimate)
+...[pytest-progress]   stage tests/test_auditor_evidence_section.py: 9 tests, 32.0s
+.........[pytest-progress]   stage tests/test_auditor_tenure_defaults.py: 9 tests, 0.0s
+.............[pytest-progress] |####..........................|  13.1% of collected 175/1335  elapsed 38s  eta 251s (linear-rate estimate)
+.........................[pytest-progress] |####..........................|  15.0% of collected 200/1335  elapsed 38s  eta 217s (linear-rate estimate)
+................. [ 16%]
+.[pytest-progress]   stage tests/test_calibration_phase6d.py: 56 tests, 2.0s
+.......[pytest-progress] |#####.........................|  16.9% of collected 225/1335  elapsed 40s  eta 197s (linear-rate estimate)
+..[pytest-progress]   stage tests/test_cfo_pat_determinism.py: 9 tests, 0.4s
+..............[pytest-progress]   stage tests/test_cli.py: 14 tests, 7.6s
+.........[pytest-progress] |######........................|  18.7% of collected 250/1335  elapsed 51s  eta 222s (linear-rate estimate)
+..............[pytest-progress]   stage tests/test_cli_phase5i.py: 23 tests, 6.8s
+...........[pytest-progress] |######........................|  20.6% of collected 275/1335  elapsed 55s  eta 210s (linear-rate estimate)
+....[pytest-progress]   stage tests/test_connectors.py: 15 tests, 0.0s
+.......... [ 21%]
+.......[pytest-progress]   stage tests/test_contingent_liabilities_extraction.py: 17 tests, 33.1s
+....[pytest-progress] |#######.......................|  22.5% of collected 300/1335  elapsed 88s  eta 303s (linear-rate estimate)
+.........................[pytest-progress] |#######.......................|  24.3% of collected 325/1335  elapsed 88s  eta 273s (linear-rate estimate)
+.F[pytest-progress]   stage tests/test_core_semantics.py: 31 tests, 38.9s
+F...[pytest-progress]   stage tests/test_cross_ipo_issue_term_provenance.py: 4 tests, 57.7s
+...................[pytest-progress] |########......................|  26.2% of collected 350/1335  elapsed 184s  eta 519s (linear-rate estimate)  FAILURES=2
+........... [ 26%]
+..............[pytest-progress] |########......................|  28.1% of collected 375/1335  elapsed 184s  eta 472s (linear-rate estimate)  FAILURES=2
+.........................[pytest-progress] |#########.....................|  30.0% of collected 400/1335  elapsed 185s  eta 432s (linear-rate estimate)  FAILURES=2
+................[pytest-progress]   stage tests/test_d1_d3_gmp_source_policy.py: 85 tests, 1.5s
+.........[pytest-progress] |##########....................|  31.8% of collected 425/1335  elapsed 187s  eta 400s (linear-rate estimate)  FAILURES=3
+F.[pytest-progress]   stage tests/test_d_peer_1_no_synthetic_peers.py: 11 tests, 0.9s
+...... [ 32%]
+.................[pytest-progress] |##########....................|  33.7% of collected 450/1335  elapsed 187s  eta 367s (linear-rate estimate)  FAILURES=3
+.......[pytest-progress]   stage tests/test_dataset_phase6b.py: 30 tests, 40.1s
+...[pytest-progress]   stage tests/test_derived_evidence_registration.py: 3 tests, 152.8s
+.............[pytest-progress]   stage tests/test_enrichment_contract.py: 13 tests, 0.0s
+..[pytest-progress] |###########...................|  35.6% of collected 475/1335  elapsed 380s  eta 687s (linear-rate estimate)  FAILURES=3
+.............[pytest-progress]   stage tests/test_enrichment_engine.py: 15 tests, 0.0s
+............[pytest-progress] |###########...................|  37.5% of collected 500/1335  elapsed 384s  eta 642s (linear-rate estimate)  FAILURES=3
+..... [ 37%]
+..........[pytest-progress]   stage tests/test_evaluation_lifecycle.py: 27 tests, 6.6s
+..........[pytest-progress] |############..................|  39.3% of collected 525/1335  elapsed 389s  eta 600s (linear-rate estimate)  FAILURES=3
+.......[pytest-progress]   stage tests/test_evaluation_record_v1.py: 17 tests, 6.7s
+............[pytest-progress]   stage tests/test_extraction.py: 12 tests, 118.8s
+......[pytest-progress] |############..................|  41.2% of collected 550/1335  elapsed 550s  eta 785s (linear-rate estimate)  FAILURES=3
+...[pytest-progress]   stage tests/test_extraction_phase5b.py: 9 tests, 37.9s
+..............[pytest-progress]   stage tests/test_financial_statement_column_mapping.py: 14 tests, 32.8s
+........[pytest-progress]   stage tests/test_fixture_fallback_isolation.py: 8 tests, 53.4s
+[pytest-progress] |#############.................|  43.1% of collected 575/1335  elapsed 636s  eta 840s (linear-rate estimate)  FAILURES=3
+.. [ 43%]
+.............[pytest-progress]   stage tests/test_four_field_manual_terms.py: 15 tests, 35.8s
+..........[pytest-progress] |#############.................|  44.9% of collected 600/1335  elapsed 708s  eta 867s (linear-rate estimate)  FAILURES=3
+.F[pytest-progress]   stage tests/test_fresh_issue_manual_entry.py: 12 tests, 36.2s
+FF.[pytest-progress]   stage tests/test_frozen_core_line_endings.py: 3 tests, 0.0s
+.......[pytest-progress]   stage tests/test_generic_issue_terms_extraction.py: 7 tests, 0.2s
+.............[pytest-progress] |##############................|  46.8% of collected 625/1335  elapsed 712s  eta 808s (linear-rate estimate)  FAILURES=6
+...................[pytest-progress]   stage tests/test_gmp_evidence_linkage.py: 32 tests, 7.7s
+..... [ 48%]
+.[pytest-progress] |###############...............|  48.7% of collected 650/1335  elapsed 716s  eta 754s (linear-rate estimate)  FAILURES=6
+..[pytest-progress]   stage tests/test_going_concern_negative_disclosure.py: 8 tests, 0.0s
+.................[pytest-progress]   stage tests/test_governance_contract_audit.py: 17 tests, 0.0s
+......[pytest-progress] |###############...............|  50.6% of collected 675/1335  elapsed 716s  eta 700s (linear-rate estimate)  FAILURES=6
+.[pytest-progress]   stage tests/test_hd_fire_primary_source_extraction.py: 7 tests, 0.0s
+..........[pytest-progress]   stage tests/test_ingestion_activity.py: 10 tests, 0.9s
+..............[pytest-progress] |################..............|  52.4% of collected 700/1335  elapsed 717s  eta 650s (linear-rate estimate)  FAILURES=6
+........[pytest-progress]   stage tests/test_issue_terms_multisource.py: 22 tests, 0.0s
+........[pytest-progress]   stage tests/test_issue_terms_resolver.py: 8 tests, 7.0s
+..... [ 53%]
+....[pytest-progress] |################..............|  54.3% of collected 725/1335  elapsed 730s  eta 614s (linear-rate estimate)  FAILURES=7
+F..[pytest-progress]   stage tests/test_issue_terms_runtime_path.py: 12 tests, 45.3s
+........[pytest-progress]   stage tests/test_issue_terms_windows_retrieval.py: 8 tests, 70.6s
+.[pytest-progress]   stage tests/test_jio_evidence_remediation.py: 1 tests, 32.3s
+....F..[pytest-progress]   stage tests/test_jio_rhp_issue_terms.py: 7 tests, 35.6s
+.[pytest-progress]   stage tests/test_jio_score_bridge.py: 1 tests, 0.0s
+.....[pytest-progress] |#################.............|  56.2% of collected 750/1335  elapsed 907s  eta 708s (linear-rate estimate)  FAILURES=8
+.........................[pytest-progress] |#################.............|  58.1% of collected 775/1335  elapsed 907s  eta 656s (linear-rate estimate)  FAILURES=8
+.................. [ 59%]
+.......[pytest-progress] |##################............|  59.9% of collected 800/1335  elapsed 908s  eta 607s (linear-rate estimate)  FAILURES=8
+.........................[pytest-progress] |###################...........|  61.8% of collected 825/1335  elapsed 908s  eta 561s (linear-rate estimate)  FAILURES=8
+.........[pytest-progress]   stage tests/test_litigation_regulatory_defaults.py: 89 tests, 0.7s
+............[pytest-progress]   stage tests/test_manual_terms_audit_log.py: 12 tests, 2.9s
+....[pytest-progress] |###################...........|  63.7% of collected 850/1335  elapsed 912s  eta 521s (linear-rate estimate)  FAILURES=8
+..[pytest-progress]   stage tests/test_market_data_presentation.py: 6 tests, 1.4s
+............. [ 64%]
+..........[pytest-progress] |####################..........|  65.5% of collected 875/1335  elapsed 1021s  eta 537s (linear-rate estimate)  FAILURES=8
+....[pytest-progress]   stage tests/test_official_discovery.py: 27 tests, 109.1s
+...............[pytest-progress]   stage tests/test_official_prospectus_pathway.py: 15 tests, 1.3s
+......[pytest-progress] |####################..........|  67.4% of collected 900/1335  elapsed 1023s  eta 494s (linear-rate estimate)  FAILURES=8
+...[pytest-progress]   stage tests/test_ofs_nil_binding.py: 9 tests, 0.0s
+......................[pytest-progress] |#####################.........|  69.3% of collected 925/1335  elapsed 1023s  eta 453s (linear-rate estimate)  FAILURES=8
+.[pytest-progress]   stage tests/test_overlays_knockouts.py: 23 tests, 0.1s
+........... [ 70%]
+......[pytest-progress]   stage tests/test_peer_row_mapping_and_bounds.py: 17 tests, 1.2s
+.....[pytest-progress]   stage tests/test_penalty_attribution.py: 5 tests, 0.4s
+..[pytest-progress] |#####################.........|  71.2% of collected 950/1335  elapsed 1025s  eta 415s (linear-rate estimate)  FAILURES=8
+.[pytest-progress]   stage tests/test_penalty_presentation.py: 3 tests, 0.6s
+........................[pytest-progress] |######################........|  73.0% of collected 975/1335  elapsed 1026s  eta 379s (linear-rate estimate)  FAILURES=8
+..[pytest-progress]   stage tests/test_phase5j_hardening.py: 26 tests, 1.0s
+.......................[pytest-progress] |######################........|  74.9% of collected 1000/1335  elapsed 1027s  eta 344s (linear-rate estimate)  FAILURES=8
+.[pytest-progress]   stage tests/test_post_listing_phase6a.py: 24 tests, 0.8s
+........ [ 75%]
+........F....[pytest-progress]   stage tests/test_presentation_api.py: 21 tests, 14.2s
+...[pytest-progress] |#######################.......|  76.8% of collected 1025/1335  elapsed 1041s  eta 315s (linear-rate estimate)  FAILURES=9
+.................[pytest-progress]   stage tests/test_price_band_notice.py: 20 tests, 0.0s
+........[pytest-progress]   stage tests/test_promoter_holding_extraction.py: 8 tests, 9.0s
+[pytest-progress] |########################......|  78.7% of collected 1050/1335  elapsed 1050s  eta 285s (linear-rate estimate)  FAILURES=9
+........[pytest-progress]   stage tests/test_receivable_period_contract.py: 8 tests, 0.0s
+.................[pytest-progress] |########################......|  80.5% of collected 1075/1335  elapsed 1057s  eta 256s (linear-rate estimate)  FAILURES=9
+...... [ 80%]
+.........[pytest-progress]   stage tests/test_reproducibility_store.py: 32 tests, 11.6s
+.....[pytest-progress]   stage tests/test_rk_fashion_reconciliation.py: 5 tests, 73.7s
+.....[pytest-progress] |#########################.....|  82.4% of collected 1100/1335  elapsed 1204s  eta 257s (linear-rate estimate)  FAILURES=9
+......[pytest-progress]   stage tests/test_rpt_extraction.py: 11 tests, 69.0s
+...................[pytest-progress] |#########################.....|  84.3% of collected 1125/1335  elapsed 1204s  eta 225s (linear-rate estimate)  FAILURES=9
+.....[pytest-progress]   stage tests/test_sector_overlays.py: 24 tests, 0.2s
+.................F.[pytest-progress]   stage tests/test_step5_auditor_and_manual_terms.py: 19 tests, 169.1s
+.[pytest-progress] |##########################....|  86.1% of collected 1150/1335  elapsed 1374s  eta 221s (linear-rate estimate)  FAILURES=10
+... [ 86%]
+.......[pytest-progress]   stage tests/test_strict_evaluation_json.py: 11 tests, 0.1s
+.......[pytest-progress]   stage tests/test_ui2_frontend.py: 7 tests, 0.0s
+........[pytest-progress]   stage tests/test_ui3_evidence.py: 8 tests, 0.4s
+[pytest-progress] |##########################....|  88.0% of collected 1175/1335  elapsed 1374s  eta 187s (linear-rate estimate)  FAILURES=10
+........[pytest-progress]   stage tests/test_ui4_performance.py: 8 tests, 0.5s
+........[pytest-progress]   stage tests/test_ui5_backtest.py: 8 tests, 0.4s
+........[pytest-progress]   stage tests/test_ui6_calibration.py: 8 tests, 1.1s
+.[pytest-progress] |###########################...|  89.9% of collected 1200/1335  elapsed 1378s  eta 155s (linear-rate estimate)  FAILURES=10
+................F..[pytest-progress]   stage tests/test_ui7_ingestion.py: 20 tests, 115.2s
+...... [ 91%]
+[pytest-progress] |############################..|  91.8% of collected 1225/1335  elapsed 1491s  eta 134s (linear-rate estimate)  FAILURES=11
+.....................F...[pytest-progress] |############################..|  93.6% of collected 1250/1335  elapsed 1493s  eta 102s (linear-rate estimate)  FAILURES=12
+.F....F..F....[pytest-progress]   stage tests/test_v16_implementation.py: 45 tests, 2.4s
+...........[pytest-progress] |#############################.|  95.5% of collected 1275/1335  elapsed 1494s  eta 70s (linear-rate estimate)  FAILURES=15
+...................... [ 97%]
+...[pytest-progress] |#############################.|  97.4% of collected 1300/1335  elapsed 1494s  eta 40s (linear-rate estimate)  FAILURES=15
+......[pytest-progress]   stage tests/test_validation_gates.py: 42 tests, 0.1s
+...................[pytest-progress]   stage tests/test_vishal_golden.py: 19 tests, 0.0s
+[pytest-progress] |##############################|  99.3% of collected 1325/1335  elapsed 1494s  eta 11s (linear-rate estimate)  FAILURES=15
+....[pytest-progress]   stage tests/test_vishal_historical_reconciliation.py: 4 tests, 0.4s
+......[pytest-progress] |##############################| 100.0% of collected 1335/1335  elapsed 1496s  eta 0s (linear-rate estimate)  FAILURES=15
+.                                  [100%][pytest-progress]   stage tests/test_workstream2_evidence_presentation.py: 8 tests, 2.0s
+[pytest-progress] finished 1335/1335 tests in 1496.2s (passed=1320 failed=15 skipped=0), exitstatus=1
+[pytest-progress]   slow test   114.0s  tests/test_derived_evidence_registration.py::test_reupload_after_evidence_fix_creates_new_evaluation_not_stale_duplicate
+[pytest-progress]   slow test    85.6s  tests/test_step5_auditor_and_manual_terms.py::test_vishal_real_filing_three_terms_keep_ofs_awaiting
+[pytest-progress]   slow test    42.1s  tests/test_rpt_extraction.py::test_vishal_canonical_mapping_and_scoring_boundary
+[pytest-progress]   slow test    42.0s  tests/test_step5_auditor_and_manual_terms.py::test_vishal_real_filing_four_field_manual_entry_completes_evaluation
+[pytest-progress]   slow test    41.2s  tests/test_ui7_ingestion.py::test_ingest_vishal_rhp_undisclosed_issue_terms_fail_precisely
+[pytest-progress]   slow test    40.8s  tests/test_ui7_ingestion.py::test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice
+[pytest-progress]   slow test    40.3s  tests/test_step5_auditor_and_manual_terms.py::test_manual_entry_never_displaces_officially_verified_values
+[pytest-progress]   slow test    39.3s  tests/test_cross_ipo_issue_term_provenance.py::test_retained_fixture_notice_is_unverified_and_fails_closed
+
+=================================== FAILURES ===================================
+___________ test_verified_notice_canonical_values_reach_evidence_api ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-8/test_verified_notice_canonical0')
+golden_input = {'ipo_id': 'VISHAL-NIRMITI-LIMITED', 'company_name': 'Vishal Nirmiti Limited', 'board': 'mainboard', 'icdr_route': '6(1)', ...}
+config = {'config_version': '1.5.0', 'spec_version': '1.5', '_conventions': {'bands': "[operator, value, score]; evaluated top-...n whose metric is NOT_APPLICABLE is removed from both numerator and denominator.', ...}, 'currency': 'INR_CRORES', ...}
+
+    def test_verified_notice_canonical_values_reach_evidence_api(tmp_path, golden_input, config):
+        """Verified source -> canonical value -> persisted -> evidence API.
+    
+        Low/high must map to their own canonical fields (the shared quote
+        contains both numbers; values come from the canonical input, never
+        from parsing the quote), lot size carries its unit, and the source
+        document identity is visible.
+        """
+        resolver = IssueTermsResolver(
+            providers=[HttpNoticeProvider({"VISHAL-NIRMITI-LIMITED": OFFICIAL_URL}, fetcher=lambda url: NOTICE_BYTES)]
+        )
+        client, store, baseline = _client(tmp_path, golden_input, config, resolver)
+    
+        res = _upload(client, VISHAL_RHP_PDF, "vishal_nirmiti_rhp.pdf")
+>       assert res.status_code == 201, res.text
+E       AssertionError: {"error":"Awaiting Issue Terms","message":"AWAITING_ISSUE_TERMS: required issue terms are unavailable: issue.price_band_low, issue.price_band_high, issue.lot_size, issue.ofs. The uploaded filing does not disclose them and official source documents were retrieved but rejected (classification, issuer identity or value checks failed; see the resolution diagnostics). No evaluation was produced, no values were assumed, and nothing was persisted. Retry after the official Price Band Notice is published, upload a filing that discloses these terms, or supply every required term through the bounded manual issue-term entry (recorded as MANUAL_ENTRY and never source-verified).","code":"AWAITING_ISSUE_TERMS","missing_fields":["price_band_low","price_band_high","lot_size","ofs"],"resolution":{"status":"UNAVAILABLE","fields":{"price_band_low":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"price_band_high":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"lot_size":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"ofs":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"fresh_issue":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"open_date":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"close_date":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"}},"verified":false,"resolved_fields":[],"unresolved_fields":["price_band_low","price_band_high","lot_size","ofs"],"conflicts":[],"from_cache":false,"source_uri":null,"provider":null,"retrieved_at":null,"document_class":null,"providers":[{"provider":"official-url","outcome":"FOUND","detail":"notice retrieved from https://www.nseindia.com/announcements/vishal-price-band","listing_searched":false,"searched_listings":[],"notes":[],"sources":[]},{"provider":"official-url","outcome":"REJECTED","detail":"STALE_OR_DIFFERENT_ISSUE: explicit issue dates differ from uploaded filing","listing_searched":false,"searched_listings":[],"notes":[],"sources":[]}],"remaining_required_fields":["issue.price_band_low","issue.price_band_high","issue.lot_size","issue.ofs"],"ready":false,"reporting_unit":"INR_LAKHS"},"ingestion_id":"ing-62f6dc8f2a4241fd","correlation_id":"ing-62f6dc8f2a4241fd","activity_url":"/api/v1/ingestions/ing-62f6dc8f2a4241fd"}
+E       assert 422 == 201
+E        +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+
+tests/test_cross_ipo_issue_term_provenance.py:95: AssertionError
+_________ test_retained_fixture_notice_is_unverified_and_fails_closed __________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-8/test_retained_fixture_notice_i0')
+golden_input = {'ipo_id': 'VISHAL-NIRMITI-LIMITED', 'company_name': 'Vishal Nirmiti Limited', 'board': 'mainboard', 'icdr_route': '6(1)', ...}
+config = {'config_version': '1.5.0', 'spec_version': '1.5', '_conventions': {'bands': "[operator, value, score]; evaluated top-...n whose metric is NOT_APPLICABLE is removed from both numerator and denominator.', ...}, 'currency': 'INR_CRORES', ...}
+
+    def test_retained_fixture_notice_is_unverified_and_fails_closed(tmp_path, golden_input, config):
+        """The authored fixture notice, offered as a retained copy, must not
+        be represented as a verified official disclosure and must not
+        resolve terms."""
+        notice_dir = tmp_path / "notices"
+        notice_dir.mkdir()
+        (notice_dir / "clean_notice.txt").write_bytes(NOTICE_BYTES)
+        resolver = IssueTermsResolver(providers=[RetainedNoticeProvider([notice_dir])])
+        client, store, baseline = _client(tmp_path, golden_input, config, resolver)
+    
+        res = _upload(client, VISHAL_RHP_PDF, "vishal_nirmiti_rhp.pdf")
+        assert res.status_code == 422, res.text
+        body = res.json()
+        assert body["code"] == "AWAITING_ISSUE_TERMS"
+>       assert body["resolution"]["status"] == "UNVERIFIED"
+E       AssertionError: assert 'UNAVAILABLE' == 'UNVERIFIED'
+E         
+E         - UNVERIFIED
+E         + UNAVAILABLE
+
+tests/test_cross_ipo_issue_term_provenance.py:137: AssertionError
+__________________________ test_frozen_core_unchanged __________________________
+
+    def test_frozen_core_unchanged():
+        ok, checks = verify_frozen_core(REPO_ROOT)
+>       assert ok, checks
+E       AssertionError: {'engine/ipo_screening/derived.py': True, 'engine/ipo_screening/scoring.py': True, 'engine/ipo_screening/knockouts.py': True, 'engine/ipo_screening/snapshots.py': True, ...}
+E       assert False
+
+tests/test_d_peer_1_no_synthetic_peers.py:160: AssertionError
+______________________ test_frozen_core_accepts_lf_files _______________________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-8/test_frozen_core_accepts_lf_fi0')
+
+    def test_frozen_core_accepts_lf_files(tmp_path: Path) -> None:
+        _prepare_fixture(tmp_path, b"\n")
+    
+        verified, results = verify_frozen_core(base_dir=tmp_path)
+    
+>       assert verified is True
+E       assert False is True
+
+tests/test_frozen_core_line_endings.py:29: AssertionError
+_____________________ test_frozen_core_accepts_crlf_files ______________________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-8/test_frozen_core_accepts_crlf_0')
+
+    def test_frozen_core_accepts_crlf_files(tmp_path: Path) -> None:
+        _prepare_fixture(tmp_path, b"\r\n")
+    
+        verified, results = verify_frozen_core(base_dir=tmp_path)
+    
+>       assert verified is True
+E       assert False is True
+
+tests/test_frozen_core_line_endings.py:38: AssertionError
+_________________ test_frozen_core_rejects_real_content_change _________________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-8/test_frozen_core_rejects_real_0')
+
+    def test_frozen_core_rejects_real_content_change(tmp_path: Path) -> None:
+        _prepare_fixture(tmp_path, b"\r\n")
+    
+        relative_path = next(iter(FROZEN_CORE_HASHES))
+        target = tmp_path / relative_path
+        target.write_bytes(target.read_bytes() + b"\n# unauthorized change\n")
+    
+        verified, results = verify_frozen_core(base_dir=tmp_path)
+    
+        assert verified is False
+        assert results[relative_path] is False
+>       assert all(
+            result
+            for path, result in results.items()
+            if path != relative_path
+        )
+E       assert False
+E        +  where False = all(<generator object test_frozen_core_rejects_real_content_change.<locals>.<genexpr> at 0x7f3ec303cf20>)
+
+tests/test_frozen_core_line_endings.py:53: AssertionError
+__________ test_partial_prospectus_fails_closed_on_missing_term_only ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-8/test_partial_prospectus_fails_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f3ec142bb90>
+golden_input = {'ipo_id': 'VISHAL-NIRMITI-LIMITED', 'company_name': 'Vishal Nirmiti Limited', 'board': 'mainboard', 'icdr_route': '6(1)', ...}
+
+    def test_partial_prospectus_fails_closed_on_missing_term_only(
+        tmp_path, monkeypatch, golden_input
+    ):
+        no_lot = PROSPECTUS_TEXT.replace(
+            '"Bid Lot" 68 Equity Shares and in multiples of 68 Equity Shares thereafter.\n', ""
+        )
+        provider = HttpProspectusProvider(
+            {"VISHAL-NIRMITI-LIMITED": SEBI_URL}, fetcher=lambda u: no_lot.encode()
+        )
+        res = _upload(_client(tmp_path, monkeypatch, golden_input, [provider]))
+        assert res.status_code == 422, res.text
+        body = res.json()
+        # Fail-closed: nothing evaluated. The diagnostics layer distinguishes
+        # what the official document verified from what it did not establish:
+        # only lot_size is unverified; assembly requires it in final mode and
+        # reports that explicitly instead of silently discarding the terms.
+        assert body["resolution"]["status"] == "PARTIAL"
+        assert body["resolution"]["resolved_fields"] == ["price_band_low", "price_band_high"]
+>       assert body["resolution"]["unresolved_fields"] == ["lot_size"]
+E       AssertionError: assert ['lot_size', 'ofs'] == ['lot_size']
+E         
+E         Left contains one more item: 'ofs'
+E         Use -v to get more diff
+
+tests/test_issue_terms_runtime_path.py:224: AssertionError
+________ test_jio_without_official_source_fails_closed_on_pricing_only _________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-8/test_jio_without_official_sour0')
+jio_canonical = {'ipo_id': 'JIO-PLATFORMS-LIMITED', 'company_name': 'JIO PLATFORMS LIMITED', 'board': 'mainboard', 'icdr_route': '6(1)', ...}
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f3ec16879d0>
+
+    def test_jio_without_official_source_fails_closed_on_pricing_only(tmp_path, jio_canonical, monkeypatch):
+        monkeypatch.setattr(
+            DocumentExtractor,
+            "extract_from_pdf",
+            lambda self, pdf_path=None, allow_fixture_fallbacks=False: (jio_canonical, {}),
+        )
+        cfg = PresentationConfig(
+            store_root=tmp_path / "evaluations",
+            config_dir=REPO_ROOT / "config",
+            issue_terms_resolver=IssueTermsResolver(providers=[]),
+        )
+        service = PresentationService(cfg)
+        with pytest.raises(IngestionAwaitingIssueTermsError) as excinfo:
+            service.ingest_document(file_bytes=b"%PDF-1.4 test", filename="jio.pdf", mode="final")
+        # OFS is filing-established (fresh-only); only pricing remains open.
+>       assert excinfo.value.missing_fields == ["price_band_low", "price_band_high", "lot_size"]
+E       AssertionError: assert ['price_band_...'fresh_issue'] == ['price_band_...', 'lot_size']
+E         
+E         Left contains one more item: 'fresh_issue'
+E         Use -v to get more diff
+
+tests/test_jio_rhp_issue_terms.py:142: AssertionError
+_______________ test_configuration_status_governance_invariants ________________
+
+populated_env = {'client': <starlette.testclient.TestClient object at 0x7f3ebbd139d0>, 'service': <ipo_screening.presentation.service....figuration_status_gove0/evaluations/VISHAL-NIRMITI-LIMITED-20261005-120000Z-final-e84f8bc0'), workbook_path=None), ...}
+
+    def test_configuration_status_governance_invariants(populated_env):
+        """GET /api/v1/configuration/current asserts v1.5 is ACTIVE, v1.6 is INACTIVE."""
+        client = populated_env["client"]
+    
+        res = client.get("/api/v1/configuration/current")
+        assert res.status_code == 200
+        data = res.json()
+    
+        active_cfg = data["active_configuration"]
+        assert active_cfg["version"] == "1.5.0"
+        assert active_cfg["status"] == "ACTIVE"
+        assert active_cfg["is_active"] is True
+    
+        candidate_cfg = data["candidate_configuration"]
+        assert candidate_cfg["version"] == "1.6.0"
+        assert candidate_cfg["status"] == "IMPLEMENTED_INACTIVE"
+        assert candidate_cfg["is_active"] is False
+    
+>       assert data["frozen_core_status"] == "VERIFIED"
+E       AssertionError: assert 'CORRUPTED' == 'VERIFIED'
+E         
+E         - VERIFIED
+E         + CORRUPTED
+
+tests/test_presentation_api.py:511: AssertionError
+_________ test_manual_entry_never_displaces_officially_verified_values _________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-8/test_manual_entry_never_displa0')
+
+    def test_manual_entry_never_displaces_officially_verified_values(tmp_path):
+        """With a verified official resolution available (mocked transport --
+        this proves channel mechanics, NOT live-source authenticity), a
+        conflicting manual entry blocks with OFFICIAL_VERIFIED origin and,
+        even after explicit confirmation, the verified values win and no
+        MANUAL_ENTRY provenance is recorded for them."""
+        from ipo_screening.issue_terms import HttpNoticeProvider
+    
+        notice_bytes = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes()
+        resolver = IssueTermsResolver(
+            providers=[
+                HttpNoticeProvider(
+                    {"VISHAL-NIRMITI-LIMITED": "https://www.nseindia.com/announcements/vishal-price-band"},
+                    fetcher=lambda url: notice_bytes,
+                )
+            ]
+        )
+        cfg = PresentationConfig(
+            store_root=tmp_path / "evaluations",
+            config_dir=REPO_ROOT / "config",
+            issue_terms_resolver=resolver,
+        )
+        service = PresentationService(cfg)
+        client = TestClient(
+            create_app(service),
+            base_url="http://127.0.0.1:8000",
+            headers={"Origin": "http://127.0.0.1:8000"},
+        )
+        pdf_bytes = VISHAL_RHP_PDF.read_bytes()
+    
+        conflict = client.post(
+            "/api/v1/ingest/manual-terms",
+            files={"file": ("vishal.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
+            data={
+                "mode": "final",
+                "price_band_low": "200",
+                "explanation": EXPLANATION,
+            },
+        )
+>       assert conflict.status_code == 409, conflict.text
+E       AssertionError: {"error":"Awaiting Issue Terms","message":"AWAITING_ISSUE_TERMS: required issue terms are unavailable: issue.price_band_high, issue.lot_size, issue.ofs. The uploaded filing does not disclose them and official source documents were retrieved but rejected (classification, issuer identity or value checks failed; see the resolution diagnostics). No evaluation was produced, no values were assumed, and nothing was persisted. Retry after the official Price Band Notice is published, upload a filing that discloses these terms, or supply every required term through the bounded manual issue-term entry (recorded as MANUAL_ENTRY and never source-verified).","code":"AWAITING_ISSUE_TERMS","missing_fields":["price_band_high","lot_size","ofs"],"resolution":{"status":"UNAVAILABLE","fields":{"price_band_low":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"price_band_high":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"lot_size":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"ofs":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"fresh_issue":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"open_date":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"close_date":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"}},"verified":false,"resolved_fields":[],"unresolved_fields":["price_band_low","price_band_high","lot_size","ofs"],"conflicts":[],"from_cache":false,"source_uri":null,"provider":null,"retrieved_at":null,"document_class":null,"providers":[{"provider":"official-url","outcome":"FOUND","detail":"notice retrieved from https://www.nseindia.com/announcements/vishal-price-band","listing_searched":false,"searched_listings":[],"notes":[],"sources":[]},{"provider":"official-url","outcome":"REJECTED","detail":"STALE_OR_DIFFERENT_ISSUE: explicit issue dates differ from uploaded filing","listing_searched":false,"searched_listings":[],"notes":[],"sources":[]}],"remaining_required_fields":["issue.price_band_low","issue.price_band_high","issue.lot_size","issue.ofs"],"ready":false,"manual_entry":{"fields":["price_band_low"],"values":{"price_band_low":200.0},"explanation":"Terms read from the exchange price-band announcement dated 2026-10-10.","provenance":"MANUAL_ENTRY","verified":false,"overridden_by_verified":[],"reporting_unit":"INR_LAKHS"},"reporting_unit":"INR_LAKHS"},"ingestion_id":"ing-c5e6a9c99f974887","correlation_id":"ing-c5e6a9c99f974887","activity_url":"/api/v1/ingestions/ing-c5e6a9c99f974887"}
+E       assert 422 == 409
+E        +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+
+tests/test_step5_auditor_and_manual_terms.py:598: AssertionError
+_______ test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice ________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-8/test_ingest_vishal_rhp_auto_re0')
+golden_input = {'ipo_id': 'VISHAL-NIRMITI-LIMITED', 'company_name': 'Vishal Nirmiti Limited', 'board': 'mainboard', 'icdr_route': '6(1)', ...}
+config = {'config_version': '1.5.0', 'spec_version': '1.5', '_conventions': {'bands': "[operator, value, score]; evaluated top-...n whose metric is NOT_APPLICABLE is removed from both numerator and denominator.', ...}, 'currency': 'INR_CRORES', ...}
+
+    def test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice(tmp_path, golden_input, config):
+        """End-to-end: Vishal RHP + runtime resolver -> assembled, evaluated,
+        persisted, idempotent.
+    
+        MOCKED verified channel: an HttpNoticeProvider with an injected
+        fetcher serves the retained notice text from an official-host URL.
+        This proves the verified-retrieval mechanics; it is not live
+        retrieval, and the served text remains the repository-retained
+        fixture text (see tests/test_cross_ipo_issue_term_provenance.py).
+        """
+        from ipo_screening.issue_terms import HttpNoticeProvider, IssueTermsResolver, NoticeSnapshotCache
+    
+        store_dir = tmp_path / "evaluations"
+        store = EvaluationStore(store_dir)
+        baseline = evaluate(golden_input, config, mode="final", evaluation_datetime=EVAL_AT, store=store)
+        historical_id = baseline.record.evaluation_id
+    
+        notice_bytes = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes()
+        resolver = IssueTermsResolver(
+            providers=[
+                HttpNoticeProvider(
+                    {"VISHAL-NIRMITI-LIMITED": "https://www.nseindia.com/announcements/vishal-price-band"},
+                    fetcher=lambda url: notice_bytes,
+                )
+            ],
+            cache=NoticeSnapshotCache(tmp_path / "terms-cache"),
+        )
+        cfg = PresentationConfig(store_root=store_dir, config_dir=REPO_ROOT / "config", issue_terms_resolver=resolver)
+        client = TestClient(create_app(PresentationService(cfg)), base_url="http://127.0.0.1:8000", headers={"Origin": "http://127.0.0.1:8000"})
+    
+        res = client.post(
+            "/api/v1/ingest/document",
+            files={"file": ("vishal_nirmiti_rhp.pdf", io.BytesIO(VISHAL_RHP_PDF.read_bytes()), "application/pdf")},
+            data={"mode": "final"},
+        )
+>       assert res.status_code == 201, f"Auto-resolution ingestion failed: {res.text}"
+E       AssertionError: Auto-resolution ingestion failed: {"error":"Awaiting Issue Terms","message":"AWAITING_ISSUE_TERMS: required issue terms are unavailable: issue.price_band_low, issue.price_band_high, issue.lot_size, issue.ofs. The uploaded filing does not disclose them and official source documents were retrieved but rejected (classification, issuer identity or value checks failed; see the resolution diagnostics). No evaluation was produced, no values were assumed, and nothing was persisted. Retry after the official Price Band Notice is published, upload a filing that discloses these terms, or supply every required term through the bounded manual issue-term entry (recorded as MANUAL_ENTRY and never source-verified).","code":"AWAITING_ISSUE_TERMS","missing_fields":["price_band_low","price_band_high","lot_size","ofs"],"resolution":{"status":"UNAVAILABLE","fields":{"price_band_low":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"price_band_high":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"lot_size":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"ofs":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"fresh_issue":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"open_date":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"},"close_date":{"state":"UNRESOLVED_AFTER_DISCOVERY","candidates":[],"qualifications":[],"freshness":"No new numeric freshness policy; explicit lifecycle mismatch rejected; publication date may be unavailable"}},"verified":false,"resolved_fields":[],"unresolved_fields":["price_band_low","price_band_high","lot_size","ofs"],"conflicts":[],"from_cache":false,"source_uri":null,"provider":null,"retrieved_at":null,"document_class":null,"providers":[{"provider":"official-url","outcome":"FOUND","detail":"notice retrieved from https://www.nseindia.com/announcements/vishal-price-band","listing_searched":false,"searched_listings":[],"notes":[],"sources":[]},{"provider":"official-url","outcome":"REJECTED","detail":"STALE_OR_DIFFERENT_ISSUE: explicit issue dates differ from uploaded filing","listing_searched":false,"searched_listings":[],"notes":[],"sources":[]}],"remaining_required_fields":["issue.price_band_low","issue.price_band_high","issue.lot_size","issue.ofs"],"ready":false,"reporting_unit":"INR_LAKHS"},"ingestion_id":"ing-bcf8dbc35dfa4729","correlation_id":"ing-bcf8dbc35dfa4729","activity_url":"/api/v1/ingestions/ing-bcf8dbc35dfa4729"}
+E       assert 422 == 201
+E        +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+
+tests/test_ui7_ingestion.py:627: AssertionError
+_________________________ test_t7_29_cli_config_verify _________________________
+
+    def test_t7_29_cli_config_verify():
+        """T-7-29: CLI config verify: runs deterministic verification and exits 0."""
+        cmd = [
+            sys.executable,
+            "engine/tools/ipo_screen.py",
+            "config",
+            "verify",
+            "--config",
+            "config/ipo-config.v1.6.0.json",
+            "--proposal",
+            "config/calibration-proposal.v1.6.0.json",
+            "--baseline",
+            "config/ipo-config.v1.5.0.json",
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+>       assert proc.returncode == 0
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/home/user/ipo-screening-engine/.venv/bin/python', 'engine/tools/ipo_screen.py', 'config', 've...ion/price_band_notice.py': False}\n================================================================================\n").returncode
+
+tests/test_v16_implementation.py:419: AssertionError
+_____________________ test_t7_34_frozen_core_verification ______________________
+
+    def test_t7_34_frozen_core_verification():
+        """T-7-34: Frozen core verification: all six engine files remain bit-for-bit identical."""
+        ok, details = verify_frozen_core()
+>       assert ok is True, f"Frozen core mismatch: {details}"
+E       AssertionError: Frozen core mismatch: {'engine/ipo_screening/derived.py': True, 'engine/ipo_screening/scoring.py': True, 'engine/ipo_screening/knockouts.py': True, 'engine/ipo_screening/snapshots.py': True, 'engine/ipo_screening/evaluation.py': True, 'engine/ipo_screening/extraction/price_band_notice.py': False}
+E       assert False is True
+
+tests/test_v16_implementation.py:508: AssertionError
+___________________ test_t7_39_provenance_chain_verification ___________________
+
+    def test_t7_39_provenance_chain_verification():
+        """T-7-39: Provenance chain verification: Dataset -> Analysis -> Proposal -> v1.6 is verified."""
+        report = verify_v1_6_implementation()
+>       assert report.get("status") == "PASS"
+E       AssertionError: assert 'FAIL' == 'PASS'
+E         
+E         - PASS
+E         + FAIL
+
+tests/test_v16_implementation.py:549: AssertionError
+____________________ test_t7_42_end_to_end_v15_v16_workflow ____________________
+
+sample_dataset = BacktestDataset(manifest=BacktestDatasetManifest(manifest_version='1.0.0', dataset_version='1.0.0', calculation_versio... observation_6m_hash='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', calculation_version='1.0.0')])
+baseline_v15_config = {'config_version': '1.5.0', 'spec_version': '1.5', '_conventions': {'bands': "[operator, value, score]; evaluated top-...n whose metric is NOT_APPLICABLE is removed from both numerator and denominator.', ...}, 'currency': 'INR_CRORES', ...}
+candidate_v16_config = {'config_version': '1.6.0', 'spec_version': '1.5', '_conventions': {'bands': "[operator, value, score]; evaluated top-...n whose metric is NOT_APPLICABLE is removed from both numerator and denominator.', ...}, 'currency': 'INR_CRORES', ...}
+
+    def test_t7_42_end_to_end_v15_v16_workflow(sample_dataset, baseline_v15_config, candidate_v16_config):
+        """T-7-42: End-to-end workflow: verifies v1.5 baseline, v1.6 implementation, diff, and shadow eval."""
+        # 1. Baseline check
+        assert baseline_v15_config["config_version"] == "1.5.0"
+        # 2. Candidate check
+        assert candidate_v16_config["config_version"] == "1.6.0"
+        # 3. Diff check
+        diff = compute_config_diff(baseline_v15_config, candidate_v16_config)
+        assert diff.is_approved_scope_only is True
+        # 4. Verification check
+        ver_res = verify_v1_6_implementation()
+>       assert ver_res["status"] == "PASS"
+E       AssertionError: assert 'FAIL' == 'PASS'
+E         
+E         - PASS
+E         + FAIL
+
+tests/test_v16_implementation.py:599: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_cross_ipo_issue_term_provenance.py: 2 warnings
+tests/test_four_field_manual_terms.py: 8 warnings
+tests/test_fresh_issue_manual_entry.py: 3 warnings
+tests/test_ingestion_activity.py: 2 warnings
+tests/test_issue_terms_runtime_path.py: 3 warnings
+tests/test_manual_terms_audit_log.py: 2 warnings
+tests/test_step5_auditor_and_manual_terms.py: 4 warnings
+tests/test_ui7_ingestion.py: 3 warnings
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/fastapi/routing.py:360: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    return await dependant.call(**values)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_cross_ipo_issue_term_provenance.py::test_verified_notice_canonical_values_reach_evidence_api
+FAILED tests/test_cross_ipo_issue_term_provenance.py::test_retained_fixture_notice_is_unverified_and_fails_closed
+FAILED tests/test_d_peer_1_no_synthetic_peers.py::test_frozen_core_unchanged
+FAILED tests/test_frozen_core_line_endings.py::test_frozen_core_accepts_lf_files
+FAILED tests/test_frozen_core_line_endings.py::test_frozen_core_accepts_crlf_files
+FAILED tests/test_frozen_core_line_endings.py::test_frozen_core_rejects_real_content_change
+FAILED tests/test_issue_terms_runtime_path.py::test_partial_prospectus_fails_closed_on_missing_term_only
+FAILED tests/test_jio_rhp_issue_terms.py::test_jio_without_official_source_fails_closed_on_pricing_only
+FAILED tests/test_presentation_api.py::test_configuration_status_governance_invariants
+FAILED tests/test_step5_auditor_and_manual_terms.py::test_manual_entry_never_displaces_officially_verified_values
+FAILED tests/test_ui7_ingestion.py::test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice
+FAILED tests/test_v16_implementation.py::test_t7_29_cli_config_verify - asser...
+FAILED tests/test_v16_implementation.py::test_t7_34_frozen_core_verification
+FAILED tests/test_v16_implementation.py::test_t7_39_provenance_chain_verification
+FAILED tests/test_v16_implementation.py::test_t7_42_end_to_end_v15_v16_workflow
+15 failed, 1320 passed, 28 warnings in 1499.12s (0:24:59)
+END_UTC=2026-10-21T09:05:32Z
+EXIT=1
