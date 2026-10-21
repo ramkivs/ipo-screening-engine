@@ -13,6 +13,7 @@ on:
       - docs/investigation/automatic-official-discovery-2026-10-21/*.py
 permissions:
   contents: read
+  checks: write
 jobs:
   actual-exchange-http:
     runs-on: windows-latest
@@ -49,4 +50,5 @@ jobs:
       - name: Real Jio PDF and live official discovery through evaluation gates
         env:
           PYTHONPATH: engine
+          LIVE_CHECK_TOKEN: ${{ github.token }}
         run: python -u docs/investigation/automatic-official-discovery-2026-10-21/verify_live_ingestion.py
