@@ -10,6 +10,7 @@ import base64
 import hashlib
 import json
 import os
+import sys
 import zlib
 from datetime import datetime, timezone
 
@@ -31,6 +32,12 @@ def emit(row):
         escaped = text.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
         print('::notice title=Live official retrieval::' + escaped, flush=True)
 
+source_set = sys.argv[1] if len(sys.argv) > 1 else 'all'
+if source_set == 'bse':
+    urls = [u for u in urls if 'bseindia.com' in u]
+elif source_set == 'nse':
+    urls = list(dict.fromkeys(u for u in urls if 'bseindia.com' not in u))
+seen_hashes = set()
 for url in urls:
     row = {'url': url, 'at': datetime.now(timezone.utc).isoformat(),
            'transport': 'production _default_http_fetch; actual public HTTP, no fixture'}
@@ -39,7 +46,9 @@ for url in urls:
         row.update(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest(),
                    classification=OfficialDiscoveryProvider._classify_listing(raw))
         packed = base64.b64encode(zlib.compress(raw)).decode()
-        if len(packed) <= 45000:
+        if row['sha256'] in seen_hashes:
+            row['response_already_retained_by_hash'] = True
+        elif len(packed) <= 12000:
             row['public_response_chunks'] = (len(packed) + 1999) // 2000
             for index in range(row['public_response_chunks']):
                 emit({'kind': 'public_response_chunk', 'url': url, 'sha256': row['sha256'],
@@ -49,4 +58,6 @@ for url in urls:
     except Exception as exc:
         row.update(error_type=type(exc).__name__, error=str(exc),
                    state='RETRIEVAL_FAILED_NOT_NONPUBLICATION')
+    if row.get('sha256'):
+        seen_hashes.add(row['sha256'])
     emit(row)

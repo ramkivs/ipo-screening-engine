@@ -49,16 +49,17 @@ with tempfile.TemporaryDirectory(prefix='actual-jio-discovery-') as temp:
             'status': exc.resolution.get('status'),
             'ready': exc.resolution.get('ready'),
             'assembly_error': exc.resolution.get('assembly_error'),
-            'field_diagnostics': exc.resolution.get('field_diagnostics')})
+            'conflicts': exc.resolution.get('conflicts'),
+            'field_diagnostics': {f: {'state': d.get('state'), 'candidates': [{k: v for k, v in c.items() if k in ('value', 'unit', 'uri', 'quote', 'content_hash', 'verification')} for c in d.get('candidates', [])]} for f, d in exc.resolution.get('fields', {}).items()}})
     except Exception as exc:
         emit('other_gate_failure', {'type': type(exc).__name__, 'message': str(exc)})
     saved = svc.get_ingestion_activity(rec.ingestion_id)
     assert saved == rec.snapshot()
-    for event in saved['events']:
-        if event['stage'] in ('official_discovery', 'term_resolution', 'evaluation', 'persistence'):
-            emit('activity_event', event)
     emit('terminal', {k: saved[k] for k in ('ingestion_id', 'status', 'error_code',
         'finished_at', 'evaluation_run', 'evaluation_id', 'persisted')})
+    for event in saved['events']:
+        if event['stage'] == 'official_discovery' and event['event_type'] == 'source_attempt' and event['details'].get('notes'):
+            emit('activity_event', event)
     if saved['status'] == 'SUCCEEDED':
         assert saved['evaluation_run'] and saved['persisted'] and saved['evaluation_id']
     else:

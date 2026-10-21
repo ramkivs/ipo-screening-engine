@@ -25,7 +25,15 @@ jobs:
       - name: Actual production HTTP exchange response probe
         env:
           PYTHONPATH: engine
-        run: python -u docs/investigation/automatic-official-discovery-2026-10-21/probe_live.py
+        run: python -u docs/investigation/automatic-official-discovery-2026-10-21/probe_live.py nse
+      - name: Actual BSE public page and archive behaviour
+        env:
+          PYTHONPATH: engine
+        run: python -u docs/investigation/automatic-official-discovery-2026-10-21/probe_live.py bse
+      - name: Inspect actual discovered official document parsing
+        env:
+          PYTHONPATH: engine
+        run: python -u docs/investigation/automatic-official-discovery-2026-10-21/inspect_documents.py
       - name: Real Jio PDF and live official discovery through evaluation gates
         env:
           PYTHONPATH: engine
