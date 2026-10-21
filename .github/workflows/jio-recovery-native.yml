@@ -1,0 +1,35 @@
+name: Jio focused native API recovery
+on:
+  push:
+    branches: [arena/95234306-ipo-screening-engine]
+    paths:
+      - .github/workflows/jio-recovery-native.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  checks: write
+jobs:
+  actual-api:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements.txt
+      - name: Actual HTTP upload, terminal GET, durable restart and conditional duplicate
+        env:
+          PYTHONPATH: engine
+          PYTHONUNBUFFERED: '1'
+          JIO_RECOVERY_OUTPUT: ${{ runner.temp }}/jio-native-api
+          LIVE_CHECK_TOKEN: ${{ github.token }}
+        run: python docs/investigation/jio-recovery/native_api.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jio-native-api-evidence
+          path: ${{ runner.temp }}/jio-native-api
