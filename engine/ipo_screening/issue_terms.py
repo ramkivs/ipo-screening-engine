@@ -57,8 +57,12 @@ DISCOVERABLE_TERMS = REQUIRED_ISSUE_TERMS + ("fresh_issue", "open_date", "close_
 OFFICIAL_HOSTS = {
     "nseindia.com",
     "www.nseindia.com",
+    # Exchange archive URLs are exposed by issuer-matched NSE issueInfo records.
+    "nsearchives.nseindia.com",
     "bseindia.com",
     "www.bseindia.com",
+    # Official document host linked by issuer-matched BSE DisplayIPO pages.
+    "listing.bseindia.com",
     "sebi.gov.in",
     "www.sebi.gov.in",
 }
@@ -112,18 +116,18 @@ def _warm_up_session(url: str, timeout_seconds: float) -> None:
         return
     if parsed.path.lower().endswith(".pdf"):
         return
-    _WARMED_HOSTS.add(host)
     try:
         warm = urllib.request.Request(
             f"{parsed.scheme}://{host}/", headers=dict(_BROWSER_HEADERS)
         )
         with urllib.request.urlopen(warm, timeout=min(timeout_seconds, 15.0)) as response:
             response.read(4096)
+        _WARMED_HOSTS.add(host)  # failed warm-ups must not poison subsequent attempts
     except Exception:
         pass  # best-effort; the real fetch and its validation decide
 
 
-def _default_http_fetch(url: str, timeout_seconds: float) -> bytes:
+def _default_http_fetch(url: str, timeout_seconds: float, *, referer: Optional[str] = None) -> bytes:
     """Default retrieval for official documents.
 
     Exchange/SEBI document servers commonly reject bare library user
@@ -140,7 +144,9 @@ def _default_http_fetch(url: str, timeout_seconds: float) -> bytes:
     parsed = urlparse(url)
     headers = dict(_BROWSER_HEADERS)
     if parsed.scheme and parsed.hostname:
-        headers["Referer"] = f"{parsed.scheme}://{parsed.hostname}/"
+        headers["Referer"] = referer or f"{parsed.scheme}://{parsed.hostname}/"
+    if parsed.path.startswith("/api/"):
+        headers["Accept"] = "application/json,text/plain,*/*"
     request = urllib.request.Request(url, headers=headers)
     # Bounded retries for transient retrieval failures (connection
     # resets, timeouts, HTTP 429/5xx): official document servers are
@@ -608,6 +614,8 @@ class OfficialDiscoveryProvider:
         # links in the served HTML).
         "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
         "https://www.bseindia.com/publicissue.html",
+        # Public record feed behind NSE's JavaScript listing; no guessed issuer IDs.
+        "https://www.nseindia.com/api/all-upcoming-issues?category=ipo",
         "https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0",
     )
     _GENERIC_TOKENS = {"LIMITED", "INDIA", "PRIVATE", "COMPANY", "INDUSTRIES", "INDUSTRY", "GLOBAL", "INTERNATIONAL"}
@@ -769,10 +777,10 @@ class OfficialDiscoveryProvider:
         self.timeout_seconds = timeout_seconds
         self._fetcher = fetcher
 
-    def _fetch(self, url: str) -> bytes:
+    def _fetch(self, url: str, referer: Optional[str] = None) -> bytes:
         if self._fetcher is not None:
             return self._fetcher(url)
-        return _default_http_fetch(url, self.timeout_seconds)
+        return _default_http_fetch(url, self.timeout_seconds, referer=referer)
 
     def _candidate_links(self, listing_bytes: bytes, base_url: str, company_name: str) -> List[str]:
         # Served HTML encodes query separators as &amp; in hrefs;
@@ -785,16 +793,15 @@ class OfficialDiscoveryProvider:
         ]
         slug = "".join(re.split(r"[^A-Za-z0-9]+", (company_name or "").upper()))
         found: List[Tuple[int, str]] = []
-        pairs: List[Tuple[str, str]] = []
-        for match in re.finditer(r'href\s*=\s*"([^"]+)"[^>]*>(.*?)</a>', text, re.IGNORECASE | re.DOTALL):
-            pairs.append((match.group(1), re.sub(r"<[^>]+>", " ", match.group(2))))
+        from .official_issue_sources import links
+        pairs = links(listing_bytes, base_url)
         for match in re.finditer(r"https?://[^\s\"<>]+?\.pdf\b", text, re.IGNORECASE):
             pairs.append((match.group(0), ""))
         seen = set()
         for href, anchor in pairs:
             url = urllib.parse.urljoin(base_url, href.strip())
             host = (urllib.parse.urlparse(url).hostname or "").lower()
-            if host not in self.allowed_hosts:
+            if host not in self.allowed_hosts or (self._requires_https and urlparse(url).scheme != "https"):
                 continue
             haystack = f"{url} {anchor}".upper()
             if slug and slug in haystack.replace("-", "").replace("_", "").replace(" ", ""):
@@ -824,7 +831,7 @@ class OfficialDiscoveryProvider:
         return [url for _prio, url in found[: self.max_candidates]]
 
 
-    def _from_issue_page(self, url: str, company_name: str) -> tuple[Optional[NoticeCandidate], str]:
+    def _from_issue_page(self, url: str, company_name: str, referer: Optional[str] = None) -> tuple[Optional[NoticeCandidate], str]:
         """Fetch and parse an official exchange issue-information page.
 
         Returns (candidate, reason); reason names the exact failing
@@ -833,26 +840,31 @@ class OfficialDiscoveryProvider:
         """
         from .extraction.exchange_issue_page import ExchangeIssuePageParser
 
-        host = (urllib.parse.urlparse(url).hostname or "").lower()
-        if host not in self.allowed_hosts:
-            return None, f"{url}: host is not an official source host"
+        host = (urlparse(url).hostname or "").lower()
+        if host not in self.allowed_hosts or (self._requires_https and urlparse(url).scheme != "https"):
+            return None, f"{url}: host is not an HTTPS official source host"
         try:
-            raw = self._fetch(url)
+            raw = self._fetch(url, referer=referer)
         except Exception as exc:
-            return None, f"{url}: issue-page retrieval failed ({type(exc).__name__})"
-        if not raw.lstrip()[:15].lower().startswith((b"<!doctype", b"<html", b"<")):
-            return None, f"{url}: issue page returned a non-HTML response"
-        if self._classify_listing(raw) == "homepage":
-            return None, (
-                f"{url}: issue page returned the exchange homepage instead of "
-                "issue information (HTTP 200 wrong-page/session response)"
-            )
+            return None, f"{url}: issue-page retrieval failed ({type(exc).__name__}: {exc})"
         try:
-            result = ExchangeIssuePageParser().parse(raw, url=url)
+            if urlparse(url).path == '/api/ipo-detail':
+                from .official_issue_sources import parse_nse_detail
+                result = parse_nse_detail(raw, url)
+            else:
+                if not raw.lstrip().startswith(b'<'):
+                    return None, f"{url}: issue page returned a non-HTML response"
+                # Detail pages are not listings. BSE uses its homepage title on
+                # real detail pages too; verify issuer + labelled terms FIRST.
+                result = ExchangeIssuePageParser().parse(raw, url=url)
         except Exception as exc:
-            return None, f"{url}: issue page could not be parsed ({type(exc).__name__})"
+            return None, f"{url}: issue page could not be parsed ({type(exc).__name__}: {exc})"
         if _norm_name(result.company_name) != _norm_name(company_name):
-            return None, f"{url}: issue page names a different issuer"
+            kind = self._classify_listing(raw)
+            reason = ("exchange homepage instead of issue information" if kind == "homepage" else
+                      "JavaScript shell with no issuer issue data" if kind == "shell" else
+                      "issue page names a different issuer or lacks issuer identity")
+            return None, f"{url}: {reason}"
         if not any(getattr(result, f + "_amount" if f in ("fresh_issue", "ofs") else f, None) is not None for f in DISCOVERABLE_TERMS):
             return None, f"{url}: issue page has no labelled Price Band or Market Lot"
         return NoticeCandidate(
@@ -860,9 +872,57 @@ class OfficialDiscoveryProvider:
             provider=self.name,
             uri=url,
             retrieved_at=_utcnow().isoformat().replace("+00:00", "Z"),
-            raw_bytes=None,
+            raw_bytes=raw,
             verified=True,
         ), ""
+
+    def _issue_attachments(self, page, company_name, ipo_id):
+        """Follow bounded document links only after the issue page issuer matches."""
+        from .official_issue_sources import links, official_document_members
+        from .extraction.official_offer_amounts import document_pages, explicit_amounts, parse_official_rhp
+        found, reasons = [], []
+        eligible = []
+        for url, label in links(page.raw_bytes or b"", page.uri):
+            parsed = urlparse(url)
+            if (parsed.hostname not in self.allowed_hosts or
+                    (self._requires_https and parsed.scheme != "https")):
+                continue
+            if (parsed.path.lower().endswith((".pdf", ".zip")) and
+                    re.search(r"price.?band|prospectus|rhp|drhp|gid|offer.document|ratios|basis.of.issue.price", label + " " + url, re.I)):
+                if url not in eligible:
+                    eligible.append(url)
+        for url in eligible[:self.max_candidates]:
+            try:
+                raw = self._fetch(url, referer=page.uri)
+                members = list(official_document_members(raw, url))
+                if not members:
+                    reasons.append(f"{url}: official archive contains no supported PDF/text members")
+                for member, uri in members:
+                    try:
+                        result = parse_official_rhp(member, uri)
+                    except Exception:
+                        result = None
+                    if result is not None:
+                        if _norm_name(result.company_name) != _norm_name(company_name):
+                            reasons.append(f"{uri}: official RHP names a different issuer")
+                            continue
+                        found.append(NoticeCandidate(result, self.name, uri,
+                            _utcnow().isoformat().replace("+00:00", "Z"), verified=True))
+                        continue
+                    for provider_cls in (HttpNoticeProvider, HttpProspectusProvider):
+                        provider = provider_cls({ipo_id: uri}, fetcher=lambda _url, data=member: data,
+                            allowed_hosts=self.allowed_hosts, timeout_seconds=self.timeout_seconds)
+                        candidate, report = provider.find(company_name, ipo_id)
+                        if candidate is not None:
+                            if provider_cls is HttpNoticeProvider:
+                                candidate.result = explicit_amounts(candidate.result, document_pages(member))
+                            found.append(candidate)
+                            break
+                    else:
+                        reasons.append(f"{uri}: attachment rejected; {report.detail}")
+            except Exception as exc:
+                reasons.append(f"{url}: official attachment retrieval/decoding failed ({type(exc).__name__}: {exc})")
+        return found, reasons
 
     @staticmethod
     def _merge_candidates(candidates: List[NoticeCandidate]) -> NoticeCandidate:
@@ -887,7 +947,7 @@ class OfficialDiscoveryProvider:
         all_candidates: List[NoticeCandidate] = []
 
         def note(text: str) -> None:
-            if text and text not in notes and len(notes) < 6:
+            if text and text not in notes:
                 notes.append(text)
 
         for listing_url in self.listing_urls:
@@ -897,6 +957,29 @@ class OfficialDiscoveryProvider:
                 detail = f"listing retrieval failed ({type(exc).__name__})"
                 note(f"{listing_url}: {detail}")
                 attempts.append(ListingAttempt(listing_url, "failed", False, 0, detail))
+                continue
+            from .official_issue_sources import NSE_LISTING, nse_issue_links
+            if listing_url == NSE_LISTING and not raw.lstrip().startswith(b"<"):
+                try:
+                    discovered = nse_issue_links(raw, company_name)
+                except (ValueError, TypeError, AttributeError) as exc:
+                    detail = f"NSE public issue records malformed/unusable ({type(exc).__name__}: {exc})"
+                    attempts.append(ListingAttempt(listing_url, "malformed", False, 0, detail))
+                    note(f"{listing_url}: {detail}")
+                    continue
+                attempts.append(ListingAttempt(listing_url, "issue_records" if discovered else "no_match",
+                    bool(discovered), len(discovered), "Exact issuer-matched NSE records; absence is not publication evidence"))
+                for page_url, api_url in discovered[:self.max_candidates]:
+                    for detail_url in (page_url, api_url):
+                        candidate, reason = self._from_issue_page(detail_url, company_name, referer=listing_url)
+                        if candidate:
+                            all_candidates.append(candidate)
+                            attachments, reasons = self._issue_attachments(candidate, company_name, ipo_id)
+                            all_candidates.extend(attachments)
+                            for reason in reasons:
+                                note(reason)
+                        else:
+                            note(reason)
                 continue
             kind = self._classify_listing(raw)
             if kind == "homepage":
@@ -943,9 +1026,13 @@ class OfficialDiscoveryProvider:
             for link in self._candidate_links(raw, listing_url, company_name):
                 low = link.lower()
                 if "displayipo" in low or "issue-information" in low or "issue_information" in low:
-                    page_candidate, reason = self._from_issue_page(link, company_name)
+                    page_candidate, reason = self._from_issue_page(link, company_name, referer=listing_url)
                     if page_candidate is not None:
                         collected.append(page_candidate)
+                        attachments, reasons = self._issue_attachments(page_candidate, company_name, ipo_id)
+                        collected.extend(attachments)
+                        for reason in reasons:
+                            note(reason)
                     else:
                         note(reason)
                     continue

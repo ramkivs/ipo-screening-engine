@@ -19,6 +19,9 @@ urls = list(OfficialDiscoveryProvider.LISTING_URLS) + [
     'https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4894&type=IPO&idtype=1&status=L&IPONo=8047&startdt=21/10/2026',
     'https://www.nseindia.com/api/all-upcoming-issues?category=ipo',
     'https://www.nseindia.com/api/ipo-detail?symbol=JPL',
+    'https://www.bseindia.com/markets/publicissues/ipoissues?id=1&Type=P',
+    'https://www.bseindia.com/markets/publicissues/displayipo?id=4894&type=IPO&idtype=1&status=L&IPONo=8047&startdt=21/10/2026',
+    'https://listing.bseindia.com/Download/8888888/PreAnchor/JioPlatformsPBAdNewspaperClippings_20261015185329.zip',
 ]
 
 def emit(row):
@@ -37,7 +40,10 @@ for url in urls:
                    classification=OfficialDiscoveryProvider._classify_listing(raw))
         packed = base64.b64encode(zlib.compress(raw)).decode()
         if len(packed) <= 45000:
-            row['zlib_base64_public_response'] = packed
+            row['public_response_chunks'] = (len(packed) + 1999) // 2000
+            for index in range(row['public_response_chunks']):
+                emit({'kind': 'public_response_chunk', 'url': url, 'sha256': row['sha256'],
+                      'index': index, 'count': row['public_response_chunks'], 'zlib_base64': packed[index * 2000:(index + 1) * 2000]})
         else:
             row['response_not_in_annotation'] = 'compressed response exceeds bounded annotation size'
     except Exception as exc:

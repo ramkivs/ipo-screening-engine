@@ -183,6 +183,15 @@ class ExchangeIssuePageParser:
                 extraction_method=ExtractionMethod.EXCHANGE_DATA.value))
             setattr(result, name + "_amount_unit", unit)
 
+        # Repeated contradictory labels in one response are not first-wins.
+        for match, names, count in ((band, ('price_band_low', 'price_band_high'), 2),
+                                    (lot, ('lot_size',), 1)):
+            if match and len({tuple(_number(m.group(i)) for i in range(1, count + 1))
+                              for m in match.re.finditer(text)}) > 1:
+                for name in names:
+                    setattr(result, name, None)
+                    result.metadata.setdefault('issue_term_errors', {})[name] = 'Conflicting labelled values in one issue page'
+
         # Issuer identity: the shortest name-like LIMITED line preceding
         # the terms (exchange pages head the issue table with it).
         head = text[: band.start()] if band else text[:2000]

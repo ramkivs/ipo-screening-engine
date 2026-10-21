@@ -91,7 +91,9 @@ def resolve_fields(resolver, outcome, candidates, company_name, ipo_id, missing_
         elif entries:
             state = "MALFORMED_OR_AMBIGUOUS"
         else:
-            state = "UNRESOLVED_AFTER_DISCOVERY"
+            state = ("MALFORMED_OR_AMBIGUOUS" if any(
+                name in getattr(c.result, "metadata", {}).get("issue_term_errors", {}) for c in candidates)
+                else "UNRESOLVED_AFTER_DISCOVERY")
         outcome.field_diagnostics[name] = {"state": state, "candidates": [e[2] for e in entries],
             "qualifications": (["Unverified candidate disagrees; not used to override official evidence"]
                 if eligible and any(e[3] and not e[4] and e[2]["comparison_value"] not in unique for e in entries) else []),
