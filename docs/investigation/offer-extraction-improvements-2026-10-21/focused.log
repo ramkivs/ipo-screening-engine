@@ -1,0 +1,33 @@
+[pytest-progress] collected 162 tests; start 18:13:54
+
+........................[pytest-progress] |#####.........................|  15.4% of collected 25/162  elapsed 0s  eta 0s (linear-rate estimate)
+........[pytest-progress]   stage tests/test_offer_table_boundaries.py: 31 tests, 0.1s
+.................[pytest-progress] |#########.....................|  30.9% of collected 50/162  elapsed 0s  eta 0s (linear-rate estimate)
+.......[pytest-progress]   stage tests/test_official_discovery.py: 24 tests, 0.0s
+.........[pytest-progress]   stage tests/test_ofs_nil_binding.py: 9 tests, 0.0s
+....... [ 44%]
+..[pytest-progress] |##############................|  46.3% of collected 75/162  elapsed 0s  eta 0s (linear-rate estimate)
+.........................[pytest-progress] |###################...........|  61.7% of collected 100/162  elapsed 0s  eta 0s (linear-rate estimate)
+........[pytest-progress]   stage tests/test_issue_terms_multisource.py: 42 tests, 0.0s
+.................[pytest-progress] |#######################.......|  77.2% of collected 125/162  elapsed 6s  eta 2s (linear-rate estimate)
+.......[pytest-progress]   stage tests/test_automatic_official_issue_discovery.py: 24 tests, 5.9s
+...........[pytest-progress]   stage tests/test_ingestion_activity.py: 11 tests, 0.8s
+.. [ 88%]
+.....[pytest-progress] |############################..|  92.6% of collected 150/162  elapsed 7s  eta 1s (linear-rate estimate)
+.......[pytest-progress]   stage tests/test_bse_current_listing.py: 14 tests, 0.0s
+.....[pytest-progress] |##############################| 100.0% of collected 162/162  elapsed 8s  eta 0s (linear-rate estimate)
+.                                                       [100%][pytest-progress]   stage tests/test_issue_terms_windows_retrieval.py: 7 tests, 1.0s
+[pytest-progress] finished 162/162 tests in 8.0s (passed=162 failed=0 skipped=0), exitstatus=0
+
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_ingestion_activity.py::test_api_error_correlates_to_recoverable_history
+tests/test_ingestion_activity.py::test_windows_trace_pattern_is_unavailable_through_the_api
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/fastapi/routing.py:360: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    return await dependant.call(**values)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+162 passed, 6 deselected, 3 warnings in 8.42s

@@ -1,0 +1,35 @@
+{
+  "runtime": "e416b1f808d09bf96b8446430ea86c93d3071557",
+  "pdf_sha256": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+  "fresh_issue_amount": null,
+  "ofs_amount": 0.0,
+  "metadata": {
+    "document_class": "OFFICIAL_RHP_TERMS",
+    "native_read_scope": {
+      "total_pages": 591,
+      "page_limit": 30,
+      "pages_examined": 30,
+      "complete_document": false,
+      "page_read_errors": [],
+      "amount_pages_considered": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "offer_table_columns": [],
+    "linear_text_excluded_table_pages": [],
+    "issue_term_diagnostics": [
+      {
+        "code": "SOURCE_PLACEHOLDER",
+        "field": "fresh_issue",
+        "page": 1,
+        "quote": "Fresh Issue Up to  \n270,000,000 \nEquity Shares of \nface value of \u20b910 \neach for cash at a \nprice of \u20b9[\u25cf] each \n(including a \nsecurities \npremium of \u20b9[\u25cf] \nper Equity Share) \naggregating up to \n\u20b9[\u25cf] million \nNot applicable Up to \n270,000,000 \nEquity Shares of \nface value of \u20b910 \neach for cash at a \nprice of \u20b9[\u25cf] ",
+        "method": "NATIVE_TEXT",
+        "coordinates": null
+      }
+    ]
+  }
+}

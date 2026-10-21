@@ -66,3 +66,12 @@ monetary placeholders; reservations/anchor allocations are not fresh cash.
 The corrected current BSE public feed still returns HTTP 403. Neither failure
 nor missing evidence proves that no other notice exists. See the
 [focused recovery report and independent evidence](docs/investigation/jio-recovery/REPORT.md).
+
+### Bounded offer-term extraction improvements
+
+The [authorized extraction enhancement](docs/investigation/offer-extraction-improvements-2026-10-21/README.md)
+adds a bounded 30-page native RHP read with summary-section qualification,
+`SOURCE_PLACEHOLDER` metadata and conservative coordinate-bound table cells.
+Explicit OFS NIL remains zero; unknown cash remains null. No new source authority
+or monetary derivation is introduced. Final native upload `ing-e5c0c436c8564ef5`
+remains BLOCKED only on fresh cash; no evaluation was produced or persisted.
