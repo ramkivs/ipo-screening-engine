@@ -314,3 +314,32 @@ Offer for Sale Size: Not Applicable
     assert candidate.result.fresh_issue_amount.extraction_method == 'OCR'
     assert candidate.result.source_ref.content_hash == hashlib.sha256(raw).hexdigest()
     assert candidate.result.metadata['ocr']['numeric_repair'] is False
+
+
+def test_read_only_ocr_deadline_discards_partial_output_and_never_enters_parser(monkeypatch):
+    import subprocess
+    from ipo_screening.extraction import official_notice_ocr as module
+    from ipo_screening.extraction import official_offer_amounts as amounts
+    monkeypatch.setattr(amounts, 'document_pages', lambda raw: [(1, '')])
+    calls = []
+    def expired(command, **kwargs):
+        calls.append((command, kwargs))
+        raise subprocess.TimeoutExpired(command, kwargs['timeout'], output=b'partial pricing')
+    monkeypatch.setattr(module.subprocess, 'run', expired)
+    with pytest.raises(ValueError, match='bounded 180-second read budget'):
+        module.parse_if_scanned(b'%PDF-image', 'https://www.bseindia.com/ad.pdf')
+    assert len(calls) == 1
+    assert calls[0][1]['input'] == b'%PDF-image'
+    assert calls[0][1]['timeout'] == 180
+    assert calls[0][0][1:] == ['-m', module.__name__]
+
+
+def test_read_only_ocr_failure_does_not_consume_partial_success_payload(monkeypatch):
+    import subprocess
+    from ipo_screening.extraction import official_notice_ocr as module
+    from ipo_screening.extraction import official_offer_amounts as amounts
+    monkeypatch.setattr(amounts, 'document_pages', lambda raw: [(1, '')])
+    monkeypatch.setattr(module.subprocess, 'run', lambda *args, **kwargs:
+        subprocess.CompletedProcess(args, 1, b'[[1,"Fresh Issue Rs 240 million"]]', b'model failure'))
+    with pytest.raises(ValueError, match='OCR failed: model failure'):
+        module.parse_if_scanned(b'%PDF-image', 'https://www.bseindia.com/ad.pdf')

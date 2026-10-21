@@ -25,10 +25,16 @@ for page, api in nse_issue_links(listing, 'Jio Platforms Limited'):
             archive = _default_http_fetch(uri, 5, referer=page)
             for member, member_uri in official_document_members(archive, uri):
                 pages = document_pages(member)
-                candidate, report = HttpNoticeProvider({'JIO': member_uri}, fetcher=lambda url: member).find('Jio Platforms Limited', 'JIO')
+                if any(len(text.strip()) >= 50 for _, text in pages):
+                    candidate, report = HttpNoticeProvider({'JIO': member_uri}, fetcher=lambda url: member).find('Jio Platforms Limited', 'JIO')
+                    report_detail = report.detail
+                else:
+                    candidate = None
+                    report_detail = 'Image-only; actual runtime OCR is verified once in the separate live ingestion step'
+
                 row = {'uri': member_uri, 'bytes': len(member), 'sha256': hashlib.sha256(member).hexdigest(),
                        'notice_values': candidate.values if candidate else None,
-                       'notice_report': report.detail[:700], 'first_page_prefix': pages[0][1][:450]}
+                       'notice_report': report_detail[:700], 'first_page_prefix': pages[0][1][:450]}
                 if candidate:
                     row['quotes'] = {name: getattr(candidate.result, name).quote for name in ('price_band_low', 'price_band_high', 'lot_size') if getattr(candidate.result, name, None)}
                 try:

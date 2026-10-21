@@ -10,6 +10,10 @@ import hashlib
 import re
 from pathlib import Path
 import threading
+import json
+import os
+import subprocess
+import sys
 
 _LOCK = threading.RLock()
 _ENGINE = None
@@ -48,7 +52,7 @@ def _ocr_pages(raw):
         engine = _engine()
         for index in range(len(doc)):
             page = doc[index]
-            scale = min(3.0, 6000 / max(page.get_size()))
+            scale = min(2.0, 4500 / max(page.get_size()))
             bitmap = page.render(scale=scale)
             image = bitmap.to_pil().convert('RGB')
             try:
@@ -95,7 +99,23 @@ def parse_if_scanned(raw, url):
     reject_general_information(native)
     if any(len(text.strip()) >= 50 for _, text in native):
         return None
-    pages = _ocr_pages(raw)
+    # The child performs read-only OCR, never evaluation or persistence. It can
+    # be stopped safely without the live-worker timeout hazard. No partial OCR
+    # output is consumed after a deadline or child failure.
+    env = dict(os.environ)
+    engine_root = str(Path(__file__).resolve().parents[2])
+    env['PYTHONPATH'] = os.pathsep.join(filter(None, [engine_root, env.get('PYTHONPATH')]))
+    with _LOCK:
+        try:
+            proc = subprocess.run([sys.executable, '-m', __name__], input=raw,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=180, check=False)
+        except subprocess.TimeoutExpired as exc:
+            raise ValueError('official image notice OCR exceeded bounded 180-second read budget') from exc
+    if proc.returncode:
+        raise ValueError('official image notice OCR failed: ' + proc.stderr.decode('utf-8', errors='replace')[-500:])
+    pages = json.loads(proc.stdout)
+    if sum(len(text) for _, text in pages) > 120000:
+        raise ValueError('OCR text exceeds bounded official notice size')
     reject_general_information(pages)
     from .interfaces import SourceDocument
     from .price_band_notice import PriceBandNoticeParser
@@ -117,3 +137,8 @@ def parse_if_scanned(raw, url):
         'minimum_line_confidence': .95, 'segments': len(pages),
         'pages': sorted({number for number, _ in pages}), 'numeric_repair': False, 'normalization': 'fixed structural heading whitespace only'}
     return result
+
+
+if __name__ == '__main__':
+    # Isolated read-only worker: no API/server/store imports and no model downloads.
+    print(json.dumps(_ocr_pages(sys.stdin.buffer.read()), ensure_ascii=False))
