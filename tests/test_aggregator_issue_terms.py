@@ -120,7 +120,10 @@ def service(tmp_path,monkeypatch,golden_input, fallback, official=None):
 
 
 def test_controlled_api_evaluation_persistence_flags_hash_restart_and_duplicate(tmp_path,monkeypatch,golden_input):
-    s=service(tmp_path,monkeypatch,golden_input,resolver())
+    transport=resolver()
+    bodies=iter([page()+b'<script>request_id=1</script>',page()+b'<script>request_id=2</script>'])
+    transport.fetcher=lambda uri:next(bodies)
+    s=service(tmp_path,monkeypatch,golden_input,transport)
     result=s.ingest_document(b'%PDF-1.4 controlled','controlled.pdf')
     assert result.issue_terms['aggregator_override']['applied_fields']==['fresh_issue']
     assert result.evaluation.authority_warnings and TAG in result.message
@@ -137,6 +140,8 @@ def test_controlled_api_evaluation_persistence_flags_hash_restart_and_duplicate(
     assert client.get('/api/v1/evaluations').json()['items'][0]['authority_warnings']
     duplicate=restarted.ingest_document(b'%PDF-1.4 controlled','controlled.pdf')
     assert duplicate.is_duplicate and duplicate.evaluation_id==result.evaluation_id
+    assert restarted.eval_store.read_full(result.evaluation_id)==stored
+    assert len(restarted.eval_store.list_evaluations())==1
 
 
 def test_disabled_fallback_keeps_old_gate(tmp_path,monkeypatch,golden_input):
@@ -178,3 +183,13 @@ def test_contradictory_rows_and_invalid_price_band_fail_closed():
     assert not r['fields']
     r=report(page().replace(b'100 to',b'121 to'))
     assert not r['fields']
+
+
+def test_assertion_identity_ignores_only_nonconsumed_html_not_changed_evidence():
+    one,facts=parse_page(page()+b'<script>request=one</script>',URI,'Acme Forge Limited',CTX)
+    two,_=parse_page(page()+b'<script>request=two</script>',URI,'Acme Forge Limited',CTX)
+    assert one['content_hash']!=two['content_hash'] and one['source_id']==two['source_id']
+    changed,_=parse_page(page(amount='241'),URI,'Acme Forge Limited',CTX)
+    assert changed['source_id']!=one['source_id']
+    changed_quote,_=parse_page(page(amount='240.0'),URI,'Acme Forge Limited',CTX)
+    assert changed_quote['source_id']!=one['source_id']

@@ -1,25 +1,25 @@
-[pytest-progress] collected 192 tests; start 19:44:22
+[pytest-progress] collected 193 tests; start 20:08:25
 
-........................[pytest-progress] |####..........................|  13.0% of collected 25/192  elapsed 0s  eta 3s (linear-rate estimate)
-.......[pytest-progress]   stage tests/test_aggregator_issue_terms.py: 30 tests, 0.5s
-..................[pytest-progress] |########......................|  26.0% of collected 50/192  elapsed 1s  eta 1s (linear-rate estimate)
-.............[pytest-progress]   stage tests/test_offer_table_boundaries.py: 31 tests, 0.1s
-.......... [ 37%]
-..[pytest-progress] |############..................|  39.1% of collected 75/192  elapsed 1s  eta 1s (linear-rate estimate)
-............[pytest-progress]   stage tests/test_official_discovery.py: 24 tests, 0.0s
+........................[pytest-progress] |####..........................|  13.0% of collected 25/193  elapsed 0s  eta 3s (linear-rate estimate)
+........[pytest-progress]   stage tests/test_aggregator_issue_terms.py: 31 tests, 0.5s
+.................[pytest-progress] |########......................|  25.9% of collected 50/193  elapsed 1s  eta 1s (linear-rate estimate)
+..............[pytest-progress]   stage tests/test_offer_table_boundaries.py: 31 tests, 0.1s
+......... [ 37%]
+..[pytest-progress] |############..................|  38.9% of collected 75/193  elapsed 1s  eta 1s (linear-rate estimate)
+.............[pytest-progress]   stage tests/test_official_discovery.py: 24 tests, 0.0s
 .........[pytest-progress]   stage tests/test_ofs_nil_binding.py: 9 tests, 0.0s
-....[pytest-progress] |################..............|  52.1% of collected 100/192  elapsed 1s  eta 1s (linear-rate estimate)
-.........................[pytest-progress] |####################..........|  65.1% of collected 125/192  elapsed 1s  eta 0s (linear-rate estimate)
-.............[pytest-progress]   stage tests/test_issue_terms_multisource.py: 42 tests, 0.0s
-....... [ 75%]
-.....[pytest-progress] |#######################.......|  78.1% of collected 150/192  elapsed 1s  eta 0s (linear-rate estimate)
-............[pytest-progress]   stage tests/test_automatic_official_issue_discovery.py: 24 tests, 5.4s
+...[pytest-progress] |################..............|  51.8% of collected 100/193  elapsed 1s  eta 1s (linear-rate estimate)
+.........................[pytest-progress] |###################...........|  64.8% of collected 125/193  elapsed 1s  eta 0s (linear-rate estimate)
+..............[pytest-progress]   stage tests/test_issue_terms_multisource.py: 42 tests, 0.0s
+...... [ 74%]
+.....[pytest-progress] |#######################.......|  77.7% of collected 150/193  elapsed 1s  eta 0s (linear-rate estimate)
+.............[pytest-progress]   stage tests/test_automatic_official_issue_discovery.py: 24 tests, 5.3s
 ...........[pytest-progress]   stage tests/test_ingestion_activity.py: 11 tests, 0.8s
-..[pytest-progress] |###########################...|  91.1% of collected 175/192  elapsed 7s  eta 1s (linear-rate estimate)
-............[pytest-progress]   stage tests/test_bse_current_listing.py: 14 tests, 0.0s
-.....[pytest-progress] |##############################| 100.0% of collected 192/192  elapsed 8s  eta 0s (linear-rate estimate)
-.                         [100%][pytest-progress]   stage tests/test_issue_terms_windows_retrieval.py: 7 tests, 1.0s
-[pytest-progress] finished 192/192 tests in 7.8s (passed=192 failed=0 skipped=0), exitstatus=0
+.[pytest-progress] |###########################...|  90.7% of collected 175/193  elapsed 7s  eta 1s (linear-rate estimate)
+.............[pytest-progress]   stage tests/test_bse_current_listing.py: 14 tests, 0.0s
+.....[pytest-progress] |##############################| 100.0% of collected 193/193  elapsed 8s  eta 0s (linear-rate estimate)
+.                        [100%][pytest-progress]   stage tests/test_issue_terms_windows_retrieval.py: 7 tests, 1.0s
+[pytest-progress] finished 193/193 tests in 7.7s (passed=193 failed=0 skipped=0), exitstatus=0
 
 =============================== warnings summary ===============================
 .venv/lib/python3.11/site-packages/fastapi/testclient.py:1
@@ -32,4 +32,4 @@ tests/test_ingestion_activity.py::test_windows_trace_pattern_is_unavailable_thro
     return await dependant.call(**values)
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-192 passed, 6 deselected, 3 warnings in 8.26s
+193 passed, 6 deselected, 3 warnings in 8.20s

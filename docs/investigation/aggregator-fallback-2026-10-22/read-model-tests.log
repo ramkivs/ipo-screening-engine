@@ -1,0 +1,13 @@
+[pytest-progress] collected 4 tests; start 20:02:12
+
+...[pytest-progress] |##############################| 100.0% of collected 4/4  elapsed 2s  eta 0s (linear-rate estimate)
+.                                                                     [100%][pytest-progress]   stage tests/test_presentation_api.py: 4 tests, 1.8s
+[pytest-progress] finished 4/4 tests in 2.5s (passed=4 failed=0 skipped=0), exitstatus=0
+
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+4 passed, 17 deselected, 1 warning in 2.94s

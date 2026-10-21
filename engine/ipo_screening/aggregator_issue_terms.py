@@ -156,6 +156,17 @@ def parse_page(raw, uri, company, context):
         if len(normalized)>1:raise ValueError('contradictory repeated '+field+' rows')
     if _values_valid({field:items[0]['value'] for field,items in candidates.items() if field in ('price_band_low','price_band_high','lot_size')}):
         raise ValueError('invalid third-party pricing invariants')
+    # Identity is the qualified assertion, not volatile React/ad payloads.
+    # Full raw response hashes remain in provenance; duplicate evaluation keeps
+    # its ORIGINAL immutable manifest. A changed value/unit/quote/row label,
+    # issuer/window or publisher URL still changes identity.
+    assertion={'issuer':issuer_key(company),'open_date':opened,'close_date':closed,'uri':uri,
+        'fields':{field:[{key:item[key] for key in ('value','unit','quote')} | {'label':item['locator'].split(', ',1)[1]}
+                         for item in items] for field,items in candidates.items()}}
+    fingerprint=hashlib.sha256(json.dumps(assertion,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode()).hexdigest()
+    source['source_id']='SRC-AGG-'+fingerprint[:16].upper()
+    for items in candidates.values():
+        for item in items:item['source_id']=source['source_id']
     return source,candidates
 
 

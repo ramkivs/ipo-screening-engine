@@ -14,3 +14,5 @@ The user's explicit 22 October 2026 instruction supersedes the previous official
 - Evaluation summary/detail warnings and evidence classification disclose this authority after restart; activity records the separate fallback stage. No suitable value leaves the original placeholder and awaiting gate intact.
 
 This is a deliberately explicit authority-policy change, not an extraction fix or an assertion that the third-party statement is an official disclosure. Existing financial/scoring/knockout/confidence rules are unchanged. Module execution does not imply a favourable investment verdict.
+
+Idempotency is scoped to qualified assertions (publisher URL, issuer/window, field values/units/quotes/row labels), not unrelated changing HTML. Every raw response keeps its full content hash. Identical asserted inputs return the original immutable evaluation/manifest, while the latest retrieval remains visible in ingestion diagnostics. No transport cache, TTL or freshness policy is introduced.

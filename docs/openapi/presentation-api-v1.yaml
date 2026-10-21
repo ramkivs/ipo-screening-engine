@@ -815,6 +815,15 @@ components:
       type: object
       required: [evaluation_id, ipo_id, company_name, evaluation_mode, evaluation_timestamp, final_score, verdict, confidence, engine_version, config_version, result_hash]
       properties:
+        authority_warnings:
+          type: array
+          items:
+            type: string
+          default: []
+          description: >-
+            Persisted-provenance authority disclosures, including
+            THIRD_PARTY_AGGREGATOR_OVERRIDE. Third-party assertions are not
+            OFFICIAL_VERIFIED. Empty for evaluations without such overrides.
         evaluation_id:
           type: string
         ipo_id:
@@ -1040,6 +1049,15 @@ components:
       type: object
       required: [evaluation_id, ipo_id, company_name, evaluation_mode, evaluation_timestamp, engine_version, spec_version, config_version, config_hash, input_snapshot_hash, source_manifest_hash, result_hash, score, knockouts, verdict, penalties, missing_unverified, provenance]
       properties:
+        authority_warnings:
+          type: array
+          items:
+            type: string
+          default: []
+          description: >-
+            Persisted-provenance authority disclosures, including
+            THIRD_PARTY_AGGREGATOR_OVERRIDE. Third-party assertions are not
+            OFFICIAL_VERIFIED. Empty for evaluations without such overrides.
         evaluation_id:
           type: string
         ipo_id:
