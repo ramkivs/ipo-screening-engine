@@ -20,6 +20,7 @@ out.mkdir(parents=True, exist_ok=True)
 rows = []
 queue = [('https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P', None)]
 seen = set()
+api_base = None
 pattern = re.compile(r'public.?issue|\bipo\b|GetPublicIssue|Pubissues|GetMkt_ISSUE', re.I)
 for _ in range(12):
     if not queue:
@@ -35,24 +36,42 @@ for _ in range(12):
         (out / (digest + '.txt')).write_bytes(raw)
         text = raw.decode('utf-8', errors='replace')
         row.update(sha256=digest, bytes=len(raw))
+        if raw.lstrip().startswith((b'{', b'[')) and len(raw) <= 100000:
+            row['public_json'] = json.loads(raw)
         matches = list(pattern.finditer(text))
         row['keyword_count'] = len(matches)
         row['contexts'] = [text[max(0, m.start()-350):m.end()+900] for m in matches[:60]]
         targets = []
         if '<app-root' in text or '<html' in text[:100].lower():
+            base_match = re.search(r'<base\b[^>]*href=["\']([^"\']+)', text, re.I)
+            document_base = urljoin(url, base_match.group(1)) if base_match else url
             for src in re.findall(r'<script\b[^>]*\bsrc=["\']([^"\']+)', text, re.I):
                 if re.search(r'(?:^|/)env\.js$|(?:^|/)main-[^/]+\.js$', src):
-                    targets.append(src)
+                    targets.append(urljoin(document_base, src))
         else:
             # Lazy route asset names near an IPO/public-issue route. These
             # are the publisher's actual import literals, not guessed paths.
-            contexts = row['contexts']
+            row['contract_contexts'] = []
+            for term in ('GetPublicIssue_par_updated', 'GetMkt_ISSUE', 'DisplayIPO',
+                         'BSE_Domain_APIUrl', 'IPO_HomePageDetail'):
+                row['contract_contexts'].extend(text[max(0, m.start()-450):m.end()+1600]
+                    for m in list(re.finditer(re.escape(term), text, re.I))[:8])
+            contexts = row['contexts'] + row['contract_contexts']
             for context in contexts:
                 targets.extend(re.findall(r'(?:import\s*\(|from\s*)["\']([^"\']+\.js)["\']', context))
             row['api_literals'] = list(dict.fromkeys(re.findall(
                 r'["\']([^"\'\s]{0,100}(?:PublicIssue|Pubissues|GetMkt_ISSUE|IPO_)[^"\'\s]{0,180})["\']', text, re.I)))[:80]
             if url.endswith('env.js'):
                 row['public_environment_source'] = text[:15000]
+                match = re.search(r'BSE_Domain_APIUrl.{0,12}[:=]\s*["\'](https://[^"\']+)', text)
+                if match:
+                    api_base = match.group(1)
+            if api_base:
+                for literal in row['api_literals']:
+                    if literal == '/GetPublicIssue_par_updated/w?flag=1':
+                        linked = api_base.rstrip('/') + literal
+                        if urlparse(linked).hostname == 'api.bseindia.com':
+                            queue.append((linked, 'https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P'))
         for target in dict.fromkeys(targets):
             linked = urljoin(url, target)
             if urlparse(linked).hostname == 'www.bseindia.com' and linked not in seen:
