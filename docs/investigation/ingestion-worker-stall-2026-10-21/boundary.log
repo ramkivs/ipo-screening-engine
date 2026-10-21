@@ -1,0 +1,57 @@
+Ingestion ing-1d171019b5a648e8 worker exited (OSError)
+Traceback (most recent call last):
+  File "/home/user/ipo-screening-engine/engine/ipo_screening/presentation/service.py", line 1128, in ingest_document
+    result = self._ingest_document_impl(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/ipo-screening-engine/engine/ipo_screening/presentation/service.py", line 1406, in _ingest_document_impl
+    _emit("document_validation", "passed", "SUCCEEDED",
+  File "/home/user/ipo-screening-engine/engine/ipo_screening/presentation/service.py", line 1303, in _emit
+    act.emit(stage, event_type, status, message, **kw)
+  File "/home/user/ipo-screening-engine/engine/ipo_screening/presentation/ingestion_activity.py", line 237, in emit
+    self._store.save(self.record)
+  File "/home/user/ipo-screening-engine/docs/investigation/ingestion-worker-stall-2026-10-21/reproduce_boundary.py", line 32, in save
+    raise OSError('injected activity write interruption')
+OSError: injected activity write interruption
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/user/ipo-screening-engine/engine/ipo_screening/presentation/service.py", line 1253, in _run
+    self.ingest_document(
+  File "/home/user/ipo-screening-engine/engine/ipo_screening/presentation/service.py", line 1171, in ingest_document
+    act.emit("finalization", "failed", "FAILED",
+  File "/home/user/ipo-screening-engine/engine/ipo_screening/presentation/ingestion_activity.py", line 237, in emit
+    self._store.save(self.record)
+  File "/home/user/ipo-screening-engine/docs/investigation/ingestion-worker-stall-2026-10-21/reproduce_boundary.py", line 32, in save
+    raise OSError('injected activity write interruption')
+OSError: injected activity write interruption
+[
+  {
+    "version": "baseline",
+    "injected_write_failures": 2,
+    "status": "RUNNING",
+    "finished_at": null,
+    "error_code": null,
+    "event_stages": [
+      "upload",
+      "upload"
+    ],
+    "evaluation_id": null
+  },
+  {
+    "version": "corrected",
+    "injected_write_failures": 2,
+    "status": "FAILED",
+    "finished_at": "2026-10-21T10:45:04.833866Z",
+    "error_code": "INGESTION_WORKER_FAILED",
+    "event_stages": [
+      "upload",
+      "background_execution",
+      "upload",
+      "document_validation",
+      "finalization",
+      "finalization"
+    ],
+    "evaluation_id": null
+  }
+]

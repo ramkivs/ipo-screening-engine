@@ -1,0 +1,35 @@
+[pytest-progress] collected 3 tests; start 10:43:23
+
+..[pytest-progress] |##############################| 100.0% of collected 3/3  elapsed 2s  eta 0s (linear-rate estimate)  FAILURES=1
+F                                                                      [100%][pytest-progress]   stage tests/test_ingestion_worker_lifecycle.py: 3 tests, 2.1s
+[pytest-progress] finished 3/3 tests in 2.1s (passed=2 failed=1 skipped=0), exitstatus=1
+
+=================================== FAILURES ===================================
+__________ test_inner_terminal_memory_does_not_hide_failed_disk_write __________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-6/test_inner_terminal_memory_doe0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fa2ba141810>
+
+    def test_inner_terminal_memory_does_not_hide_failed_disk_write(tmp_path, monkeypatch):
+        svc = service(tmp_path)
+        original = svc.activity_store.save
+        failed = []
+        def save(record):
+            if record['status'] == 'FAILED' and not failed:
+                failed.append(True)
+                raise OSError('synthetic terminal write failure')
+            original(record)
+        monkeypatch.setattr(svc.activity_store, 'save', save)
+        rec = svc.start_ingestion_async(b'invalid pdf')
+        saved = terminal(svc, rec)
+        assert failed and rec.snapshot()['status'] == 'FAILED'
+>       assert saved['status'] == 'FAILED' and saved['error_code'] == 'VALIDATION_ERROR'
+E       AssertionError: assert ('RUNNING' == 'FAILED'
+E         
+E         - FAILED
+E         + RUNNING)
+
+tests/test_ingestion_worker_lifecycle.py:182: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_ingestion_worker_lifecycle.py::test_inner_terminal_memory_does_not_hide_failed_disk_write
+1 failed, 2 passed, 9 deselected in 2.47s

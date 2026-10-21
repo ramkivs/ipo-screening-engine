@@ -567,7 +567,7 @@ def create_router(service: PresentationService) -> APIRouter:
             content={
                 "ingestion_id": recorder.ingestion_id,
                 "correlation_id": recorder.ingestion_id,
-                "status": "RUNNING",
+                "status": recorder.snapshot()["status"],
                 "activity_url": f"/api/v1/ingestions/{recorder.ingestion_id}",
                 "events_url": f"/api/v1/ingestions/{recorder.ingestion_id}/events",
             },

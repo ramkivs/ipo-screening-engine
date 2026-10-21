@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import logging
 from datetime import datetime, timezone
 import shutil
 import tempfile
@@ -1208,27 +1209,70 @@ class PresentationService:
         filename: str = "filing.pdf",
         mode: str = "final",
     ) -> IngestionRecorder:
-        """Start ingestion on a background thread with a live trace.
+        """Dispatch a traced worker; never assume inner terminal recording ran.
 
-        Returns the recorder immediately; the UI polls the activity
-        endpoints for events while processing continues.  The terminal
-        outcome is recorded by ``ingest_document`` itself, so a thread
-        failure can never leave a trace stuck at RUNNING without the
-        wrapper's terminal recording having run.
+        A live but blocked thread cannot safely be killed or labelled failed:
+        it may later persist an evaluation. This boundary handles dispatch and
+        exited workers, not an unsafe wall-clock cancellation of live work.
         """
         import threading as _threading
+        from .ingestion_activity import TERMINAL_STATUSES
 
+        logger = logging.getLogger(__name__)
         recorder = self.activity_store.new_recorder(filename=filename, mode=mode)
+
+        def _failed(code: str, message: str) -> None:
+            snapshot = recorder.snapshot()
+            if snapshot["status"] in TERMINAL_STATUSES:
+                # Memory is not proof of durability: finish mutates the record
+                # before its atomic filesystem write, which can itself fail.
+                saved = self.activity_store.get(recorder.ingestion_id)
+                if saved != snapshot:
+                    try:
+                        self.activity_store.save(snapshot)
+                    except Exception:
+                        logger.exception("Ingestion %s existing terminal activity write failed",
+                                         recorder.ingestion_id)
+                return  # preserve specific BLOCKED/FAILED or genuine success
+            try:
+                recorder.finish("FAILED", error_code=code, error_message=message)
+            except Exception:
+                logger.exception("Ingestion %s terminal activity write failed", recorder.ingestion_id)
+                # finish updated the in-memory terminal record/event before
+                # writing it. Retry that exact snapshot once (no duplicate event).
+                try:
+                    self.activity_store.save(recorder.snapshot())
+                except Exception:
+                    logger.exception("Ingestion %s terminal activity retry failed; storage unavailable",
+                                     recorder.ingestion_id)
 
         def _run() -> None:
             try:
+                recorder.emit("background_execution", "started", "RUNNING",
+                              "Background ingestion worker entered processing.")
                 self.ingest_document(
                     file_bytes=file_bytes, filename=filename, mode=mode, recorder=recorder
                 )
-            except Exception:
-                pass  # terminal outcome already recorded by ingest_document
+            except BaseException as exc:
+                # SystemExit in a daemon thread is not process termination;
+                # Exception-only handlers otherwise leave a durable RUNNING row.
+                if recorder.snapshot()["status"] not in TERMINAL_STATUSES:
+                    logger.exception("Ingestion %s worker exited (%s)",
+                                     recorder.ingestion_id, type(exc).__name__)
+                    _failed("INGESTION_WORKER_FAILED",
+                            f"Background ingestion worker failed ({type(exc).__name__}); see server logs.")
+            finally:
+                _failed("INGESTION_WORKER_INCOMPLETE",
+                        "Background ingestion worker returned without a terminal processing result.")
 
-        _threading.Thread(target=_run, daemon=True, name=f"ingest-{recorder.ingestion_id}").start()
+        try:
+            _threading.Thread(target=_run, daemon=True,
+                              name=f"ingest-{recorder.ingestion_id}").start()
+        except Exception as exc:
+            logger.exception("Ingestion %s dispatch failed (%s)",
+                             recorder.ingestion_id, type(exc).__name__)
+            _failed("INGESTION_DISPATCH_FAILED",
+                    f"Could not start ingestion worker ({type(exc).__name__}); see server logs.")
         return recorder
 
     def _ingest_document_impl(

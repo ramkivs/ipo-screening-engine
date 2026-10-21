@@ -1,0 +1,5 @@
+engine/ipo_screening/presentation/service.py:610: error: Item "None" of "Any | dict[Any, Any] | None" has no attribute "get"  [union-attr]
+engine/ipo_screening/presentation/service.py:611: error: Item "None" of "Any | dict[Any, Any] | None" has no attribute "get"  [union-attr]
+Found 2 errors in 1 file (checked 2 source files)
+
+EXIT=1

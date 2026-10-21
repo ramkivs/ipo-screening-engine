@@ -1,0 +1,30 @@
+[
+  {
+    "version": "baseline",
+    "injected_write_failures": 2,
+    "status": "RUNNING",
+    "finished_at": null,
+    "error_code": null,
+    "event_stages": [
+      "upload",
+      "upload"
+    ],
+    "evaluation_id": null
+  },
+  {
+    "version": "corrected",
+    "injected_write_failures": 2,
+    "status": "FAILED",
+    "finished_at": "2026-10-21T10:45:04.833866Z",
+    "error_code": "INGESTION_WORKER_FAILED",
+    "event_stages": [
+      "upload",
+      "background_execution",
+      "upload",
+      "document_validation",
+      "finalization",
+      "finalization"
+    ],
+    "evaluation_id": null
+  }
+]

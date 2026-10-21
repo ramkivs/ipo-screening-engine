@@ -1,0 +1,120 @@
+[pytest-progress] collected 6 tests; start 10:39:22
+
+FFFF.[pytest-progress] |##############################| 100.0% of collected 6/6  elapsed 6s  eta 0s (linear-rate estimate)  FAILURES=4
+.                                                                   [100%][pytest-progress]   stage tests/test_ingestion_worker_lifecycle.py: 6 tests, 4.1s
+[pytest-progress] finished 6/6 tests in 6.1s (passed=2 failed=4 skipped=0), exitstatus=1
+
+=================================== FAILURES ===================================
+________ test_exception_outside_inner_terminal_handler_is_durable[exc0] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-0/test_exception_outside_inner_t0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fccead1ae50>
+exc = RuntimeError('synthetic boundary failure')
+
+    @pytest.mark.parametrize('exc', [RuntimeError('synthetic boundary failure'), SystemExit('synthetic exit')])
+    def test_exception_outside_inner_terminal_handler_is_durable(tmp_path, monkeypatch, exc):
+        svc = service(tmp_path)
+        def fail(**kw):
+            kw['recorder'].emit('upload', 'received', 'SUCCEEDED', 'Received')
+            raise exc
+        monkeypatch.setattr(svc, 'ingest_document', fail)
+        rec = svc.start_ingestion_async(b'%PDF-1.4 test')
+        saved = terminal(svc, rec)
+>       assert saved['status'] == 'FAILED'
+E       AssertionError: assert 'RUNNING' == 'FAILED'
+E         
+E         - FAILED
+E         + RUNNING
+
+tests/test_ingestion_worker_lifecycle.py:36: AssertionError
+________ test_exception_outside_inner_terminal_handler_is_durable[exc1] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-0/test_exception_outside_inner_t1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fcceaca1810>
+exc = SystemExit('synthetic exit')
+
+    @pytest.mark.parametrize('exc', [RuntimeError('synthetic boundary failure'), SystemExit('synthetic exit')])
+    def test_exception_outside_inner_terminal_handler_is_durable(tmp_path, monkeypatch, exc):
+        svc = service(tmp_path)
+        def fail(**kw):
+            kw['recorder'].emit('upload', 'received', 'SUCCEEDED', 'Received')
+            raise exc
+        monkeypatch.setattr(svc, 'ingest_document', fail)
+        rec = svc.start_ingestion_async(b'%PDF-1.4 test')
+        saved = terminal(svc, rec)
+>       assert saved['status'] == 'FAILED'
+E       AssertionError: assert 'RUNNING' == 'FAILED'
+E         
+E         - FAILED
+E         + RUNNING
+
+tests/test_ingestion_worker_lifecycle.py:36: AssertionError
+___________ test_thread_dispatch_failure_has_durable_terminal_state ____________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-0/test_thread_dispatch_failure_h0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fcceac73210>
+
+    def test_thread_dispatch_failure_has_durable_terminal_state(tmp_path, monkeypatch):
+        svc = service(tmp_path)
+        monkeypatch.setattr(threading.Thread, 'start', lambda self: (_ for _ in ()).throw(RuntimeError('cannot start')))
+>       rec = svc.start_ingestion_async(b'%PDF-1.4 test')
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_ingestion_worker_lifecycle.py:46: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+engine/ipo_screening/presentation/service.py:1231: in start_ingestion_async
+    _threading.Thread(target=_run, daemon=True, name=f"ingest-{recorder.ingestion_id}").start()
+tests/test_ingestion_worker_lifecycle.py:45: in <lambda>
+    monkeypatch.setattr(threading.Thread, 'start', lambda self: (_ for _ in ()).throw(RuntimeError('cannot start')))
+                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+.0 = <tuple_iterator object at 0x7fcceabd3b80>
+
+>   monkeypatch.setattr(threading.Thread, 'start', lambda self: (_ for _ in ()).throw(RuntimeError('cannot start')))
+E   RuntimeError: cannot start
+
+tests/test_ingestion_worker_lifecycle.py:45: RuntimeError
+__________ test_return_without_terminal_state_is_not_silently_running __________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-0/test_return_without_terminal_s0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fccead1a5d0>
+
+    def test_return_without_terminal_state_is_not_silently_running(tmp_path, monkeypatch):
+        svc = service(tmp_path)
+        monkeypatch.setattr(svc, 'ingest_document', lambda **kw: None)
+        rec = svc.start_ingestion_async(b'%PDF-1.4 test')
+        saved = terminal(svc, rec)
+>       assert saved['status'] == 'FAILED' and saved['error_code'] == 'INGESTION_WORKER_INCOMPLETE'
+E       AssertionError: assert ('RUNNING' == 'FAILED'
+E         
+E         - FAILED
+E         + RUNNING)
+
+tests/test_ingestion_worker_lifecycle.py:57: AssertionError
+=============================== warnings summary ===============================
+tests/test_ingestion_worker_lifecycle.py::test_exception_outside_inner_terminal_handler_is_durable[exc1]
+  /home/user/ipo-screening-engine/.venv/lib/python3.11/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread ingest-ing-541671bf55884d4e
+  
+  Traceback (most recent call last):
+    File "/usr/lib/python3.11/threading.py", line 1038, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.11/threading.py", line 975, in run
+      self._target(*self._args, **self._kwargs)
+    File "/home/user/ipo-screening-engine/engine/ipo_screening/presentation/service.py", line 1225, in _run
+      self.ingest_document(
+    File "/home/user/ipo-screening-engine/tests/test_ingestion_worker_lifecycle.py", line 32, in fail
+      raise exc
+  SystemExit: synthetic exit
+  
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_ingestion_worker_lifecycle.py::test_exception_outside_inner_terminal_handler_is_durable[exc0]
+FAILED tests/test_ingestion_worker_lifecycle.py::test_exception_outside_inner_terminal_handler_is_durable[exc1]
+FAILED tests/test_ingestion_worker_lifecycle.py::test_thread_dispatch_failure_has_durable_terminal_state
+FAILED tests/test_ingestion_worker_lifecycle.py::test_return_without_terminal_state_is_not_silently_running
+4 failed, 2 passed, 1 warning in 6.53s

@@ -1201,3 +1201,59 @@ Reconciled against the remote repository (`ramkivs/ipo-screening-engine`), all b
   PR #6 OPEN/unmerged and head/base unchanged (it is on another existing branch,
   not this session branch). Commit/push and remote byte/SHA/main/PR/worktree
   verification follow this append-only entry; actual SHA is in completion response.
+
+
+## 2026-10-21 — Async ingestion worker/durability correction; Windows cause OPEN
+
+- **Observed report:** ing-bbd84e84a1f24abd on Windows PID 11272 stayed RUNNING
+  with two upload events. No actual process stacks, deployed module identity,
+  ingestion JSON or local exception logs are accessible in Arena. Do not certify
+  the exact local root cause or claim this PID/record was remotely repaired.
+- **History:** latest remote cb5c5e595557ed79f5f78bbc3150ac42b5cd7f88 changes
+  issue-term discovery after validation/extraction. The defective daemon wrapper
+  dates to 22f82b8; no causal link from latest provider changes to the two-event
+  stall is proved. Earliest confirmed persisted frontier is upload SUCCEEDED;
+  the actual stopped Python operation is unknown without local stacks.
+- **Demonstrated defect:** two injected activity-write failures through the real
+  baseline ingestion error path cause the worker to exit silently, leaving exactly
+  two durable upload events, RUNNING, no error/finish/evaluation ID. The old outer
+  except Exception:pass assumed terminal reporting never failed. It also missed
+  SystemExit, dispatch failure and workers returning without terminal results.
+  Terminal memory state could differ from disk after a failed final save.
+- **Correction:** service worker-entry event; dispatch/escaped-worker/incomplete
+  fallback terminal failure with correlated traceback logging. Preserve inner
+  blocked/failure/success and reconcile terminal snapshot with disk; bounded retry
+  persists that same snapshot rather than processing/evaluating again. API 202
+  acknowledgement uses actual activity status rather than unconditional RUNNING.
+  No superficial UI polling change, arbitrary live-thread timeout or false success.
+- **Evidence:** baseline two-event storage-fault reproduction stays RUNNING; fixed
+  reproduction becomes durable FAILED/INGESTION_WORKER_FAILED. Repository Jio PDF
+  SHA256 72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d
+  reaches BLOCKED/AWAITING_ISSUE_TERMS under both dispatchers (32.05/31.73 s),
+  providers empty, no network/evaluation/persistence. Windows byte identity unknown.
+- **Validation:** first regression run 4 failed/2 passed (6.53 s); separate terminal
+  memory/disk regression failed before refinement. Final focused 23 passed,
+  3 deprecation warnings, 1.84 s. Final full backend **1,368 passed, 0 failed/skipped,
+  25 deprecation warnings, 1653.21 s, EXIT 0**. Frontend **90 passed/0 failed**;
+  Python/JS syntax and ten-profile config validation EXIT 0. Final 210-file manifest
+  unchanged after full run; SHA256
+  0e3fa79105b2bdfea1442d591f1150edcc7b6d0fbe4a94affb2423e3a944db9a.
+- **Non-green checks disclosed:** standard mypy 2.4.0 exits 2 on duplicate module
+  discovery, identical at baseline. Limited modified-module check exits 1 on two
+  existing None.get read-model errors, identical normalized baseline diagnostics.
+  npm run build exits 1 (no build script; static frontend served directly). No
+  type suppression, unrelated cleanup or artificial build step added to claim pass.
+- **Remaining boundaries:** exact Windows cause OPEN; obtain original JSON/logs,
+  deployed commit/module/PDF identity and current-PID Python thread dump before
+  restart. No old ingestion record rewritten. Live blocked threads, abrupt process
+  death and permanently unwritable activity storage are NOT claimed solved; no
+  unsafe timeout marks FAILED while a live worker might later persist. This is a
+  verified bounded repository correction, not full local-stall investigation closure.
+- **Artifacts:** docs/investigation/ingestion-worker-stall-2026-10-21/REPORT.md,
+  reproducible baseline/current scripts/results, before/final test logs, type/build
+  evidence and frozen manifest. Temporary isolated tests only; no production IPO,
+  Jio or HD Fire evaluation/history mutation, scoring/config/schema/golden change.
+- **Publication:** existing arena/95234306-ipo-screening-engine only; main untouched,
+  PR #6 OPEN/unmerged, existing head/base unchanged. Final commit/push and independent
+  remote byte/SHA/tracker/main/PR/worktree verification follow this append-only
+  entry; exact publication SHA appears in the completion response.
