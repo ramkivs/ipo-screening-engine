@@ -3787,7 +3787,7 @@ export class App {
       const nextAction = record.status === 'SUCCEEDED'
         ? 'Open the evaluation from the outcome panel.'
         : record.status === 'BLOCKED'
-          ? 'Upload a filing that discloses the unresolved terms, retry after the official terms are published, or use the bounded manual entry below where offered. An unavailable source is not proof that terms do not exist.'
+          ? 'Retry automatic official discovery or upload an applicable authoritative filing that establishes the unresolved fields. Missing evidence does not prove that terms are unpublished; a price band alone does not establish a fresh-issue monetary amount.'
           : 'Review the failed stage above and retry. Quote the ingestion id when seeking diagnostics.';
       summary = `<div class="activity-summary">
         <div><strong>Terminal summary</strong> — status <span class="badge ${badgeFor(record.status)}">${this.escape(record.status)}</span></div>

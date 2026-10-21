@@ -66,7 +66,7 @@ OFFICIAL_HOSTS = {
 
 # Archive hosts are eligible only in the issuer-matched discovery pathway.
 # Preserve the existing direct notice/final-Prospectus URL allowlists.
-DISCOVERY_HOSTS = OFFICIAL_HOSTS | {'nsearchives.nseindia.com', 'listing.bseindia.com'}
+DISCOVERY_HOSTS = OFFICIAL_HOSTS | {'nsearchives.nseindia.com', 'listing.bseindia.com', 'api.bseindia.com'}
 
 _BROWSER_HEADERS = {
     "User-Agent": (
@@ -141,13 +141,17 @@ def _default_http_fetch(url: str, timeout_seconds: float, *, referer: Optional[s
     mistaken for the requested page.
     """
     _ensure_session_opener()
-    _warm_up_session(url, timeout_seconds)
     parsed = urlparse(url)
+    is_bse_api = parsed.hostname == 'api.bseindia.com' and parsed.path.startswith('/BseIndiaAPI/api/')
+    _warm_up_session('https://www.bseindia.com/' if is_bse_api else url, timeout_seconds)
     headers = dict(_BROWSER_HEADERS)
     if parsed.scheme and parsed.hostname:
         headers["Referer"] = referer or f"{parsed.scheme}://{parsed.hostname}/"
-    if parsed.path.startswith("/api/"):
+    if parsed.path.startswith("/api/") or is_bse_api:
         headers["Accept"] = "application/json,text/plain,*/*"
+    if is_bse_api:
+        headers["Origin"] = "https://www.bseindia.com"
+        headers["Referer"] = referer or "https://www.bseindia.com/"
     request = urllib.request.Request(url, headers=headers)
     # Bounded retries for transient retrieval failures (connection
     # resets, timeouts, HTTP 429/5xx): official document servers are
@@ -619,6 +623,8 @@ class OfficialDiscoveryProvider:
         # links in the served HTML).
         "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
         "https://www.bseindia.com/publicissue.html",
+        # Actual current public SPA feed, not the deprecated GetPublicIssue/w.
+        "https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue_par_updated/w?flag=1",
         # Public record feed behind NSE's JavaScript listing; no guessed issuer IDs.
         "https://www.nseindia.com/api/all-upcoming-issues?category=ipo",
         "https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0",
@@ -960,11 +966,37 @@ class OfficialDiscoveryProvider:
 
         for listing_url in self.listing_urls:
             try:
-                raw = self._fetch(listing_url)
+                from .official_issue_sources import BSE_LISTING, BSE_PUBLIC_LISTING
+                raw = self._fetch(listing_url, referer=BSE_PUBLIC_LISTING if listing_url == BSE_LISTING else None)
             except Exception as exc:
-                detail = f"listing retrieval failed ({type(exc).__name__})"
+                detail = f"listing retrieval failed ({type(exc).__name__}: {exc})"
                 note(f"{listing_url}: {detail}")
                 attempts.append(ListingAttempt(listing_url, "failed", False, 0, detail))
+                continue
+            if listing_url == BSE_LISTING and not raw.lstrip().startswith(b"<"):
+                from .official_issue_sources import bse_issue_records
+                try:
+                    records = bse_issue_records(raw, company_name)
+                except (ValueError, TypeError, AttributeError) as exc:
+                    detail = f"BSE public issue records malformed/unusable ({type(exc).__name__}: {exc})"
+                    attempts.append(ListingAttempt(listing_url, "malformed", False, 0, detail))
+                    note(f"{listing_url}: {detail}")
+                    continue
+                attempts.append(ListingAttempt(listing_url, "issue_records" if records else "no_match",
+                    bool(records), len(records), "Exact issuer-matched current BSE IPO records; absence is not publication evidence"))
+                for page_url, result in records[:self.max_candidates]:
+                    candidate = NoticeCandidate(result, self.name, listing_url,
+                        _utcnow().isoformat().replace("+00:00", "Z"), raw_bytes=raw, verified=True)
+                    all_candidates.append(candidate)
+                    page_candidate, reason = self._from_issue_page(page_url, company_name, referer=BSE_PUBLIC_LISTING)
+                    if page_candidate:
+                        all_candidates.append(page_candidate)
+                        attachments, reasons = self._issue_attachments(page_candidate, company_name, ipo_id)
+                        all_candidates.extend(attachments)
+                        for reason in reasons:
+                            note(reason)
+                    else:
+                        note(reason)
                 continue
             from .official_issue_sources import NSE_LISTING, nse_issue_links
             if listing_url == NSE_LISTING and not raw.lstrip().startswith(b"<"):

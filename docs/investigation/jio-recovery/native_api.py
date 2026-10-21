@@ -44,6 +44,33 @@ def serve(port):
             with (sources / 'requests.jsonl').open('a', encoding='utf-8') as handle:
                 handle.write(json.dumps(row) + '\n')
     terms._default_http_fetch = observed_fetch
+    from ipo_screening.extraction import official_notice_ocr as ocr
+    original_ocr = ocr.parse_if_scanned
+
+    def observed_ocr(raw, uri):
+        row = {'uri': uri, 'document_sha256': hashlib.sha256(raw).hexdigest()}
+        started = time.monotonic()
+        try:
+            result = original_ocr(raw, uri)
+            row['ocr_performed'] = result is not None
+            if result is not None:
+                row['metadata'] = result.metadata
+                row['fields'] = {}
+                for name in ('price_band_low', 'price_band_high', 'lot_size', 'open_date',
+                             'close_date', 'fresh_issue_amount', 'ofs_amount'):
+                    obj = getattr(result, name, None)
+                    row['fields'][name] = ({key: getattr(obj, key) for key in
+                        ('value', 'quote', 'page', 'locator', 'extraction_method', 'confidence', 'verification')}
+                        if obj is not None else None)
+            return result
+        except Exception:
+            row['traceback'] = traceback.format_exc()
+            raise
+        finally:
+            row['elapsed_seconds'] = time.monotonic() - started
+            with (sources / 'ocr.jsonl').open('a', encoding='utf-8') as handle:
+                handle.write(json.dumps(row, default=str) + '\n')
+    ocr.parse_if_scanned = observed_ocr
     from ipo_screening.presentation.api import create_app
     from ipo_screening.presentation.service import PresentationConfig, PresentationService
     import uvicorn
@@ -77,7 +104,10 @@ def publish(result):
 
 def main():
     import httpx
-    result = {'runtime_sha': os.getenv('GITHUB_SHA'), 'platform': sys.platform,
+    from importlib.metadata import version
+    result = {'runtime_dependencies': {name: version(name) for name in
+              ('rapidocr', 'onnxruntime', 'pypdfium2', 'pypdf')},
+              'runtime_sha': os.getenv('GITHUB_SHA'), 'platform': sys.platform,
               'python': sys.version, 'accepted': False}
     pdf = ROOT / 'evidence/non-authoritative/jio/U72900GJ2019PLC110816_JIO.pdf'
     raw = pdf.read_bytes()
@@ -196,6 +226,9 @@ def main():
             result['actual_source_requests'] = [json.loads(line) for line in requests.read_text(encoding='utf-8').splitlines()]
             from source_inventory import inspect_sources
             result['source_inventory'] = inspect_sources(OUT / 'sources', OUT / 'review')
+            ocr_log = OUT / 'sources' / 'ocr.jsonl'
+            if ocr_log.exists():
+                result['actual_ocr_invocations'] = [json.loads(line) for line in ocr_log.read_text(encoding='utf-8').splitlines()]
         publish(result)
     if 'diagnostic_traceback' in result:
         raise RuntimeError('Native API diagnostic failed; see retained full traceback')

@@ -7,6 +7,7 @@ unreadable markers, never silently spliced into a different assertion.
 """
 from dataclasses import replace
 import hashlib
+import logging
 import re
 from pathlib import Path
 import threading
@@ -155,13 +156,29 @@ def parse_if_scanned(raw, url):
     env = dict(os.environ)
     engine_root = str(Path(__file__).resolve().parents[2])
     env['PYTHONPATH'] = os.pathsep.join(filter(None, [engine_root, env.get('PYTHONPATH')]))
+    # The native 5-page TOI notice took 178.8s in a successful run and
+    # exceeded the former fixed 180s in retained runs. Allow 45s per
+    # sampled page plus one reserve (the native-text sampler stops at five,
+    # the OCR worker rejects more than six). This remains <=270s, not an
+    # unbounded ingestion-worker deadline or permission to use partial OCR.
+    read_budget = max(180, 45 * (len(native) + 1))
     with _LOCK:
         try:
             proc = subprocess.run([sys.executable, '-m', __name__], input=raw,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=180, check=False)
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=read_budget, check=False)
         except subprocess.TimeoutExpired as exc:
-            raise ValueError('official image notice OCR exceeded bounded 180-second read budget') from exc
+            logging.getLogger(__name__).error(
+                'Official OCR timeout: budget=%s interpreter=%s module=%s document_sha256=%s; stderr=%s',
+                read_budget, sys.executable, __name__, hashlib.sha256(raw).hexdigest(),
+                (exc.stderr or b'').decode('utf-8', errors='replace'))
+            raise ValueError(f'official image notice OCR exceeded bounded {read_budget}-second read budget') from exc
     if proc.returncode:
+        # Preserve the actual complete child traceback in the server log;
+        # the UI/provider note remains bounded and is never parsed as facts.
+        logging.getLogger(__name__).error(
+            'Official OCR child failed: exit=%s interpreter=%s module=%s document_sha256=%s; stderr=%s',
+            proc.returncode, sys.executable, __name__, hashlib.sha256(raw).hexdigest(),
+            proc.stderr.decode('utf-8', errors='replace'))
         raise ValueError('official image notice OCR failed: ' + proc.stderr.decode('utf-8', errors='replace')[-500:])
     decoded = json.loads(proc.stdout)
     pages = decoded['pages']
@@ -199,6 +216,7 @@ def parse_if_scanned(raw, url):
     result.metadata['ocr'] = {'engine': 'rapidocr-3.10.0 bundled PP-OCRv6 ONNX',
         'identity_strategy': 'full-width first-page header; financial fields from original crops only',
         'minimum_line_confidence': .95, 'inference_threads': _INFERENCE_THREADS, 'segments': len(pages),
+        'read_budget_seconds': read_budget,
         'pages': sorted({number for number, _ in pages}), 'numeric_repair': False, 'normalization': 'fixed structural heading whitespace only'}
     return result
 

@@ -7,6 +7,7 @@ import base64
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import re
 
@@ -64,7 +65,9 @@ def inspect_sources(sources, review):
                                 row['review_images'].append({'page': number+1, 'width': mono.width,
                                     'height': mono.height, 'crop': 'top 1600 rendered pixels only; NOT whole-page examination',
                                     'render': 'bilevel diagnostic; original PDF retained unchanged',
-                                    'name': target.name, 'png_base64': base64.b64encode(target.read_bytes()).decode()})
+                                    'name': target.name, 'png_sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+                                    **({'png_base64': base64.b64encode(target.read_bytes()).decode()}
+                                       if os.getenv('JIO_RECOVERY_INLINE_REVIEW') == '1' else {})})
                                 mono.close()
                                 header.close()
                             finally:

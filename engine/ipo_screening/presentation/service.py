@@ -1487,10 +1487,11 @@ class PresentationService:
               details={"company_name": str(canonical_dict.get("company_name", "")),
                        "ipo_id": str(canonical_dict.get("ipo_id", ""))})
         _filing_issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
-        for _f in ("price_band_low", "price_band_high", "lot_size", "ofs", "fresh_issue"):
+        for _f in ("price_band_low", "price_band_high", "lot_size", "ofs", "fresh_issue",
+                   "open_date", "close_date", "fresh_shares"):
             _emit("term_resolution", "term_status",
                   "SUCCEEDED" if _filing_issue.get(_f) is not None else "BLOCKED",
-                  f"issue.{_f}: " + ("disclosed by the filing." if _filing_issue.get(_f) is not None else "not disclosed by the filing."),
+                  f"issue.{_f}: " + ("disclosed by the filing." if _filing_issue.get(_f) is not None else "not established by filing extraction."),
                   details={"field": f"issue.{_f}",
                            "state": "extracted" if _filing_issue.get(_f) is not None else "missing",
                            "origin": "filing"})
@@ -1505,6 +1506,7 @@ class PresentationService:
                             if _f in ("ofs", "fresh_issue") else None,
                     "uri": source.get("uri"), "content_hash": source.get("content_hash"),
                     "confidence": spec.get("extraction_confidence"),
+                    "document_class": source.get("source_type"),
                 })
 
         # Peer rows enter the canonical input here and are schema-bound

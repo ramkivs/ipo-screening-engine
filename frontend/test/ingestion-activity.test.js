@@ -166,3 +166,20 @@ test('Activity App - the Windows failure pattern renders UNAVAILABLE and never U
   assert.ok(html.includes('Persisted: <strong>no</strong>'));
   assert.ok(html.includes('issue.price_band_low'));
 });
+
+test('Activity App - fresh-only blocker is not described as unpublished pricing or manual recovery', () => {
+  const app = new App();
+  const container = mockContainer();
+  app.renderIngestionActivity(container, {
+    ingestion_id: 'ing-controlled', status: 'BLOCKED', evaluation_run: false,
+    persisted: false, missing_fields: ['issue.fresh_issue'], events: [],
+  });
+  const html = container.panel.innerHTML;
+  assert.ok(html.includes('issue.fresh_issue'));
+  assert.ok(html.includes('Evaluation run: <strong>no</strong>'));
+  assert.ok(html.includes('Persisted: <strong>no</strong>'));
+  assert.ok(html.includes('Retry automatic official discovery'));
+  assert.ok(html.includes('Missing evidence does not prove that terms are unpublished'));
+  assert.ok(!html.includes('use the bounded manual entry'));
+  assert.ok(!html.includes('retry after the official terms are published'));
+});

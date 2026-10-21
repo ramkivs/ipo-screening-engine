@@ -1,16 +1,8 @@
 name: Live official exchange discovery investigation
+# Superseded automatic recovery checks live in jio-recovery-native.yml.
+# Keep this older redundant service/probe harness available for explicit use.
 on:
-  push:
-    branches: [arena/95234306-ipo-screening-engine]
-    paths:
-      - .github/workflows/official-discovery-live.yml
-      - engine/ipo_screening/official_issue_sources.py
-      - engine/ipo_screening/issue_terms.py
-      - engine/ipo_screening/extraction/official_offer_amounts.py
-      - engine/ipo_screening/extraction/official_notice_ocr.py
-      - tests/test_automatic_official_issue_discovery.py
-      - requirements.txt
-      - docs/investigation/automatic-official-discovery-2026-10-21/*.py
+  workflow_dispatch:
 permissions:
   contents: read
   checks: write
