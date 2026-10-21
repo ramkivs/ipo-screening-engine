@@ -85,10 +85,13 @@ if os.getenv('GITHUB_ACTIONS'):
     summary += '```json\n' + json.dumps(retained, indent=2, ensure_ascii=True) + '\n```'
     if len(summary.encode('utf-8')) > 60000:
         raise RuntimeError('live-result evidence exceeds check-summary bound; no truncated success published')
+    diagnostics = json.dumps([r for r in records if r['kind'] == 'activity_event'], indent=2, ensure_ascii=True)
+    if len(diagnostics.encode('utf-8')) > 60000:
+        raise RuntimeError('live source diagnostics exceed check-text bound')
     body = {'name': 'Actual Jio ingestion result (official discovery)',
         'head_sha': os.environ['GITHUB_SHA'], 'status': 'completed',
         'conclusion': 'success' if accepted else 'neutral',
-        'output': {'title': 'Jio automatic ingestion: ' + terminal['status'], 'summary': summary}}
+        'output': {'title': 'Jio automatic ingestion: ' + terminal['status'], 'summary': summary, 'text': diagnostics}}
     request = urllib.request.Request('https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] + '/check-runs',
         data=json.dumps(body).encode('utf-8'), method='POST', headers={
             'Authorization': 'Bearer ' + os.environ['LIVE_CHECK_TOKEN'],
