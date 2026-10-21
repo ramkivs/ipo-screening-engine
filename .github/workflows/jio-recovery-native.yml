@@ -12,6 +12,9 @@ on:
       - engine/ipo_screening/issue_terms.py
       - engine/ipo_screening/official_issue_sources.py
       - engine/ipo_screening/extraction/official_notice_ocr.py
+      - engine/ipo_screening/extraction/official_offer_amounts.py
+      - engine/ipo_screening/extraction/offer_table.py
+      - tests/test_offer_table_boundaries.py
       - tests/test_bse_current_listing.py
       - tests/test_ingestion_activity.py
       - tests/test_issue_terms_multisource.py
@@ -35,7 +38,7 @@ jobs:
       - name: Focused activity, conflict and explicit NIL safety checks only
         env:
           PYTHONPATH: engine
-        run: python -m pytest -q tests/test_ingestion_activity.py tests/test_issue_terms_multisource.py tests/test_ofs_nil_binding.py tests/test_bse_current_listing.py tests/test_official_discovery.py tests/test_automatic_official_issue_discovery.py tests/test_issue_terms_windows_retrieval.py -m "not slow"
+        run: python -m pytest -q tests/test_offer_table_boundaries.py tests/test_ingestion_activity.py tests/test_issue_terms_multisource.py tests/test_ofs_nil_binding.py tests/test_bse_current_listing.py tests/test_official_discovery.py tests/test_automatic_official_issue_discovery.py tests/test_issue_terms_windows_retrieval.py -m "not slow"
       - name: Focused terminal activity UI checks (no build or unrelated suite)
         run: node --test frontend/test/ingestion-activity.test.js frontend/test/ingestion-activity-flow.test.js
       - name: Actual HTTP upload, terminal GET, durable restart and conditional duplicate
