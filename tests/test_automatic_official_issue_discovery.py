@@ -343,3 +343,14 @@ def test_read_only_ocr_failure_does_not_consume_partial_success_payload(monkeypa
         subprocess.CompletedProcess(args, 1, b'[[1,"Fresh Issue Rs 240 million"]]', b'model failure'))
     with pytest.raises(ValueError, match='OCR failed: model failure'):
         module.parse_if_scanned(b'%PDF-image', 'https://www.bseindia.com/ad.pdf')
+
+
+def test_ocr_primary_issuer_header_excludes_newspaper_masthead_without_letter_repair():
+    from ipo_screening.extraction.official_notice_ocr import _primary_issuer_header
+    assert _primary_issuer_header([(1, 'DAILY NEWSPAPER\nACME FORGE LIMITED\nCIN: U12345MH2020PLC123456\nRegistered Office: Mumbai')]) == ('ACME FORGE LIMITED', 'ACME FORGE LIMITED')
+    assert _primary_issuer_header([(1, 'DAILY NEWSPAPER\nACMEFORGELIMITED\nREGISTEREDOFFICE: Mumbai')]) == ('ACMEFORGE LIMITED', 'ACMEFORGELIMITED')
+    assert _primary_issuer_header([(1, 'Other company Limited\nBook running lead manager')]) is None
+    assert _primary_issuer_header([(2, 'Other company Limited\nRegistered Office: Mumbai')]) is None
+    assert _primary_issuer_header([(1, '[UNREADABLE_OCR_LINE]\nRegistered Office: Mumbai')]) is None
+    with pytest.raises(ValueError, match='conflicting standalone primary issuer'):
+        _primary_issuer_header([(1, 'ACME FORGE LIMITED\nCIN: x\nOTHER COMPANY LIMITED\nCIN: y')])

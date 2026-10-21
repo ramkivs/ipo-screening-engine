@@ -52,7 +52,7 @@ def _ocr_pages(raw):
         engine = _engine()
         for index in range(len(doc)):
             page = doc[index]
-            scale = min(2.0, 4500 / max(page.get_size()))
+            scale = min(3.0, 4500 / max(page.get_size()))
             bitmap = page.render(scale=scale)
             image = bitmap.to_pil().convert('RGB')
             try:
@@ -89,6 +89,32 @@ def reject_general_information(pages):
         raise ValueError('General Information Document examples are not issuer issue terms')
 
 
+def _primary_issuer_header(pages):
+    """Standalone issuer heading immediately followed by its identity/office block.
+
+    Newspaper mastheads must not be swallowed into a legal name by the frozen
+    parser's broad fallback. No requested issuer, alias or repaired letters are
+    used: the source heading itself must still pass the caller's exact match.
+    """
+    found = {}
+    for page, text in pages:
+        if page != 1:
+            continue
+        lines = text.splitlines()
+        for i, line in enumerate(lines[:25]):
+            match = re.fullmatch(r'([A-Z][A-Z0-9 &,.\-]{2,80}?)(?:\s*LIMITED)', line.strip(), re.I)
+            if not match:
+                continue
+            context = '\n'.join(lines[i + 1:i + 6])
+            if not re.search(r'CORPORATE\s*IDENTITY\s*NUMBER|\bCIN\b|REGISTERED\s*OFFICE', context, re.I):
+                continue
+            name = match.group(1).strip() + ' LIMITED'
+            found[re.sub(r'[^A-Z0-9]', '', name.upper())] = (name, line.strip())
+    if len(found) > 1:
+        raise ValueError('conflicting standalone primary issuer headings in OCR notice')
+    return next(iter(found.values()), None)
+
+
 def parse_if_scanned(raw, url):
     """None means native text exists; errors mean OCR/parse failure, not absence."""
     if not raw.startswith(b'%PDF-'):
@@ -123,6 +149,11 @@ def parse_if_scanned(raw, url):
     source = SourceDocument(source_id='SRC-PBN-' + digest[:8].upper(), source_type='EXCHANGE',
                             uri=url, content_hash=digest, file_size_bytes=len(raw))
     result = PriceBandNoticeParser().parse_document(source, pages)
+    header = _primary_issuer_header(pages)
+    if header:
+        result.company_name = header[0]
+        result.metadata['ocr_primary_issuer_quote'] = header[1]
+    result.metadata['ocr_header_excerpt'] = pages[0][1][:650] if pages else ''
     result = explicit_amounts(result, pages)
     for name in ('price_band_low', 'price_band_high', 'lot_size', 'open_date', 'close_date',
                  'fresh_issue_amount', 'ofs_amount'):
@@ -141,4 +172,4 @@ def parse_if_scanned(raw, url):
 
 if __name__ == '__main__':
     # Isolated read-only worker: no API/server/store imports and no model downloads.
-    print(json.dumps(_ocr_pages(sys.stdin.buffer.read()), ensure_ascii=False))
+    print(json.dumps(_ocr_pages(sys.stdin.buffer.read()), ensure_ascii=True))

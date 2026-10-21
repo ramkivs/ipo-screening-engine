@@ -501,7 +501,7 @@ class HttpNoticeProvider:
         except Exception as exc:
             return None, ProviderReport(self.name, "REJECTED", f"retrieved document is not a parseable Price Band Notice: {exc}")
         if _norm_name(result.company_name) != _norm_name(company_name):
-            return None, ProviderReport(self.name, "REJECTED", "retrieved notice names a different issuer")
+            return None, ProviderReport(self.name, "REJECTED", "retrieved notice names a different issuer: " + repr(result.company_name) + ("; OCR header: " + result.metadata["ocr_header_excerpt"] if result.metadata.get("ocr_header_excerpt") else ""))
         return (
             NoticeCandidate(
                 result=result,
