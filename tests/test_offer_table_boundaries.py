@@ -12,7 +12,7 @@ def extract(text):
     return explicit_amounts(ExchangeIssueTermsResult(source=None, source_ref=None, is_classified_notice=False), [(1, text)])
 
 
-@pytest.mark.parametrize('token', ['[●]', '[ ]', 'TBD'])
+@pytest.mark.parametrize('token', ['[●]', '[ ]', '[]', '[•]', '[--]', '[...]', 'TBD'])
 def test_placeholder_is_null_diagnostic_not_zero(token):
     r = extract(f'Fresh Issue aggregating up to Rs. {token} million')
     assert r.fresh_issue_amount is None
@@ -174,3 +174,19 @@ def test_multiline_visitor_chunk_is_not_reconstructed_into_cells():
     columns=component_columns(Page(),1)
     assert not columns[0]['cells']
     assert columns[0]['ambiguous_text_runs']
+
+
+def test_ocr_placeholder_diagnostic_does_not_claim_native_text():
+    r=ExchangeIssueTermsResult(source=None,source_ref=None,is_classified_notice=False)
+    # The production OCR caller sets this marker before monetary parsing,
+    # and attaches the final OCR summary only after parsing completes.
+    r.metadata['ocr_header_excerpt']='Original OCR header'
+    r=explicit_amounts(r,[(1,'Fresh Issue aggregating up to Rs. [●] million')])
+    assert r.metadata['issue_term_diagnostics'][0]['method']=='OCR'
+
+
+@pytest.mark.parametrize('token',['[]','[•]','[--]','[...]'])
+def test_all_recognized_placeholders_prevent_later_amount_borrowing(token):
+    r=extract(f'Fresh Issue aggregating up to Rs. {token} million. Later aggregating up to Rs. 600 million')
+    assert r.fresh_issue_amount is None
+    assert r.metadata['issue_term_diagnostics'][0]['code']=='SOURCE_PLACEHOLDER'

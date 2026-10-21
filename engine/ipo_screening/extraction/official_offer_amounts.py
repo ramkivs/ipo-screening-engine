@@ -18,6 +18,8 @@ from .prospectus_terms import ProspectusTermsParser
 from .sections import _find_ofs_nil
 
 
+_SOURCE_PLACEHOLDER = re.compile(r'\[\s*(?:[●•.\-]+)?\s*\]|\bTBD\b', re.I)
+
 def explicit_amounts(result, pages, table_columns=()):
     if not isinstance(result, ExchangeIssueTermsResult):
         result = ExchangeIssueTermsResult(**{f.name: getattr(result, f.name)
@@ -45,15 +47,15 @@ def explicit_amounts(result, pages, table_columns=()):
                 amount = re.search(r'aggregating\s+(?:up\s+to\s+|to\s+)?(?:₹|Rs\.?|INR)\s*'
                                    r'(\d[\d,]*(?:\.\d+)?)\s*(lakhs?|millions?|crores?)', segment, re.I)
                 assertion = re.split(r'fresh\s+(?:issue|offer)|offer\s+for\s+sale|total\s+(?:issue|offer)|reservation|employee|shareholder|anchor', segment, maxsplit=1, flags=re.I)[0]
-                if re.search(r'\[\s*[●•.\- ]+\s*\]|\bTBD\b', assertion, re.I):
+                if _SOURCE_PLACEHOLDER.search(assertion):
                     diagnostics.append({'code': 'SOURCE_PLACEHOLDER', 'field': name,
                         'page': page, 'quote': cell['text'] if cell else text[m.start():m.end()+len(assertion)],
-                        'method': 'NATIVE_TABLE' if cell else ('OCR' if result.metadata.get('ocr') else 'NATIVE_TEXT'),
+                        'method': 'NATIVE_TABLE' if cell else ('OCR' if ('ocr' in result.metadata or 'ocr_header_excerpt' in result.metadata) else 'NATIVE_TEXT'),
                         'coordinates': {'x': cell['x'], 'y': cell['y']} if cell else None})
                 if not amount:
                     continue
                 before = segment[:amount.start()]
-                if re.search(r'offer\s+for\s+sale|fresh\s+(?:issue|offer)|reservation|employee|shareholder|anchor|total\s+(?:issue|offer)|UNREADABLE_OCR_LINE|[●]|\bTBD\b|\[\s*\]', before, re.I):
+                if re.search(r'offer\s+for\s+sale|fresh\s+(?:issue|offer)|reservation|employee|shareholder|anchor|total\s+(?:issue|offer)|UNREADABLE_OCR_LINE|[●]|\bTBD\b|\[\s*\]', before, re.I) or _SOURCE_PLACEHOLDER.search(before):
                     continue  # another component, reservation, or a placeholder intervened
                 from .exchange_issue_page import _number
                 value = _number(amount.group(1))
