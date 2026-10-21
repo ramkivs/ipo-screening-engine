@@ -17,6 +17,7 @@ import sys
 
 _LOCK = threading.RLock()
 _ENGINE = None
+_INFERENCE_THREADS = min(4, os.cpu_count() or 1)
 
 
 def _engine():
@@ -33,7 +34,7 @@ def _engine():
         params = {name + '.model_path': str(path) for name, path in paths.items()}
         params.update({'Global.log_level': 'error', 'Global.max_side_len': 2000,
                        'Det.limit_side_len': 1600, 'Det.limit_type': 'max',
-                       'EngineConfig.onnxruntime.intra_op_num_threads': 1,
+                       'EngineConfig.onnxruntime.intra_op_num_threads': _INFERENCE_THREADS,
                        'EngineConfig.onnxruntime.inter_op_num_threads': 1})
         _ENGINE = RapidOCR(params=params)
     return _ENGINE
@@ -165,7 +166,7 @@ def parse_if_scanned(raw, url):
                 setattr(result, name, replace(obj, extraction_method='OCR', confidence=.95,
                     locator='Offline OCR; original PDF page ' + str(obj.page) + '; ' + (obj.locator or 'notice')))
     result.metadata['ocr'] = {'engine': 'rapidocr-3.10.0 bundled PP-OCRv6 ONNX',
-        'minimum_line_confidence': .95, 'segments': len(pages),
+        'minimum_line_confidence': .95, 'inference_threads': _INFERENCE_THREADS, 'segments': len(pages),
         'pages': sorted({number for number, _ in pages}), 'numeric_repair': False, 'normalization': 'fixed structural heading whitespace only'}
     return result
 
