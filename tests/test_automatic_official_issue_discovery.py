@@ -367,3 +367,9 @@ def test_archive_hosts_are_scoped_to_issuer_matched_discovery_not_direct_prospec
     for cls in (HttpNoticeProvider, HttpProspectusProvider):
         candidate, report = cls({'ACME': archive}, fetcher=forbidden_fetch).find(NAME, 'ACME')
         assert candidate is None and report.outcome == 'REJECTED'
+
+
+def test_draft_offer_document_is_never_promoted_to_current_rhp_authority():
+    from ipo_screening.extraction.official_offer_amounts import parse_official_rhp
+    with pytest.raises(ValueError, match='Draft Red Herring Prospectus cannot be promoted'):
+        parse_official_rhp(('Draft ' + RHP).encode(), 'https://www.nseindia.com/draft.pdf')

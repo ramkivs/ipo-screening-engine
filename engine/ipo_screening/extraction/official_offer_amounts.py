@@ -82,7 +82,9 @@ def parse_official_rhp(raw, url):
     pages = document_pages(raw)
     cover = '\n'.join(t for _, t in pages[:2])
     # A dated document title, not a mention of an RHP elsewhere in a notice.
-    dated = re.search(r'(?:Draft\s+)?Red\s+Herring\s+Prospectus\s*\n?\s*(?:Dated|Date)\s*:', cover, re.I)
+    if re.search(r'\bDraft\s+Red\s+Herring\s+Prospectus\s*(?:Dated|Date)\s*:', cover, re.I):
+        raise ValueError('Draft Red Herring Prospectus cannot be promoted to current RHP terms')
+    dated = re.search(r'Red\s+Herring\s+Prospectus\s*\n?\s*(?:Dated|Date)\s*:', cover, re.I)
     # Some filed RHP covers have a graphical (non-text) dated title. Their
     # explicit issuer responsibility statement and complete offer-table header
     # establish the document role without inventing a publication date.
