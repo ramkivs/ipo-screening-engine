@@ -1,0 +1,77 @@
+"""Read public SPA assets to locate BSE's published data contract.
+
+No endpoint guessing, form submission, access-control bypass or financial-term
+inference. URLs are followed only from actual first-party HTML/JS references.
+"""
+import base64
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import traceback
+from urllib.parse import urljoin, urlparse
+import urllib.request
+import zlib
+from ipo_screening.issue_terms import _default_http_fetch
+
+out = Path(os.environ['JIO_RECOVERY_OUTPUT'])
+out.mkdir(parents=True, exist_ok=True)
+rows = []
+queue = [('https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P', None)]
+seen = set()
+pattern = re.compile(r'public.?issue|\bipo\b|GetPublicIssue|Pubissues|GetMkt_ISSUE', re.I)
+for _ in range(12):
+    if not queue:
+        break
+    url, referrer = queue.pop(0)
+    if url in seen:
+        continue
+    seen.add(url)
+    row = {'url': url, 'referrer': referrer}
+    try:
+        raw = _default_http_fetch(url, 15, referer=referrer)
+        digest = hashlib.sha256(raw).hexdigest()
+        (out / (digest + '.txt')).write_bytes(raw)
+        text = raw.decode('utf-8', errors='replace')
+        row.update(sha256=digest, bytes=len(raw))
+        matches = list(pattern.finditer(text))
+        row['keyword_count'] = len(matches)
+        row['contexts'] = [text[max(0, m.start()-350):m.end()+900] for m in matches[:60]]
+        targets = []
+        if '<app-root' in text or '<html' in text[:100].lower():
+            for src in re.findall(r'<script\b[^>]*\bsrc=["\']([^"\']+)', text, re.I):
+                if re.search(r'(?:^|/)env\.js$|(?:^|/)main-[^/]+\.js$', src):
+                    targets.append(src)
+        else:
+            # Lazy route asset names near an IPO/public-issue route. These
+            # are the publisher's actual import literals, not guessed paths.
+            contexts = row['contexts']
+            for context in contexts:
+                targets.extend(re.findall(r'(?:import\s*\(|from\s*)["\']([^"\']+\.js)["\']', context))
+            row['api_literals'] = list(dict.fromkeys(re.findall(
+                r'["\']([^"\'\s]{0,100}(?:PublicIssue|Pubissues|GetMkt_ISSUE|IPO_)[^"\'\s]{0,180})["\']', text, re.I)))[:80]
+            if url.endswith('env.js'):
+                row['public_environment_source'] = text[:15000]
+        for target in dict.fromkeys(targets):
+            linked = urljoin(url, target)
+            if urlparse(linked).hostname == 'www.bseindia.com' and linked not in seen:
+                queue.append((linked, url))
+    except Exception:
+        row['traceback'] = traceback.format_exc()
+    rows.append(row)
+    print(json.dumps(row), flush=True)
+result = {'scope': 'Actual public first-party SPA contract research, not verified issue terms', 'requests': rows}
+(out / 'bse-source-contract.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
+packed = base64.b64encode(zlib.compress(json.dumps(result).encode())).decode()
+for index, offset in enumerate(range(0, len(packed), 55000)):
+    body = {'name': f'BSE published SPA contract {index}', 'head_sha': os.environ['GITHUB_SHA'],
+        'status': 'completed', 'conclusion': 'neutral', 'output': {'title': 'Public BSE source-contract research',
+        'summary': f'Actual production transport, read-only first-party assets; compressed part {index}. Not ingestion acceptance.',
+        'text': packed[offset:offset+55000]}}
+    req = urllib.request.Request('https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] + '/check-runs',
+        data=json.dumps(body).encode(), method='POST', headers={
+            'Authorization': 'Bearer ' + os.environ['LIVE_CHECK_TOKEN'],
+            'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=30) as response:
+        print('Evidence: ' + json.load(response)['html_url'], flush=True)

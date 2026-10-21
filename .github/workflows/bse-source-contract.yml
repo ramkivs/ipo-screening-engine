@@ -1,0 +1,35 @@
+name: Focused public BSE source contract
+on:
+  push:
+    branches: [arena/95234306-ipo-screening-engine]
+    paths:
+      - .github/workflows/bse-source-contract.yml
+      - docs/investigation/jio-recovery/bse_source_contract.py
+permissions:
+  contents: read
+  checks: write
+jobs:
+  public-assets:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements.txt
+      - name: Follow actual public HTML and route-asset references
+        env:
+          PYTHONPATH: engine
+          PYTHONUNBUFFERED: '1'
+          JIO_RECOVERY_OUTPUT: ${{ runner.temp }}/bse-source-contract
+          LIVE_CHECK_TOKEN: ${{ github.token }}
+        run: python docs/investigation/jio-recovery/bse_source_contract.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bse-public-source-contract
+          path: ${{ runner.temp }}/bse-source-contract
