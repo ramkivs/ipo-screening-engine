@@ -178,3 +178,55 @@ def test_jio_completes_via_verified_prospectus_pathway(tmp_path):
     assert amount.extracted_value == 148500.0
     assert amount.verification == "OFFICIAL_VERIFIED"  # stated in the verified Prospectus
     assert items["EV-issue-ofs"].verification == "FILING"  # never re-labelled official
+
+
+def test_captured_pypdf619_cover_zero_survives_canonical_gate_and_evidence(tmp_path, monkeypatch):
+    """Actual PDF + captured 6.19 cover, then controlled official completion.
+
+    Not a live Windows ingestion. No aggregator/manual OFS or fresh-only
+    inference supplies the zero: its quote must contain Not applicable.
+    """
+    import copy
+    import hashlib
+    from ipo_screening.issue_terms import HttpProspectusProvider
+
+    assert hashlib.sha256(JIO_PDF.read_bytes()).hexdigest() == '72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d'
+    cover = (REPO_ROOT / 'tests/fixtures/jio/cover-page-pypdf-6.19.0.txt').read_text(encoding='utf-8')
+    original = SectionExtractor.extract_page_text
+    monkeypatch.setattr(SectionExtractor, 'extract_page_text',
+        lambda self, page: cover if page == 1 else original(self, page))
+    doc, report = DocumentExtractor().extract_from_pdf(JIO_PDF, allow_fixture_fallbacks=False)
+    raw = next(ex for ex in report.extractions if ex.field_path == 'issue.ofs')
+    assert raw.candidate_value == doc['issue']['ofs'] == 0.0
+    assert 'OFFER FOR \nSALE SIZE' in raw.quote and raw.quote.endswith('Not applicable')
+    assert doc['_evidence']['issue.ofs']['quote'] == raw.quote
+    assert doc['issue']['ofs_sellers'] == []
+
+    # Replay this captured extraction at the existing service seam, without
+    # rerunning the financial reader or making any public-source request.
+    monkeypatch.setattr(DocumentExtractor, 'extract_from_pdf',
+        lambda *args, **kwargs: (copy.deepcopy(doc), report))
+    blocked = PresentationService(PresentationConfig(store_root=tmp_path/'blocked/evaluations',
+        config_dir=REPO_ROOT/'config', issue_terms_resolver=IssueTermsResolver([])))
+    with pytest.raises(IngestionAwaitingIssueTermsError) as exc:
+        blocked.ingest_document(b'%PDF-1.4 controlled', 'captured-cover.pdf')
+    assert 'ofs' not in exc.value.missing_fields and 'fresh_issue' in exc.value.missing_fields
+    assert blocked.eval_store.list_evaluations() == []
+
+    provider = HttpProspectusProvider({'JIO-PLATFORMS-LIMITED': 'https://www.sebi.gov.in/sebi_data/attachdocs/jio-prospectus.pdf'},
+        fetcher=lambda uri: PROSPECTUS_TEXT.encode())
+    service = PresentationService(PresentationConfig(store_root=tmp_path/'complete/evaluations',
+        config_dir=REPO_ROOT/'config', issue_terms_resolver=IssueTermsResolver([provider])))
+    result = service.ingest_document(b'%PDF-1.4 controlled', 'captured-cover.pdf')
+    record = service.eval_store.read_full(result.evaluation_id)
+    assert record['input_snapshot']['input']['issue']['ofs'] == 0.0
+    assert len(record['score']['modules']) == 6
+    evidence = next(item for item in service.get_evaluation_evidence(result.evaluation_id).items
+                    if item.evidence_id == 'EV-issue-ofs')
+    assert evidence.extracted_value == 0.0 and evidence.verification == 'FILING'
+    assert evidence.quote == raw.quote
+    activity = service.get_ingestion_activity(result.ingestion_id)
+    assert any(event['details'].get('field') == 'issue.ofs' and
+               event['details'].get('origin') == 'filing' and event['details'].get('value') == 0.0
+               for event in activity['events'])
+    assert service.eval_store.verify_hashes(result.evaluation_id)['result_hash_matches']

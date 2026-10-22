@@ -34,7 +34,7 @@ from .numbers import is_undisclosed_marker, parse_indian_number
 # refusing a NIL that is itself the value of another structural label.
 
 _OFS_NIL_PATTERN = re.compile(
-    r'offer for sale(?: size)?[^\n]*?(?:[^\n]*?\n){0,32}?\s*(?:NIL|Not\s+Applicable)\b',
+    r'(?P<label>offer\s+for\s+sale(?:\s+size)?)[^\n]*?(?:[^\n]*?\n){0,32}?\s*(?:NIL|Not\s+Applicable)\b',
     re.IGNORECASE,
 )
 _OFS_NIL_TOKEN = re.compile(r'(?:NIL|Not\s+Applicable)\b', re.IGNORECASE)
@@ -62,20 +62,20 @@ def _find_ofs_nil(cover_text: str) -> Optional[str]:
       * "Offer for Sale Size: Not applicable" (same line);
       * "OFFER FOR SALE SIZE" followed by a value line "Not applicable";
       * "OFFER FOR SALE SIZE" followed by a fresh row and then the OFS cell
-        "Not applicable" (the real Jio cover shape).
+        "Not applicable" (the real Jio cover shape), including a reader-wrapped
+        label such as "OFFER FOR\nSALE SIZE".
 
     Rejected:
       * an OFS label line that itself states an amount or quantity;
       * a NIL that is the value of a bare Fresh Issue / Pre-IPO / Promoter /
-        reservation / total-issue label, on its own line or as the previous
-        line.
+        reservation / total-issue label, on its own line, as the previous line,
+        or as a wrapped preceding label.
     """
     for match in _OFS_NIL_PATTERN.finditer(cover_text):
         quote = match.group(0)
-        first_line = quote.split("\n", 1)[0]
-        after_label = re.sub(
-            r'^offer\s+for\s+sale(?:\s+size)?', '', first_line, flags=re.IGNORECASE
-        )
+        # Start AFTER the complete (possibly wrapped) label, so an amount
+        # on "SALE SIZE Rs. ..." is still checked, not hidden by the wrap.
+        after_label = cover_text[match.end("label"):match.end()].split("\n", 1)[0]
         if _OFS_NIL_AMOUNT.search(after_label):
             # The OFS row states an amount/quantity: it is not NIL.
             continue
@@ -95,6 +95,12 @@ def _find_ofs_nil(cover_text: str) -> Optional[str]:
         if _OFS_NIL_BARE_LABEL.match(prev_line):
             # "Fresh Issue" / "Pre-IPO Placement" / "Promoter Group" on the
             # line immediately before a standalone NIL: not the OFS value.
+            continue
+        # Competing bare labels can wrap too (e.g. "TOTAL ISSUE\nSIZE").
+        # Retain both original guards and reject their wrapped equivalents.
+        label_lines = before.split("\n")[-4:] + [line_prefix]
+        if any(_OFS_NIL_BARE_LABEL.match("\n".join(label_lines[-n:]).strip())
+               for n in range(2, min(5, len(label_lines)) + 1)):
             continue
         return quote
     return None

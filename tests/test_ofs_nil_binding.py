@@ -106,3 +106,45 @@ def test_fresh_only_cover_still_establishes_ofs_zero():
     fields = {ex.field_path: ex for ex in _stub_extractor(cover).extract_cover_and_offer()}
     assert fields["issue.ofs"].candidate_value == 0.0
     assert fields["issue.ofs_sellers"].candidate_value == []
+
+
+# Captured from the unchanged repository PDF with pypdf 6.19.0. This retains
+# the observed Windows header/value order, not an invented ideal table.
+def test_pypdf619_jio_split_header_and_value_order():
+    from pathlib import Path
+    cover = (Path(__file__).parent / 'fixtures/jio/cover-page-pypdf-6.19.0.txt').read_text(encoding='utf-8')
+    assert 'OFFER FOR \nSALE SIZE' in cover
+    quote = _find_ofs_nil(cover)
+    assert quote is not None and quote.endswith('Not applicable')
+    assert '₹[●] million' in quote
+    fields = {ex.field_path: ex for ex in _stub_extractor(cover).extract_cover_and_offer()}
+    assert fields['issue.ofs'].candidate_value == 0.0
+    assert fields['issue.ofs'].quote == quote
+    assert fields['issue.ofs_sellers'].candidate_value == []
+
+
+def test_split_header_never_borrows_another_fields_nil():
+    for label in ('Fresh Issue', 'Pre-IPO Placement', 'Promoter Group',
+                  'Employee Reservation', 'Shareholder Reservation', 'Total Issue Size',
+                  'Fresh\nIssue', 'Promoter\nGroup', 'Employee\nReservation', 'Total Issue\nSize',
+                  'Eligible\nRIL\nShareholder\nReservation'):
+        for suffix in (f'{label}: NIL', f'{label}\nNIL'):
+            assert _find_ofs_nil('OFFER FOR\nSALE SIZE\n'+suffix) is None
+
+
+def test_split_label_amount_on_final_label_line_is_not_nil():
+    assert _find_ofs_nil('OFFER FOR\nSALE SIZE Rs. 712.13 crore\nDetails\nNIL') is None
+    assert _find_ofs_nil('OFFER FOR\nSALE SIZE 26,280,000 Equity Shares\nDetails\nNIL') is None
+
+
+def test_split_header_does_not_extend_existing_lookahead():
+    assert _find_ofs_nil('OFFER FOR\nSALE SIZE\n'+'unrelated line\n'*34+'Not applicable') is None
+
+
+def test_captured_fresh_issue_is_not_enough_without_explicit_nil():
+    from pathlib import Path
+    cover = (Path(__file__).parent / 'fixtures/jio/cover-page-pypdf-6.19.0.txt').read_text(encoding='utf-8')
+    without_declaration = cover.replace('Not applicable', '[unavailable]')
+    assert _find_ofs_nil(without_declaration) is None
+    fields = {ex.field_path: ex for ex in _stub_extractor(without_declaration).extract_cover_and_offer()}
+    assert 'issue.ofs' not in fields
