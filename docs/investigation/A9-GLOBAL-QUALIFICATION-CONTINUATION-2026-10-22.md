@@ -350,3 +350,28 @@ source-policy/A18 addenda are reconciled. Exact remaining evidence artifacts and
 custodians in A28 are unchanged; no broad discovery/contact/new capture occurred.
 A9 remains OPEN pending evidence-backed qualification, real multi-issue positive
 baseline, accepting integration and its global regression.
+
+## A28 full validation receipt
+
+Actual current executions for authorized component changes: local backend
+**1111 passed / 19 warnings / 1279.61s**; focused **241 passed / 28.54s**;
+frontend **77 passed**; four schemas, frozen core 6/6, unchanged golden hash,
+inactive-v1.6, compile, artifact integrity and diff checks PASS.
+
+Remote full workflow **39813896414** is **COMPLETED/SUCCESS**, exact revision
+**0eb1da06f0cfa1fed906195866676754d6d24cc8**; job/check **119947163975 SUCCESS**.
+API-visible totals: **1111 tests / 0 failures / 0 errors / 0 skipped / 951.463s**.
+All backend/frontend/schema/integrity/compile/clean-tree steps succeeded. Exact
+published contract and implementation tree/bytes were independently verified.
+The final documentation-only receipt is CI-skipped, with those component bytes
+unchanged. Original failed run's inaccessible logs and unknown cause remain an
+honest residual limitation, not a renewed full-CI blocker or an invented root cause.
+
+Q1/Q2 are now explicitly ratified and Q3's delegated exact representation is
+implemented/tested; they are NOT outstanding approval requests. Current publisher
+qualification is still absent. Format-only unit subjects deliberately contain
+nonexistent approval/evidence refs and cannot substitute for genuine positive
+source evidence. No consumer of the new sidecar enables A9. The accepting
+integration and legitimate multi-issue positives depend on actual R7/R8 evidence
+and RAMKI's attributable scoped qualification. **OPEN — CONTRACT/IMPLEMENTATION
+GAP** remains correct, while independent contract/component work is complete.

@@ -1,8 +1,8 @@
-# A28 — GMP qualification contract resolution request
+# A28 — GMP qualification policy and binding contract
 
-- **Decision ID:** A28 (renumbered from PR #7's conflicting A19 request label; no semantic disposition)
+- **Decision ID:** A28 (renumbered from PR #7's conflicting A19 request label; ratification below)
 - **Status:** Q1/Q2 RATIFIED; Q3 BOUNDED DESIGN AUTHORIZED — SOURCE QUALIFICATION STILL OPEN
-- **Decision authority requested:** RAMKI / PA
+- **Decision authority:** RAMKI / PA — explicit Q1/Q2 ratification and Q3 bounded technical delegation, 2026-10-22
 - **Preparation date:** 2026-10-22 (Asia/Calcutta)
 - **Repository:** `ramkivs/ipo-screening-engine`
 - **Implementation baseline:** `e05c0efbca1ecb3024e52da73a22e180ea171118`, inherited without modification on `arena/07f3439f-ipo-screening-engine`.
@@ -10,7 +10,7 @@
 - **Scope:** Shared A9 accepting path; not a source approval, scoring change or schema amendment.
 - **Current approval:** explicit RAMKI choices in the ratification section supersede earlier open-request text. No publisher is qualified and no accepting path is enabled by this record.
 
-## Authority reconciliation
+## Authority reconciliation (historical request; superseded by ratification below)
 
 A16 and the 2026-10-22 one-pass execution directive authorize routine preparation,
 testing, documentation, publication and remote verification. They do not select
