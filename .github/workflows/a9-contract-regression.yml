@@ -15,6 +15,10 @@ permissions:
 jobs:
   regression:
     runs-on: ubuntu-latest
+    # Dispatch may be unavailable to the integration. An explicit push marker
+    # requests the same bounded suite; unmarked pushes still run full regression.
+    env:
+      A9_TEST_SCOPE: ${{ inputs.scope || (contains(github.event.head_commit.message, '[a9-linkage]') && 'linkage') || 'full' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,7 +34,6 @@ jobs:
       - name: Backend regression with API-visible failure diagnostics
         env:
           PYTHONPATH: engine
-          A9_TEST_SCOPE: ${{ inputs.scope || 'full' }}
         shell: bash
         run: |
           mkdir -p build
@@ -60,7 +63,7 @@ jobs:
           PYTHON
           exit "$status"
       - run: npm test --prefix frontend
-        if: always() && inputs.scope != 'linkage'
+        if: always() && env.A9_TEST_SCOPE != 'linkage'
       - name: Schema and integrity checks
         if: always()
         env:
