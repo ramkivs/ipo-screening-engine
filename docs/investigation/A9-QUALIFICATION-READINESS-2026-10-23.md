@@ -101,3 +101,30 @@ attributable source/archive records specified in intake/inventory, then evidence
 assessment and RAMKI/PA scoped decision. Genuine multi-issue source-backed positives,
 shared accepting verifier and corresponding global/replay validation remain future
 conditional work. Q1–Q3 are not reopened; original failed-run cause stays UNKNOWN.
+
+## Verified validation/publication receipt
+
+- Implementation/intake/test commit: `b3ce4312969322f07e1a85774c5b13d6a360610a`.
+  Actual remote branch/commit/tree and all ten changed-file bytes matched local
+  Git before recording this receipt.
+- New focused CI **39838046080**, exact head above: **aggregate COMPLETED/SUCCESS**;
+  job/check **120031445595 SUCCESS**. API-visible totals **175 tests,0 failures,
+  0 errors,0 skipped,18.363s**. Includes76 new synthetic cases plus current binding,
+  production linkage/replay and retained-inventory regression. New helper and
+  extended CI target warrant this run; it is not an unchanged96-suite repetition.
+- Remote schema/integrity (frozen/golden/inactive-v1.6), compilation and clean-tree
+  steps SUCCESS. Frontend deliberately skipped by focused scope; actual LOCAL
+  frontend77 passed0failed/skipped,659.068ms. Local relevant backend171 passed16.54s.
+- Workflow YAML/shell syntax, document links and synthetic-label checks PASS.
+  All current schemas/frozen/golden/inactive-v1.6 and compile/diff PASS locally.
+- Previous full39829866211 at8706bd4 remains inherited1163/backend+frontend success;
+  it is not misrepresented as a new full test run for this delta. New helper is
+  opt-in/integrity-only and not imported into the unchanged admission pipeline.
+- Final receipt documentation-only, CI skipped; helper/tests/workflow/fixtures,
+  schemas/config/capture bytes match focused-testedb3ce431. Final remote identity
+  and exact changed bytes are checked after push in PR7 receipt. Main/PR6 preserved.
+
+Intake specs, packet template/population, file-pin component and synthetic suite
+are complete. ML/IG NOT QUALIFIED; PD NOT QUALIFIED/closed/non-independent. No
+source facts, scoped authority or genuine accepting positive were manufactured.
+**A9 remains OPEN — CONTRACT/IMPLEMENTATION GAP.**
