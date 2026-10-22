@@ -20,11 +20,34 @@ jobs:
           node-version: '22'
       - run: python -m pip install -r requirements.txt
       # This validates the current fail-closed contract, NOT qualified admission.
-      - run: python -m pytest tests/ -q
+      - name: Backend regression with API-visible failure diagnostics
         env:
           PYTHONPATH: engine
+        shell: bash
+        run: |
+          mkdir -p build
+          status=0
+          python -m pytest tests/ -q --junitxml=build/a9-results.xml || status=$?
+          python - <<'PYTHON'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          path = Path("build/a9-results.xml")
+          if path.exists():
+              root = ET.parse(path).getroot()
+              for case in root.iter("testcase"):
+                  for kind in ("failure", "error"):
+                      for error in case.findall(kind):
+                          text = f"{case.get('classname')}.{case.get('name')}: {error.text}"
+                          text = text[:12000].replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                          print(f"::error::{text}")
+              for suite in root.iter("testsuite"):
+                  print("Test totals:", suite.attrib)
+          PYTHON
+          exit "$status"
       - run: npm test --prefix frontend
+        if: always()
       - name: Schema and integrity checks
+        if: always()
         env:
           PYTHONPATH: engine
         run: |
@@ -45,4 +68,6 @@ jobs:
           print("Schemas, frozen core, golden result and inactive v1.6: PASS")
           PYTHON
       - run: python -m compileall -q engine
+        if: always()
       - run: git diff --exit-code && git diff --check
+        if: always()
