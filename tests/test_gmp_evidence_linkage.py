@@ -666,3 +666,75 @@ def test_failed_or_unlinked_legacy_inputs_keep_the_existing_a15_mapping(
     a15 = _a15_document(outcome)
     assert not any(item["code"] == GMP_LINK_DIAGNOSTIC_CODE for item in a15["result"]["diagnostics"])
     assert not any(item.get("subject_kind") == "RAW_ARTIFACT_BYTES" for item in a15["integrity"]["digests"])
+
+
+@pytest.mark.parametrize("issuer", ["Acme Corp", "Example Instruments"])
+@pytest.mark.parametrize("hour", [14, 15])
+def test_unqualified_linkage_replay_is_not_issuer_or_evaluation_specific(
+    tmp_path, monkeypatch, golden_input, config, issuer, hour
+):
+    """Component-positive linkage is NOT a qualified positive A9 fixture."""
+    slug = issuer.lower().replace(" ", "-")
+    url = f"https://publisher.example/ipo/{slug}"
+
+    def identity(manifest):
+        manifest["publisherIssuePage"]["url"] = url
+        manifest["publisherIssuePage"]["displayedIssueName"] = issuer
+        manifest["artifacts"][0]["url"] = url
+
+    text = CAPTURE_TEXT.replace("Acme Corp", issuer)
+    repo, _hash, source = _make_capture_repo(
+        tmp_path, manifest_mutator=identity, artifact_text=text
+    )
+    _use_test_repo(monkeypatch, repo)
+    document = _linked_input(golden_input, source)
+    document["company_name"] = issuer
+    document["_evidence"]["company_name"]["quote"] = f"# {issuer}IPO GMP Today"
+    store = EvaluationStore(tmp_path / "evaluations")
+    at = EVALUATED_AT.replace(hour=hour)
+    outcome = evaluate(document, config, evaluation_datetime=at, store=store)
+    original = _a15_document(outcome)
+    restored = _a15_document(replay(store, outcome.record.evaluation_id, config))
+    assert "result=VERIFIED" in _link_diagnostic(original)["message"]
+    assert restored["result"]["outcome_resolution"] == original["result"]["outcome_resolution"]
+    assert original["result"]["outcome_resolution"]["reason"]["code"] == "SOURCE_UNQUALIFIED"
+    assert "final_outcome" not in original["result"]
+    assert store.verify_hashes(outcome.record.evaluation_id)["artifact_mismatches"] == []
+    preliminary = _a15_document(evaluate(
+        document, config, mode="preliminary", evaluation_datetime=at
+    ))
+    assert "A9_GMP_FINAL_WITHHELD" not in {
+        item["code"] for item in preliminary["result"]["diagnostics"]
+    }
+
+
+@pytest.mark.parametrize("trend", ["strong", "flat", "falling"])
+def test_a18_nonnull_trend_rejection_is_not_hidden_by_blanket_a9_veto(
+    tmp_path, monkeypatch, golden_input, config, trend
+):
+    """Exercise the linkage reason itself, not merely Final withholding."""
+    repo, _hash, source = _make_capture_repo(tmp_path)
+    _use_test_repo(monkeypatch, repo)
+    document = _linked_input(golden_input, source)
+    baseline = _a15_document(evaluate(document, config, evaluation_datetime=EVALUATED_AT))
+    assert "result=VERIFIED" in _link_diagnostic(baseline)["message"]
+    document["market"]["gmp"]["trend"] = trend
+    changed = _a15_document(evaluate(document, config, evaluation_datetime=EVALUATED_AT))
+    diagnostic = _link_diagnostic(changed)["message"]
+    assert "result=VERIFIED" not in diagnostic
+    assert "market.gmp.trend has no linked evidence" in diagnostic
+    assert changed["result"]["outcome_resolution"]["reason"]["code"] == "SOURCE_UNQUALIFIED"
+
+
+def test_retained_marketlive_package_integrity_is_not_qualification():
+    """D1 permits rendered bytes; these eight digests certify no publisher."""
+    package = (
+        Path(__file__).resolve().parents[1]
+        / "evidence/gmp-observations/marketliveipogmp-tonbo-20261015"
+    )
+    manifest = json.loads((package / "capture-manifest.json").read_text(encoding="utf-8"))
+    assert len(manifest["artifacts"]) == 8
+    for artifact in manifest["artifacts"]:
+        data = (package / artifact["file"]).read_bytes()
+        assert len(data) == artifact["bytes"], artifact["id"]
+        assert hashlib.sha256(data).hexdigest().lower() == artifact["sha256"].lower(), artifact["id"]
