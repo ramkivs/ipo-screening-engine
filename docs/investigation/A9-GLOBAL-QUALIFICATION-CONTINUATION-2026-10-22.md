@@ -293,3 +293,38 @@ separately from Q1–Q3's narrow substantive authority decisions. No new capture
 ratification was obtained. Source qualification and the accepting path remain
 incomplete; independent authorized regression preparation has progressed and is
 complete for the identified gaps. **OPEN — CONTRACT/IMPLEMENTATION GAP**.
+
+## CI convergence receipt — supersedes earlier pending-aggregate reports
+
+Run **39790967681** is now authoritatively **COMPLETED/SUCCESS** at `b9df27b…`,
+aggregate updated 2026-10-22T15:32:21Z. Its completed successful job is no longer
+being substituted for an unfinished aggregate. Original run **39787253029** is
+still failed; log retrieval again ends in EOF at the redirected log host. Its
+root cause is still unknown, not a fixed product defect inferred from a rerun.
+
+The prior four added replay/cutoff-isolation tests had only local validation.
+Workflow support now allows a fixed-target `linkage` scope without repeating the
+full backend merely to address GitHub status/log gaps. Default/full behavior is
+preserved. Dispatch permission was denied (403 integration access); an explicit
+`[a9-linkage]` push marker provided the focused run without credential escalation.
+
+Focused run **39810158200**, commit **9d4e504b62ee95a35cde22d1ffe17176b21fd9a0**:
+**aggregate SUCCESS**, job/check **119933931735 SUCCESS**; API-visible JUnit totals
+**44 tests, 0 failures/errors/skips, 8.744s**. Schema/integrity, compile and
+clean-tree steps passed. Frontend deliberately skipped for focused scope. This
+is actual remote validation of the existing four additions, not a new full-suite
+run or qualified positive-path proof. Local workflow parsing/syntax/routing and
+unknown-scope rejection checks passed. Action-runtime warning is non-fatal.
+
+Workspace restoration was safely reconciled by comparing all 359 tracked files
+to the remote starting head before updating Git HEAD/index without file changes.
+No source search/capture, policy ratification, runtime, schema or scoring change
+occurred. A28's exact Q1–Q3 boundaries and source/archive evidence handoff remain
+unchanged. Other branch tips did not change; no newly permitted retrieval route
+was identified. The authoritative tracker contains this receipt and owners.
+
+This receipt itself is docs-only, CI skipped; workflow/tests/runtime bytes remain
+identical to the focused validated revision. Independent CI convergence work is
+complete. A9 remains **OPEN — CONTRACT/IMPLEMENTATION GAP**: contract ratification
+and real R7/R8 evidence precede any scoped publisher qualification, genuine
+multi-issue positive baseline or accepting implementation.
