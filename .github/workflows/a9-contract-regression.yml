@@ -40,7 +40,7 @@ jobs:
           status=0
           case "$A9_TEST_SCOPE" in
             full) target=(tests/) ;;
-            linkage) target=(tests/test_gmp_evidence_linkage.py tests/test_gmp_binding.py tests/test_gmp_retained_inventory.py) ;;
+            linkage) target=(tests/test_gmp_evidence_linkage.py tests/test_gmp_binding.py tests/test_gmp_retained_inventory.py tests/test_gmp_mechanics.py) ;;
             *) echo "Unsupported A9 test scope" >&2; exit 2 ;;
           esac
           echo "A9 contract boundary regression scope: $A9_TEST_SCOPE (not qualified admission)"

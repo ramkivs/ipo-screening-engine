@@ -123,3 +123,48 @@ def parse_binding(text: str) -> dict:
         raise BindingIntegrityError(str(exc)) from exc
     verify_binding_integrity(envelope)
     return envelope
+
+
+def verify_binding_files(envelope: Mapping[str, Any], repo_root: Path) -> None:
+    """Verify all declared exact-file pins, NOT authority, semantics or admission.
+
+    Reuses A28.1 representation validation. Fragments locate evidence within a
+    file but never narrow the byte-hash subject. Each distinct resolved file is
+    read once per invocation; no cache survives into another evaluation/replay.
+    This helper is not consumed by the production admission path.
+    """
+    verify_binding_integrity(envelope)
+    root = Path(repo_root).resolve()
+    declared: dict[str, str] = {}
+
+    def collect(value: Any) -> None:
+        if isinstance(value, dict):
+            if set(value) == {'ref', 'sha256'}:
+                declared[value['ref'].split('#', 1)[0]] = value['sha256']
+            for item in value.values():
+                collect(item)
+        elif isinstance(value, list):
+            for item in value:
+                collect(item)
+
+    collect(envelope['subject'])
+    # Also guard aliases/symlinks: one resolved file must not acquire two pins.
+    resolved: dict[Path, str] = {}
+    for ref, digest in sorted(declared.items()):
+        try:
+            path = (root / ref).resolve()
+            if root not in path.parents:
+                raise BindingIntegrityError('binding file escapes repository root')
+            previous = resolved.setdefault(path, digest)
+            if previous != digest:
+                raise BindingIntegrityError('contradictory pins for resolved file')
+        except (OSError, RuntimeError) as exc:
+            raise BindingIntegrityError('binding file path could not be resolved') from exc
+    import hashlib
+    for path, expected in resolved.items():
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            raise BindingIntegrityError('binding file is missing or unreadable') from exc
+        if hashlib.sha256(data).hexdigest() != expected:
+            raise BindingIntegrityError('binding file digest mismatch')
