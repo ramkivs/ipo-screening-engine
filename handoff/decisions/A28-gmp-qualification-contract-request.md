@@ -1,14 +1,14 @@
 # A28 — GMP qualification contract resolution request
 
 - **Decision ID:** A28 (renumbered from PR #7's conflicting A19 request label; no semantic disposition)
-- **Status:** BOUNDED DISPOSITION RECORDED — ACCEPTING CONTRACT OPEN / NOT RATIFIED
+- **Status:** Q1/Q2 RATIFIED; Q3 BOUNDED DESIGN AUTHORIZED — SOURCE QUALIFICATION STILL OPEN
 - **Decision authority requested:** RAMKI / PA
 - **Preparation date:** 2026-10-22 (Asia/Calcutta)
 - **Repository:** `ramkivs/ipo-screening-engine`
 - **Implementation baseline:** `e05c0efbca1ecb3024e52da73a22e180ea171118`, inherited without modification on `arena/07f3439f-ipo-screening-engine`.
 - **Evidence-policy baseline:** `e8f9a28219aab69673c74e3b049729b77f1dfef5`.
 - **Scope:** Shared A9 accepting path; not a source approval, scoring change or schema amendment.
-- **New approval text:** NONE. Confirmed inherited decisions below retain their original authority; no publisher qualification or accepting-path authority follows from this disposition.
+- **Current approval:** explicit RAMKI choices in the ratification section supersede earlier open-request text. No publisher is qualified and no accepting path is enabled by this record.
 
 ## Authority reconciliation
 
@@ -307,3 +307,124 @@ external acquisition route was discovered or assumed in this continuation.
 A checksum does not qualify the publisher, and a ratified policy would not create
 missing historical evidence. Conditional accepting implementation remains blocked
 only on its concrete authority/evidence dependencies, not routine engineering.
+
+## RAMKI/PA ratification and bounded design delegation — 2026-10-22
+
+**CURRENT CONTROLLING DISPOSITION:** Q1 and Q2 RATIFIED; Q3 bounded technical
+representation/design AUTHORIZED and specified below. Earlier OPEN statements
+are historical and superseded only to this extent. No publisher is approved.
+
+**Authority:** in the current Arena question interaction RAMKI selected:
+
+- Q1 `explicit_only`: “Explicit observation; no automatic fallback”. Use only the
+  explicitly referenced evidence-bound observation. No latest-reading selection,
+  source fallback or averaging. Preserve competing versions; unresolved conflicts,
+  corrections or withdrawals withhold admission until attributable A1 adjudication
+  establishes applicability.
+- Q2 `optional`: “Allow absent trend as UNKNOWN”. Absence may pass A9 only if ALL
+  other qualification requirements pass; scoring keeps UNKNOWN. Asserted trend
+  must be publisher-supplied and evidence-linked under the bounded A18 extension;
+  unsupported/conflicting assertions fail closed. No derived trend.
+- Q3 `delegate`: “Authorize bounded Q3 design”. Exact fields, deterministic
+  canonical-JSON/SHA-256 and minimum versioned compatibility extensions may bind
+  authorized publisher disposition/scope, issuer/specific issue, selected
+  observation, exact evidence/manifest/artifact pins, immutable policy versions
+  and evaluation cutoff. Retain replay dependencies; exclude digest itself,
+  result hash and derived evaluation ID. No publisher approval, scoring/freshness
+  or other-gate changes. Publish exact contract and validate it before dependent
+  implementation. This is explicit substantive authority, not inferred silence.
+
+### Exact delegated representation: A28.1
+
+An optional standalone artifact `gmp-qualification-binding.v1.json` has exactly
+`subject` and `sha256`. It is NOT added to canonical input or A15. Existing closed
+schemas and historical readers remain unchanged. No engine consumer/admission
+branch is enabled by defining it. Its normative closed schema is
+`schema/gmp-qualification-binding.v1.schema.json`.
+
+The exact hash subject is `subject` ONLY, with these required members:
+
+| Member | Exact material |
+|---|---|
+| `contract_version` | Constant `A28.1` |
+| `publisher_id`, `issuer_id`, `issue_id` | Nonempty stable identities; issuer and offering remain distinct |
+| `publisher_issue_url` | Explicit HTTPS issue URL |
+| `qualification_decision` | Pin `{ref, sha256}` to actual attributable approved publisher disposition |
+| `qualification_scope` | Pin `{ref, sha256}` identifying its exact scope, including issue and temporal applicability |
+| `qualification_evidence` | Nonempty pins to supporting R1–R8 records |
+| `observation` | `{source_id, pct, as_of, trend}`: exact decimal string; publisher instant; mapped `strong`/`flat`/`falling` or null |
+| `evidence` | `{manifest, artifact_id, artifact, capture_start, capture_end, identity_quote, pct_quote, as_of_quote, trend_quote}`; manifest/artifact are exact-byte pins; quotes are `{locator, quote}`; trend quote null iff absent |
+| `selection` | `{policy, adjudications}`; policy constant `explicit-only-a1`; pins to every applicable A1 adjudication, possibly empty only without unresolved disputes |
+| `context` | `{evaluation_at, mode, engine_version, spec_version, config_sha256, policy_refs}`; mode `FINAL`, immutable applicable policy pins |
+
+Pins identify repository-relative retained files, optionally a fragment, and a
+lowercase SHA-256 of the WHOLE exact file bytes (fragment selects semantic scope,
+not a different byte subject). Arrays of pins are lexically sorted by `ref`,
+unique by ref; ordering is not a priority signal. All object properties are
+required, unknown properties rejected; nullable absence is explicit. Strings
+must already be NFC. Percentage is a plain base-10 string, no exponent/leading
+plus/leading zeros/trailing fractional zeros/negative zero; nonzero and within
+existing input percentage bounds. No new positivity policy is introduced.
+Instants are UTC `YYYY-MM-DDTHH:MM:SS.ffffffZ` with exactly six fractional digits;
+conversion must start with an explicit-offset source instant, never guessed UTC.
+Quote text/locators retain exact publisher evidence, not reconstructed values.
+
+**Canonical bytes:** existing `hashing.canonical_json(subject).encode('utf-8')`,
+canonical grammar `1.5.0` (NFC, sorted keys, separators comma/colon, no whitespace).
+Subject numbers are strings, avoiding binary-float ambiguity. `sha256` equals
+lowercase SHA-256 hex of those bytes; no prefix. Envelope, digest, result hash and
+evaluation ID are excluded. This uses, but does not change, existing hashing.
+Version/grammar changes require a new contract version, not silent reinterpretation.
+D1/A18 retained artifact bytes are always hashed exactly, not NFC-reconstructed.
+
+### Verification, authority signal and replay semantics
+
+The eventual qualification signal is an INTERNAL verified decision, not an
+input approval Boolean: actual attributable approved publisher disposition AND
+its issuer/issue/time scope, R1–R8 evidence, bound explicit observation, policy
+versions and evaluation context all pass, with recomputed qualification digest.
+No record ID, hostname, digest equality, schema validity or A18 VERIFIED status
+by itself produces that signal. Open requests and invented approval records fail.
+A28 ratification is NOT itself a publisher disposition.
+
+Before successful admission, read each pinned file once and recompute its exact
+raw digest; validate authority/scope, evidence semantics, actual identity/value/
+time/trend and snapshot equality. Validate A17's inclusive cutoff/24h and D2's
+complete capture window. Apply Q1 including all competing declarations and relevant
+revision/withdrawal/adjudication records; an empty adjudication list cannot prove
+absence of conflicts. A mechanically well-formed envelope with invented record
+pins never authorizes Final. Binding tooling in isolation checks representation,
+relationships and digest only, and must say so explicitly.
+
+Replay retains the envelope and EVERY exact referenced byte plus raw declarations
+and applicable authority/policy evidence. It must not query mutable pages/current
+approval lists or reconstruct missing prior availability. Verification failures
+remain failures; replay never mutates the original record. Missing/corrupt policy,
+authority or external evidence fails verification. Qualification must be upstream
+of result hash/derived evaluation ID; persist/link after verification. Retroactive
+revocation/adjudication is never silently applied to rewrite historical results.
+
+### Bounded A18 trend extension
+
+Reuse `_evidence['market.gmp.trend']`, canonical ID `EV-market.gmp.trend`, same
+source, exact `line <n>` locator and MANUAL_ENTRY quote. Supported rendered layout
+is a single unambiguous `Trend: <publisher label>` line; quote is the exact label.
+Reuse A17's existing label map (case-insensitive/trimmed only). Multiple trend
+lines, unsupported labels, contradictory aliases, quote/value mismatch or missing
+asserted-label evidence fail linkage. If input trend is absent, trend evidence
+must also be absent; no hidden asserted label is ignored. Null trend retains
+legacy three-field linkage; declared trend adds the fourth evidence reference and
+projection/replay checks. Existing unlinked/historical inputs are unchanged.
+This extension authorizes label linkage only, never source qualification/scoring.
+
+### Implementation sequencing / remaining evidence boundary
+
+Publish this exact contract first; validate its schema/serialization and trend
+extension. Implement those independent bounded components with mechanical unit
+fixtures (not qualified positives). Do NOT add an accepting A9 branch until real
+R7/R8 evidence permits an attributable publisher qualification and genuine
+multi-issuer/issue baseline. MarketLiveIPOGMP and InvestorGain remain NOT QUALIFIED;
+PapsDigital remains closed/non-independent. Source/archive custodian still owns
+the exact missing records in the evidence handoff above. **A9 remains OPEN —
+CONTRACT/IMPLEMENTATION GAP**, now for source evidence/qualification and dependent
+accepting implementation, not unresolved Q1–Q3 policy delegation.
