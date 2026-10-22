@@ -15,7 +15,7 @@ diff). They need not share the same branch ancestry to establish content equalit
 
 A16 and the current one-pass directive authorize this work. The superseded broad
 Phase-1 hold is not a blocker. GOV-001 permits an explicitly open decision record;
-[A19](../../handoff/decisions/A19-gmp-qualification-contract-request.md) records
+[A28](../../handoff/decisions/A28-gmp-qualification-contract-request.md) records
 only the actual semantic questions, not an application for routine permission.
 No live authority-decision service was found; the request has no approval response.
 
@@ -64,7 +64,7 @@ labelled demonstrated same-stamp mutation.
 | Capture by cutoff / 24h | Timing interval above only; expired for October19+ Final |
 | R7 / R8 | UNRESOLVED; engine policy questions separated from factual evidence |
 | A18 | Mechanism available, local byte integrity checked; no evaluation or qualification created from it in this pass |
-| Qualification signal / required hash | Undefined; A19 OPEN, artifact hashes not substituted |
+| Qualification signal / required hash | Undefined; A28 OPEN, artifact hashes not substituted |
 | Qualified replay | BLOCKED on authorized contract plus legitimate evidence baseline |
 
 InvestorGain remains NOT QUALIFIED. PapsDigital remains closed as a non-independent
@@ -85,7 +85,7 @@ alternative. No publisher or qualifying positive fixture was created.
    regression baseline. A policy decision cannot create that evidence.
 5. **Needs new semantic authority:** qualification authority/scope; selection and
    correction rules; required trend/absence treatment; signal/hash subject and
-   exact representation/compatibility. A19 requests only these decisions.
+   exact representation/compatibility. A28 requests only these decisions.
 
 ## Implementation design completed without speculative runtime changes
 
@@ -113,7 +113,7 @@ After ratification AND sufficient evidence, implement in this order:
 
 No new runtime API, approval flag, hash function, schema or accepting branch was
 implemented. The proposed exact semantic contents and unresolved serialization
-choices are recorded in A19, visibly unapproved.
+choices are recorded in A28, visibly unapproved.
 
 ## Regression preparation and limits
 
@@ -162,7 +162,7 @@ runtime acceptance is claimed. No application server was started or stopped.
 
 ## Completion boundary
 
-Independent work is complete subject to publication/CI verification. A19 is a
+Independent work is complete subject to publication/CI verification. A28 is a
 request, not approval. Remaining order: semantic disposition + actual R7/R8
 source evidence -> authorized source qualification -> compatible signal/hash
 implementation -> global accepting-path tests -> integrity/replay/remote closure.
@@ -186,5 +186,60 @@ actual executions; a successful remote job does not explain the prior failure.
 
 This receipt is docs-only, CI intentionally skipped. Runtime, tests and workflow
 remain byte-identical to the job-tested b9df27b revision; remote verification of
-the receipt follows publication. Remaining work is unchanged: A19 ratification
+the receipt follows publication. Remaining work is unchanged: A28 ratification
 and sufficient source evidence before any accepting implementation. Status OPEN.
+
+## Dependency convergence recheck — 2026-10-22
+
+Remote starting state: PR #7 OPEN, head `f3e1e0fe9d5e7c5305f9053a14a70cef3cdfae10`,
+base `arena/5dd3fe52-ipo-screening-engine` still `e05c0ef…`; no intervening changes.
+Main remains `01ba66c`; PR #6 is preserved. Exact remote record content was
+inspected rather than interpreting the PR description as policy authority.
+
+**Governance correction:** this PR's formerly labelled A19 GMP request collides
+with published approved K1 policy A19. It is now **A28**, next unused ID across the
+19 remote branch trees examined. All active links were corrected; the request's
+status/semantics are unchanged. The approved K1 A19 is unrelated and untouched.
+The separately recorded October22 aggregator issue-term authorization was also
+read: it explicitly concerns missing fresh/OFS/band/lot terms, not GMP approval.
+It cannot supply A9 authority by analogy. No ratified GMP disposition was found.
+
+**CI recheck:** run 39787253029 remains COMPLETED/FAILURE. Reattempted log retrieval
+fails at the redirected results-receiver.actions.githubusercontent.com host
+(EOF); available check annotations still expose only exit 1. Cause unavailable,
+not guessed. Run 39790967681 still reports IN_PROGRESS/null aggregate at
+2026-10-22T14:33:00Z, while its only regression job 119866566070 remains
+COMPLETED/SUCCESS. PR head f3e1e0f has no check rollup (docs-only skipped commit).
+CI is NOT represented as fully passing. No additional full-suite rerun is
+justified: the regression already succeeded and another execution cannot explain
+an inaccessible earlier log or repair GitHub aggregate finalization. Neither
+cancel nor forced status updates are used to manufacture completion.
+
+**Evidence recheck:** all 19 remote branch trees examined; no additional retained
+GMP observation paths. The current MarketLive manifest blob remains
+`86d20565f0cb64a8360a6f7db4af55d3257dc754` across the working/policy/published
+implementation branches. A historical branch holds an older variant, not a newly
+established observation. No new public capture, provider contact or broad source
+search occurred. Existing expired Tonbo evidence is not relabelled. A16 does not
+authorize external provider contact; no newly established permitted retrieval
+route or named historical archive is available in these records. Do not probe
+invented endpoints or reinstate a native-byte prerequisite.
+
+**Diagnostic review:** gmp_evidence.py diagnostic_message explicitly says the
+local-byte link is not publisher authentication or A9 qualification; the verified
+link reason repeats that limitation. Existing cross-issuer/time tests assert
+SOURCE_UNQUALIFIED/no final_outcome and replay; trend tests assert the component
+failure reason, not merely A9's blanket veto. No runtime diagnostic change or
+additional duplicate tests are warranted.
+
+| Remaining dependency | Owner / authorized next action | Downstream boundary |
+|---|---|---|
+| Qualification/selection/trend/signal/hash/serialization disposition | RAMKI/PA: ratify or amend A28 through GOV-001 durable record | No new accepting branch, signal, hash subject or schema |
+| R7 actual correction/withdrawal/version/conflict history; R8 retained historical observations | Source/evidence custodian must supply actual archived records; engineer can assess them under approved rules or use a specifically permitted public route when identified | No source qualification or fabricated multi-issue positive baseline |
+| CI aggregate finalization / original failure detail | GitHub Actions service/repository operator can supply accessible original logs or finalized authoritative aggregate; engineer rechecks when evidence changes | No claim that CI is fully passing or original failure is explained |
+
+Only governance identity, documentation and tracker references changed in this
+continuation. Existing implementation/test/schema/evidence/workflow blobs remain
+unchanged. Documentation links/IDs, retained-byte integrity and diff checks were
+validated; no already-passing full suite was redundantly rerun. A9 remains
+**OPEN — CONTRACT/IMPLEMENTATION GAP**.

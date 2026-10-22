@@ -1,6 +1,6 @@
-# A19 — GMP qualification contract resolution request
+# A28 — GMP qualification contract resolution request
 
-- **Decision ID:** A19
+- **Decision ID:** A28 (renumbered from PR #7's conflicting A19 request label; no semantic disposition)
 - **Status:** OPEN DECISION REQUEST — NOT APPROVED
 - **Decision authority requested:** RAMKI / PA
 - **Preparation date:** 2026-10-22 (Asia/Calcutta)
@@ -90,3 +90,21 @@ superseding approved record), preserving the request and its evidence. Separate
 publisher qualification must identify the evidence supporting R7/R8. Until both
 are resolved, retain **OPEN — CONTRACT/IMPLEMENTATION GAP**. No implicit approval
 is inferred from commit, PR, CI success, silence or a routine-work authorization.
+
+## Governance identity correction — 2026-10-22 continuation
+
+The remote-tree recheck found that A19 was already assigned to the RAMKI-approved
+K1 going-concern positive-evidence policy on `arena/95234306-ipo-screening-engine`
+(and `arena/ae4d04e8-ipo-screening-engine`). Its record is
+`handoff/decisions/A19-k1-going-concern-positive-evidence.md`, Git blob
+`27ab99f470e93b2b6fa91e550b03ca3b83c0ec0c` at `e8f9a282…`.
+That policy has no GMP qualification scope. A20–A27 are also already assigned.
+All 19 current remote branch trees were checked; no A28 record was found before
+this correction. GOV-001 requires unique IDs, so this OPEN GMP request is A28.
+No existing approved decision is renamed, imported or modified.
+
+Historical PR #7 references to the GMP “A19 request” mean this request only,
+never the approved K1 A19 policy. The prior request remains retrievable at
+`f3e1e0fe9d5e7c5305f9053a14a70cef3cdfae10:handoff/decisions/A19-gmp-qualification-contract-request.md`.
+The renumbering neither ratifies the proposal nor changes any requested choice.
+The status remains **OPEN DECISION REQUEST — NOT APPROVED**; approved text NONE.
