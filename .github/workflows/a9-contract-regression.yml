@@ -3,6 +3,13 @@ on:
   push:
     branches: [arena/07f3439f-ipo-screening-engine]
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Full current-contract regression, or focused linkage and integrity only (neither proves qualification)
+        type: choice
+        options: [full, linkage]
+        default: full
+        required: true
 permissions:
   contents: read
 jobs:
@@ -23,11 +30,18 @@ jobs:
       - name: Backend regression with API-visible failure diagnostics
         env:
           PYTHONPATH: engine
+          A9_TEST_SCOPE: ${{ inputs.scope || 'full' }}
         shell: bash
         run: |
           mkdir -p build
           status=0
-          python -m pytest tests/ -q --junitxml=build/a9-results.xml || status=$?
+          case "$A9_TEST_SCOPE" in
+            full) target=tests/ ;;
+            linkage) target=tests/test_gmp_evidence_linkage.py ;;
+            *) echo "Unsupported A9 test scope" >&2; exit 2 ;;
+          esac
+          echo "A9 contract boundary regression scope: $A9_TEST_SCOPE (not qualified admission)"
+          python -m pytest "$target" -q --junitxml=build/a9-results.xml || status=$?
           python - <<'PYTHON'
           from pathlib import Path
           import xml.etree.ElementTree as ET
@@ -42,10 +56,11 @@ jobs:
                           print(f"::error::{text}")
               for suite in root.iter("testsuite"):
                   print("Test totals:", suite.attrib)
+                  print("::notice::A9 selected-suite totals: " + str(suite.attrib))
           PYTHON
           exit "$status"
       - run: npm test --prefix frontend
-        if: always()
+        if: always() && inputs.scope != 'linkage'
       - name: Schema and integrity checks
         if: always()
         env:
