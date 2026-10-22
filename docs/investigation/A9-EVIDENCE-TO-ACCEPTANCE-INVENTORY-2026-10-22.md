@@ -274,3 +274,14 @@ withdrawals. PD adds no independent corroboration.
 
 **A9 remains OPEN — CONTRACT/IMPLEMENTATION GAP.** Targeted acquisition and its
 independent assessment are complete. Original failed-run cause stays UNKNOWN.
+
+### Subsequent source-safeguard engineering receipt
+
+[Source-safeguards assessment](A9-SOURCE-SAFEGUARDS-2026-10-22.md) records independent
+engineering following the targeted acquisition: reject multiple GMP candidates
+rather than choosing list order, and reject declared failed retrievals/known PD
+unavailability at the retained-capture loader. No new publisher records, signatures,
+identity schema, qualification decision or accepting branch. Captures and the
+source-specific dependency findings above are unchanged. Full CI39829866211 at
+`8706bd4…` COMPLETED/SUCCESS:1163 tests,0 failures/errors/skips; frontend/schema/
+integrity/compile/clean-tree SUCCESS. A9 remains OPEN — CONTRACT/IMPLEMENTATION GAP.

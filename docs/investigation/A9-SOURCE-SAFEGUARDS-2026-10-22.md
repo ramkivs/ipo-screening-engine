@@ -92,3 +92,25 @@ Source/archive records -> engineering assessment -> RAMKI/PA scoped qualificatio
 -> genuine multi-issuer/multi-issue positive baseline and shared accepting verifier
 with global negative/positive/replay validation. No Q1–Q3 reopening. Independent
 engineering safeguards are implemented without pretending this dependency is met.
+
+## Verified full-CI receipt
+
+- Runtime/test commit: `8706bd4c95f47af4dbc46ae9b62eac1594cf5a73`.
+  Remote branch/commit/tree identity and exact six changed-file contents matched
+  local Git bytes before validation completion.
+- Full run **39829866211**, exact head above: **aggregate COMPLETED/SUCCESS**;
+  job/check **120002834170 SUCCESS**. GitHub API-visible totals:
+  **1163 tests,0 failures,0 errors,0 skipped,817.954s**.
+- Backend, frontend, schema/integrity (including frozen core/golden/inactive-v1.6),
+  compilation and clean-tree steps all SUCCESS. Node-action/runtime and Ubuntu
+  runner-image migration notices were non-fatal; no unrelated upgrade included.
+- Local287 backend/77 frontend counts above are actual executions. The new remote
+  full run is not inherited from the earlier96-test run.
+- Final receipt is documentation-only with CI skipped; runtime/tests/workflow,
+  schema/config and all retained captures match the full-CI-tested runtime commit.
+  Exact final remote identity/changed bytes and main/PR6 preservation are checked
+  after push and recorded in PR7. This is not a claim of another full execution.
+
+Qualification and acceptance remain unchanged: all candidates NOT QUALIFIED,
+PD closed/non-independent; no authorized real-source accepting/replay positive.
+Independent safeguards and their regression validation are complete.
