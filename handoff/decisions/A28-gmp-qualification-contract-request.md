@@ -260,3 +260,50 @@ Neither a decision nor a checksum creates it. No conditional implementation
 prerequisite is satisfied by this bounded disposition. Routine investigation,
 preparation and validation remain authorized; no repeated routine approval is
 requested. **A9: OPEN — CONTRACT/IMPLEMENTATION GAP.**
+
+## Final continuation: mechanical consequences and evidence handoff
+
+No newer ratification was present at the verified PR #7 starting head
+`1459731f0231c6f236e42ed04e76fcd54869692d`. A28's bounded disposition stands;
+this continuation grants no new policy and leaves Q1–Q3's exact open choices
+unchanged. A19 is not a GMP approval.
+
+- **Q1 mechanical consequence:** identical captured text supplies no precedence
+  or revision fact. A1 withholding/adjudication applies to actual disputes; an
+  automatic successful-selection rule remains a new substantive choice. Missing
+  correction/withdrawal histories are evidence gaps, not authority requests.
+- **Q2 mechanical consequence:** absent labels stay UNKNOWN; A18's null-trend link
+  can verify while A9 remains withheld. A17 supplies no successful-Final rule for
+  absence. Neither mandatory nor optional admission can be inferred from that
+  existing component behaviour. Actual publisher labels are evidence; choosing
+  their necessity for admission is the remaining policy decision.
+- **Q3 mechanical consequence:** an external pinned capture must be rechecked,
+  not trusted merely because a stored link once verified. Existing store-hash
+  verification certifies the store, not today's external manifest/artifact bytes.
+  New tests demonstrate these distinct integrity boundaries without defining a
+  qualification hash. Exact-byte hashing and existing linkage replay are fixed;
+  an authorization signal, composite subject/serialization and qualified replay
+  representation remain unratified. No new field or digest meaning is adopted.
+
+### Exact evidence acquisition handoff (existing retained baseline)
+
+All paths below are relative to
+`evidence/gmp-observations/marketliveipogmp-tonbo-20261015/`.
+
+| Requirement | Retained artifact and demonstrated fact | Unproven / exact record needed | Custodian / permitted route |
+|---|---|---|---|
+| Publisher qualification | About/issue rendered captures establish named publisher and stated methodology; assessment preserves bounded R1–R6 passes | Completed R7/R8 evidence assessment AND attributable scoped qualification disposition, not merely page integrity | Publisher owns underlying records; RAMKI/PA owns qualification disposition; Arena assesses supplied evidence |
+| Observation identity/value | `source-captures/marketliveipogmp-ipo-tonbo-imaging-india-chunk-0.md`: Tonbo context, ₹500/+71.4%, explicit publisher stamp | Distinct-issue evidence for every new offering; no cross-issuer or cross-offering borrowing | A genuinely issue-specific permitted capture, retained with locators; no new capture obtained here |
+| Observation/capture timing | `capture-manifest.json`: complete bracket ending October15 13:17:58.770Z; publisher stamp October15 10:32Z | An actual observation/capture appropriate to each requested later evaluation; earlier availability cannot be backfilled | Previously obtained capture with honest window at/before the cutoff, or a new capture for a genuinely new cutoff through an identified authorized route |
+| Same-stamp change / correction / revision | About promises and byte-identical recapture declarations only | Actual before/after records, observation identifiers/stamps, correction declaration, what changed and timing; preserve old version | Publisher/site archive custodian; supplied archive/captures or specifically authorized public history retrieval if identified |
+| Withdrawal | No retained withdrawal example | Actual withdrawal notice identifying affected observation and when it ceased applicability, with original preserved | Publisher/archive custodian; no demonstrated archive/endpoint in current evidence |
+| Conflict / precedence | Cross-check claims, no traceable competing-reading resolution; Hero Motors assurance/timestamp inconsistency unexplained | Competing scoped observations plus source explanation and any RAMKI A1 adjudication; auto precedence additionally requires Q1 | Source custodian supplies facts; RAMKI adjudicates, Arena does not select by majority/latest |
+| Historical reproducibility | Exact captured bytes reproduce one observation; chart reading list is absent | Retained identifiable historical readings and versions plus independently established availability at the relevant cutoff | Publisher/archive custodian supplies dated history; later mutable page alone is insufficient |
+
+D1 rendered captures remain acceptable. No provider-native bytes are imposed.
+The historical Tonbo timing-only interval ended October16 10:32Z and cannot
+support a later Final. No new evidence, public-history endpoint or permitted
+external acquisition route was discovered or assumed in this continuation.
+A checksum does not qualify the publisher, and a ratified policy would not create
+missing historical evidence. Conditional accepting implementation remains blocked
+only on its concrete authority/evidence dependencies, not routine engineering.

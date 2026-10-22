@@ -738,3 +738,61 @@ def test_retained_marketlive_package_integrity_is_not_qualification():
         data = (package / artifact["file"]).read_bytes()
         assert len(data) == artifact["bytes"], artifact["id"]
         assert hashlib.sha256(data).hexdigest().lower() == artifact["sha256"].lower(), artifact["id"]
+
+
+@pytest.mark.parametrize(
+    ("target", "reason"),
+    [("artifact", "byte count or SHA-256 does not match"),
+     ("manifest", "manifest SHA-256 does not match")],
+)
+def test_replay_rechecks_external_bytes_without_rewriting_stored_evidence(
+    tmp_path, monkeypatch, golden_input, config, target, reason
+):
+    """A persisted verified link is not a cached approval of future bytes."""
+    repo, _hash, source = _make_capture_repo(tmp_path)
+    _use_test_repo(monkeypatch, repo)
+    store = EvaluationStore(tmp_path / "evaluations")
+    outcome = evaluate(_linked_input(golden_input, source), config,
+                       evaluation_datetime=EVALUATED_AT, store=store)
+    original = store.read_artifact(outcome.record.evaluation_id, "evaluation-record.v1")
+    assert "result=VERIFIED" in _link_diagnostic(original)["message"]
+    path = repo / MANIFEST_URI_PATH
+    if target == "artifact":
+        path = path.parent / "source-captures/page.md"
+        path.write_bytes(path.read_bytes().replace(b"+71.4%", b"+72.4%"))
+    else:
+        path.write_bytes(path.read_bytes() + b" ")
+    replayed = _a15_document(replay(store, outcome.record.evaluation_id, config))
+    message = _link_diagnostic(replayed)["message"]
+    assert "result=FAILED:" in message
+    assert reason in message
+    assert replayed["result"]["outcome_resolution"]["reason"]["code"] == "SOURCE_UNQUALIFIED"
+    assert "final_outcome" not in replayed["result"]
+    assert store.read_artifact(outcome.record.evaluation_id, "evaluation-record.v1") == original
+    # The store's own hash verification is not an external-evidence recheck.
+    assert store.verify_hashes(outcome.record.evaluation_id)["artifact_mismatches"] == []
+
+
+@pytest.mark.parametrize("early_first", [True, False])
+def test_capture_availability_never_leaks_across_evaluation_cutoffs(
+    tmp_path, monkeypatch, golden_input, config, early_first
+):
+    """Reuse identical input in both orders; assert component timing, not A9 alone."""
+    repo, _hash, source = _make_capture_repo(tmp_path)
+    _use_test_repo(monkeypatch, repo)
+    document = _linked_input(golden_input, source)
+    early = EVALUATED_AT.replace(hour=13, minute=16)
+    instants = [early, EVALUATED_AT] if early_first else [EVALUATED_AT, early]
+    store = EvaluationStore(tmp_path / "evaluations")
+    ids = []
+    for instant in instants:
+        outcome = evaluate(document, config, evaluation_datetime=instant, store=store)
+        ids.append(outcome.record.evaluation_id)
+        expected = "NOT_AVAILABLE_BY_CUTOFF" if instant == early else "VERIFIED"
+        original = _a15_document(outcome)
+        assert f"result={expected}" in _link_diagnostic(original)["message"]
+        restored = _a15_document(replay(store, outcome.record.evaluation_id, config))
+        assert _link_diagnostic(restored)["message"] == _link_diagnostic(original)["message"]
+        assert restored["result"]["outcome_resolution"] == original["result"]["outcome_resolution"]
+        assert "final_outcome" not in restored["result"]
+    assert ids[0] != ids[1]

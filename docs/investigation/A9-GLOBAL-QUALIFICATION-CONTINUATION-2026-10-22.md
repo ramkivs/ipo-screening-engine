@@ -269,3 +269,27 @@ is claimed. This pass changes only the disposition and its tracker/execution
 record. Current validation is documentation/integrity checks, not a rerun of the
 previously reported backend/frontend counts. Accepting-path authority and source
 qualification remain unmet. **OPEN — CONTRACT/IMPLEMENTATION GAP.**
+
+## Final independent regression pass
+
+Four non-duplicative cases extend linkage coverage: external manifest/artifact
+mutation AFTER persistence and replay, and reuse of one input across an early
+unavailable cutoff and later available cutoff in BOTH execution orders. Existing
+tamper tests mutate before evaluation; existing replay tests use unchanged or
+already-conflicting declarations. The new cases combine these boundaries to
+prove revalidation and evaluation isolation rather than only blanket A9 rejection.
+Stored A15 evidence remains immutable; store-hash success alone does not certify
+external evidence. No qualification semantics or successful A9 baseline is added.
+
+Actual execution: linkage suite **44 passed in 16.49s**; direct frozen-core 6/6,
+golden, inactive-v1.6, three schemas, eight retained artifacts, compile and diff
+checks PASS. Full backend/frontend counts earlier in this document are inherited,
+not newly run. New tests are locally verified only; full CI intentionally skipped
+because another full run would not resolve the inaccessible original log or
+unfinalized aggregate. Existing CI results are not attributed to this test delta.
+
+A28 now identifies each exact missing R7/R8 record and its custodian/route,
+separately from Q1–Q3's narrow substantive authority decisions. No new capture or
+ratification was obtained. Source qualification and the accepting path remain
+incomplete; independent authorized regression preparation has progressed and is
+complete for the identified gaps. **OPEN — CONTRACT/IMPLEMENTATION GAP**.
