@@ -167,3 +167,24 @@ request, not approval. Remaining order: semantic disposition + actual R7/R8
 source evidence -> authorized source qualification -> compatible signal/hash
 implementation -> global accepting-path tests -> integrity/replay/remote closure.
 Until all closure criteria pass: **OPEN — CONTRACT/IMPLEMENTATION GAP**.
+
+## Publication receipt
+
+PR #7 publishes bounded changes on the fixed session branch, based on PR #6's
+implementation head without modifying PR #6/main. Preparation commit:
+`ba9cc5ae726b25ec182db1149185c8fba62cb832`; API-visible CI diagnostics commit:
+`b9df27b45852c4afbb4cc4f430e79c7eea74b424`. Exact five changed-file bytes, remote
+commit and full tree identity matched local Git at each published revision.
+
+First workflow run 39787253029 failed backend; redirected logs are inaccessible
+and the check exposes only exit 1. Cause remains unknown. The diagnostic rerun
+39790967681 at b9df27b has a COMPLETED/SUCCESS regression job/check 119866566070
+(all backend/frontend/schema/integrity/compile/clean-tree steps successful).
+Workflow aggregate still reports IN_PROGRESS/null conclusion at 14:25:14Z; this
+report does not invent aggregate completion. Local 1059/189/77 results stand as
+actual executions; a successful remote job does not explain the prior failure.
+
+This receipt is docs-only, CI intentionally skipped. Runtime, tests and workflow
+remain byte-identical to the job-tested b9df27b revision; remote verification of
+the receipt follows publication. Remaining work is unchanged: A19 ratification
+and sufficient source evidence before any accepting implementation. Status OPEN.
