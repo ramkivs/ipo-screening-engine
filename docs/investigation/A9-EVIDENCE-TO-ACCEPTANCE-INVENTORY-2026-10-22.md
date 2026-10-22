@@ -175,3 +175,28 @@ regression proceed. Q1–Q3 do not need another ratification.
 Validation/publication receipt is recorded in the tracker after actual CI and
 remote-byte verification. Existing full-CI success at `0eb1da06…` is inherited,
 not proof of this new test delta. **OPEN — CONTRACT/IMPLEMENTATION GAP**.
+
+## Executed validation/publication receipt
+
+- Evidence inventory/test commit: `15090b93a4fddc37a3dc9612168a46879e22974e`.
+  Remote commit/tree and all four changed-file contents matched local Git bytes.
+- New local inventory suite: **4 passed, 0.02s**. Workflow YAML, shell syntax,
+  full/linkage fixed target selection and invalid-scope rejection: PASS.
+- Focused remote run **39821911585**, exact head `15090b93…`:
+  **aggregate COMPLETED/SUCCESS**; job/check **119975087099 SUCCESS**.
+  API-visible totals: **96 tests, 0 failures, 0 errors, 0 skipped**, 17.563s.
+  Includes new inventory plus existing A28 binding/linkage, trend, mutation,
+  replay and isolation coverage. Schema/integrity/compile/clean-tree steps PASS.
+  Frontend intentionally skipped under focused scope, not a new full/UI run.
+- Previous full run **39813896414** remains COMPLETED/SUCCESS at `0eb1da06…`;
+  its 1111-backend/full-frontend validation is inherited. No runtime, input/A15
+  schema, config, frozen-core, scoring or retained-evidence bytes changed here.
+- Original failed **39787253029** log access remains unavailable (redirected
+  host EOF); cause UNKNOWN. No inference from later green runs.
+- Final receipt is documentation-only with CI skipped. It does not receive a
+  new runtime CI claim; tests/workflow/runtime bytes are those of validated
+  `15090b93…`. Final exact remote identity and byte verification follow push.
+
+Independent inventory/audit/regression/publication work is complete. No source
+qualification/admission signal was produced. The concrete source/archive handoff
+and conditional accepting-path dependency above remain unchanged.
