@@ -45,7 +45,7 @@ from .evaluation import (
     compute_preliminary_delta,
 )
 from .gmp_policy import apply_gmp_cutoff
-from .gmp_evidence import capture_gmp_linkage_context, GMP_LINK_EVIDENCE_FIELDS
+from .gmp_evidence import capture_gmp_linkage_context, GMP_LINK_EVIDENCE_FIELDS, GMP_LINK_OPTIONAL_EVIDENCE_FIELDS
 from .json_strict import load_strict_json
 from .knockouts import KnockoutSummary, evaluate_knockouts
 from .overlays import EffectiveScoringPlan, resolve_overlays
@@ -463,7 +463,7 @@ def replay(
     else:
         input_document["_sources"] = evidence.get("sources") or []
         evidence_path_by_id = {
-            evidence_id: field_path for field_path, evidence_id in GMP_LINK_EVIDENCE_FIELDS
+            evidence_id: field_path for field_path, evidence_id in GMP_LINK_EVIDENCE_FIELDS + GMP_LINK_OPTIONAL_EVIDENCE_FIELDS
         }
         input_document["_evidence"] = {
             evidence_path_by_id.get(item["evidence_id"], item["evidence_id"]): item

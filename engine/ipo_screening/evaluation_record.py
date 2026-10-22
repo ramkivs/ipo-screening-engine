@@ -1020,9 +1020,9 @@ def _a9_final_gmp_gate(
 ) -> Optional[Dict[str, Any]]:
     """Return A9's nonterminal reason for Final under the current GMP contract.
 
-    The A9 contract still defines no qualifying GMP source or qualification
-    signal and does not define the required A9 GMP hash subject. The separate §7
-    local-byte linkage is recorded for evidence reproducibility only; it does
+    A28 defines the qualification-binding sidecar, but no publisher is qualified
+    and no evidence-backed admission verifier consumes that sidecar here. The
+    separate A18/A28 local-byte linkage records reproducibility only; it does
     not grant A9 qualification and is not consumed here. A generic market
     digest, an opaque legacy SourceRef.content_hash, or a verified local link is
     never substituted for A9 approval. Missing values remain distinct from

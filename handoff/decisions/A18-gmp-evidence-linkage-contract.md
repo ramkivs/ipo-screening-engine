@@ -39,3 +39,17 @@ Previously reported clean-tree verification applied that patch to a temporary ar
 ## Publication reconciliation (2026-10-16)
 
 The publication snapshot above is superseded. The eight-path implementation was integrated into `arena/573e69a4-ipo-screening-engine` by PR #4 (implementation commit `c0577d85f268164c6dcccc74fa42125d3f2ba48b`, merge `52536a1d9aae7aa298038b07893668af78e360fc`), and the tracker integration record by PR #5 (merge `9e8c260576b85fad66484c19eec04fe328e1575f`, the authoritative HEAD when this record was published). This decision record and source-policy §7 are published in the authoritative tree by the documentation commit accompanying this reconciliation; the earlier session branches (`arena/ea6e5bc2-ipo-screening-engine`, `arena/gmp-evidence-linkage-docs-clean`, `arena/5ccbfd5d-ipo-screening-engine`) are provenance only and must not be merged. At the authoritative HEAD, the full Python suite was run in a Linux environment: **885 passed** (focused GMP group **128 passed**), frozen core 6/6, golden result and v1.6 checks PASS, frontend **55 passed** — self-run verification, not independent review. Qualification limits above are unchanged.
+
+## A28 explicit extension — 2026-10-22
+
+RAMKI's current Q2 selection ratifies optional/UNKNOWN trend admission if all
+other qualification requirements pass, and authorizes bounded asserted-label
+linkage. A28's exact trend extension supersedes only this record's absent trend
+link representation. Non-null trend now requires the fourth canonical evidence
+`EV-market.gmp.trend`, exact label locator/quote on one `Trend: <label>` line,
+the same source and existing A17 mapping. Unsupported/conflicting/hidden labels
+fail linkage. Null trend preserves three-field linkage when no label is asserted.
+Projection and replay preserve the fourth reference when present. No derived
+label, input/A15 schema change, scoring change or source approval follows.
+The A28.1 standalone binding schema is NOT an input/A15 extension and is NOT
+consumed for A9 admission until actual qualification evidence exists.

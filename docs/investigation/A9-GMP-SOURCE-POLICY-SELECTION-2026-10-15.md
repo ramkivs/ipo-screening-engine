@@ -189,3 +189,16 @@ The code/test source is `ca6c9862c5809d72a73d1493ef5f6fe31ec7f34f`, present unch
 Previously reported verification on a temporary baseline-plus-patch tree: focused tests **128 passed**; full suite **885 passed** with two Starlette deprecation warnings; compileall, frozen-core (6/6), golden-result, and v1.6 integrity checks passed. These results are not a substitute for rerunning checks on the Windows-created final implementation commit.
 
 After Windows creates and remotely verifies the two clean refs, update the tracker in a documentation-only follow-up with the exact implementation/doc ref SHAs, ancestry, changed paths, and final test evidence. Do not record a publication claim before fetching and verifying the corresponding remote ref.
+
+## A28 ratification reconciliation — 2026-10-22
+
+A28 now records RAMKI's explicit Q1/Q2 ratification and Q3 bounded technical
+design delegation. Explicitly referenced observation only; no automatic fallback,
+latest-reading selection or averaging; unresolved revisions/withdrawals/conflicts
+remain withheld pending A1 adjudication. Missing trend may remain UNKNOWN only
+when all other admission conditions pass; asserted trend requires exact publisher
+label linkage. A28 defines the exact standalone binding/serialization contract.
+These changes do not qualify MarketLiveIPOGMP/InvestorGain or close R7/R8. Earlier
+PR-4f/PR-5/open representation statements are superseded only within this exact
+scope; no automatic precedence or blanket permanent disqualification is adopted.
+D1–D3 and all unchanged A17/A18 safeguards remain binding.

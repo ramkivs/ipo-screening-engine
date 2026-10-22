@@ -39,12 +39,12 @@ jobs:
           mkdir -p build
           status=0
           case "$A9_TEST_SCOPE" in
-            full) target=tests/ ;;
-            linkage) target=tests/test_gmp_evidence_linkage.py ;;
+            full) target=(tests/) ;;
+            linkage) target=(tests/test_gmp_evidence_linkage.py tests/test_gmp_binding.py) ;;
             *) echo "Unsupported A9 test scope" >&2; exit 2 ;;
           esac
           echo "A9 contract boundary regression scope: $A9_TEST_SCOPE (not qualified admission)"
-          python -m pytest "$target" -q --junitxml=build/a9-results.xml || status=$?
+          python -m pytest "${target[@]}" -q --junitxml=build/a9-results.xml || status=$?
           python - <<'PYTHON'
           from pathlib import Path
           import xml.etree.ElementTree as ET

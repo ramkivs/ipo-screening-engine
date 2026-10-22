@@ -328,3 +328,25 @@ identical to the focused validated revision. Independent CI convergence work is
 complete. A9 remains **OPEN — CONTRACT/IMPLEMENTATION GAP**: contract ratification
 and real R7/R8 evidence precede any scoped publisher qualification, genuine
 multi-issue positive baseline or accepting implementation.
+
+## Actual Q1–Q3 ratification and component implementation
+
+The current interaction obtained explicit RAMKI choices instead of another
+unchanged blocker report: `explicit_only`, `optional`, `delegate`. A28 records
+that actual new authority and the exact A28.1 representation; published contract
+commit `2a80d90` precedes dependent code. Earlier statements that Q1–Q3 lack
+ratification are now historical. Source approval remains separate.
+
+Independent bounded implementation: strict standalone binding schema/digest
+utility (NO authority/admission signal), canonical field/byte/time/pin checks,
+strict duplicate-key parsing, and A18 exact publisher-trend linkage with fourth
+reference, projection and replay checks. Null trend remains UNKNOWN. The new
+sidecar is not added to closed input/A15 and no successful A9 branch is enabled.
+Absent source evidence cannot be replaced by format-only synthetic unit subjects.
+
+Focused suites: **241 passed in 28.54s**. Full local/remote validation follows for
+this actual runtime change, not to explain inaccessible old CI logs. Governing
+source-policy/A18 addenda are reconciled. Exact remaining evidence artifacts and
+custodians in A28 are unchanged; no broad discovery/contact/new capture occurred.
+A9 remains OPEN pending evidence-backed qualification, real multi-issue positive
+baseline, accepting integration and its global regression.
