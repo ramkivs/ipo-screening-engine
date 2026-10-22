@@ -1,0 +1,49 @@
+{
+  "recorded_at_utc": "2026-10-22",
+  "branch": "arena/95234306-ipo-screening-engine",
+  "published_commit": "54b344799853dbcc046841494e87980f4dad9dee",
+  "parent": "75df573e96a8499ad06865cf5cd29e4da244ade7",
+  "tree": "00f5f20a10b958c909adeb8800e498c5b73b48fb",
+  "remote_ref": "refs/heads/arena/95234306-ipo-screening-engine",
+  "verification": {
+    "method": "GitHub REST git/commits and branch endpoints after push",
+    "remote_commit_equal_local": true,
+    "remote_tree_equal_local": true,
+    "changed_blob_shas_equal_local": true,
+    "main_sha": "01ba66c12ca1195fd7acbd287c3e39a019808094",
+    "pr_6": {
+      "state": "OPEN",
+      "base": "arena/573e69a4-ipo-screening-engine",
+      "head": "e05c0efbca1ecb3024e52da73a22e180ea171118",
+      "merged": false
+    },
+    "workflow_runs_created_for_commit": [],
+    "note": "Changed paths are not watched by the existing workflows; the latest branch run remains the historical ba7a069 acceptance."
+  },
+  "files": [
+    {
+      "path": "docs/investigation/ofs-split-header-2026-10-22/REPORT.md",
+      "blob": "989a1aa43d0a9a1e652c857966d54418d45f6afa"
+    },
+    {
+      "path": "engine/ipo_screening/extraction/sections.py",
+      "blob": "0fec0c63f33c3548a0c3989917adb7fdc40ba5fe"
+    },
+    {
+      "path": "handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md",
+      "blob": "25bc0122084ef0ce8aa1a1c14c82aa70a3dbe3df"
+    },
+    {
+      "path": "tests/fixtures/jio/cover-page-pypdf-6.19.0.txt",
+      "blob": "a64384fc5b20c0a0a7e303e7364e8b9c846efea2"
+    },
+    {
+      "path": "tests/test_jio_rhp_issue_terms.py",
+      "blob": "6fc09d507eb8b972f87d24d0e9131c854b5f17e3"
+    },
+    {
+      "path": "tests/test_ofs_nil_binding.py",
+      "blob": "a95b0d9479fc2b1dfca4359b494bc625b1568f46"
+    }
+  ]
+}
