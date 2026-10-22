@@ -200,3 +200,77 @@ not proof of this new test delta. **OPEN — CONTRACT/IMPLEMENTATION GAP**.
 Independent inventory/audit/regression/publication work is complete. No source
 qualification/admission signal was produced. The concrete source/archive handoff
 and conditional accepting-path dependency above remain unchanged.
+
+## Targeted acquisition continuation
+
+Checkpoint fetched again at October22 17:42Z: PR7 still OPEN at
+`9f40862eac7d68a804e9e6c8aad3f8e486d160d0`, base `e05c0ef…`. Ratified
+A28/A28.1 and published branch tips unchanged; no newly published source archive
+was found. Working files matched all364 remote tracked files. Local Git metadata
+had reverted to the main ancestor while files remained at the published head;
+a mixed reset of THIS SAME branch to its verified remote head repaired metadata
+without changing any file. This was checkpoint reconciliation, not a repeat GMP
+checksum audit. No other branch was checked out or changed.
+
+### New evidence actually obtained
+
+The existing documented `functions.fetch_page` route IS available this turn.
+The previous absence of a reachable immutable archive remains true, but must not
+be confused with inability to render public pages now. Six targeted calls used
+only four previously known public URLs: ML Tonbo/About, IG Tonbo chunks0/1/2,
+PD Tonbo. No broad discovery/API probe/access workaround/contact occurred.
+
+New package:
+[`evidence/gmp-observations/targeted-followup-20261022/`](../../evidence/gmp-observations/targeted-followup-20261022/README.md).
+Five retained files have exact local-byte SHA-256/counts, method, URL, tool title,
+chunk/retention scope and honest shared retrieval bounds in its capture manifest.
+IG comment-only chunk2 was inspected, not retained; no digest invented. Source
+version IDs, HTTP receipts/headers and cache status are unknown. Tool content is
+manually transcribed rendered evidence, with disclosed excerpts/newlines—not
+provider-native bytes, signatures or authority. First shared bracket is coarse:
+fetch-mtime17:42:32.252218Z to post-call UTC17:43:12.825118Z. Second is directly
+clock-bracketed17:43:12.830244Z–17:43:35.200412Z. All on October22; neither
+bracket is an exact per-call receipt. Source generation time is not inferred.
+
+### Candidate dispositions under unchanged A28/A28.1
+
+| Candidate | New supporting facts / actual progress | Disposition and exact remaining source record |
+|---|---|---|
+| MarketLiveIPOGMP | New Tonbo display ₹512/+73.1%,21Oct9:37pm IST, versus October15₹500. About repeats never-overwritten/corrections-disclosed claims; sync time/contact address changed. No actual correction/withdrawal/version trail returned. | **NOT QUALIFIED.** ML archive custodian must supply observation-specific before/after history, attributable correction/version/withdrawal timing and traceable competing-record resolution or equivalent retained evidence. Changed current value is not correction history. Separately, this reading expired22Oct16:07Z BEFORE capture, so no timing-eligible Final from it. |
+| InvestorGain | ₹445; daily table12 rows, intraday76 rows. All41 old intraday entries match later rows36–76 in raw time/value/trend;35 added rows, ordinal IDs shift. New material supports two bounded captured views, not immutable source versions. | **NOT QUALIFIED.** IG archive/data custodian must supply attributable source-time/zone and update-versus-observation semantics, observation-identifiable revision/withdrawal history and correction/conflict resolution. Stable IDs OR equivalent attributable traceability would serve; native IDs are not invented as a new policy prerequisite. No source-zone conversion or earlier availability inferred. |
+| PapsDigital | Public issue route returned a temporarily-unavailable rendering; no new observation/source/version/independence evidence. No retry. | **NOT QUALIFIED; closed as non-independent alternative.** PD/IG custodians would need upstream-to-relay identity/version/propagation timing and explanation of contradictory labels; independent status cannot come from the same IG relay. Outage is not a publisher withdrawal notice. |
+
+IG daily October15 changed from17:37/₹495 to23:37/₹500: different displayed
+timestamps, not proven same-stamp correction. New narrative says upward today,
+but daily/model/FAQ says Volatile. Scope/semantics may differ; neither arbitrary
+precedence nor trend omission is authorized to resolve this. No A1 adjudication
+or publisher explanation accompanies it. Two capture times do not prove each
+row's earlier cutoff availability, missing intermediate versions or absence of
+withdrawals. PD adds no independent corroboration.
+
+### Qualification, acceptance and validation outcome
+
+- Existing NOT QUALIFIED states are retained on evidence insufficiency. No new
+  governance approval, real A28.1 qualification binding or authority was created.
+  RAMKI/PA can qualify only on sufficient attributable evidence within scope.
+- No eligible qualified observation, genuine multi-issuer/multi-issue positive
+  baseline or shared accepting path exists. Existing fail-closed behavior,
+  explicit-only selection, A1/A17, optional UNKNOWN trend, Preliminary/scoring,
+  frozen/input/A15 schemas and unrelated outcome gates remain unchanged.
+- **New-material checks executed:** five new file counts/SHA-256 match manifest;
+  IG76/old41 comparison with35 additions and shifted ordinals PASS; ML About
+  comparison excluding only disclosed sync/contact fields PASS; links/JSON/UTF-8
+  and diff checks PASS. Reproduction code is in the package README. An initial
+  comparison excluding only sync correctly exposed the changed contact field;
+  scope was corrected to report that difference, not alter source evidence.
+- No old checksum audit,96-test focused rerun, full backend/frontend rerun or
+  inaccessible-failure-log retry. Previous focused39821911585 at15090b93 and
+  full39813896414 at0eb1da06 remain COMPLETED/SUCCESS and inherited—not fresh
+  CI for new evidence. This docs/evidence-only publication skips CI.
+- **Specific remaining dependency:** ML/IG source/archive custodians' missing
+  records above (PD remains a relay); engineering assesses; RAMKI/PA records
+  evidence-backed scoped qualification; only then engineering implements and
+  validates shared acceptance/real positives/replay. No renewed Q1–Q3 request.
+
+**A9 remains OPEN — CONTRACT/IMPLEMENTATION GAP.** Targeted acquisition and its
+independent assessment are complete. Original failed-run cause stays UNKNOWN.

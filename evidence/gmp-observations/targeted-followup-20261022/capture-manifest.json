@@ -1,0 +1,150 @@
+{
+  "artifactType": "gmp-targeted-rendered-source-capture-manifest",
+  "status": "NON-AUTHORITATIVE INVESTIGATION EVIDENCE. No source qualification, qualifying snapshot, A28.1 binding or A9 required hash.",
+  "createdDate": "2026-10-22",
+  "recordRef": "docs/investigation/A9-EVIDENCE-TO-ACCEPTANCE-INVENTORY-2026-10-22.md#targeted-acquisition-continuation",
+  "captureMethod": {
+    "tool": "functions.fetch_page",
+    "representation": "Manually retained rendered Markdown/transcription excerpts, not HTML or provider-native response bytes. No machine comparison to tool output is possible. Local editorial headings and trailing newlines are disclosed.",
+    "rawProviderResponseBytesCaptured": false,
+    "responseHeadersCaptured": false,
+    "exactReceiptTimeCaptured": false,
+    "toolCacheStatusDisclosed": false,
+    "publisherVersionIdentity": "No stable observation IDs, ETag, revision tokens or source version IDs returned. Artifact IDs are LOCAL capture IDs only.",
+    "sha256Scope": "Exact bytes of each retained UTF-8 local file (including added newline and editorial headings where present); not publisher response bytes, source signatures, qualification hashes or binding hashes.",
+    "hashFormat": "SHA-256 uppercase hexadecimal, existing retained-evidence convention.",
+    "access": "Existing documented rendered-page route, no direct sandbox publisher request, APIs, new access methods or publisher contact. No retry of PD outage.",
+    "clockLimit": "First group uses conservative fetch-mtime lower bound, second group explicit before/after UTC reads. No fresh external clock cross-check or exact network receipt is asserted."
+  },
+  "artifacts": [
+    {
+      "id": "ML-T22",
+      "file": "source-captures/ml-tonbo.md",
+      "url": "https://marketliveipogmp.com/ipo/tonbo-imaging-india",
+      "toolResultStatus": "success",
+      "toolPageTitle": "Tonbo Imaging India IPO GMP Today — ₹512 Grey Market Premium | MarketLiveIPOGMP",
+      "chunkIndex": 0,
+      "hasMore": false,
+      "totalChunks": 1,
+      "retrievalWindow": {
+        "startUtc": "2026-10-22T17:42:32.252218Z",
+        "endUtc": "2026-10-22T17:43:12.825118Z",
+        "basis": "Conservative shared bracket: FETCH_HEAD mtime from this pass git fetch before first three parallel tool calls, to sandbox UTC clock after their completion. Start is NOT a per-call clock read or exact request/receipt time."
+      },
+      "retentionScope": "Full tool-rendered content manually transcribed, trailing newline added.",
+      "displayedSourceTime": "₹512/+73.1%; 21 Oct, 9:37 pm IST; FAQ supplies 2026",
+      "publisherVersionId": null,
+      "bytes": 1695,
+      "sha256": "54F3597E68B72B45B342C3D53FCA8D9991F4E443E77EAE1F4A701AD98F74BF24"
+    },
+    {
+      "id": "IG-T22-0",
+      "file": "source-captures/ig-chunk0-excerpts.md",
+      "url": "https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/",
+      "toolResultStatus": "success",
+      "toolPageTitle": "Tonbo Imaging India IPO GMP Today & History",
+      "chunkIndex": 0,
+      "hasMore": true,
+      "totalChunks": 3,
+      "retrievalWindow": {
+        "startUtc": "2026-10-22T17:42:32.252218Z",
+        "endUtc": "2026-10-22T17:43:12.825118Z",
+        "basis": "Conservative shared bracket: FETCH_HEAD mtime from this pass git fetch before first three parallel tool calls, to sandbox UTC clock after their completion. Start is NOT a per-call clock read or exact request/receipt time."
+      },
+      "retentionScope": "Discontinuous labeled excerpts: update label, headline, narrative, complete daily and intraday tables, model direction row. Local headings mark omissions; not full chunk.",
+      "displayedSourceTime": "₹445; Oct 22, 2026 09:37:03 PM; no source timezone supplied",
+      "publisherVersionId": null,
+      "bytes": 5898,
+      "sha256": "1C855B687903B21172F28BB705F6DA91211EFDF993C8FC018DD884CB6D4EA980"
+    },
+    {
+      "id": "PD-T22",
+      "file": "source-captures/pd-unavailable.md",
+      "url": "https://www.papsdigital.com/ipo-gmp/tonbo-imaging-india",
+      "toolResultStatus": "success",
+      "toolPageTitle": "PapsDigital — temporarily unavailable",
+      "chunkIndex": 0,
+      "hasMore": false,
+      "totalChunks": 1,
+      "retrievalWindow": {
+        "startUtc": "2026-10-22T17:42:32.252218Z",
+        "endUtc": "2026-10-22T17:43:12.825118Z",
+        "basis": "Conservative shared bracket: FETCH_HEAD mtime from this pass git fetch before first three parallel tool calls, to sandbox UTC clock after their completion. Start is NOT a per-call clock read or exact request/receipt time."
+      },
+      "retentionScope": "Full tool-rendered outage message manually transcribed, trailing newline added; no GMP record.",
+      "displayedSourceTime": null,
+      "publisherVersionId": null,
+      "bytes": 99,
+      "sha256": "A6D072FB7CF2F0803792E37AC1AA598D503C5C9A415EAF64FF0E8E0820656931"
+    },
+    {
+      "id": "IG-T22-1",
+      "file": "source-captures/ig-chunk1-excerpt.md",
+      "url": "https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/",
+      "toolResultStatus": "success",
+      "toolPageTitle": "Tonbo Imaging India IPO GMP Today & History",
+      "chunkIndex": 1,
+      "hasMore": true,
+      "totalChunks": 3,
+      "retrievalWindow": {
+        "startUtc": "2026-10-22T17:43:12.830244Z",
+        "endUtc": "2026-10-22T17:43:35.200412Z",
+        "basis": "Sandbox UTC clock reads before and after second group of three parallel tool calls. Shared bracket, not per-call receipt time."
+      },
+      "retentionScope": "Contiguous excerpt from ## Investorgain through FAQ12. Comments12 and remaining comments omitted; trailing newline added.",
+      "displayedSourceTime": "FAQ repeats Oct 22nd 2026 09:37 PM; timezone/event semantics absent",
+      "publisherVersionId": null,
+      "bytes": 4047,
+      "sha256": "60F0B54C8659F342A2EB728CB3BACA55C68EE95A83FD409986CF1AC39FF0C360"
+    },
+    {
+      "id": "ML-A22",
+      "file": "source-captures/ml-about.md",
+      "url": "https://marketliveipogmp.com/about",
+      "toolResultStatus": "success",
+      "toolPageTitle": "How We Source and Publish IPO GMP Data | MarketLiveIPOGMP",
+      "chunkIndex": 0,
+      "hasMore": false,
+      "totalChunks": 1,
+      "retrievalWindow": {
+        "startUtc": "2026-10-22T17:43:12.830244Z",
+        "endUtc": "2026-10-22T17:43:35.200412Z",
+        "basis": "Sandbox UTC clock reads before and after second group of three parallel tool calls. Shared bracket, not per-call receipt time."
+      },
+      "retentionScope": "Full tool-rendered content manually transcribed, trailing newline added.",
+      "displayedSourceTime": "Last data sync Wed, 21 Oct, 2026, 9:37 pm IST",
+      "publisherVersionId": null,
+      "bytes": 2012,
+      "sha256": "476F56C66BA16FE1D2543C38733A6FEAB5072DAD1BDA4D0083D3587C313F6F80"
+    }
+  ],
+  "retrievedNotRetained": [
+    {
+      "url": "https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/",
+      "chunkIndex": 2,
+      "toolResultStatus": "success",
+      "toolPageTitle": "Tonbo Imaging India IPO GMP Today & History",
+      "hasMore": false,
+      "totalChunks": 3,
+      "retrievalWindow": {
+        "startUtc": "2026-10-22T17:43:12.830244Z",
+        "endUtc": "2026-10-22T17:43:35.200412Z",
+        "basis": "Sandbox UTC clock reads before and after second group of three parallel tool calls. Shared bracket, not per-call receipt time."
+      },
+      "scope": "Only continuation of user comments/post-message/footer; no new qualification facts. Content not retained, no byte digest claimed."
+    }
+  ],
+  "derivedChecks": {
+    "investorgainDisplayedHistoryComparison": {
+      "priorArtifact": "evidence/gmp-observations/investorgain-tonbo-20261015/source-captures/investorgain-gmp-tonbo-2369-chunk-0.md",
+      "priorRows": 41,
+      "newRows": 76,
+      "matchingValueRawTimeTrendRows": 41,
+      "newlyDisplayedRows": 35,
+      "newOrdinalRangeForPriorRows": "36–76",
+      "limitation": "Comparison ignores row ordinal. Raw displayed times are matched as strings, not normalized event IDs; no timezone/year/receipt identity inferred. No same-stamp change in these shared rows is observed, not proof none ever occurred."
+    },
+    "marketliveAboutComparison": "Aside from sync date and contact address, retained text matches previous About after terminal newline normalization; correction-method claims unchanged. Contact address change is not a GMP correction record; no address contacted.",
+    "marketliveTiming": "Source IST21Oct21:37 = 2026-10-21T16:07:00Z; inclusive A17 expiry2026-10-22T16:07:00Z, before earliest capture-window bound17:42:32.252218Z. No timely as-of capture established."
+  }
+}
