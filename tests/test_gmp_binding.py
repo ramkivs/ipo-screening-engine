@@ -129,3 +129,25 @@ def test_strict_sidecar_parse_and_duplicate_rejection(subject):
     duplicate = text.replace('"publisher_id": "FORMAT-ONLY"', '"publisher_id": "FORMAT-ONLY", "publisher_id": "SUBSTITUTED"')
     with pytest.raises(BindingIntegrityError): parse_binding(duplicate)
     with pytest.raises(BindingIntegrityError): parse_binding('{not JSON}')
+
+
+@pytest.mark.parametrize('as_of,start,end,cutoff,valid', [
+    # Explicit observation and complete capture exactly at evaluation cutoff.
+    ('2026-10-15T14:00:00.000000Z', '2026-10-15T14:00:00.000000Z',
+     '2026-10-15T14:00:00.000000Z', '2026-10-15T14:00:00.000000Z', True),
+    # A historical publisher stamp does not rescue late availability (D2).
+    ('2026-10-15T10:32:00.000000Z', '2026-10-15T13:15:00.000000Z',
+     '2026-10-15T14:00:00.000001Z', '2026-10-15T14:00:00.000000Z', False),
+    # Oct22 ML follow-up timing relationships, FORMAT ONLY (not qualification).
+    ('2026-10-21T16:07:00.000000Z', '2026-10-22T17:42:32.252218Z',
+     '2026-10-22T17:43:12.825118Z', '2026-10-22T17:43:12.825118Z', False),
+])
+def test_additional_capture_and_observation_boundaries(subject, as_of, start, end, cutoff, valid):
+    subject['observation']['as_of'] = as_of
+    subject['evidence'].update(capture_start=start, capture_end=end)
+    subject['context']['evaluation_at'] = cutoff
+    if valid:
+        assert len(binding_digest(subject)) == 64  # representation only
+    else:
+        with pytest.raises(BindingIntegrityError, match='ineligible capture'):
+            binding_digest(subject)

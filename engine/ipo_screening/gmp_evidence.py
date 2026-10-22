@@ -244,6 +244,10 @@ def _load_rendered_capture_from_manifest(
         # Two declarations would let one reference resolve to either file.
         raise GmpEvidenceError(f"artifact {artifact_id!r} is declared more than once in {path.name}")
     entry = entries[0]
+    # A recorded acquisition failure is not missing GMP, displayed zero or a
+    # publisher withdrawal. Unknown legacy status is not upgraded to success.
+    if entry.get("toolResultStatus") not in (None, "success"):
+        raise GmpEvidenceError("capture failed: retrieval tool did not report success")
 
     file_name = entry.get("file")
     declared = entry.get("sha256")
@@ -285,6 +289,11 @@ def _load_rendered_capture_from_manifest(
             text = data.decode("utf-8")
         except UnicodeDecodeError:
             text = None
+    # The documented PD response is a successful TOOL rendering of an error
+    # page, not a GMP observation. This is deliberately not an HTML/DOM parser
+    # or a claim that arbitrary error pages can be recognized heuristically.
+    if text is not None and text.lstrip().startswith("# Temporarily unavailable"):
+        raise GmpEvidenceError("capture failed: temporary-unavailability page")
 
     window = entry.get("retrievalWindowUtc")
     window = window if isinstance(window, Mapping) else {}
