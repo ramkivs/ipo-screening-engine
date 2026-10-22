@@ -243,3 +243,29 @@ continuation. Existing implementation/test/schema/evidence/workflow blobs remain
 unchanged. Documentation links/IDs, retained-byte integrity and diff checks were
 validated; no already-passing full suite was redundantly rerun. A9 remains
 **OPEN — CONTRACT/IMPLEMENTATION GAP**.
+
+## A28 bounded disposition entered
+
+The A9/A28 contract-disposition instruction was executed through GOV-001 in A28,
+not by inventing a new source investigation. A1 resolves the conflict authority
+question already: RAMKI adjudicates, agents do not, and no majority vote or silent
+precedence can settle disputed fields. Those settled points are now explicit in
+the disposition alongside Model A, A17, D1–D3 and A18 safeguards.
+
+The record isolates only three remaining substantive approvals: Q1 successful
+selection/revision/withdrawal precedence beyond A1; Q2 absent-trend admission and
+any necessary trend evidence extension; Q3 scoped qualification signal and exact
+hash/serialization/policy-evaluation/replay representation. Current null-trend
+linkage is not admission, and non-null rejection is not silently removed. Approved
+artifact-byte hash subjects are fully distinguished from the unratified A9 hash.
+No runtime change is justified while the existing implementation matches the
+approved contract and actual qualifying evidence is absent. Source R7/R8 records
+remain a separate required dependency; no expired Tonbo capture is repurposed.
+
+PR/base/head were reverified, A28 path history and comments checked, governing
+records reread, and unchanged policy/governance tips confirmed. CI aggregate and
+original-log limitations persist; no new CI success or unexplained-failure fix
+is claimed. This pass changes only the disposition and its tracker/execution
+record. Current validation is documentation/integrity checks, not a rerun of the
+previously reported backend/frontend counts. Accepting-path authority and source
+qualification remain unmet. **OPEN — CONTRACT/IMPLEMENTATION GAP.**
