@@ -293,12 +293,20 @@ Bids can be made for a minimum of 50 Equity Shares and in multiples of 50 Equity
 Fresh Issue aggregating up to Rs 240 million
 Offer for Sale Size: Not Applicable
 '''
-    image = Image.new('RGB', (1800, 1000), 'white')
+    # Narrow single-column advertisement, sized so every text line fits inside
+    # one OCR tile at the pipeline's render scale (1040 px at 160 dpi renders to
+    # 1458 px, under the 1600 px tile). The previous 1800 px / 90-character
+    # layout produced lines wider than a tile, so each line was cut at a crop
+    # boundary and its OCR confidence depended on the host CPU: the CI runner
+    # returned an [UNREADABLE_OCR_LINE] there and lost both prices, while this
+    # sandbox recovered them. The notice content, the image-only rendering, the
+    # real OCR engine and the original-hash assertion are unchanged.
+    image = Image.new('RGB', (1040, 800), 'white')
     try:
         font = ImageFont.truetype('DejaVuSans.ttf', 28)
     except OSError:
         font = ImageFont.truetype('arial.ttf', 28)
-    ImageDraw.Draw(image).multiline_text((40, 40), '\n'.join(textwrap.fill(line, width=90) for line in text.splitlines()),
+    ImageDraw.Draw(image).multiline_text((40, 40), '\n'.join(textwrap.fill(line, width=54) for line in text.splitlines()),
         fill='black', font=font, spacing=15)
     buffer = io.BytesIO()
     image.save(buffer, format='PDF', resolution=160)
@@ -307,8 +315,8 @@ Offer for Sale Size: Not Applicable
     candidate, report = HttpNoticeProvider({'ACME': 'https://www.bseindia.com/notice.pdf'},
         fetcher=lambda url: raw).find(NAME, 'ACME')
     assert candidate is not None, report.detail
-    assert candidate.values['price_band_low'] == 100
-    assert candidate.values['price_band_high'] == 120 and candidate.values['lot_size'] == 50
+    assert candidate.values['price_band_low'] == 100, candidate.values
+    assert candidate.values['price_band_high'] == 120 and candidate.values['lot_size'] == 50, candidate.values
     assert candidate.result.fresh_issue_amount.value == 240
     assert candidate.result.price_band_high.extraction_method == 'OCR'
     assert candidate.result.fresh_issue_amount.extraction_method == 'OCR'
