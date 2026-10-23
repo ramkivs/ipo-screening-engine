@@ -357,6 +357,92 @@ def test_ocr_primary_issuer_header_excludes_newspaper_masthead_without_letter_re
         _primary_issuer_header([(1, 'ACME FORGE LIMITED\nCIN: x\nOTHER COMPANY LIMITED\nCIN: y')])
 
 
+
+# The same rendered notice is segmented differently by host OCR engines: one
+# keeps the heading spacing, the other merges it. The text below is the merged
+# form the CI runner actually produced for the image-only test above.
+SEPARATED_OCR_TEXT = (
+    'PRICE BAND ADVERTISEMENT\n'
+    'INITIAL PUBLIC OFFERING OF ACME FORGE LIMITED\n'
+    'NOTICE TO INVESTORS\n'
+    'The Floor Price is Rs 100 per Equity Share and the Cap Price is Rs 120 per Equity Share.\n'
+    'The Price Band is Rs 100 to Rs 120 per Equity Share.\n'
+    'Bids can be made for a minimum of 50 Equity Shares and in multiples of 50 Equity Shares thereafter.\n'
+    'Fresh Issue aggregating up to Rs 240 million\n'
+    'Offer for Sale Size: Not Applicable')
+CONCATENATED_OCR_TEXT = (
+    'PRICEBANDADVERTISEMENT\n'
+    'INITIAL PUBLICOFFERINGOFACMEFORGELIMITED\n'
+    'NOTICE TO INVESTORS\n'
+    'The Floor Price is Rs 100 per Equity Share and the Cap Price is Rs 120 per Equity Share.\n'
+    'The Price Band is Rs100 to Rs 120 per EquityShare.\n'
+    'Bids can be made for a minimum of 50 Equity Shares and in multiples of 50 Equity Shares\n'
+    'thereafter.\n'
+    'Fresh Issue aggregatingup toRs 240million\n'
+    'Offer forSale Size:NotApplicable')
+
+
+def parse_ocr_payload(monkeypatch, text, url='https://www.bseindia.com/notice.pdf'):
+    import subprocess
+    from ipo_screening.extraction import official_notice_ocr as module, official_offer_amounts as amounts
+    payload = json.dumps({'pages': [[1, text]], 'identity_pages': [[1, text]]}).encode()
+    monkeypatch.setattr(amounts, 'document_pages', lambda raw: [(1, '')])
+    monkeypatch.setattr(module.subprocess, 'run',
+        lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, payload, b''))
+    return module.parse_if_scanned(b'%PDF-image', url)
+
+
+def test_merged_heading_spacing_is_restored_without_repairing_issuer_letters_or_digits():
+    from ipo_screening.extraction.official_notice_ocr import _restore_heading_spacing
+    assert _restore_heading_spacing('INITIAL PUBLICOFFERINGOFACMEFORGELIMITED') == \
+        'INITIAL PUBLIC OFFERING OF ACMEFORGE LIMITED'
+    assert _restore_heading_spacing('PRICEBANDADVERTISEMENT') == 'PRICE BAND  ADVERTISEMENT '
+    assert _restore_heading_spacing('ACME FORGE LIMITED') == 'ACME FORGE LIMITED'
+    # Structural only: a word that merely ends in the legal suffix, an
+    # identifier with a glued digit, and every amount survive untouched.
+    assert _restore_heading_spacing('UNLIMITED') == 'UNLIMITED'
+    assert _restore_heading_spacing('ACME CORP LIMITED1') == 'ACME CORP LIMITED1'
+    assert _restore_heading_spacing('ACME FORGELTD 100-120 Rs 240 million') == \
+        'ACME FORGE LTD 100-120 Rs 240 million'
+
+
+@pytest.mark.parametrize('text', [SEPARATED_OCR_TEXT, CONCATENATED_OCR_TEXT], ids=['separated', 'concatenated'])
+def test_ocr_heading_segmentation_variants_identify_the_configured_issuer(monkeypatch, text):
+    from ipo_screening.issue_terms import _norm_name, HttpNoticeProvider
+    result = parse_ocr_payload(monkeypatch, text)
+    assert _norm_name(result.company_name) == _norm_name(NAME)
+    assert result.price_band_low.value == 100 and result.price_band_high.value == 120
+    assert result.lot_size.value == 50
+    assert result.fresh_issue_amount.value == 240
+    assert result.ofs_amount.value == 0
+    assert result.metadata['ocr']['numeric_repair'] is False
+    candidate, report = HttpNoticeProvider({'ACME': 'https://www.bseindia.com/notice.pdf'},
+        fetcher=lambda url: b'%PDF-image').find(NAME, 'ACME')
+    assert candidate is not None, report.detail
+    assert _norm_name(candidate.result.company_name) == _norm_name(NAME)
+
+
+def test_merged_and_separated_ocr_extract_identical_issue_terms(monkeypatch):
+    merged = parse_ocr_payload(monkeypatch, CONCATENATED_OCR_TEXT)
+    separated = parse_ocr_payload(monkeypatch, SEPARATED_OCR_TEXT)
+    for name in ('price_band_low', 'price_band_high', 'lot_size', 'fresh_issue_amount', 'ofs_amount'):
+        assert getattr(merged, name).value == getattr(separated, name).value, name
+
+
+@pytest.mark.parametrize('text', [
+    CONCATENATED_OCR_TEXT.replace('ACMEFORGELIMITED', 'OTHERCOMPANYLIMITED'),
+    SEPARATED_OCR_TEXT.replace('ACME FORGE LIMITED', 'OTHER COMPANY LIMITED'),
+], ids=['concatenated', 'separated'])
+def test_merged_heading_does_not_match_a_different_issuer(monkeypatch, text):
+    from ipo_screening.issue_terms import _norm_name, HttpNoticeProvider
+    result = parse_ocr_payload(monkeypatch, text)
+    assert _norm_name(result.company_name) != _norm_name(NAME)
+    candidate, report = HttpNoticeProvider({'ACME': 'https://www.bseindia.com/notice.pdf'},
+        fetcher=lambda url: b'%PDF-image').find(NAME, 'ACME')
+    assert candidate is None
+    assert 'different issuer' in report.detail
+
+
 def test_archive_hosts_are_scoped_to_issuer_matched_discovery_not_direct_prospectus_urls():
     from ipo_screening.issue_terms import HttpNoticeProvider, HttpProspectusProvider, OfficialDiscoveryProvider
     archive = 'https://nsearchives.nseindia.com/content/ipo/issuer.pdf'

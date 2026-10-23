@@ -20,6 +20,46 @@ _LOCK = threading.RLock()
 _ENGINE = None
 _INFERENCE_THREADS = min(4, os.cpu_count() or 1)
 
+# Fixed structural vocabulary only. OCR engines merge inter-word spaces inside
+# these headings (the same image yields "INITIAL PUBLIC OFFERING OF" on one
+# host and "INITIAL PUBLICOFFERINGOF" on another). Restoring a known phrase is
+# not repair of issuer letters, digits or amounts.
+_HEADING_VOCABULARY = ('PRICE BAND ADVERTISEMENT', 'INITIAL PUBLIC OFFERING OF',
+                       'FLOOR PRICE', 'CAP PRICE', 'PRICE BAND', 'FRESH ISSUE',
+                       # The one wording the offer parser requires to bind a
+                       # fresh-issue amount; the runner merged it as
+                       # "aggregatingup toRs 240million".
+                       'AGGREGATING UP TO',
+                       # Same merge class on the OFS row; both are fixed
+                       # structural phrases, and restoring them keeps an
+                       # explicit "Offer for Sale: Not applicable" readable.
+                       'OFFER FOR SALE', 'NOT APPLICABLE')
+# The legal suffix is another fixed token: OCR may emit "...ACMEFORGELIMITED"
+# with no space before LIMITED. Splitting the suffix restores the ordinary
+# spelling of the issuer's own heading; it never inserts, deletes, repairs or
+# guesses an issuer letter, digit or name, and an all-caps word that merely
+# ends in the suffix (UNLIMITED) is left untouched.
+_FUSED_LEGAL_SUFFIX = re.compile(r'(?<![A-Za-z0-9])([A-Z][A-Z0-9&,.\-]{1,60}?)(LIMITED|LTD)(?![A-Za-z0-9])')
+_NOT_A_NAME_STEM = {'UN', 'NON'}
+
+
+def _restore_heading_spacing(text):
+    """Normalize merged spaces in fixed headings on every OCR text form.
+
+    Applied identically to the identity header and to the financial crops, so
+    one engine's segmentation cannot make the issuer heading readable in one
+    form and unreadable in the other.
+    """
+    for words in _HEADING_VOCABULARY:
+        text = re.sub(r'(?i)\b' + r'\s*'.join(words.split()), words + ' ', text)
+
+    def split_suffix(match):
+        if match.group(1) in _NOT_A_NAME_STEM:
+            return match.group(0)
+        return match.group(1) + ' ' + match.group(2)
+
+    return _FUSED_LEGAL_SUFFIX.sub(split_suffix, text)
+
 
 def _engine():
     global _ENGINE
@@ -68,8 +108,9 @@ def _ocr_pages(raw):
                         detected = engine(np.asarray(header))
                         texts = getattr(detected, 'txts', None) or ()
                         scores = getattr(detected, 'scores', None) or ()
-                        identity_pages.append((1, '\n'.join(t if score >= .95 else '[UNREADABLE_OCR_LINE]'
-                            for t, score in zip(texts, scores))))
+                        identity_pages.append((1, _restore_heading_spacing('\n'.join(
+                            t if score >= .95 else '[UNREADABLE_OCR_LINE]'
+                            for t, score in zip(texts, scores)))))
                     finally:
                         header.close()
                 for left in range(0, image.width, 1480):
@@ -79,13 +120,9 @@ def _ocr_pages(raw):
                             detected = engine(np.asarray(crop))
                             texts = getattr(detected, 'txts', None) or ()
                             scores = getattr(detected, 'scores', None) or ()
-                            text = '\n'.join(t if score >= .95 else '[UNREADABLE_OCR_LINE]'
-                                             for t, score in zip(texts, scores))
-                            # OCR may fuse spaces in headings; restore only
-                            # fixed vocabulary, never issuer letters/digits.
-                            for words in ('PRICE BAND ADVERTISEMENT', 'INITIAL PUBLIC OFFERING OF',
-                                          'FLOOR PRICE', 'CAP PRICE', 'PRICE BAND', 'FRESH ISSUE'):
-                                text = re.sub(r'(?i)\b' + r'\s*'.join(words.split()), words + ' ', text)
+                            text = _restore_heading_spacing('\n'.join(
+                                t if score >= .95 else '[UNREADABLE_OCR_LINE]'
+                                for t, score in zip(texts, scores)))
                             output.append((index + 1, text))
                         finally:
                             crop.close()
@@ -181,8 +218,11 @@ def parse_if_scanned(raw, url):
             proc.stderr.decode('utf-8', errors='replace'))
         raise ValueError('official image notice OCR failed: ' + proc.stderr.decode('utf-8', errors='replace')[-500:])
     decoded = json.loads(proc.stdout)
-    pages = decoded['pages']
-    identity_pages = decoded['identity_pages']
+    # Idempotent: the child already normalises, and re-applying it keeps every
+    # OCR output form (identity header, financial crops, any retained payload)
+    # on one spelling rule without repairing issuer letters or digits.
+    pages = [(page, _restore_heading_spacing(text)) for page, text in decoded['pages']]
+    identity_pages = [(page, _restore_heading_spacing(text)) for page, text in decoded['identity_pages']]
     if sum(len(text) for _, text in pages) > 120000:
         raise ValueError('OCR text exceeds bounded official notice size')
     reject_general_information(pages)
@@ -217,7 +257,8 @@ def parse_if_scanned(raw, url):
         'identity_strategy': 'full-width first-page header; financial fields from original crops only',
         'minimum_line_confidence': .95, 'inference_threads': _INFERENCE_THREADS, 'segments': len(pages),
         'read_budget_seconds': read_budget,
-        'pages': sorted({number for number, _ in pages}), 'numeric_repair': False, 'normalization': 'fixed structural heading whitespace only'}
+        'pages': sorted({number for number, _ in pages}), 'numeric_repair': False,
+        'normalization': 'fixed structural vocabulary and legal-suffix separation only'}
     return result
 
 
