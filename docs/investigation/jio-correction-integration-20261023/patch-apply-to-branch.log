@@ -1,0 +1,264 @@
+# corrections.patch applied to branch engine 8a1a370 (target-engine fit check)
+# patch source: docs/investigation/jio-fresh-20261023/source-lineage/corrections.patch
+# command: git apply --reject --whitespace=nowarn corrections.patch
+Checking patch engine/ipo_screening/evaluation_record.py...
+Checking patch engine/ipo_screening/extraction/builder.py...
+error: while searching for:
+            "rpt_pct_revenue": _pick_gov("rpt_pct_revenue", 6.67 if self.allow_fixture_fallbacks else None),
+            "rpt_pct_of_revenue_growth": _pick_gov("rpt_pct_of_revenue_growth", None),
+            "board_independent_majority": _pick_gov("board_independent_majority", False),
+            "kmp_exits_2y": _pick_gov("kmp_exits_2y", 0),
+        }
+        # Schema-permitted governance inputs that a penalty/knockout consumes
+        # must not be dropped.  ``auditor_or_cfo_exit_2y`` drives the
+
+error: patch failed: engine/ipo_screening/extraction/builder.py:367
+Checking patch engine/ipo_screening/extraction/sections.py...
+error: while searching for:
+# refusing a NIL that is itself the value of another structural label.
+
+_OFS_NIL_PATTERN = re.compile(
+    r'offer for sale(?: size)?[^\n]*?(?:[^\n]*?\n){0,32}?\s*(?:NIL|Not\s+Applicable)\b',
+    re.IGNORECASE,
+)
+_OFS_NIL_TOKEN = re.compile(r'(?:NIL|Not\s+Applicable)\b', re.IGNORECASE)
+
+error: patch failed: engine/ipo_screening/extraction/sections.py:34
+error: while searching for:
+      * "Offer for Sale Size: Not applicable" (same line);
+      * "OFFER FOR SALE SIZE" followed by a value line "Not applicable";
+      * "OFFER FOR SALE SIZE" followed by a fresh row and then the OFS cell
+        "Not applicable" (the real Jio cover shape).
+
+    Rejected:
+      * an OFS label line that itself states an amount or quantity;
+      * a NIL that is the value of a bare Fresh Issue / Pre-IPO / Promoter /
+        reservation / total-issue label, on its own line or as the previous
+        line.
+    """
+    for match in _OFS_NIL_PATTERN.finditer(cover_text):
+        quote = match.group(0)
+        first_line = quote.split("\n", 1)[0]
+        after_label = re.sub(
+            r'^offer\s+for\s+sale(?:\s+size)?', '', first_line, flags=re.IGNORECASE
+        )
+        if _OFS_NIL_AMOUNT.search(after_label):
+            # The OFS row states an amount/quantity: it is not NIL.
+            continue
+
+error: patch failed: engine/ipo_screening/extraction/sections.py:62
+error: while searching for:
+            # "Fresh Issue" / "Pre-IPO Placement" / "Promoter Group" on the
+            # line immediately before a standalone NIL: not the OFS value.
+            continue
+        return quote
+    return None
+
+
+error: patch failed: engine/ipo_screening/extraction/sections.py:96
+error: while searching for:
+                        # be established, so the field stays unknown.
+                        pre_pct = None
+
+        if pre_pct is not None:
+            extractions.append(
+                RawExtraction(
+
+error: patch failed: engine/ipo_screening/extraction/sections.py:814
+Hunk #5 succeeded at 626 (offset -218 lines).
+Hunk #6 succeeded at 765 (offset -246 lines).
+Hunk #7 succeeded at 781 (offset -246 lines).
+Hunk #8 succeeded at 798 (offset -246 lines).
+Hunk #9 succeeded at 822 (offset -246 lines).
+Hunk #10 succeeded at 838 (offset -246 lines).
+Hunk #11 succeeded at 1156 (offset -1451 lines).
+error: while searching for:
+                    txt,
+                    re.IGNORECASE,
+                )
+                if m_tenure:
+                    aud_changed_3y = False
+                    tenure_page = p
+
+error: patch failed: engine/ipo_screening/extraction/sections.py:2607
+error: while searching for:
+                section_text,
+                re.IGNORECASE,
+            )
+            if negative_eom and not self._has_positive_emphasis_of_matter(section_text):
+                eom_quote = self._opinion_sentence(
+                    section_text, r"\b(?:no|nil|without)\s+(?:any\s+)?emphasis\s+of\s+matters?\b"
+                ) or " ".join(negative_eom.group(0).split())
+                extractions.append(
+                    RawExtraction(
+                        field_path="governance.repeated_eom",
+                        candidate_value=False,
+                        raw_text=eom_quote,
+                        page=found_opinion_page,
+                        section="Financial Information",
+                        locator="Auditor Opinion Notes",
+                        quote=eom_quote,
+
+error: patch failed: engine/ipo_screening/extraction/sections.py:2654
+Checking patch engine/ipo_screening/extraction/toc.py...
+error: while searching for:
+_SECTION_PATTERNS = (
+    ("the_offer", re.compile(r"\bTHE\s+OFFER\b", re.IGNORECASE)),
+    ("capital_structure", re.compile(r"\bCAPITAL\s+STRUCTURE\b", re.IGNORECASE)),
+    ("objects_of_the_offer", re.compile(r"\bOBJECTS\s+OF\s+(?:THE\s+)?OFFER\b", re.IGNORECASE)),
+    # SEBI's current heading is "BASIS FOR ISSUE PRICE"; older filings use
+    # "BASIS FOR OFFER PRICE".  Both route to the same section.
+    ("basis_for_offer_price", re.compile(r"\bBASIS\s+(?:FOR|OF)\s+(?:THE\s+)?(?:OFFER|ISSUE)\s+PRICE\b", re.IGNORECASE)),
+    ("industry_overview", re.compile(r"\bINDUSTRY\s+OVERVIEW\b", re.IGNORECASE)),
+    ("our_business", re.compile(r"\bOUR\s+BUSINESS\b", re.IGNORECASE)),
+    ("our_management", re.compile(r"\bOUR\s+MANAGEMENT\b", re.IGNORECASE)),
+    ("promoters", re.compile(r"\bOUR\s+PROMOTER(?:S|\s+AND\s+PROMOTER\s+GROUP)?\b", re.IGNORECASE)),
+    ("restated_financials", re.compile(r"\b(?:RESTATED\s+(?:CONSOLIDATED\s+)?FINANCIAL\s+INFORMATION|(?:RESTATED\s+)?(?:CONSOLIDATED\s+)?FINANCIAL\s+STATEMENTS)\b", re.IGNORECASE)),
+    ("financial_indebtedness", re.compile(r"\b(?:FINANCIAL\s+INDEBTEDNESS|CAPITALISATION\s+STATEMENT)\b", re.IGNORECASE)),
+
+error: patch failed: engine/ipo_screening/extraction/toc.py:26
+Checking patch engine/ipo_screening/pipeline.py...
+Checking patch tests/test_extraction.py...
+Checking patch tests/test_extraction_phase5b.py...
+error: while searching for:
+    # Group Companies -- not the issuer.  The criterion therefore reports UNKNOWN:
+    # 4 points off the earned score, 4 off the available base, Module D 6.0 ->
+    # 2.0 and unknown points 6.0 -> 10.0.  Measured on the fixture, not asserted.
+    assert outcome.record.score["final_score"] == 37.0
+
+
+# --------------------------------------------------------------------------
+
+error: patch failed: tests/test_extraction_phase5b.py:122
+error: while searching for:
+    # the `clean` bucket, so the bucket is UNKNOWN instead of the favourable 4/4
+    # (score 41.0 -> 37.0, and 4 points of availability with it).
+    assert canonical["governance"]["litigation_bucket"] is None
+    assert outcome.record.score["final_score"] == 37.0
+
+
+# --------------------------------------------------------------------------
+
+error: patch failed: tests/test_extraction_phase5b.py:153
+error: while searching for:
+    # SEBI/Stock Exchange regulatory actions" is a one-dimension denial, so
+    # `clean` is not established (43.0 -> 39.0).
+    assert canonical["governance"]["litigation_bucket"] is None
+    assert outcome.record.score["final_score"] == 39.0
+
+
+# --------------------------------------------------------------------------
+
+error: patch failed: tests/test_extraction_phase5b.py:208
+Checking patch tests/test_jio_fresh_regressions.py...
+Checking patch tests/test_promoter_holding_extraction.py...
+error: tests/test_promoter_holding_extraction.py: No such file or directory
+Checking patch tests/test_rk_fashion_reconciliation.py...
+error: while searching for:
+    # 55.0 - 2 (supplier) - 2 (cagr) - 1 (cfo) - 1 (auditor opinion unknown, B(i))
+    # - 4 (litigation unknown, D-5: the "clean" that earned these 4 points was a
+    # default, and availability drops by the same 4 points, 73 -> 69).
+    assert outcome.record.score["final_score"] == 45.0
+    assert outcome.record.score["base_score"] == 48.0
+    assert outcome.record.score["penalties_total"] == -3.0
+    assert outcome.record.confidence["level"] == "Low"
+    assert outcome.record.confidence["completeness_pct"] == 69.0
+    assert outcome.record.score["lower_bound"] == 32.0
+    assert outcome.record.score["upper_bound"] == 76.0
+    assert outcome.record.verdict["verdict"] == "INSUFFICIENT_DATA"
+
+    # Module assertions
+
+error: patch failed: tests/test_rk_fashion_reconciliation.py:163
+error: while searching for:
+    # Module D: 6 / 15.  The auditor criterion (2 pts) is unknown (opinion not
+    # established, B(i)) and, after D-5, so is litigation (4 pts): its 4 points
+    # used to be awarded for reading nothing.
+    assert modules["D"]["score"] == 6.0
+    assert modules["D"]["unknown_points"] == 6.0
+    lit_crit = next(c for c in modules["D"]["criteria"] if c["criterion_id"] == "litigation")
+    assert lit_crit["state"] == "UNKNOWN"
+    assert lit_crit.get("score") is None
+
+error: patch failed: tests/test_rk_fashion_reconciliation.py:202
+Checking patch tests/test_ui7_ingestion.py...
+error: while searching for:
+    # D-5: this synthetic filing carries no litigation section, so the
+    # litigation criterion is UNKNOWN instead of being awarded 4/4 on the
+    # extractor's "clean" default (final 23.0 -> 19.0, available 26 -> 22).
+    assert body["final_score"] == pytest.approx(19.0)
+    assert body["verdict"] == "INSUFFICIENT_DATA"
+    assert body["confidence"] == "Low"
+    assert body["result_hash"] is not None
+
+error: patch failed: tests/test_ui7_ingestion.py:104
+error: while searching for:
+    detail = detail_res.json()
+    assert detail["evaluation_id"] == sample_eval_id
+    assert detail["company_name"] == "AURORA SYSTEMS LIMITED"
+    assert detail["score"]["final_score"] == pytest.approx(19.0)  # D-5
+
+    # Step 7: Verify golden hash for Vishal Nirmiti is strictly preserved
+    vishal_detail = client.get(f"/api/v1/evaluations/{test_env['vishal_eval_id']}").json()
+
+error: patch failed: tests/test_ui7_ingestion.py:138
+error: while searching for:
+    # D-5: RK's litigation section is never located by the TOC router, so the
+    # scan covers no page at all; "clean" on an empty scan was an unsupported
+    # finding, and the criterion is now UNKNOWN (49.0 -> 45.0).
+    assert body["final_score"] == pytest.approx(45.0)
+    assert body["confidence"] == "Low"
+    assert body["verdict"] == "INSUFFICIENT_DATA"
+
+    eval_data = body["evaluation"]
+    assert eval_data["score"]["final_score"] == pytest.approx(45.0)  # D-5
+    assert eval_data["score"]["base_score"] == pytest.approx(48.0)  # D-5
+    assert eval_data["score"]["penalties_total"] == pytest.approx(-3.0)
+    assert eval_data["score"]["completeness_pct"] == pytest.approx(69.0)  # D-5
+
+    # Prove absence of Vishal Nirmiti qualitative defaults
+    modules = {m["id"]: m for m in eval_data["score"]["modules"]}
+
+error: patch failed: tests/test_ui7_ingestion.py:688
+Applied patch engine/ipo_screening/evaluation_record.py cleanly.
+Applying patch engine/ipo_screening/extraction/builder.py with 1 reject...
+Hunk #1 applied cleanly.
+Rejected hunk #2.
+Applying patch engine/ipo_screening/extraction/sections.py with 6 rejects...
+Rejected hunk #1.
+Rejected hunk #2.
+Rejected hunk #3.
+Rejected hunk #4.
+Hunk #5 applied cleanly.
+Hunk #6 applied cleanly.
+Hunk #7 applied cleanly.
+Hunk #8 applied cleanly.
+Hunk #9 applied cleanly.
+Hunk #10 applied cleanly.
+Hunk #11 applied cleanly.
+Rejected hunk #12.
+Rejected hunk #13.
+Applying patch engine/ipo_screening/extraction/toc.py with 1 reject...
+Rejected hunk #1.
+Applied patch engine/ipo_screening/pipeline.py cleanly.
+Applied patch tests/test_extraction.py cleanly.
+Applying patch tests/test_extraction_phase5b.py with 3 rejects...
+Rejected hunk #1.
+Rejected hunk #2.
+Rejected hunk #3.
+Applied patch tests/test_jio_fresh_regressions.py cleanly.
+Applying patch tests/test_rk_fashion_reconciliation.py with 2 rejects...
+Rejected hunk #1.
+Rejected hunk #2.
+Applying patch tests/test_ui7_ingestion.py with 3 rejects...
+Rejected hunk #1.
+Rejected hunk #2.
+Rejected hunk #3.
+
+# rejected hunks
+## ./engine/ipo_screening/extraction/builder.py.rej
+## ./engine/ipo_screening/extraction/sections.py.rej
+## ./engine/ipo_screening/extraction/toc.py.rej
+## ./tests/test_extraction_phase5b.py.rej
+## ./tests/test_rk_fashion_reconciliation.py.rej
+## ./tests/test_ui7_ingestion.py.rej

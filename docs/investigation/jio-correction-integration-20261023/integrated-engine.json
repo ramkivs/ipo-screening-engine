@@ -1,0 +1,125 @@
+{
+  "engine_tree": "jio-pubtree",
+  "routing": {
+    "contingent_liabilities": [
+      79,
+      80
+    ],
+    "related_party": [
+      80,
+      99
+    ],
+    "capital_structure": [
+      99,
+      116
+    ],
+    "objects_of_the_offer": [
+      116,
+      126
+    ],
+    "basis_for_offer_price": [
+      126,
+      152
+    ],
+    "industry_overview": [
+      152,
+      196
+    ],
+    "our_business": [
+      196,
+      293
+    ],
+    "our_management": [
+      293,
+      320
+    ],
+    "restated_financials": [
+      320,
+      432
+    ],
+    "financial_indebtedness": [
+      432,
+      463
+    ],
+    "litigation": [
+      463,
+      478
+    ]
+  },
+  "governance": [
+    {
+      "field": "governance.auditor_opinion",
+      "value": "unqualified",
+      "page": 324,
+      "quote": "do not require any adjustment for modification as there is no modification in the underlying audit reports",
+      "quote_is_processing": false
+    },
+    {
+      "field": "governance.auditor_changed_3y",
+      "value": false,
+      "page": 322,
+      "quote": "b) Auditors\u2019 report jointly issued by us dated April 24, 2026, April 24, 2025 and April 22, 2024 respectively on the Consolidated Financial Statements of the Group and its associate and joint venture as at and for years ended March 31, 2026, 2025 and 2024 as referred in paragraph 4(b) above.",
+      "quote_is_processing": false
+    },
+    {
+      "field": "governance.auditor_reputed",
+      "value": true,
+      "page": 324,
+      "quote": "Auditor: Deloitte Haskins & Sells LLP; Chaturvedi & Shah LLP, reputed network: True",
+      "quote_is_processing": true
+    },
+    {
+      "field": "governance.repeated_eom",
+      "value": false,
+      "page": 430,
+      "quote": "no Emphasis of matters in auditor\u2019s report for the period / year ended 30th June, 2026, 30th June, 2025, 31st March, 2026, 31st March, 2025 and 31st March, 2024",
+      "quote_is_processing": false
+    },
+    {
+      "field": "governance.litigation_bucket",
+      "value": "criminal_or_regulatory",
+      "page": 464,
+      "quote": "(iv) RJIL has received one summon dated September 29, 2022 and two summons dated December 26, 2023, from magistrates in Kuthuparamba and Payyanur pursuant to one criminal complaint dated May 16, 2019 and two criminal complaints each dated March 31, 2023, filed by the Secretaries of Malur Gram Panchayat and Cherupuzha Gram Panchayat (\u201cComplainants\u201d) before such magistrates under Section 210 of the ",
+      "quote_is_processing": false
+    },
+    {
+      "field": "governance.board_independent_majority",
+      "value": false,
+      "page": 293,
+      "quote": "Board independent majority: False",
+      "quote_is_processing": true
+    }
+  ],
+  "use_of_proceeds": {
+    "value": [
+      {
+        "category": "debt_repayment",
+        "amount": 275000.0
+      },
+      {
+        "category": "gcp",
+        "amount": null,
+        "undisclosed_marker": "[\u25cf]"
+      }
+    ],
+    "page": 116,
+    "leaves": [
+      {
+        "field": "use_of_proceeds[0].amount",
+        "value": 275000.0,
+        "page": 116
+      },
+      {
+        "field": "use_of_proceeds[1].amount",
+        "value": null,
+        "page": 116
+      }
+    ]
+  },
+  "capital_structure_promoter": {
+    "capital_structure.promoter_pre_pct": {
+      "value": 66.43,
+      "page": 104
+    }
+  }
+}

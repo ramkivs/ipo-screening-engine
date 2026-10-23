@@ -1,0 +1,77 @@
+{
+  "engine_tree": "jio-branch-tree",
+  "routing": {
+    "contingent_liabilities": [
+      79,
+      80
+    ],
+    "related_party": [
+      80,
+      99
+    ],
+    "capital_structure": [
+      99,
+      152
+    ],
+    "industry_overview": [
+      152,
+      196
+    ],
+    "our_business": [
+      196,
+      432
+    ],
+    "financial_indebtedness": [
+      432,
+      463
+    ],
+    "litigation": [
+      463,
+      478
+    ]
+  },
+  "governance": [
+    {
+      "field": "governance.litigation_bucket",
+      "value": "criminal_or_regulatory",
+      "page": 464,
+      "quote": "Litigation bucket classified as: criminal_or_regulatory",
+      "quote_is_processing": true
+    },
+    {
+      "field": "governance.sebi_ed_action_active",
+      "value": false,
+      "page": 464,
+      "quote": "No active SEBI or ED regulatory proceedings",
+      "quote_is_processing": false
+    },
+    {
+      "field": "governance.board_independent_majority",
+      "value": false,
+      "page": 290,
+      "quote": "Board independent majority: False",
+      "quote_is_processing": true
+    }
+  ],
+  "use_of_proceeds": {
+    "value": [
+      {
+        "category": "gcp",
+        "amount": null,
+        "undisclosed_marker": "[\u25cf]"
+      }
+    ],
+    "page": 120,
+    "leaves": []
+  },
+  "capital_structure_promoter": {
+    "capital_structure.promoter_pre_pct": {
+      "value": 100.0,
+      "page": 99
+    },
+    "capital_structure.promoter_post_pct": {
+      "value": 100.0,
+      "page": 99
+    }
+  }
+}

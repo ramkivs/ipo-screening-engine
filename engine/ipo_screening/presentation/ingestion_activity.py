@@ -17,8 +17,10 @@ applicable, ``details`` (sanitized, bounded), ``duration_ms``,
 
 Safety: details are sanitized before persistence -- keys that could
 carry credentials/cookies/tokens are dropped, strings are truncated,
-and nesting/collections are bounded.  No uploaded document content and
-no raw source response bodies are recorded.
+and nesting/collections are bounded. No full uploaded documents or raw source
+response bodies are recorded. Selected issue-field evidence quotations may be
+retained as bounded, numbered parts for lossless diagnostic readback; they do
+not constitute evaluation artifacts or upgrade a candidate's verification.
 """
 
 from __future__ import annotations
@@ -91,6 +93,9 @@ class IngestionActivityStore:
     def __init__(self, root: str | Path, max_records: int = 200) -> None:
         self.root = Path(root)
         self.max_records = max_records
+        # NTFS replacement can deny concurrent opens of the destination.
+        # Atomic publication does not by itself synchronize Windows readers.
+        self._io_lock = threading.RLock()
 
     def _path(self, ingestion_id: str) -> Path:
         safe = re.sub(r"[^A-Za-z0-9_-]", "", str(ingestion_id))[:64]
@@ -110,53 +115,55 @@ class IngestionActivityStore:
         return recorder
 
     def save(self, record: Dict[str, Any]) -> None:
-        self.root.mkdir(parents=True, exist_ok=True)
-        path = self._path(str(record["ingestion_id"]))
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(record, indent=2, sort_keys=False), encoding="utf-8")
-        tmp.replace(path)  # atomic on POSIX and Windows
+        with self._io_lock:
+            self.root.mkdir(parents=True, exist_ok=True)
+            path = self._path(str(record["ingestion_id"]))
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(record, indent=2, sort_keys=False), encoding="utf-8")
+            tmp.replace(path)  # atomic on POSIX and Windows
 
     def get(self, ingestion_id: str) -> Optional[Dict[str, Any]]:
-        path = self._path(ingestion_id)
-        if not path.is_file():
-            return None
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return None
+        with self._io_lock:
+            path = self._path(ingestion_id)
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                return None  # I/O errors and corrupt records are not absence
 
     def list_recent(self, limit: int = 50) -> List[Dict[str, Any]]:
-        if not self.root.is_dir():
-            return []
-        files = sorted(
-            (p for p in self.root.glob("*.json") if p.is_file()),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        out: List[Dict[str, Any]] = []
-        for path in files[: max(1, min(limit, 200))]:
-            try:
-                record = json.loads(path.read_text(encoding="utf-8"))
-            except Exception:
-                continue
-            out.append({k: v for k, v in record.items() if k != "events"})
-        return out
-
-    def _prune(self) -> None:
-        try:
+        with self._io_lock:
             if not self.root.is_dir():
-                return
+                return []
             files = sorted(
                 (p for p in self.root.glob("*.json") if p.is_file()),
                 key=lambda p: p.stat().st_mtime,
+                reverse=True,
             )
-            for path in files[: max(0, len(files) - self.max_records)]:
+            out: List[Dict[str, Any]] = []
+            for path in files[: max(1, min(limit, 200))]:
                 try:
-                    path.unlink()
-                except OSError:
-                    pass
-        except Exception:
-            pass  # retention is best-effort; never fails an ingestion
+                    record = json.loads(path.read_text(encoding="utf-8"))
+                except Exception:
+                    continue
+                out.append({k: v for k, v in record.items() if k != "events"})
+            return out
+
+    def _prune(self) -> None:
+        with self._io_lock:
+            try:
+                if not self.root.is_dir():
+                    return
+                files = sorted(
+                    (p for p in self.root.glob("*.json") if p.is_file()),
+                    key=lambda p: p.stat().st_mtime,
+                )
+                for path in files[: max(0, len(files) - self.max_records)]:
+                    try:
+                        path.unlink()
+                    except OSError:
+                        pass
+            except Exception:
+                pass  # retention is best-effort; never fails an ingestion
 
 
 class IngestionRecorder:

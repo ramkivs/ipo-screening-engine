@@ -132,17 +132,19 @@ class FinancialTableExtractor:
 
         kpi_start = 50 if self.page_count >= 50 else 1
         kpi_page, kpi_text = self._find_page(
-            ["Key Performance Indicators", "Key performance indicators", "Return on Capital Employed"],
+            ["Key Performance Indicators", "Key performance indicators", "Return on Capital Employed",
+             r"Return on (?:Average )?Capital\s+Employed"],
             kpi_start,
             min(self.page_count, 250),
-            required_content=["Return on Capital Employed", "ROCE", "CRAR"],
+            required_content=["Return on Capital Employed", "ROCE", "CRAR",
+                              r"Return on (?:Average )?Capital\s+Employed"],
         )
 
-        cl_start = 250 if self.page_count >= 250 else 1
-        cl_page, cl_text = self._find_page(
-            ["Contingent Liabilities and Commitments", "Contingent Liabilities"],
-            cl_start,
-            self.page_count,
+        # Contingent liabilities: read the note itself (not the summary page,
+        # not the first line containing "Total").  A wrong amount here is a
+        # direct knockout input, so the reader fails closed.
+        cl_page, cl_amount, cl_unquantified, cl_quote = self._extract_contingent_liabilities(
+            page_ranges
         )
 
         # Detect reporting unit from P&L or BS
@@ -178,7 +180,7 @@ class FinancialTableExtractor:
                 ("cost_of_materials", [r"cost of material consumed"]),
                 ("employee_expenses", [r"employee benefits expenses", r"employee benefits"]),
                 ("finance_costs", [r"finance costs", r"finance cost", r"interest expended"]),
-                ("depreciation", [r"depreciation and amortization"]),
+                ("depreciation", [r"depreciation and amorti[sz]ation"]),
                 ("total_expenses", [r"total expenses\b"]),
                 ("pbt", [r"profit/(loss) before tax", r"profit before tax"]),
                 ("pat", [r"profit after tax", r"profit/(loss) for the year", r"profit/(loss) after tax"]),
@@ -192,11 +194,23 @@ class FinancialTableExtractor:
             [
                 ("trade_receivables", [r"trade receivables"]),
                 ("cash_and_equivalents", [r"cash and cash equivalents"]),
-                ("net_worth", [r"total equity\b", r"total equity \(d\)"]),
+                ("net_worth", [r"total equity(?! and liabilit)", r"total equity \(d\)"]),
                 ("total_borrowings", [r"total borrowings\b"]),
             ],
             len(years),
         )
+
+        # Total equity is not always printed as a row (Jio's restated
+        # statement lists Equity Share capital, Other Equity and
+        # Non-Controlling Interest, then goes straight to Liabilities).
+        # Derive it from the disclosed components only when they reconcile
+        # to Total Assets - Total Liabilities; otherwise leave it unknown.
+        if "net_worth" not in bs_items:
+            derived_net_worth = self._derive_net_worth_from_equity(
+                bs_text or "", len(years)
+            )
+            if derived_net_worth is not None:
+                bs_items["net_worth"] = derived_net_worth
 
         # Parse non-current and current borrowings if total borrowings not already extracted
         if "total_borrowings" not in bs_items:
@@ -211,35 +225,48 @@ class FinancialTableExtractor:
         cf_items = self._parse_table_lines(
             cf_text or "",
             [
-                ("cfo", [r"net cash provided by/\(used in\) operating activities", r"net cash from operating activities"]),
+                ("cfo", [r"net cash provided by/\(used in\) operating activities", r"net cash from operating activities", r"net cash flow from operating activities"]),
                 ("capex", [r"purchase of property,\s*plant and equipment", r"purchase of fixed assets"]),
             ],
             len(years),
         )
 
         # Parse KPI items
-        roce_vals = self._parse_kpi_line(kpi_text or "", r"return on capital employed", len(years))
+        roce_vals = self._parse_kpi_line(kpi_text or "", r"return on (?:average )?capital\s+employed", len(years))
         crar_vals = self._parse_kpi_line(kpi_text or "", r"crar\b|capital adequacy ratio", len(years))
         gnpa_vals = self._parse_kpi_line(kpi_text or "", r"gross npa", len(years))
         nim_vals = self._parse_kpi_line(kpi_text or "", r"net interest margin|nim\b", len(years))
         cost_income_vals = self._parse_kpi_line(kpi_text or "", r"cost to income", len(years))
 
-        # Parse Contingent liabilities
-        cl_amount = self._parse_contingent_liabilities(cl_text or "")
+        # Contingent liabilities (see _extract_contingent_liabilities).
         if cl_amount is not None:
             extractions.append(
                 RawExtraction(
                     field_path="financials.contingent_liabilities",
                     candidate_value=cl_amount,
-                    raw_text=str(cl_amount),
+                    raw_text=cl_quote or str(cl_amount),
                     raw_unit=unit,
                     page=cl_page or 1,
                     section="Notes to Restated Financials",
-                    locator="Contingent Liabilities and Commitments",
-                    quote=f"Total Contingent Liabilities: {cl_amount}",
-                    quote_is_processing=True,
+                    locator="Contingent Liabilities and Commitments (claims not acknowledged as debts, latest fiscal year)",
+                    quote=cl_quote or str(cl_amount),
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
+                )
+            )
+        if cl_unquantified is not None:
+            extractions.append(
+                RawExtraction(
+                    field_path="financials.contingent_liabilities_unquantified",
+                    candidate_value=True,
+                    raw_text=cl_quote or "unquantified contingent liabilities",
+                    raw_unit=unit,
+                    page=cl_page or 1,
+                    section="Notes to Restated Financials",
+                    locator="Contingent Liabilities and Commitments — unquantified disclosure",
+                    quote=cl_quote or "unquantified contingent liabilities",
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.9,
                 )
             )
 
@@ -388,23 +415,102 @@ class FinancialTableExtractor:
                         next_nums = self._extract_row_numbers(lines[i + 1])
                         if len(next_nums) >= n_cols:
                             nums = next_nums
-                    if len(nums) == n_cols + 1:
-                        nums = nums[1:]
                     if len(nums) >= n_cols:
-                        results[field_name] = nums[:n_cols]
+                        # Statement tables are newest-first and may carry a
+                        # note number and interim (three-month) columns
+                        # before the fiscal-year block (SEBI RHP summary and
+                        # Ind AS statement convention). The fiscal block is
+                        # the rightmost n_cols. For legacy 3/4-numeric rows
+                        # this selects exactly what the previous
+                        # (drop-first-then-take-first) rules selected.
+                        results[field_name] = nums[-n_cols:]
 
         return results
+
+    _EQUITY_COMPONENT_SPECS = [
+        ("equity_share_capital", [r"^equity\s+share\s+capital\b"]),
+        ("other_equity", [r"^other\s+equity\b"]),
+        ("non_controlling_interest", [r"^non[-\s]?controlling\s+interests?\b"]),
+    ]
+
+    def _derive_net_worth_from_equity(
+        self, text: str, n_cols: int
+    ) -> Optional[List[Optional[float]]]:
+        """Derive net worth (equity attributable to owners) from components.
+
+        Used only when the statement prints no Total Equity row.  Net worth
+        is Equity Share Capital + Other Equity.  A separately presented
+        Non-Controlling Interest line is *not* part of net worth: the issuer
+        reports "Total Equity (As per Restated Consolidated Statement of
+        Assets and Liabilities)" as the two owner components (see Jio Note
+        38: 3,359,769 at FY2026), while the balance-sheet reconciliation
+        Total Assets - Total Liabilities includes NCI.  When NCI is
+        disclosed, the components must still tie to that residual after NCI
+        is added back; otherwise the field stays unknown.  The result never
+        includes the "Total Equity and Liabilities" grand total and is never
+        a guessed or partial component.
+        """
+        components = self._parse_table_lines(
+            text, self._EQUITY_COMPONENT_SPECS, n_cols
+        )
+        share_capital = components.get("equity_share_capital")
+        other_equity = components.get("other_equity")
+        if not share_capital or not other_equity:
+            return None
+        nci = components.get("non_controlling_interest")
+        totals = self._parse_table_lines(
+            text,
+            [
+                ("total_assets", [r"^total\s+assets\b"]),
+                ("total_liabilities", [r"^total\s+liabilities\b"]),
+            ],
+            n_cols,
+        )
+        total_assets = totals.get("total_assets")
+        total_liabilities = totals.get("total_liabilities")
+        result: List[Optional[float]] = []
+        for index in range(n_cols):
+            try:
+                net_worth = float(share_capital[index]) + float(other_equity[index])
+            except (IndexError, TypeError, ValueError):
+                return None
+            if (
+                total_assets is not None
+                and total_liabilities is not None
+                and index < len(total_assets)
+                and index < len(total_liabilities)
+                and total_assets[index] is not None
+                and total_liabilities[index] is not None
+            ):
+                target = float(total_assets[index]) - float(total_liabilities[index])
+                tolerance = max(0.5, abs(target) * 0.0005)
+                reconciled = net_worth
+                if nci is not None:
+                    try:
+                        reconciled += float(nci[index])
+                    except (IndexError, TypeError, ValueError):
+                        return None
+                if abs(reconciled - target) > tolerance:
+                    return None
+                result.append(round(net_worth, 2))
+            else:
+                # Without a balance-sheet reconciliation an NCI row makes
+                # the treatment of non-controlling interest ambiguous.
+                if nci is not None:
+                    return None
+                result.append(round(net_worth, 2))
+        return result
 
     def _extract_all_borrowings(self, text: str, n_cols: int) -> List[List[Optional[float]]]:
         rows: List[List[Optional[float]]] = []
         lines = [l.strip() for l in text.split("\n") if l.strip()]
         for line in lines:
-            if re.search(r'-\s*borrowings\b', line, re.IGNORECASE):
+            # Dash-rendered ("- Borrowings") or plain "Borrowings" rows;
+            # never "Total Borrowings" (that total has its own item key).
+            if re.search(r'^\s*-?\s*borrowings\b', line, re.IGNORECASE):
                 nums = self._extract_row_numbers(line)
-                if len(nums) == n_cols + 1:
-                    nums = nums[1:]
                 if len(nums) >= n_cols:
-                    rows.append(nums[:n_cols])
+                    rows.append(nums[-n_cols:])
         return rows
 
     def _extract_row_numbers(self, line: str) -> List[Optional[float]]:
@@ -428,22 +534,247 @@ class FinancialTableExtractor:
         return None
 
     def _parse_kpi_line(self, text: str, pattern: str, n_cols: int) -> Optional[List[Optional[float]]]:
-        for line in text.split("\n"):
-            if re.search(pattern, line, re.IGNORECASE):
-                nums = re.findall(r'[0-9]+\.[0-9]+', line)
-                parsed = [float(x) for x in nums if float(x) < 200.0]
-                if len(parsed) >= n_cols:
-                    return parsed[:n_cols]
+        lines = text.split("\n")
+        for i, line in enumerate(lines):
+            window = line
+            if not re.search(pattern, window, re.IGNORECASE) or not re.search(r"[0-9]+\.[0-9]+", window):
+                # KPI rows wrap across lines (e.g. "Return on Average
+                # Capital" / "Employed(18) % 2.56% ..."); join one line.
+                if i + 1 < len(lines):
+                    window = f"{line} {lines[i + 1]}"
+            if not re.search(pattern, window, re.IGNORECASE):
+                continue
+            nums = re.findall(r'[0-9]+\.[0-9]+', window)
+            parsed = [float(x) for x in nums if float(x) < 200.0]
+            if len(parsed) >= n_cols:
+                # Newest-first tables may carry interim columns before the
+                # fiscal block; select the rightmost n_cols (identical to
+                # the previous selection for exactly-n_cols rows).
+                return parsed[-n_cols:]
         return None
 
-    def _parse_contingent_liabilities(self, text: str) -> Optional[float]:
-        lines = text.split("\n")
-        for line in lines:
-            if re.search(r'Total', line, re.IGNORECASE) and re.search(r'[0-9,]+\.[0-9]+', line):
-                nums = re.findall(r'[0-9,]+(?:\.[0-9]+)?', line)
-                if nums:
-                    return parse_indian_number(nums[0])
-        return None
+    # Contingent-liabilities note (issuer-neutral).
+    _CL_NOTE_HEADING = re.compile(
+        r"^\s*(?:\d{1,2}(?:\.\d+)?\s+)?contingent\s+liabilities\s*"
+        r"(?:and\s+commitments?)?\s*:?\s*$",
+        re.IGNORECASE,
+    )
+    _CL_DATE = re.compile(
+        r"(\d{1,2})(?:st|nd|rd|th)?\s+"
+        r"(January|February|March|April|May|June|July|August|September|October|November|December)"
+        r"\s*,?\s*(\d{4})",
+        re.IGNORECASE,
+    )
+    _CL_COMMITMENTS_HEADING = re.compile(
+        r"^\s*(?:\(?\s*(?:II|2|[Bb])\s*\)?\s*[.):]?\s*)?commitments?\b",
+        re.IGNORECASE,
+    )
+    _CL_NEXT_NOTE = re.compile(r"^\s*\d{1,2}(?:\.\d+)?\s+[A-Z][A-Za-z]")
+    _CL_TOTAL_LABEL = re.compile(r"\btotal\b", re.IGNORECASE)
+    _CL_COMMITMENT_LABEL = re.compile(
+        r"\bcommitments?\b|\bcapital\s+account\b|\bcontracts?\s+remaining\b",
+        re.IGNORECASE,
+    )
+    # Amounts in a note table: grouped (Indian or western) or decimal.  A bare
+    # four-digit year is filtered out later, so period headers are not rows.
+    _CL_AMOUNT = re.compile(
+        r"\(?\s*\d{1,3}(?:,\d{2,3})+(?:\.\d+)?\s*\)?"
+        r"|\(?\s*\d+\.\d+\s*\)?"
+        r"|\(?\s*\d{4,}\s*\)?"
+    )
+    _CL_UNQUANTIFIED = re.compile(
+        r"\bunquantified\b|\bcannot\s+be\s+quantified\b|\bnot\s+quantifiable\b"
+        r"|\bamounts?\s+(?:is|are)\s+not\s+ascertainable\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _cl_row_amounts(cls, line: str) -> Optional[List[float]]:
+        """Amount cells of a table row, or ``None`` when the line is not a row.
+
+        A row *ends* with an amount cell; prose that merely mentions a number
+        in the middle of a sentence does not.  A bare four-digit year in the
+        period header is not an amount.
+        """
+        matches = list(cls._CL_AMOUNT.finditer(line))
+        if not matches:
+            return None
+        if line[matches[-1].end():].strip(" *†‡)(;:"):
+            return None
+        values: List[float] = []
+        for match in matches:
+            token = match.group(0)
+            cleaned = token.replace("(", "").replace(")", "").replace(",", "").strip()
+            try:
+                value = float(cleaned)
+            except ValueError:
+                continue
+            if "," not in token and "." not in token and 1900 <= value <= 2100:
+                continue  # a year, not an amount
+            values.append(-value if token.strip().startswith("(") else value)
+        return values or None
+
+    def _extract_contingent_liabilities(
+        self,
+        page_ranges: Optional[Dict[str, Tuple[int, int]]],
+    ) -> Tuple[Optional[int], Optional[float], Optional[bool], str]:
+        """Read the contingent-liability section total from the note.
+
+        Numerator definition (decision D-2, 2026-10-20): the disclosed total
+        of the **contingent-liability section**, excluding capital commitments
+        (``(II) Commitments`` or a commitment-labelled row).
+
+        * a unique ``Total`` row inside the section wins and the constituent
+          rows are ignored, so an aggregate is never added to its own parts;
+        * otherwise the section's rows are summed;
+        * a commitment-labelled row (or a commitments subsection) is excluded;
+        * an unparseable / width-mismatched row, more than one total, or no
+          row at all fails closed to ``None`` -- a quantified subset is not
+          evidence that the whole section is quantified.
+
+        Column selection is unchanged: the latest fiscal-year (31 March)
+        column, never an interim column mixed with a full-year net worth.
+        The unquantified flag is read from the same section with the same
+        polarity rule (a negated statement is not a positive finding) and is
+        never coerced to ``False``.
+        """
+        ranges: List[Tuple[int, int]] = []
+        if page_ranges and page_ranges.get("restated_financials"):
+            ranges.append(page_ranges["restated_financials"])
+        if self.page_count >= 250:
+            ranges.append((250, self.page_count))
+        ranges.append((1, self.page_count))
+
+        seen_pages: set = set()
+        for start, end in ranges:
+            for p in range(max(1, start), min(end, self.page_count) + 1):
+                if p in seen_pages:
+                    continue
+                seen_pages.add(p)
+                lines = [l.strip() for l in self.extract_page_text(p).splitlines() if l.strip()]
+                heading_index = next(
+                    (i for i, line in enumerate(lines) if self._CL_NOTE_HEADING.match(line)),
+                    None,
+                )
+                if heading_index is None:
+                    continue
+                # The table (or the row) may continue on the next page.
+                note_lines = list(lines[heading_index + 1:])
+                for extra in range(p + 1, min(p + 2, self.page_count) + 1):
+                    note_lines.extend(
+                        l.strip() for l in self.extract_page_text(extra).splitlines() if l.strip()
+                    )
+
+                section_end = len(note_lines)
+                for i, line in enumerate(note_lines):
+                    if self._CL_COMMITMENTS_HEADING.match(line):
+                        section_end = i
+                        break
+                    # The next numbered note on the same page is not part of
+                    # this section, even when no commitments subsection exists.
+                    if (
+                        self._CL_NEXT_NOTE.match(line)
+                        and len(line.split()) <= 8
+                        and not self._CL_AMOUNT.search(line)
+                    ):
+                        section_end = i
+                        break
+
+                section = note_lines[:section_end]
+                first_row = next(
+                    (i for i, line in enumerate(section) if self._cl_row_amounts(line)),
+                    None,
+                )
+                if first_row is None:
+                    continue
+                # The period headers are the date labels immediately above the
+                # first row.  Taking the whole page would blend the note's
+                # header with an adjacent note's identical header (Jio pp. 405-406).
+                header_window = section[max(0, first_row - 30): first_row]
+                dates: List[Tuple[int, str, int]] = [
+                    (int(d), m.capitalize(), int(y))
+                    for d, m, y in self._CL_DATE.findall("\n".join(header_window))
+                ]
+                if not dates:
+                    continue
+                march_columns = [
+                    (index, year)
+                    for index, (_, month, year) in enumerate(dates)
+                    if month.lower() == "march"
+                ]
+                if not march_columns:
+                    continue
+                column, _ = max(march_columns, key=lambda item: item[1])
+
+                rows: List[Tuple[str, float]] = []
+                ambiguous = False
+                pending: List[str] = []
+                for line in section:
+                    # Period headers and subsection headings are not row labels.
+                    if self._CL_DATE.search(line) or re.match(
+                        r"^\s*(?:as\s+at\b|\(?\s*(?:I|1|[Aa])\s*\)?[.):]?\s*contingent\s+liabilit)",
+                        line,
+                        re.IGNORECASE,
+                    ):
+                        pending = []
+                        continue
+                    amounts = self._cl_row_amounts(line)
+                    if amounts is None:
+                        # Label lines wrap; short lines carry the row label.
+                        if len(line.split()) <= 12:
+                            pending.append(line)
+                            pending = pending[-3:]
+                        else:
+                            pending = []
+                        continue
+                    label_match = self._CL_AMOUNT.search(line)
+                    label = " ".join(pending + ([line[: label_match.start()]] if label_match else []))
+                    # Prose that precedes a total on the same line is not part
+                    # of the row label ("Certain claims are unquantified. Total").
+                    label = re.split(r"(?<=\.)\s+", label)[-1]
+                    pending = []
+                    if len(amounts) > len(dates):
+                        amounts = amounts[-len(dates):]
+                    if len(amounts) < len(dates):
+                        ambiguous = True
+                        continue
+                    rows.append((label, amounts[column]))
+
+                # The unquantified statement usually sits inside the same
+                # section.  A negated statement ("there are no unquantified
+                # claims") contains the keyword but asserts the opposite.
+                unquantified = None
+                section_text = "\n".join(section)
+                m_unquantified = self._CL_UNQUANTIFIED.search(section_text)
+                if m_unquantified:
+                    prefix = section_text[max(0, m_unquantified.start() - 80): m_unquantified.start()]
+                    prefix = re.split(r"[.;\n]", prefix)[-1]
+                    if not re.search(
+                        r"\b(?:no|not|nil|none|without)\b", prefix, re.IGNORECASE
+                    ):
+                        unquantified = True
+
+                if ambiguous:
+                    return p, None, unquantified, ""  # a row could not be aligned to the columns
+                contingent = [row for row in rows if not self._CL_COMMITMENT_LABEL.search(row[0])]
+                totals = [row for row in contingent if self._CL_TOTAL_LABEL.search(row[0])]
+                if len(totals) == 1:
+                    amount = totals[0][1]
+                    used = [totals[0]]
+                elif len(totals) > 1:
+                    return p, None, unquantified, ""  # which aggregate is the section total is ambiguous
+                elif contingent and unquantified:
+                    # Some exposure has no amount and the note discloses no
+                    # total: a sum of the quantified rows would understate it.
+                    return p, None, unquantified, ""
+                elif contingent:
+                    amount = sum(value for _, value in contingent)
+                    used = contingent
+                else:
+                    continue
+                quote = " | ".join(" ".join(label.split()) for label, _ in used)
+                return p, amount, unquantified, quote
+        return None, None, None, ""
 
     def _extract_from_kpi_and_summary_tables(
         self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None
@@ -583,17 +914,16 @@ class FinancialTableExtractor:
             fc_vals = [0.97, 0.24, 0.33]
 
         def _get_val(arr: Optional[List[float]], yr_offset: int) -> Optional[float]:
-            if not arr:
+            if not arr or len(arr) < 3:
                 return None
-            if len(arr) == 4:
-                mapping = {0: 3, 1: 2, 2: 1}
-                idx = mapping.get(yr_offset, 1)
-                return arr[idx] if idx < len(arr) else None
-            elif len(arr) == 3:
-                mapping = {0: 2, 1: 1, 2: 0}
-                idx = mapping.get(yr_offset, 0)
-                return arr[idx] if idx < len(arr) else None
-            return None
+            # Newest-first fiscal block is the rightmost 3 values (rows may
+            # carry note numbers and interim columns before it). Identical
+            # to the previous 3/4-element mappings; also covers 5-column
+            # summary tables (interim + fiscal).
+            sel = arr[-3:]
+            mapping = {0: 2, 1: 1, 2: 0}
+            idx = mapping.get(yr_offset, 0)
+            return sel[idx]
 
         periods: List[Dict[str, Any]] = []
         for offset, yr in enumerate(["2024", "2025", "2026"]):

@@ -92,11 +92,18 @@ export class ApiClient {
       }
       const code = errPayload.code || (errPayload.detail && errPayload.detail.code) || `HTTP_${response.status}`;
       const message = errPayload.message || (errPayload.detail && errPayload.detail.message) || (typeof errPayload.detail === 'string' ? errPayload.detail : response.statusText);
-      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : {};
+      // The local API's HTTPException handler returns the detail dict
+      // as the flat body; accept both that contract and nested `detail`.
+      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : errPayload;
       const details = { ...(detailObj.details || {}), ...(errPayload.details || {}) };
       if (detailObj.missing_fields) details.missing_fields = detailObj.missing_fields;
       if (detailObj.resolution) details.resolution = detailObj.resolution;
       if (detailObj.conflicts) details.conflicts = detailObj.conflicts;
+      // Preserve the audit-log correlation so every submission
+      // (accepted or rejected) can be traced to its durable activity record.
+      if (detailObj.ingestion_id) details.ingestion_id = detailObj.ingestion_id;
+      if (detailObj.correlation_id) details.correlation_id = detailObj.correlation_id;
+      if (detailObj.activity_url) details.activity_url = detailObj.activity_url;
       throw new ApiError(response.status, code, message, Object.keys(details).length ? details : null);
     }
 
@@ -363,11 +370,18 @@ export class ApiClient {
       // AWAITING_ISSUE_TERMS diagnostics (missing fields + per-provider
       // resolution reports) so the UI can show WHY terms are unresolved
       // instead of only the generic message.
-      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : {};
+      // The local API's HTTPException handler returns the detail dict
+      // as the flat body; accept both that contract and nested `detail`.
+      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : errPayload;
       const details = { ...(detailObj.details || {}), ...(errPayload.details || {}) };
       if (detailObj.missing_fields) details.missing_fields = detailObj.missing_fields;
       if (detailObj.resolution) details.resolution = detailObj.resolution;
       if (detailObj.conflicts) details.conflicts = detailObj.conflicts;
+      // Preserve the audit-log correlation so every submission
+      // (accepted or rejected) can be traced to its durable activity record.
+      if (detailObj.ingestion_id) details.ingestion_id = detailObj.ingestion_id;
+      if (detailObj.correlation_id) details.correlation_id = detailObj.correlation_id;
+      if (detailObj.activity_url) details.activity_url = detailObj.activity_url;
       throw new ApiError(response.status, code, message, Object.keys(details).length ? details : null);
     }
 
@@ -376,8 +390,10 @@ export class ApiClient {
 
   /**
    * Step 5: ingest with bounded manual issue-term entry.
-   * Manual values (price_band_low / price_band_high / lot_size) are
+   * Manual values (price_band_low / price_band_high / lot_size / ofs) are
    * provenance-labelled MANUAL_ENTRY server-side and never verified.
+   * issue.ofs is the Offer-for-Sale monetary amount in the filing's
+   * reporting unit; an explicit 0 is preserved as submitted.
    */
   async ingestManualTerms(file, options = {}) {
     if (!file) {
@@ -394,6 +410,8 @@ export class ApiClient {
     if (terms.price_band_low !== undefined && terms.price_band_low !== null && terms.price_band_low !== '') formData.append('price_band_low', String(terms.price_band_low));
     if (terms.price_band_high !== undefined && terms.price_band_high !== null && terms.price_band_high !== '') formData.append('price_band_high', String(terms.price_band_high));
     if (terms.lot_size !== undefined && terms.lot_size !== null && terms.lot_size !== '') formData.append('lot_size', String(terms.lot_size));
+    if (terms.ofs !== undefined && terms.ofs !== null && terms.ofs !== '') formData.append('ofs', String(terms.ofs));
+    if (terms.fresh_issue !== undefined && terms.fresh_issue !== null && terms.fresh_issue !== '') formData.append('fresh_issue', String(terms.fresh_issue));
     if (options.explanation) formData.append('explanation', options.explanation);
     if (options.confirmConflicts) formData.append('confirm_conflicts', 'true');
 
@@ -416,11 +434,18 @@ export class ApiClient {
       }
       const code = errPayload.code || (errPayload.detail && errPayload.detail.code) || 'INGESTION_ERROR';
       const message = errPayload.message || (errPayload.detail && errPayload.detail.message) || (typeof errPayload.detail === 'string' ? errPayload.detail : 'Manual-terms ingestion failed');
-      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : {};
+      // The local API's HTTPException handler returns the detail dict
+      // as the flat body; accept both that contract and nested `detail`.
+      const detailObj = errPayload.detail && typeof errPayload.detail === 'object' ? errPayload.detail : errPayload;
       const details = { ...(detailObj.details || {}), ...(errPayload.details || {}) };
       if (detailObj.missing_fields) details.missing_fields = detailObj.missing_fields;
       if (detailObj.resolution) details.resolution = detailObj.resolution;
       if (detailObj.conflicts) details.conflicts = detailObj.conflicts;
+      // Preserve the audit-log correlation so every submission
+      // (accepted or rejected) can be traced to its durable activity record.
+      if (detailObj.ingestion_id) details.ingestion_id = detailObj.ingestion_id;
+      if (detailObj.correlation_id) details.correlation_id = detailObj.correlation_id;
+      if (detailObj.activity_url) details.activity_url = detailObj.activity_url;
       throw new ApiError(response.status, code, message, Object.keys(details).length ? details : null);
     }
     return response.json();

@@ -116,7 +116,13 @@ def test_fixture_class_b_cyclical_manufacturing_5fy():
     outcome = evaluate(canonical, config, mode="final")
     assert outcome.record.validation["ok"] is True
     assert outcome.record.plan["sector_overlay"] == "cyclical"
-    assert outcome.record.score["final_score"] == 41.0
+    # 41.0 -> 37.0 under A24-D1 (approved 2026-10-20): the litigation criterion
+    # is `clean` only for a denial covering the Company, its Promoters and its
+    # Directors, and this filing's nil names the Promoters, the Directors and the
+    # Group Companies -- not the issuer.  The criterion therefore reports UNKNOWN:
+    # 4 points off the earned score, 4 off the available base, Module D 6.0 ->
+    # 2.0 and unknown points 6.0 -> 10.0.  Measured on the fixture, not asserted.
+    assert outcome.record.score["final_score"] == 36.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
 
 
 # --------------------------------------------------------------------------
@@ -140,7 +146,14 @@ def test_fixture_class_c_epc_infrastructure():
     outcome = evaluate(canonical, config, mode="final")
     assert outcome.record.validation["ok"] is True
     assert outcome.record.plan["sector_overlay"] == "epc_real_estate"
-    assert outcome.record.score["final_score"] == 41.0
+    # A23: this filing's litigation disclosure -- "Our Company and Promoters
+    # have no pending criminal actions or disciplinary proceedings by SEBI or
+    # Stock Exchanges." -- denies the criminal/regulatory dimension only.  It
+    # says nothing about material civil litigation, which is the other half of
+    # the `clean` bucket, so the bucket is UNKNOWN instead of the favourable 4/4
+    # (score 41.0 -> 37.0, and 4 points of availability with it).
+    assert canonical["governance"]["litigation_bucket"] is None
+    assert outcome.record.score["final_score"] == 36.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
 
 
 # --------------------------------------------------------------------------
@@ -191,7 +204,11 @@ def test_fixture_class_e_modern_complex_rhp():
     config = load_config(CONFIG_FILE)
     outcome = evaluate(canonical, config, mode="final")
     assert outcome.record.validation["ok"] is True
-    assert outcome.record.score["final_score"] == 43.0
+    # A23, same correction as class_c: "no pending criminal proceedings or
+    # SEBI/Stock Exchange regulatory actions" is a one-dimension denial, so
+    # `clean` is not established (43.0 -> 39.0).
+    assert canonical["governance"]["litigation_bucket"] is None
+    assert outcome.record.score["final_score"] == 38.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
 
 
 # --------------------------------------------------------------------------
@@ -231,14 +248,28 @@ def test_evidence_provenance_and_auditability():
 
     assert "_evidence" in canonical
     evidence = canonical["_evidence"]
-    assert len(evidence) >= 10
+    # D-5: the floor used to be 10 because the extraction *always* emitted a
+    # "governance.sebi_ed_action_active" record whose quotation -- "No active
+    # SEBI or ED regulatory proceedings" -- appears in no filing.  That
+    # unevidenced record is gone, so nine evidenced fields remained: a lower count
+    # of real provenance, not a loss of it.  Its absence is the point of the
+    # change, so it is asserted rather than tolerated.
+    #
+    # A24-D1 (approved 2026-10-20) removes one more: this filing's nil reads
+    # "None of our Promoters, Directors, or Group Companies are involved in any
+    # material litigation or criminal cases", which does not reach the Company
+    # itself, so no bucket -- and therefore no provenance entry -- is emitted.
+    # Eight conclusions with real provenance beat nine of which one was assumed.
+    assert len(evidence) >= 8
+    assert "governance.sebi_ed_action_active" not in evidence
+    assert "governance.litigation_bucket" not in evidence
 
     # Ensure crucial financial and governance fields carry traceable provenance
     for field in [
         "company_name",
         "capital_structure.promoter_pre_pct",
         "financials.periods",
-        "governance.litigation_bucket",
+        "financials.reporting_unit",
     ]:
         assert field in evidence, f"Field {field} missing in extraction evidence log"
         rec = evidence[field]

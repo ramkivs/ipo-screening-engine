@@ -88,6 +88,60 @@ def enforce_schema(
     return findings
 
 
+def validate_peer_records(
+    peers: Any,
+    schema: Optional[Mapping[str, Any]] = None,
+) -> List[Finding]:
+    """Validate the canonical ``peers`` array against the input schema, early.
+
+    The full document gate runs at evaluation time
+    (:func:`ipo_screening.pipeline.evaluate` -> ``enforce_schema``), but peer
+    rows enter the canonical input at ingestion time -- before issue terms
+    exist. Out-of-contract peer values have therefore historically surfaced
+    only at evaluation time as an anonymous wall (audit trace
+    ing-81fd285e5b8248c6: ``SCHEMA_VIOLATION at peers/0/roe_pct: 26957.28 is
+    greater than maximum 10000``). This runs the SAME schema definition over
+    the peers array at ingestion and term-submission time and names the peer
+    and field so the diagnostic is actionable. Values are never clamped or
+    substituted; the bounds are exactly the schema's.
+    """
+    resolved = dict(load_schema()) if schema is None else dict(schema)
+    peers_schema = dict(resolved.get("properties", {}).get("peers") or {"type": "array"})
+    if "$defs" in resolved:
+        peers_schema.setdefault("$defs", resolved["$defs"])
+    validator = get_validator(peers_schema)
+    document = [] if peers is None else peers
+    findings: List[Finding] = []
+    errors = sorted(validator.iter_errors(document), key=lambda e: (list(e.absolute_path), e.message))
+    for error in errors:
+        loc = list(error.absolute_path)
+        location = "peers" + "".join(f"/{part}" for part in loc)
+        name = None
+        if loc and isinstance(document, list):
+            try:
+                row = document[loc[0]]
+                name = row.get("name") if isinstance(row, Mapping) else None
+            except (IndexError, TypeError, AttributeError):
+                name = None
+        prefix = f"peer {name!r} " if name else ""
+        findings.append(
+            Finding(
+                code="SCHEMA_VIOLATION",
+                message=f"{prefix}{error.message}",
+                severity=SEVERITY_ERROR,
+                scope="schema",
+                location=location,
+                detail={
+                    "validator": error.validator,
+                    "path": loc,
+                    "schema_path": list(error.absolute_schema_path),
+                    "peer_name": name,
+                },
+            )
+        )
+    return findings
+
+
 def validate_input_schema_path(path: str) -> None:
     """Validate a candidate input file against the schema, for CLI use."""
     with Path(path).open("r", encoding="utf-8") as handle:
@@ -100,5 +154,6 @@ __all__ = [
     "get_validator",
     "validate_schema",
     "enforce_schema",
+    "validate_peer_records",
     "validate_input_schema_path",
 ]

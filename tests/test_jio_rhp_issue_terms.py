@@ -138,8 +138,14 @@ def test_jio_without_official_source_fails_closed_on_pricing_only(tmp_path, jio_
     service = PresentationService(cfg)
     with pytest.raises(IngestionAwaitingIssueTermsError) as excinfo:
         service.ingest_document(file_bytes=b"%PDF-1.4 test", filename="jio.pdf", mode="final")
-    # OFS is filing-established (fresh-only); only pricing remains open.
-    assert excinfo.value.missing_fields == ["price_band_low", "price_band_high", "lot_size"]
+    # OFS is filing-established (fresh-only). The fresh-issue AMOUNT is also
+    # required and absent: the cover prints "aggregating up to ₹[●] million",
+    # so no amount is established. The earlier expectation omitted it because
+    # the older cover reader derived a fresh amount from shares x cap price,
+    # which is a price-band substitution the canonical contract forbids.
+    assert excinfo.value.missing_fields == [
+        "price_band_low", "price_band_high", "lot_size", "fresh_issue",
+    ]
 
 
 def test_jio_completes_via_verified_prospectus_pathway(tmp_path):
@@ -163,13 +169,16 @@ def test_jio_completes_via_verified_prospectus_pathway(tmp_path):
     issue = record["input_snapshot"]["input"]["issue"]
     assert (issue["price_band_low"], issue["price_band_high"], issue["lot_size"]) == (500.0, 550.0, 25)
     assert issue["ofs"] == 0.0  # filing-established: no Offer for Sale
-    # Stated Rs.148,500 million converted to canonical INR lakhs.
-    assert issue["fresh_issue"] == 1485000.0
+    # Canonical issue amounts are in the filing's ``reporting_unit`` (see the
+    # input schema: "fresh_issue ... in reporting_unit"), which for this filing
+    # is INR_MILLIONS. The earlier INR_LAKHS expectation was an engine-side
+    # unit assumption, not a property of the stated Rs.148,500.00 MILLION.
+    assert issue["fresh_issue"] == 148500.0
     assert issue["fresh_shares"] == 270000000
 
     evidence = service.get_evaluation_evidence(resp.evaluation_id)
     items = {item.evidence_id: item for item in evidence.items}
     amount = items["EV-issue.fresh_issue"]
-    assert amount.extracted_value == 1485000.0
+    assert amount.extracted_value == 148500.0
     assert amount.verification == "OFFICIAL_VERIFIED"  # stated in the verified Prospectus
     assert items["EV-issue-ofs"].verification == "FILING"  # never re-labelled official

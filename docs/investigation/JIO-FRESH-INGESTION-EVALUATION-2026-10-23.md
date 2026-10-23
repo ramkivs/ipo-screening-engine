@@ -46,7 +46,9 @@ Two independent intake attempts were made before the successful one. The first (
 | Executing revision | `514ca599d3982bc160319793ef2f7f06d046fd27` | Adds the completed OFS-NIL binding correction (`54b3447`, wrapped `OFFER FOR / SALE SIZE` labels) |
 | Validated revision | `36086944a2c321d2613af28972fd887af9f25f8c` | Adds the corrected regression expectations; engine bytes identical to the executing revision |
 
-These three commits are **local integration objects**, not a fork of this branch's engine: they are reconstructible byte-for-byte from remote refs plus the published patch. See `docs/investigation/jio-fresh-20261023/source-lineage/LINEAGE.md`; the reconstruction was executed and verified against every engine/test file hash (`executed-source-sha256.txt`). The branch engine is deliberately not overwritten, because the Arena line and the evidence line carry different A9 implementations (for example `gmp_binding.py` exists only on the Arena line).
+These three commits were **local integration objects** at the time of the run: reconstructible byte-for-byte from remote refs plus the published patch (see `docs/investigation/jio-fresh-20261023/source-lineage/LINEAGE.md`, verified against every engine/test file hash in `executed-source-sha256.txt`).
+
+> **Integration update (2026-10-23, later the same day).** The branch engine now **is** this composition: the non-A9 engine was adopted into `arena/07f3439f-ipo-screening-engine` with the branch's A9 subsystem retained byte-identical, and the corrections applied on top. See [`JIO-CORRECTION-INTEGRATION-2026-10-23.md`](JIO-CORRECTION-INTEGRATION-2026-10-23.md). The findings in this report are unchanged; only the note below about the engine *not* being merged is superseded.
 
 `main` was not touched. The historical evaluations were not opened for writing, and no store directory outside this report's own artifact path was used.
 

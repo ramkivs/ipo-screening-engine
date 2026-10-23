@@ -501,6 +501,28 @@ export class App {
   // View 3: Evaluation Scorecard & Detail (#evaluations/{id})
   // --------------------------------------------------------------------------
 
+  renderPenaltyItems(penalties) {
+    if (!penalties || penalties.length === 0) {
+      return '<p style="color: var(--text-muted); font-size: 0.85rem;">Zero penalties triggered for this evaluation.</p>';
+    }
+    return `<ul style="list-style: none;">${penalties.map(p => {
+      const isUnknown = p.state === 'UNKNOWN';
+      const stateLabel = isUnknown
+        ? 'UNKNOWN \u2014 carried in range'
+        : (p.points === 0 ? 'Not triggered' : 'Applied');
+      const badgeClass = isUnknown ? 'badge-unknown' : (p.points === 0 ? 'badge-clear' : 'badge-avoid');
+      return `
+      <li style="padding: 8px 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+        <div>
+          <strong>${this.escape(p.id)}:</strong> ${this.escape(p.label)}
+          <div style="margin-top: 3px;"><span class="badge ${badgeClass}">${stateLabel}</span></div>
+          ${p.reason ? `<div style="color: var(--text-muted); font-size: 0.78rem; margin-top: 2px;">${this.escape(p.reason)}</div>` : ''}
+        </div>
+        <span class="badge badge-avoid">${p.points.toFixed(1)} pts</span>
+      </li>`;
+    }).join('')}</ul>`;
+  }
+
   async renderScorecard(evaluationId) {
     this.setViewActive('scorecard-view');
     const container = document.getElementById('scorecard-view');
@@ -574,6 +596,7 @@ export class App {
         <div class="scorecard-banner">
           <div class="scorecard-meta">
             <h2>${this.escape(evaluation.company_name)}</h2>
+            ${this.renderAuthorityWarnings(evaluation)}
             <div class="meta-tags">
               <span class="meta-tag">IPO ID: ${this.escape(evaluation.ipo_id)}</span>
               <span class="meta-tag">MODE: ${this.escape(evaluation.evaluation_mode)}</span>
@@ -715,20 +738,7 @@ export class App {
                 Total: ${score.penalties_total.toFixed(1)} pts
               </span>
             </div>
-            ${penalties.length === 0 ? `
-              <p style="color: var(--text-muted); font-size: 0.85rem;">Zero penalties triggered for this evaluation.</p>
-            ` : `
-              <ul style="list-style: none;">
-                ${penalties.map(p => `
-                  <li style="padding: 8px 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-                    <div>
-                      <strong>${this.escape(p.id)}:</strong> ${this.escape(p.label)}
-                    </div>
-                    <span class="badge badge-avoid">${p.points.toFixed(1)} pts</span>
-                  </li>
-                `).join('')}
-              </ul>
-            `}
+            ${this.renderPenaltyItems(penalties)}
           </div>
 
           <!-- Missing / Unverified Items -->
@@ -3240,6 +3250,12 @@ export class App {
     if (target && target.classList) target.classList.add('active');
   }
 
+  renderAuthorityWarnings(evaluation) {
+    return (evaluation.authority_warnings || []).map(warning =>
+      `<div class="state-box" role="note"><strong>Third-party authority override</strong><p>${this.escape(warning)}</p></div>`
+    ).join('');
+  }
+
   renderEvaluationsTableHtml(evaluations) {
     if (!evaluations || evaluations.length === 0) {
       return `<div class="state-box"><p>No evaluations recorded yet.</p></div>`;
@@ -3263,7 +3279,7 @@ export class App {
             ${evaluations.map(e => `
               <tr>
                 <td><code>${this.escape(e.evaluation_id)}</code></td>
-                <td><strong>${this.escape(e.company_name)}</strong></td>
+                <td><strong>${this.escape(e.company_name)}</strong>${this.renderAuthorityWarnings(e)}</td>
                 <td><span class="meta-tag">${this.escape(e.evaluation_mode)}</span></td>
                 <td><strong>${e.final_score !== null ? e.final_score.toFixed(1) : '—'}</strong></td>
                 <td>${this.renderVerdictBadge(e.verdict)}</td>
@@ -3778,7 +3794,7 @@ export class App {
       const nextAction = record.status === 'SUCCEEDED'
         ? 'Open the evaluation from the outcome panel.'
         : record.status === 'BLOCKED'
-          ? 'Upload a filing that discloses the unresolved terms, retry after the official terms are published, or use the bounded manual entry below where offered. An unavailable source is not proof that terms do not exist.'
+          ? 'Retry automatic official discovery or upload an applicable authoritative filing that establishes the unresolved fields. Missing evidence does not prove that terms are unpublished; a price band alone does not establish a fresh-issue monetary amount.'
           : 'Review the failed stage above and retry. Quote the ingestion id when seeking diagnostics.';
       summary = `<div class="activity-summary">
         <div><strong>Terminal summary</strong> — status <span class="badge ${badgeFor(record.status)}">${this.escape(record.status)}</span></div>
@@ -3858,17 +3874,53 @@ export class App {
   }
 
   /**
+   * Audit-log linkage for the manual issue-term flow: register the
+   * submission's durable activity record as the latest ingestion and
+   * refresh the Ingestion Activity panel so the audit surface shows the
+   * manual submission (accepted or rejected) instead of staying silent.
+   * Display is best-effort; the record itself is durable server-side.
+   */
+  async attachIngestionAudit(ingestionId) {
+    if (!ingestionId) return null;
+    try { localStorage.setItem('ipo.lastIngestionId', String(ingestionId)); } catch { /* private mode */ }
+    if (typeof this.api.getIngestion !== 'function') return null;
+    try {
+      const record = await this.api.getIngestion(String(ingestionId));
+      if (typeof document !== 'undefined' && document) {
+        this.renderIngestionActivity(document, record);
+      }
+      return record;
+    } catch { return null; }
+  }
+
+  /**
    * Step 5 pre-processing workflow: when required issue terms are
-   * unresolved (AWAITING_ISSUE_TERMS), let the operator enter the three
-   * authorized terms (price-band floor/cap, lot size) with a mandatory
-   * explanation. Manual entry is visibly NOT source verification;
-   * conflicts block until explicitly confirmed; non-enterable terms
-   * remain blockers.
+   * unresolved (AWAITING_ISSUE_TERMS), let the operator enter the four
+   * required terms (price-band floor/cap, lot size, OFS amount) with a
+   * mandatory explanation. All four are required to complete initial
+   * screening manually and may be read off the broker platform. Manual
+   * entry is visibly NOT source verification (MANUAL_ENTRY provenance,
+   * unverified); conflicts block until explicitly confirmed. Invalid or
+   * incomplete values prevent evaluation.
    */
   renderManualTermsPanel(container, err, mode) {
     if (!container) return;
-    const ENTERABLE = ['price_band_low', 'price_band_high', 'lot_size'];
-    const LABELS = { price_band_low: 'Price-Band Floor (₹)', price_band_high: 'Price-Band Cap (₹)', lot_size: 'Lot Size (shares)', ofs: 'Offer For Sale (₹ lakh)' };
+    const ENTERABLE = ['price_band_low', 'price_band_high', 'lot_size', 'ofs', 'fresh_issue'];
+    const reportingUnit = (err && err.details && err.details.resolution && err.details.resolution.reporting_unit) || '';
+    const ofsUnit = reportingUnit === 'INR_CRORES'
+      ? 'amount in ₹ crore'
+      : reportingUnit === 'INR_LAKHS'
+        ? 'amount in ₹ lakh'
+        : reportingUnit === 'INR_MILLIONS'
+          ? 'amount in ₹ million'
+          : 'monetary amount in the filing\u2019s reporting unit (₹ lakh, ₹ crore or ₹ million)';
+    const LABELS = {
+      price_band_low: 'Price-Band Floor (₹ per share)',
+      price_band_high: 'Price-Band Cap (₹ per share)',
+      lot_size: 'Lot Size (shares)',
+      ofs: `Offer For Sale (OFS) \u2014 ${ofsUnit}`,
+      fresh_issue: `Fresh Issue Amount \u2014 ${ofsUnit}`,
+    };
     let missing = (err && err.details && err.details.missing_fields) || [];
     let awaitingMessage = err ? err.message : '';
     const providerReports = (err && err.details && err.details.resolution && err.details.resolution.providers) || [];
@@ -3910,8 +3962,11 @@ export class App {
         </div>
         ${providerDiagnostics}
         <div class="alert" style="margin-bottom: 12px; font-size: 0.85rem;">
-          <strong>Manual entry is not official-source verification.</strong> Entered values are recorded as
-          <code>MANUAL_ENTRY</code> provenance, remain unverified, and never displace a verified official value.
+          <strong>All five issue terms above are required to complete initial screening manually</strong>
+          and may be supplied from the broker platform&rsquo;s IPO page.
+          <strong>Manual entry is not official-source verification:</strong> entered values are recorded as
+          <code>MANUAL_ENTRY</code> provenance, remain unverified, are flagged as manually supplied on the
+          evaluation, and never displace a verified official value. Invalid or incomplete values prevent evaluation.
         </div>
         <div class="ingest-grid" style="gap: 12px;">
           <div class="form-group"><label class="form-label" for="mt-price-band-low">${LABELS.price_band_low}</label>
@@ -3920,6 +3975,10 @@ export class App {
             <input type="number" step="any" min="0" class="form-select" id="mt-price-band-high" placeholder="e.g. 220" /></div>
           <div class="form-group"><label class="form-label" for="mt-lot-size">${LABELS.lot_size}</label>
             <input type="number" step="1" min="0" class="form-select" id="mt-lot-size" placeholder="e.g. 68" /></div>
+          <div class="form-group"><label class="form-label" for="mt-ofs">${LABELS.ofs}</label>
+            <input type="number" step="any" min="0" class="form-select" id="mt-ofs" placeholder="e.g. 3300 (0 = no offer for sale)" /></div>
+          <div class="form-group"><label class="form-label" for="mt-fresh-issue">${LABELS.fresh_issue}</label>
+            <input type="number" step="any" min="0" class="form-select" id="mt-fresh-issue" placeholder="e.g. 14500 (0 = pure OFS offer, no fresh issue)" /></div>
         </div>
         <div class="form-group" style="margin-top: 12px;">
           <label class="form-label" for="mt-explanation">Explanation (required for any manual entry)</label>
@@ -3944,9 +4003,13 @@ export class App {
       const low = container.querySelector('#mt-price-band-low').value;
       const high = container.querySelector('#mt-price-band-high').value;
       const lot = container.querySelector('#mt-lot-size').value;
+      const ofsInput = container.querySelector('#mt-ofs').value;
+      const freshInput = container.querySelector('#mt-fresh-issue').value;
       if (low !== '') terms.price_band_low = Number(low);
       if (high !== '') terms.price_band_high = Number(high);
       if (lot !== '') terms.lot_size = Number(lot);
+      if (ofsInput !== '') terms.ofs = Number(ofsInput);
+      if (freshInput !== '') terms.fresh_issue = Number(freshInput);
       const explanation = container.querySelector('#mt-explanation').value.trim();
 
       if (Object.keys(terms).length === 0) {
@@ -3970,9 +4033,34 @@ export class App {
         const result = await this.api.ingestManualTerms(this.selectedIngestFile, {
           mode, terms, explanation, confirmConflicts: conflictPending,
         });
-        const manualNote = result.issue_terms && result.issue_terms.manual_entry
-          ? `<div style="font-size: 0.85rem; margin-bottom: 12px;">Manually entered (unverified): <code>${this.escape((result.issue_terms.manual_entry.fields || []).join(', '))}</code></div>`
+        // Audit log: the manual submission has its own durable activity
+        // record. Register it as the latest ingestion and refresh the
+        // Ingestion Activity panel so the audit surface shows this
+        // submission (events, evaluation outcome, persistence).
+        await this.attachIngestionAudit(result.ingestion_id);
+        const auditNote = result.ingestion_id
+          ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
+               Audit trace recorded: <code>${this.escape(String(result.ingestion_id))}</code>
+               (manual submission, validation, evaluation and persistence events)
+               &mdash; see <strong>Ingestion Activity</strong> in Workflow Progress &amp; Audit Status.</div>`
           : '';
+        const manualEntry = result.issue_terms && result.issue_terms.manual_entry;
+        let manualNote = '';
+        if (manualEntry) {
+          const unit = manualEntry.reporting_unit ? ` (${this.escape(String(manualEntry.reporting_unit))})` : '';
+          const rows = (manualEntry.fields || []).map((f) => {
+            const value = manualEntry.values ? manualEntry.values[f] : '';
+            const unitCell = (f === 'ofs' || f === 'fresh_issue') ? unit : (f === 'lot_size' ? ' (shares)' : ' (₹/share)');
+            return `<tr><td><code>issue.${this.escape(f)}</code></td><td><strong>${this.escape(String(value))}</strong>${unitCell}</td></tr>`;
+          }).join('');
+          manualNote = `
+            <div style="font-size: 0.85rem; margin-bottom: 12px;">
+              <div style="margin-bottom: 4px;"><span class="badge badge-unknown-evidence" title="Entered manually by the operator; not verified against an official source">MANUALLY ENTERED (Not Source-Verified)</span></div>
+              <div style="margin-bottom: 4px;">The engine evaluated these manually supplied values, recorded as <code>MANUAL_ENTRY</code> provenance and still unverified:</div>
+              <table style="width: 100%; font-size: 0.82rem; border-collapse: collapse;">${rows}</table>
+              ${manualEntry.explanation ? `<div style="margin-top: 4px; color: var(--text-muted);">Explanation: ${this.escape(manualEntry.explanation)}</div>` : ''}
+            </div>`;
+        }
         container.innerHTML = `
           <div class="ingest-result-overview" role="region" aria-label="Manual Terms Ingestion Result">
             <div class="ingest-result-header">
@@ -3989,6 +4077,7 @@ export class App {
                 <div style="margin-top: 6px;">${this.renderVerdictBadge(result.verdict)}</div></div>
             </div>
             ${manualNote}
+            ${auditNote}
             <div class="ingest-actions">
               <a href="#evaluations/${this.escape(result.evaluation_id)}" class="btn btn-primary" style="text-decoration: none; text-align: center;">Open Full Evaluation Scorecard &rarr;</a>
             </div>
@@ -3996,6 +4085,14 @@ export class App {
         `;
       } catch (err2) {
         submitBtn.disabled = false;
+        // Rejected submissions are auditable too: register the trace so
+        // the Ingestion Activity log shows what was submitted and why it
+        // was rejected (validation, conflict, or unresolved terms).
+        const errAuditId = err2 && err2.details ? err2.details.ingestion_id : null;
+        if (errAuditId) await this.attachIngestionAudit(errAuditId);
+        const auditRef = errAuditId
+          ? ` <span style="color: var(--text-muted);">Audit trace: <code>${this.escape(String(errAuditId))}</code></span>`
+          : '';
         if (err2.code === 'ISSUE_TERM_CONFLICT' && err2.details && Array.isArray(err2.details.conflicts)) {
           conflictPending = true;
           const rows = err2.details.conflicts.map((c) => `<li><code>${this.escape(c.field)}</code>: entered <strong>${this.escape(String(c.manual_value))}</strong> vs existing <strong>${this.escape(String(c.existing_value))}</strong> (${this.escape(c.existing_origin === 'OFFICIAL_VERIFIED' ? 'verified official source — the verified value will be kept' : 'filing extraction — the entered value will replace it')})</li>`).join('');
@@ -4009,14 +4106,14 @@ export class App {
                 <span>I confirm these resolutions. Manual values stay labelled MANUAL_ENTRY (unverified); verified official values are never displaced.</span>
               </label>
             </div>`;
-          statusBox.innerHTML = '<span class="badge badge-consider">Resolve the conflicts above, then submit again.</span>';
+          statusBox.innerHTML = `<span class="badge badge-consider">Resolve the conflicts above, then submit again.</span>${auditRef}`;
         } else if (err2.code === 'AWAITING_ISSUE_TERMS') {
           missing = (err2.details && err2.details.missing_fields) || missing;
           const list = container.querySelector('#mt-missing-list');
           if (list) list.innerHTML = renderMissing();
-          statusBox.innerHTML = `<span class="badge badge-unknown-evidence">Still awaiting terms</span> <span>${this.escape(err2.message || '')}</span>`;
+          statusBox.innerHTML = `<span class="badge badge-unknown-evidence">Still awaiting terms</span> <span>${this.escape(err2.message || '')}</span>${auditRef}`;
         } else {
-          statusBox.innerHTML = `<span class="badge badge-unknown-evidence">${this.escape(err2.code || 'ERROR')}</span> <span>${this.escape(err2.message || 'Submission failed')}</span>`;
+          statusBox.innerHTML = `<span class="badge badge-unknown-evidence">${this.escape(err2.code || 'ERROR')}</span> <span>${this.escape(err2.message || 'Submission failed')}</span>${auditRef}`;
         }
       }
     });

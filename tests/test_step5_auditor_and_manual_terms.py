@@ -1,4 +1,4 @@
-"""Step 5 + Step 4 closure regression suite (2026-10-17).
+"""Step 5 + Step 4 closure regression suite (2026-10-17; extended 2026-10-18).
 
 Area B(i): the auditor opinion is established only by positive
 examination-report language. The previous behaviour defaulted to
@@ -9,13 +9,19 @@ now stays None (schema-supported null) unless the source establishes
 it; K1's tri-state contract resolves UNVERIFIED, never CLEAR, on
 unknown input (knockout semantics unchanged).
 
-Area C / Step 5: bounded manual entry of price_band_low,
-price_band_high and lot_size through POST /api/v1/ingest/manual-terms.
-Manual values carry MANUAL_ENTRY provenance against a STRUCTURED_INPUT
-operator source, are never presented as verified, require an
-explanation, block on conflicts until explicitly confirmed, never
-displace a verified official value, and leave OFS derivation unchanged.
-Unresolved terms keep the fail-closed AWAITING_ISSUE_TERMS posture.
+Area C / Step 5: manual entry of the four required issue terms
+price_band_low, price_band_high, lot_size and ofs through
+POST /api/v1/ingest/manual-terms (three-term scope 2026-10-17; OFS
+added 2026-10-18 so initial screening never waits for official-source
+retrieval). Manual values carry MANUAL_ENTRY provenance against a
+STRUCTURED_INPUT operator source, are never presented as verified,
+require an explanation, block on conflicts until explicitly confirmed,
+and never displace a verified official value. issue.ofs is the
+Offer-for-Sale monetary amount in the filing's reporting unit (v1.5
+contract); its derivation from seller shares x cap price is unchanged.
+Unresolved terms keep the fail-closed AWAITING_ISSUE_TERMS posture; the
+focused four-field workflow suite lives in
+tests/test_four_field_manual_terms.py.
 """
 
 from __future__ import annotations
@@ -189,7 +195,10 @@ def _missing_terms_doc(golden_input):
     doc["issue"]["price_band_low"] = None
     doc["issue"]["price_band_high"] = None
     doc["issue"]["lot_size"] = None
-    assert doc["issue"]["ofs"] is not None  # OFS stays filing/derived, never manual
+    # The golden fixture discloses the OFS amount; this helper removes
+    # only the three pricing terms (OFS is independently enterable and
+    # covered in tests/test_four_field_manual_terms.py).
+    assert doc["issue"]["ofs"] is not None
     return doc
 
 
@@ -409,10 +418,12 @@ def test_manual_terms_endpoint_rejects_forbidden_parameters(
 VISHAL_RHP_PDF = REPO_ROOT / "handoff" / "reference" / "U01122MH1994PLC185445-vishal nirmiti.pdf"
 
 
-def test_vishal_real_filing_manual_entry_fills_only_authorized_terms(tmp_path):
-    """Real RHP with [●] terms: manual entry fills floor/cap/lot but OFS
-    remains outstanding (not manually enterable, derivation unchanged),
-    so the posture stays AWAITING_ISSUE_TERMS and nothing persists."""
+def test_vishal_real_filing_three_terms_keep_ofs_awaiting(tmp_path):
+    """Real RHP with [●] terms: manual entry of floor/cap/lot alone leaves
+    issue.ofs outstanding (never defaulted or silently derived in this
+    path), so the posture stays AWAITING_ISSUE_TERMS and nothing
+    persists. issue.ofs itself is enterable -- see the four-field
+    completion test below."""
     cfg = PresentationConfig(
         store_root=tmp_path / "evaluations",
         config_dir=REPO_ROOT / "config",
@@ -459,6 +470,87 @@ def test_vishal_real_filing_manual_entry_fills_only_authorized_terms(tmp_path):
     assert service.eval_store.list_evaluations() == []
 
 
+def test_vishal_real_filing_four_field_manual_entry_completes_evaluation(
+    tmp_path, config
+):
+    """End-to-end on the real RHP: filing extraction -> official discovery
+    reports UNAVAILABLE (no providers configured) -> the operator supplies
+    all four terms from the broker platform (OFS as the canonical monetary
+    amount in INR lakh, the filing's reporting unit) -> the EXISTING
+    scoring engine evaluates and the record persists with MANUAL_ENTRY
+    provenance on all four values."""
+    from datetime import datetime, timezone as _tz
+
+    from conftest import run as run_eval
+
+    cfg = PresentationConfig(
+        store_root=tmp_path / "evaluations",
+        config_dir=REPO_ROOT / "config",
+        issue_terms_resolver=IssueTermsResolver(providers=[]),
+    )
+    service = PresentationService(cfg)
+    client = TestClient(
+        create_app(service),
+        base_url="http://127.0.0.1:8000",
+        headers={"Origin": "http://127.0.0.1:8000"},
+    )
+    pdf_bytes = VISHAL_RHP_PDF.read_bytes()
+
+    res = client.post(
+        "/api/v1/ingest/manual-terms",
+        files={"file": ("vishal.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
+        data={
+            "mode": "final",
+            "price_band_low": "208",
+            "price_band_high": "220",
+            "lot_size": "68",
+            "ofs": "3300",
+            "explanation": EXPLANATION,
+        },
+    )
+    assert res.status_code == 201, res.text
+    body = res.json()
+
+    manual = body["issue_terms"]["manual_entry"]
+    assert manual["provenance"] == "MANUAL_ENTRY"
+    assert manual["verified"] is False
+    assert set(manual["fields"]) == {
+        "price_band_low",
+        "price_band_high",
+        "lot_size",
+        "ofs",
+    }
+    assert manual["reporting_unit"] == "INR_LAKHS"
+
+    # The evaluation was produced and persisted by the existing engine.
+    assert body["evaluation_id"]
+    record = service.eval_store.read(body["evaluation_id"])
+    issue = record["input_snapshot"]["input"]["issue"]
+    assert issue["price_band_low"] == 208.0
+    assert issue["price_band_high"] == 220.0
+    assert issue["lot_size"] == 68
+    assert issue["ofs"] == 3300.0
+
+    record_items = {item["evidence_id"]: item for item in record["evidence"]["evidence"]}
+    for field in ("price_band_low", "price_band_high", "lot_size", "ofs"):
+        item = record_items[f"EV-issue.{field}"]
+        assert item["extraction_method"] == "MANUAL_ENTRY"
+        assert item["source_id"] == "SRC-MANUAL-ENTRY"
+        assert EXPLANATION in (item.get("note") or "")
+
+    # The recorded score is exactly what pipeline.evaluate() produces
+    # from the persisted input values (values reached scoring).
+    snapshot_input = record["input_snapshot"]["input"]
+    moment = datetime.strptime(
+        record["evaluation_timestamp"], "%Y-%m-%dT%H:%M:%SZ"
+    ).replace(tzinfo=_tz.utc)
+    replay = run_eval(snapshot_input, config, at=moment)
+    assert float(record["score"]["final_score"]) == pytest.approx(
+        float(replay.score.final_score)
+    )
+    assert str(record["verdict"]["verdict"]) == str(replay.score.verdict)
+
+
 # --------------------------------------------------------------------------
 # Manual entry vs OFFICIAL_VERIFIED (mechanics; mocked transport)
 # --------------------------------------------------------------------------
@@ -472,7 +564,10 @@ def test_manual_entry_never_displaces_officially_verified_values(tmp_path):
     MANUAL_ENTRY provenance is recorded for them."""
     from ipo_screening.issue_terms import HttpNoticeProvider
 
-    notice_bytes = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes()
+    # Synthetic transport only: match the unchanged RHP cover issue window.
+    notice_bytes = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes().replace(
+        b"Tuesday, October 06, 2026", b"Wednesday, September 30, 2026"
+    ).replace(b"Thursday, October 08, 2026", b"Monday, October 05, 2026")
     resolver = IssueTermsResolver(
         providers=[
             HttpNoticeProvider(

@@ -217,12 +217,16 @@ def test_partial_prospectus_fails_closed_on_missing_term_only(
     body = res.json()
     # Fail-closed: nothing evaluated. The diagnostics layer distinguishes
     # what the official document verified from what it did not establish:
-    # only lot_size is unverified; assembly requires it in final mode and
-    # reports that explicitly instead of silently discarding the terms.
+    # only lot_size remains required after existing OFS derivation; partial
+    # assembly must retain pricing and the service must still block readiness.
     assert body["resolution"]["status"] == "PARTIAL"
     assert body["resolution"]["resolved_fields"] == ["price_band_low", "price_band_high"]
-    assert body["resolution"]["unresolved_fields"] == ["lot_size"]
-    assert "lot_size" in body["resolution"]["assembly_error"]
+    # Discovery truthfully records OFS as not directly sourced. Existing
+    # downstream seller-share derivation can still supply it during assembly.
+    assert body["resolution"]["unresolved_fields"] == ["lot_size", "ofs"]
+    assert body["resolution"]["remaining_required_fields"] == ["issue.lot_size"]
+    assert body["resolution"]["ready"] is False
+    assert "assembly_error" not in body["resolution"]
 
 
 # ----------------------------------------------------------------------

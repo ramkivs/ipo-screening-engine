@@ -85,7 +85,13 @@ def test_conflicting_official_disclosures_are_not_arbitrarily_selected():
     ]
     outcome = _resolve(IssueTermsResolver(providers=providers))
     assert outcome.status == "CONFLICT"
-    assert outcome.notice is None
+    # Conflicts block only the disputed fields, not independent valid lot/dates.
+    assert outcome.notice is not None
+    assert "price_band_low" not in outcome.resolved_fields
+    assert "price_band_high" not in outcome.resolved_fields
+    assert "lot_size" in outcome.resolved_fields
+    assert "price_band_low" not in outcome.enrichment_payload["price_band"]
+    assert "price_band_high" not in outcome.enrichment_payload["price_band"]
     assert any("price_band_low" in c for c in outcome.conflicts)
 
 

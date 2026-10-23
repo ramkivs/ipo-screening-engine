@@ -338,7 +338,7 @@ def evaluate(
 
     record = build_record(
         canonical_snapshot=canonical.to_snapshot_dict(),
-        evidence=canonical.registry.to_dict(),
+        evidence={**canonical.registry.to_dict(), "field_map": dict(sorted(canonical._evidence_index.items()))},
         market_snapshot=market.to_dict(),
         peer_snapshot=peers.to_dict(),
         derived_metrics=derived.to_dict(),

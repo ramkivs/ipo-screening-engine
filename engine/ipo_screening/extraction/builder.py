@@ -148,7 +148,7 @@ class CanonicalInputBuilder:
     def _build_evidence(self) -> Dict[str, Dict[str, Any]]:
         evidence_dict: Dict[str, Dict[str, Any]] = {}
         for ex in self.extractions:
-            evidence_dict[ex.field_path] = ex.to_evidence_dict(self.doc.source_id)
+            evidence_dict.setdefault(ex.field_path, ex.to_evidence_dict(self.doc.source_id))
 
         # Seller-specific OFS quantities: the cover extraction records the
         # (single, list-valued) ofs_sellers result; without subfield
@@ -208,17 +208,24 @@ class CanonicalInputBuilder:
         if post_shares is None and pre_shares is not None and fresh_shares is not None:
             post_shares = pre_shares + fresh_shares
 
-        # Deterministically derive post_issue_eps from restated PAT and post_issue_shares if not explicitly provided
+        # Deterministically derive post_issue_eps from restated PAT and
+        # post_issue_shares if not explicitly provided.  The reporting unit
+        # is the filing's, never an assumed lakh default: a filing stated in
+        # INR millions previously produced an EPS ten times too small
+        # (Jio: 3.26 instead of 32.63), which feeds P/E and PEG.
         post_eps = _pick_issue("post_issue_eps", None)
         if post_eps is None:
             fin_base = self.base.get("financials", {})
             periods = fin_base.get("periods") or self._get_field("financials.periods", [])
-            if post_shares and periods and post_shares > 0:
+            unit = fin_base.get("reporting_unit") or self._get_field(
+                "financials.reporting_unit", "INR_LAKHS"
+            )
+            factor = self._ISSUE_UNIT_TO_RUPEES.get(unit)
+            if post_shares and periods and post_shares > 0 and factor:
                 latest_p = periods[-1]
                 latest_pat = latest_p.get("pat")
                 if latest_pat is not None:
-                    # latest_pat in INR_LAKHS -> multiply by 100,000 for total INR
-                    post_eps = round((latest_pat * 100000.0) / post_shares, 2)
+                    post_eps = round((latest_pat * factor) / post_shares, 2)
         if post_eps is None and self.allow_fixture_fallbacks:
             post_eps = default_eps
 
@@ -252,12 +259,31 @@ class CanonicalInputBuilder:
         unit = fin_base["reporting_unit"] if "reporting_unit" in fin_base else self._get_field("financials.reporting_unit", "INR_LAKHS")
         periods = fin_base["periods"] if "periods" in fin_base else self._get_field("financials.periods", [])
         cl = fin_base["contingent_liabilities"] if "contingent_liabilities" in fin_base else self._get_field("financials.contingent_liabilities", None)
-        return {
+        # The unquantified flag is extracted only from a positive disclosure;
+        # an absent disclosure leaves it unknown (never False).
+        cl_unquantified = fin_base.get("contingent_liabilities_unquantified")
+        if cl_unquantified is None:
+            cl_unquantified = self._get_field("financials.contingent_liabilities_unquantified", None)
+        result = {
             "reporting_unit": unit,
             "periods": periods,
             "contingent_liabilities": cl,
-            "contingent_liabilities_unquantified": fin_base.get("contingent_liabilities_unquantified", None),
+            "contingent_liabilities_unquantified": cl_unquantified,
         }
+        # Schema-permitted penalty inputs must not be dropped by the builder:
+        # the ``unreconciled_metrics`` penalty consumes this flag, and a value
+        # present in the input/extraction was previously lost here (the
+        # penalty could never be evaluated).  Only carried when established,
+        # so an absent value stays absent (UNKNOWN), never defaulted.
+        if "adjusted_metrics_unreconciled" in fin_base:
+            result["adjusted_metrics_unreconciled"] = fin_base["adjusted_metrics_unreconciled"]
+        else:
+            extracted_unreconciled = self._get_field(
+                "financials.adjusted_metrics_unreconciled", None
+            )
+            if extracted_unreconciled is not None:
+                result["adjusted_metrics_unreconciled"] = extracted_unreconciled
+        return result
 
     def _build_capital_structure(self) -> Dict[str, Any]:
         cap_base = self.base.get("capital_structure", {})
@@ -284,15 +310,45 @@ class CanonicalInputBuilder:
             return extracted_uop
         return []
 
+    #: Bucket spellings an input may legitimately use for one of the three
+    #: governed buckets.  Anything else is UNKNOWN -- never "clean": an
+    #: unreadable value is missing evidence, not evidence of no litigation.
+    _LITIGATION_BUCKET_ALIASES = {
+        "clean": "clean",
+        "none": "clean",
+        "nil": "clean",
+        "no_litigation": "clean",
+        "minor_civil": "minor_civil",
+        "civil": "minor_civil",
+        "material_civil": "minor_civil",
+        "criminal_or_regulatory": "criminal_or_regulatory",
+        "criminal": "criminal_or_regulatory",
+        "regulatory": "criminal_or_regulatory",
+    }
+
+    @classmethod
+    def _normalise_litigation_bucket(cls, value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        return cls._LITIGATION_BUCKET_ALIASES.get(str(value).strip().lower())
+
     def _build_governance(self) -> Dict[str, Any]:
         gov_base = self.base.get("governance", {})
-        lit = gov_base["litigation_bucket"] if "litigation_bucket" in gov_base else self._get_field("governance.litigation_bucket", "clean")
-        if lit in ("none", None, "clean"):
-            lit = "clean"
-        elif lit in ("material_civil", "civil"):
-            lit = "minor_civil"
-        elif lit != "criminal_or_regulatory":
-            lit = "clean"
+        # D-5: neither the litigation bucket nor the SEBI/ED flag may be
+        # defaulted.  The previous code (a) fell back to ``"clean"`` when the
+        # extraction carried no bucket, (b) mapped *any* value that was not
+        # ``criminal_or_regulatory`` onto ``"clean"`` -- so an extracted
+        # ``minor_civil`` finding was silently rewritten into the favourable
+        # bucket, 4/4 points instead of 2/4, destroying the evidence it was
+        # taken from -- and (c) defaulted ``sebi_ed_action_active`` to
+        # ``False``.  Both fields now stay ``None`` (UNKNOWN) unless the input
+        # or an evidenced extraction establishes them; only explicitly stated
+        # synonyms of a bucket are normalised.
+        if "litigation_bucket" in gov_base:
+            raw_lit: Any = gov_base["litigation_bucket"]
+        else:
+            raw_lit = self._get_field("governance.litigation_bucket", None)
+        lit = self._normalise_litigation_bucket(raw_lit)
 
         def _pick_gov(key: str, default: Any = None) -> Any:
             if key in gov_base:
@@ -307,12 +363,26 @@ class CanonicalInputBuilder:
             "eom_materiality": _pick_gov("eom_materiality", None),
             "going_concern_uncertainty": _pick_gov("going_concern_uncertainty", None),
             "litigation_bucket": lit,
-            "sebi_ed_action_active": _pick_gov("sebi_ed_action_active", False),
+            "sebi_ed_action_active": _pick_gov("sebi_ed_action_active", None),
             "rpt_pct_revenue": _pick_gov("rpt_pct_revenue", 6.67 if self.allow_fixture_fallbacks else None),
             "rpt_pct_of_revenue_growth": _pick_gov("rpt_pct_of_revenue_growth", None),
             "board_independent_majority": _pick_gov("board_independent_majority", False),
-            "kmp_exits_2y": _pick_gov("kmp_exits_2y", 0),
+            "kmp_exits_2y": _pick_gov("kmp_exits_2y", None),
         }
+        # Schema-permitted governance inputs that a penalty/knockout consumes
+        # must not be dropped.  ``auditor_or_cfo_exit_2y`` drives the
+        # auditor/CFO-exit penalty; it was previously read by the derived
+        # metric but never carried into the canonical input, so the penalty
+        # was structurally UNKNOWN for every builder-based evaluation.  The
+        # key is added only when the input/extraction establishes it, so the
+        # absent case remains UNKNOWN (and the golden input is unchanged).
+        for optional_key in ("auditor_or_cfo_exit_2y",):
+            if optional_key in gov_base:
+                gov[optional_key] = gov_base[optional_key]
+            else:
+                extracted = self._get_field(f"governance.{optional_key}", None)
+                if extracted is not None:
+                    gov[optional_key] = extracted
         self._derive_rpt_metrics(gov)
         return gov
 
@@ -331,8 +401,15 @@ class CanonicalInputBuilder:
     # missing periods/revenue, non-positive revenue, unknown or
     # unconvertible units, or a missing numerator leave the fields null.
     _RPT_SALES_SERVICES_CATEGORIES = frozenset(
-        {"sale_of_goods", "sale_of_services", "job_work_charges_received"}
+        {"sale_of_goods", "sale_of_services", "revenue_from_operations", "job_work_charges_received"}
     )
+    _ISSUE_UNIT_TO_RUPEES = {
+        "INR_LAKHS": 1e5,
+        "INR_CRORES": 1e7,
+        "INR_MILLIONS": 1e6,
+        "INR_BILLIONS": 1e9,
+    }
+
     _RPT_UNIT_TO_RUPEES = {
         "INR_LAKHS": 1e5,
         "INR_CRORES": 1e7,

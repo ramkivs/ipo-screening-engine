@@ -24,6 +24,8 @@ Semantics preserved:
 from __future__ import annotations
 
 import hashlib
+import copy
+import math
 import http.cookiejar
 import json
 from html import unescape as html_unescape
@@ -46,10 +48,12 @@ from .extraction.prospectus_terms import ProspectusTermsParser
 
 PRICING_TERMS = ("price_band_low", "price_band_high", "lot_size")
 REQUIRED_ISSUE_TERMS = PRICING_TERMS + ("ofs",)
+DISCOVERABLE_TERMS = REQUIRED_ISSUE_TERMS + ("fresh_issue", "open_date", "close_date")
 
 # Source hierarchy: official exchange/SEBI/issuer documents retrieved
 # directly outrank retained copies of the same official documents; both
-# outrank anything else, which this resolver does not consult at all.
+# outrank other evidence. Optional platform candidates are retained but
+# never acquire official verification authority.
 OFFICIAL_HOSTS = {
     "nseindia.com",
     "www.nseindia.com",
@@ -59,6 +63,10 @@ OFFICIAL_HOSTS = {
     "www.sebi.gov.in",
 }
 
+
+# Archive hosts are eligible only in the issuer-matched discovery pathway.
+# Preserve the existing direct notice/final-Prospectus URL allowlists.
+DISCOVERY_HOSTS = OFFICIAL_HOSTS | {'nsearchives.nseindia.com', 'listing.bseindia.com', 'api.bseindia.com'}
 
 _BROWSER_HEADERS = {
     "User-Agent": (
@@ -108,18 +116,19 @@ def _warm_up_session(url: str, timeout_seconds: float) -> None:
         return
     if parsed.path.lower().endswith(".pdf"):
         return
-    _WARMED_HOSTS.add(host)
     try:
         warm = urllib.request.Request(
             f"{parsed.scheme}://{host}/", headers=dict(_BROWSER_HEADERS)
         )
         with urllib.request.urlopen(warm, timeout=min(timeout_seconds, 15.0)) as response:
             response.read(4096)
+        _WARMED_HOSTS.add(host)  # failed warm-ups must not poison subsequent attempts
     except Exception:
         pass  # best-effort; the real fetch and its validation decide
 
 
-def _default_http_fetch(url: str, timeout_seconds: float) -> bytes:
+def _default_http_fetch(url: str, timeout_seconds: float, *, referer: Optional[str] = None,
+                        eligible_redirect_hosts: Optional[set[str]] = None) -> bytes:
     """Default retrieval for official documents.
 
     Exchange/SEBI document servers commonly reject bare library user
@@ -132,11 +141,17 @@ def _default_http_fetch(url: str, timeout_seconds: float) -> bytes:
     mistaken for the requested page.
     """
     _ensure_session_opener()
-    _warm_up_session(url, timeout_seconds)
     parsed = urlparse(url)
+    is_bse_api = parsed.hostname == 'api.bseindia.com' and parsed.path.startswith('/BseIndiaAPI/api/')
+    _warm_up_session('https://www.bseindia.com/' if is_bse_api else url, timeout_seconds)
     headers = dict(_BROWSER_HEADERS)
     if parsed.scheme and parsed.hostname:
-        headers["Referer"] = f"{parsed.scheme}://{parsed.hostname}/"
+        headers["Referer"] = referer or f"{parsed.scheme}://{parsed.hostname}/"
+    if parsed.path.startswith("/api/") or is_bse_api:
+        headers["Accept"] = "application/json,text/plain,*/*"
+    if is_bse_api:
+        headers["Origin"] = "https://www.bseindia.com"
+        headers["Referer"] = referer or "https://www.bseindia.com/"
     request = urllib.request.Request(url, headers=headers)
     # Bounded retries for transient retrieval failures (connection
     # resets, timeouts, HTTP 429/5xx): official document servers are
@@ -146,6 +161,13 @@ def _default_http_fetch(url: str, timeout_seconds: float) -> bytes:
     for attempt in range(3):
         try:
             with urllib.request.urlopen(request, timeout=timeout_seconds) as response:  # noqa: S310 (allow-listed hosts only)
+                final_url = response.geturl() if hasattr(response, "geturl") else url
+                final_host = (urlparse(final_url).hostname or "").lower()
+                original_host = (urlparse(url).hostname or "").lower()
+                eligible = eligible_redirect_hosts if eligible_redirect_hosts is not None else OFFICIAL_HOSTS
+                allowed_redirects = eligible if original_host in eligible else {original_host}
+                if final_host not in allowed_redirects or urlparse(final_url).scheme != parsed.scheme:
+                    raise ValueError("retrieval redirected outside eligible source hosts")
                 return response.read()
         except urllib.error.HTTPError as exc:
             last_exc = exc
@@ -224,13 +246,13 @@ def _notice_values(result: PriceBandNoticeResult) -> Dict[str, Any]:
 
 def _values_valid(values: Mapping[str, Any]) -> Optional[str]:
     low, high, lot = (values.get(k) for k in PRICING_TERMS)
-    if low is not None and (not isinstance(low, (int, float)) or low <= 0):
+    if low is not None and (isinstance(low, bool) or not isinstance(low, (int, float)) or not math.isfinite(low) or low <= 0):
         return "price_band_low is not a positive number"
-    if high is not None and (not isinstance(high, (int, float)) or high <= 0):
+    if high is not None and (isinstance(high, bool) or not isinstance(high, (int, float)) or not math.isfinite(high) or high <= 0):
         return "price_band_high is not a positive number"
     if low is not None and high is not None and high < low:
         return "price_band_high is below price_band_low"
-    if lot is not None and (not isinstance(lot, (int, float)) or int(lot) <= 0):
+    if lot is not None and (isinstance(lot, bool) or not isinstance(lot, (int, float)) or not math.isfinite(lot) or lot <= 0 or int(lot) != lot):
         return "lot_size is not a positive integer"
     return None
 
@@ -253,6 +275,7 @@ class NoticeCandidate:
     from_cache: bool = False
     raw_bytes: Optional[bytes] = None
     verified: bool = False
+    components: List[Any] = field(default_factory=list)
 
     @property
     def values(self) -> Dict[str, Any]:
@@ -305,6 +328,21 @@ class ProviderReport:
         return [attempt.url for attempt in self.sources if attempt.searched]
 
 
+def _json_safe_diagnostics(value: Any) -> Any:
+    """Keep rejected nonfinite evidence legible without emitting illegal JSON.
+
+    This is reporting only: candidate validation/selection uses the original
+    numbers, and no rejected value is coerced to zero or canonical input.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return repr(value)
+    if isinstance(value, dict):
+        return {key: _json_safe_diagnostics(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_diagnostics(item) for item in value]
+    return copy.deepcopy(value)
+
+
 @dataclass
 class ResolutionOutcome:
     status: str  # RESOLVED | PARTIAL | UNPUBLISHED | UNAVAILABLE | CONFLICT | UNVERIFIED
@@ -322,10 +360,13 @@ class ResolutionOutcome:
     # carried truthfully into reports; a Prospectus is never labelled a
     # Price Band Notice.
     document_class: Optional[str] = None
+    field_diagnostics: Dict[str, Any] = field(default_factory=dict)
+    enrichment_payload: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "status": self.status,
+            "fields": _json_safe_diagnostics(self.field_diagnostics),
             "verified": self.verified,
             "resolved_fields": list(self.resolved_fields),
             "unresolved_fields": list(self.unresolved_fields),
@@ -429,6 +470,7 @@ class HttpNoticeProvider:
     ):
         self.urls_by_ipo = dict(urls_by_ipo)
         self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(OFFICIAL_HOSTS)
+        self._requires_https = allowed_hosts is None
         self.timeout_seconds = timeout_seconds
         self._fetcher = fetcher
 
@@ -442,8 +484,8 @@ class HttpNoticeProvider:
         if not url:
             return None, ProviderReport(self.name, "UNAVAILABLE", "no official notice URL configured for this issuer")
         host = (urlparse(url).hostname or "").lower()
-        if host not in self.allowed_hosts:
-            return None, ProviderReport(self.name, "REJECTED", f"host {host or '?'} is not an official source host")
+        if host not in self.allowed_hosts or (self._requires_https and urlparse(url).scheme != "https"):
+            return None, ProviderReport(self.name, "REJECTED", f"host {host or '?'} is not an HTTPS official source host")
         try:
             raw = self._fetch(url)
         except Exception as exc:
@@ -456,13 +498,16 @@ class HttpNoticeProvider:
                 handle.write(raw)
                 temp_path = Path(handle.name)
             try:
-                result = PriceBandNoticeParser().parse_from_file(temp_path)
+                from .extraction.official_notice_ocr import parse_if_scanned
+                result = parse_if_scanned(raw, url)
+                if result is None:
+                    result = PriceBandNoticeParser().parse_from_file(temp_path)
             finally:
                 _best_effort_unlink(temp_path)
         except Exception as exc:
             return None, ProviderReport(self.name, "REJECTED", f"retrieved document is not a parseable Price Band Notice: {exc}")
         if _norm_name(result.company_name) != _norm_name(company_name):
-            return None, ProviderReport(self.name, "REJECTED", "retrieved notice names a different issuer")
+            return None, ProviderReport(self.name, "REJECTED", "retrieved notice names a different issuer: " + repr(result.company_name) + ("; OCR header: " + result.metadata["ocr_header_excerpt"] if result.metadata.get("ocr_header_excerpt") else ""))
         return (
             NoticeCandidate(
                 result=result,
@@ -498,6 +543,7 @@ class HttpProspectusProvider:
     ):
         self.urls_by_ipo = dict(urls_by_ipo)
         self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(OFFICIAL_HOSTS)
+        self._requires_https = allowed_hosts is None
         self.timeout_seconds = timeout_seconds
         self._fetcher = fetcher
 
@@ -511,8 +557,8 @@ class HttpProspectusProvider:
         if not url:
             return None, ProviderReport(self.name, "UNAVAILABLE", "no official prospectus URL configured for this issuer")
         host = (urlparse(url).hostname or "").lower()
-        if host not in self.allowed_hosts:
-            return None, ProviderReport(self.name, "REJECTED", f"host {host or '?'} is not an official source host")
+        if host not in self.allowed_hosts or (self._requires_https and urlparse(url).scheme != "https"):
+            return None, ProviderReport(self.name, "REJECTED", f"host {host or '?'} is not an HTTPS official source host")
         try:
             raw = self._fetch(url)
         except Exception as exc:
@@ -577,6 +623,10 @@ class OfficialDiscoveryProvider:
         # links in the served HTML).
         "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
         "https://www.bseindia.com/publicissue.html",
+        # Actual current public SPA feed, not the deprecated GetPublicIssue/w.
+        "https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue_par_updated/w?flag=1",
+        # Public record feed behind NSE's JavaScript listing; no guessed issuer IDs.
+        "https://www.nseindia.com/api/all-upcoming-issues?category=ipo",
         "https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0",
     )
     _GENERIC_TOKENS = {"LIMITED", "INDIA", "PRIVATE", "COMPANY", "INDUSTRIES", "INDUSTRY", "GLOBAL", "INTERNATIONAL"}
@@ -731,16 +781,18 @@ class OfficialDiscoveryProvider:
         max_candidates: int = 6,
         timeout_seconds: float = 60.0,
     ):
-        self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(OFFICIAL_HOSTS)
+        self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(DISCOVERY_HOSTS)
+        self._requires_https = allowed_hosts is None
         self.listing_urls = list(listing_urls) if listing_urls is not None else list(self.LISTING_URLS)
         self.max_candidates = max_candidates
         self.timeout_seconds = timeout_seconds
         self._fetcher = fetcher
 
-    def _fetch(self, url: str) -> bytes:
+    def _fetch(self, url: str, referer: Optional[str] = None) -> bytes:
         if self._fetcher is not None:
             return self._fetcher(url)
-        return _default_http_fetch(url, self.timeout_seconds)
+        return _default_http_fetch(url, self.timeout_seconds, referer=referer,
+                                   eligible_redirect_hosts=self.allowed_hosts)
 
     def _candidate_links(self, listing_bytes: bytes, base_url: str, company_name: str) -> List[str]:
         # Served HTML encodes query separators as &amp; in hrefs;
@@ -753,16 +805,15 @@ class OfficialDiscoveryProvider:
         ]
         slug = "".join(re.split(r"[^A-Za-z0-9]+", (company_name or "").upper()))
         found: List[Tuple[int, str]] = []
-        pairs: List[Tuple[str, str]] = []
-        for match in re.finditer(r'href\s*=\s*"([^"]+)"[^>]*>(.*?)</a>', text, re.IGNORECASE | re.DOTALL):
-            pairs.append((match.group(1), re.sub(r"<[^>]+>", " ", match.group(2))))
+        from .official_issue_sources import links
+        pairs = links(listing_bytes, base_url)
         for match in re.finditer(r"https?://[^\s\"<>]+?\.pdf\b", text, re.IGNORECASE):
             pairs.append((match.group(0), ""))
         seen = set()
         for href, anchor in pairs:
             url = urllib.parse.urljoin(base_url, href.strip())
             host = (urllib.parse.urlparse(url).hostname or "").lower()
-            if host not in self.allowed_hosts:
+            if host not in self.allowed_hosts or (self._requires_https and urlparse(url).scheme != "https"):
                 continue
             haystack = f"{url} {anchor}".upper()
             if slug and slug in haystack.replace("-", "").replace("_", "").replace(" ", ""):
@@ -792,7 +843,7 @@ class OfficialDiscoveryProvider:
         return [url for _prio, url in found[: self.max_candidates]]
 
 
-    def _from_issue_page(self, url: str, company_name: str) -> tuple[Optional[NoticeCandidate], str]:
+    def _from_issue_page(self, url: str, company_name: str, referer: Optional[str] = None) -> tuple[Optional[NoticeCandidate], str]:
         """Fetch and parse an official exchange issue-information page.
 
         Returns (candidate, reason); reason names the exact failing
@@ -801,36 +852,91 @@ class OfficialDiscoveryProvider:
         """
         from .extraction.exchange_issue_page import ExchangeIssuePageParser
 
-        host = (urllib.parse.urlparse(url).hostname or "").lower()
-        if host not in self.allowed_hosts:
-            return None, f"{url}: host is not an official source host"
+        host = (urlparse(url).hostname or "").lower()
+        if host not in self.allowed_hosts or (self._requires_https and urlparse(url).scheme != "https"):
+            return None, f"{url}: host is not an HTTPS official source host"
         try:
-            raw = self._fetch(url)
+            raw = self._fetch(url, referer=referer)
         except Exception as exc:
-            return None, f"{url}: issue-page retrieval failed ({type(exc).__name__})"
-        if not raw.lstrip()[:15].lower().startswith((b"<!doctype", b"<html", b"<")):
-            return None, f"{url}: issue page returned a non-HTML response"
-        if self._classify_listing(raw) == "homepage":
-            return None, (
-                f"{url}: issue page returned the exchange homepage instead of "
-                "issue information (HTTP 200 wrong-page/session response)"
-            )
+            return None, f"{url}: issue-page retrieval failed ({type(exc).__name__}: {exc})"
         try:
-            result = ExchangeIssuePageParser().parse(raw, url=url)
+            if urlparse(url).path == '/api/ipo-detail':
+                from .official_issue_sources import parse_nse_detail
+                result = parse_nse_detail(raw, url)
+            else:
+                if not raw.lstrip().startswith(b'<'):
+                    return None, f"{url}: issue page returned a non-HTML response"
+                # Detail pages are not listings. BSE uses its homepage title on
+                # real detail pages too; verify issuer + labelled terms FIRST.
+                result = ExchangeIssuePageParser().parse(raw, url=url)
         except Exception as exc:
-            return None, f"{url}: issue page could not be parsed ({type(exc).__name__})"
+            return None, f"{url}: issue page could not be parsed ({type(exc).__name__}: {exc})"
         if _norm_name(result.company_name) != _norm_name(company_name):
-            return None, f"{url}: issue page names a different issuer"
-        if result.price_band_low is None and result.lot_size is None:
+            kind = self._classify_listing(raw)
+            reason = ("exchange homepage instead of issue information" if kind == "homepage" else
+                      "JavaScript shell with no issuer issue data" if kind == "shell" else
+                      "issue page names a different issuer or lacks issuer identity")
+            return None, f"{url}: {reason}"
+        if not any(getattr(result, f + "_amount" if f in ("fresh_issue", "ofs") else f, None) is not None for f in DISCOVERABLE_TERMS):
             return None, f"{url}: issue page has no labelled Price Band or Market Lot"
         return NoticeCandidate(
             result=result,
             provider=self.name,
             uri=url,
             retrieved_at=_utcnow().isoformat().replace("+00:00", "Z"),
-            raw_bytes=None,
+            raw_bytes=raw,
             verified=True,
         ), ""
+
+    def _issue_attachments(self, page, company_name, ipo_id):
+        """Follow bounded document links only after the issue page issuer matches."""
+        from .official_issue_sources import links, official_document_members
+        from .extraction.official_offer_amounts import document_pages, explicit_amounts, parse_official_rhp
+        found, reasons = [], []
+        eligible = []
+        for url, label in links(page.raw_bytes or b"", page.uri):
+            parsed = urlparse(url)
+            if (parsed.hostname not in self.allowed_hosts or
+                    (self._requires_https and parsed.scheme != "https")):
+                continue
+            if (parsed.path.lower().endswith((".pdf", ".zip")) and
+                    re.search(r"price.?band|prospectus|rhp|drhp|gid|offer.document|ratios|basis.of.issue.price", label + " " + url, re.I)):
+                if url not in eligible:
+                    eligible.append(url)
+        for url in eligible[:self.max_candidates]:
+            try:
+                raw = self._fetch(url, referer=page.uri)
+                members = list(official_document_members(raw, url))
+                if not members:
+                    reasons.append(f"{url}: official archive contains no supported PDF/text members")
+                for member, uri in members:
+                    try:
+                        result = parse_official_rhp(member, uri)
+                    except Exception:
+                        result = None
+                    if result is not None:
+                        if _norm_name(result.company_name) != _norm_name(company_name):
+                            reasons.append(f"{uri}: official RHP names a different issuer")
+                            continue
+                        found.append(NoticeCandidate(result, self.name, uri,
+                            _utcnow().isoformat().replace("+00:00", "Z"), verified=True))
+                        continue
+                    rejected = []
+                    for provider_cls in (HttpNoticeProvider, HttpProspectusProvider):
+                        provider = provider_cls({ipo_id: uri}, fetcher=lambda _url, data=member: data,
+                            allowed_hosts=self.allowed_hosts, timeout_seconds=self.timeout_seconds)
+                        candidate, report = provider.find(company_name, ipo_id)
+                        if candidate is not None:
+                            if provider_cls is HttpNoticeProvider:
+                                candidate.result = explicit_amounts(candidate.result, document_pages(member))
+                            found.append(candidate)
+                            break
+                        rejected.append(f"{report.provider}: {report.detail}")
+                    else:
+                        reasons.append(f"{uri}: attachment rejected; " + "; ".join(rejected))
+            except Exception as exc:
+                reasons.append(f"{url}: official attachment retrieval/decoding failed ({type(exc).__name__}: {exc})")
+        return found, reasons
 
     @staticmethod
     def _merge_candidates(candidates: List[NoticeCandidate]) -> NoticeCandidate:
@@ -840,55 +946,80 @@ class OfficialDiscoveryProvider:
         keep their own quotes/locators; sources are recorded."""
         if len(candidates) == 1:
             return candidates[0]
-        # A final Prospectus is the richest primary (it can also carry
-        # the stated fresh-issue amount); otherwise first discovered.
-        primary = next(
-            (c for c in candidates if getattr(c.result, "document_class", "") == "OFFICIAL_PROSPECTUS"),
-            candidates[0],
-        )
-        # Never merge disagreeing disclosures: surface the conflict
-        # instead of arbitrarily preferring one source.
+        primary = copy.deepcopy(candidates[0])
+        primary.components = list(candidates)
         for other in candidates[1:]:
-            for field_name in ("price_band_low", "price_band_high", "lot_size"):
-                left = getattr(primary.result, field_name, None)
-                right = getattr(other.result, field_name, None)
-                if left is not None and right is not None and float(left.value) != float(right.value):
-                    raise ValueError(
-                        f"conflicting official values for {field_name}: {left.value} ({primary.uri}) vs {right.value} ({other.uri})"
-                    )
-        merged_from = [primary.uri]
-        for other in (c for c in candidates if c is not primary):
-            filled = False
-            for field_name in ("price_band_low", "price_band_high", "lot_size", "open_date", "close_date"):
-                if getattr(primary.result, field_name, None) is None and getattr(other.result, field_name, None) is not None:
-                    setattr(primary.result, field_name, getattr(other.result, field_name))
-                    filled = True
-            # A final Prospectus additionally carries the stated
-            # fresh-issue amount; keep it reachable for enrichment.
-            if getattr(other.result, "fresh_issue_amount", None) is not None and getattr(primary.result, "fresh_issue_amount", None) is None:
-                primary.result.fresh_issue_amount = other.result.fresh_issue_amount  # type: ignore[attr-defined]
-            if filled:
-                merged_from.append(other.uri)
-        if len(merged_from) > 1 and hasattr(primary.result, "metadata"):
-            primary.result.metadata["merged_from"] = merged_from
+            for name in PRICING_TERMS + ("open_date", "close_date"):
+                if getattr(primary.result, name, None) is None:
+                    setattr(primary.result, name, getattr(other.result, name, None))
         return primary
 
     def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
         reached = False
         notes: List[str] = []
         attempts: List[ListingAttempt] = []
+        all_candidates: List[NoticeCandidate] = []
 
         def note(text: str) -> None:
-            if text and text not in notes and len(notes) < 6:
+            if text and text not in notes:
                 notes.append(text)
 
         for listing_url in self.listing_urls:
             try:
-                raw = self._fetch(listing_url)
+                from .official_issue_sources import BSE_LISTING, BSE_PUBLIC_LISTING
+                raw = self._fetch(listing_url, referer=BSE_PUBLIC_LISTING if listing_url == BSE_LISTING else None)
             except Exception as exc:
-                detail = f"listing retrieval failed ({type(exc).__name__})"
+                detail = f"listing retrieval failed ({type(exc).__name__}: {exc})"
                 note(f"{listing_url}: {detail}")
                 attempts.append(ListingAttempt(listing_url, "failed", False, 0, detail))
+                continue
+            if listing_url == BSE_LISTING and not raw.lstrip().startswith(b"<"):
+                from .official_issue_sources import bse_issue_records
+                try:
+                    records = bse_issue_records(raw, company_name)
+                except (ValueError, TypeError, AttributeError) as exc:
+                    detail = f"BSE public issue records malformed/unusable ({type(exc).__name__}: {exc})"
+                    attempts.append(ListingAttempt(listing_url, "malformed", False, 0, detail))
+                    note(f"{listing_url}: {detail}")
+                    continue
+                attempts.append(ListingAttempt(listing_url, "issue_records" if records else "no_match",
+                    bool(records), len(records), "Exact issuer-matched current BSE IPO records; absence is not publication evidence"))
+                for page_url, result in records[:self.max_candidates]:
+                    candidate = NoticeCandidate(result, self.name, listing_url,
+                        _utcnow().isoformat().replace("+00:00", "Z"), raw_bytes=raw, verified=True)
+                    all_candidates.append(candidate)
+                    page_candidate, reason = self._from_issue_page(page_url, company_name, referer=BSE_PUBLIC_LISTING)
+                    if page_candidate:
+                        all_candidates.append(page_candidate)
+                        attachments, reasons = self._issue_attachments(page_candidate, company_name, ipo_id)
+                        all_candidates.extend(attachments)
+                        for reason in reasons:
+                            note(reason)
+                    else:
+                        note(reason)
+                continue
+            from .official_issue_sources import NSE_LISTING, nse_issue_links
+            if listing_url == NSE_LISTING and not raw.lstrip().startswith(b"<"):
+                try:
+                    discovered = nse_issue_links(raw, company_name)
+                except (ValueError, TypeError, AttributeError) as exc:
+                    detail = f"NSE public issue records malformed/unusable ({type(exc).__name__}: {exc})"
+                    attempts.append(ListingAttempt(listing_url, "malformed", False, 0, detail))
+                    note(f"{listing_url}: {detail}")
+                    continue
+                attempts.append(ListingAttempt(listing_url, "issue_records" if discovered else "no_match",
+                    bool(discovered), len(discovered), "Exact issuer-matched NSE records; absence is not publication evidence"))
+                for page_url, api_url in discovered[:self.max_candidates]:
+                    for detail_url in (page_url, api_url):
+                        candidate, reason = self._from_issue_page(detail_url, company_name, referer=listing_url)
+                        if candidate:
+                            all_candidates.append(candidate)
+                            attachments, reasons = self._issue_attachments(candidate, company_name, ipo_id)
+                            all_candidates.extend(attachments)
+                            for reason in reasons:
+                                note(reason)
+                        else:
+                            note(reason)
                 continue
             kind = self._classify_listing(raw)
             if kind == "homepage":
@@ -935,9 +1066,13 @@ class OfficialDiscoveryProvider:
             for link in self._candidate_links(raw, listing_url, company_name):
                 low = link.lower()
                 if "displayipo" in low or "issue-information" in low or "issue_information" in low:
-                    page_candidate, reason = self._from_issue_page(link, company_name)
+                    page_candidate, reason = self._from_issue_page(link, company_name, referer=listing_url)
                     if page_candidate is not None:
                         collected.append(page_candidate)
+                        attachments, reasons = self._issue_attachments(page_candidate, company_name, ipo_id)
+                        collected.extend(attachments)
+                        for reason in reasons:
+                            note(reason)
                     else:
                         note(reason)
                     continue
@@ -953,17 +1088,13 @@ class OfficialDiscoveryProvider:
                     note(f"{link}: {sub_report.detail}")
             if collected:
                 attempt.detail += "; issuer-matched official document found"
-                try:
-                    merged = self._merge_candidates(collected)
-                except ValueError as exc:
-                    return None, ProviderReport(
-                        self.name, "REJECTED", str(exc), sources=list(attempts)
-                    )
-                return merged, ProviderReport(
-                    self.name, "FOUND", f"discovered official document via {listing_url}: {merged.uri}",
-                    sources=list(attempts),
-                )
-            attempt.detail += "; no issuer-matched official document found in it"
+                all_candidates.extend(collected)
+            else:
+                attempt.detail += "; no issuer-matched official document found in it"
+        if all_candidates:
+            merged = self._merge_candidates(all_candidates)
+            return merged, ProviderReport(self.name, "FOUND", "examined all configured listings; issuer-matched documents found",
+                                          notes=list(notes), sources=list(attempts))
         if reached:
             searched = [a.url for a in attempts if a.searched]
             detail = (
@@ -1024,7 +1155,10 @@ class NoticeSnapshotCache:
                 handle.write(bin_path.read_bytes())
                 temp_path = Path(handle.name)
             try:
-                result = PriceBandNoticeParser().parse_from_file(temp_path)
+                from .extraction.official_notice_ocr import parse_if_scanned
+                result = parse_if_scanned(bin_path.read_bytes(), meta.get("uri", ""))
+                if result is None:
+                    result = PriceBandNoticeParser().parse_from_file(temp_path)
             finally:
                 _best_effort_unlink(temp_path)
         except Exception:
@@ -1075,7 +1209,7 @@ class IssueTermsResolver:
         self.providers = list(providers)
         self.cache = cache
 
-    def resolve(self, *, company_name: str, ipo_id: str, missing_fields: Sequence[str]) -> ResolutionOutcome:
+    def resolve(self, *, company_name: str, ipo_id: str, missing_fields: Sequence[str], issue_context: Optional[Mapping[str, Any]] = None) -> ResolutionOutcome:
         missing = [f for f in missing_fields if f in PRICING_TERMS]
         outcome = ResolutionOutcome(status="UNPUBLISHED", unresolved_fields=list(missing_fields))
 
@@ -1095,12 +1229,17 @@ class IssueTermsResolver:
                     ProviderReport("snapshot-cache", "UNAVAILABLE", f"cached snapshot from {cached.retrieved_at} is stale; refresh required")
                 )
 
-        if not candidates:
-            for provider in self.providers:
+        # A cache is evidence, not permission to skip remaining configured sources.
+        for provider in self.providers:
+            try:
                 candidate, report = provider.find(company_name, ipo_id)
-                outcome.provider_reports.append(report)
-                if candidate is not None:
-                    candidates.append(candidate)
+            except Exception as exc:
+                candidate = None
+                report = ProviderReport(getattr(provider, "name", type(provider).__name__),
+                                        "UNAVAILABLE", f"provider failed: {type(exc).__name__}: {exc}")
+            outcome.provider_reports.append(report)
+            if candidate is not None:
+                candidates.extend(candidate.components or [candidate])
 
         if not candidates:
             # A NOT_FOUND provider report becomes UNPUBLISHED only when
@@ -1122,70 +1261,13 @@ class IssueTermsResolver:
                 for r in outcome.provider_reports
             )
             outcome.status = "UNPUBLISHED" if searched else "UNAVAILABLE"
+            outcome.field_diagnostics = {f: {"state": "NOT_DISCLOSED_IN_EXAMINED_SOURCES" if searched else "SOURCE_UNAVAILABLE",
+                                           "candidates": [], "detail": "Eligible providers exhausted; listing silence is not proof of non-publication."}
+                                         for f in missing_fields}
             return outcome
 
-        # Provenance gate: only documents retrieved from allow-listed
-        # official hosts count as verified disclosures. Retained copies
-        # (including any file shipped or staged locally) are reported so
-        # the operator can act, but they never resolve canonical terms.
-        verified_candidates = [c for c in candidates if c.verified]
-        if not verified_candidates:
-            outcome.status = "UNVERIFIED"
-            for candidate in candidates:
-                outcome.provider_reports.append(
-                    ProviderReport(
-                        candidate.provider,
-                        "UNVERIFIED",
-                        f"issuer-matched notice at {candidate.uri} is a retained copy whose "
-                        "official provenance is not established; not used for evaluation",
-                    )
-                )
-            return outcome
-        candidates = verified_candidates
-
-        # Conflict detection: never arbitrarily select between disclosures.
-        conflicts: List[str] = []
-        baseline = candidates[0].values
-        for other in candidates[1:]:
-            for field_name in PRICING_TERMS:
-                left, right = baseline.get(field_name), other.values.get(field_name)
-                if left is not None and right is not None and float(left) != float(right):
-                    conflicts.append(f"issue.{field_name}: {left} ({candidates[0].provider}) vs {right} ({other.provider})")
-        if conflicts:
-            outcome.status = "CONFLICT"
-            outcome.conflicts = conflicts
-            return outcome
-
-        chosen = candidates[0]
-        invalid = _values_valid(chosen.values)
-        if invalid:
-            outcome.status = "UNAVAILABLE"
-            outcome.provider_reports.append(ProviderReport(chosen.provider, "REJECTED", f"unsupported value: {invalid}"))
-            return outcome
-
-        resolved = [f for f in missing if chosen.values.get(f) is not None]
-        outcome.resolved_fields = resolved
-        outcome.unresolved_fields = [f for f in missing_fields if f not in resolved and f != "ofs"]
-        outcome.notice = chosen.result
-        outcome.document_class = getattr(chosen.result, "document_class", "PRICE_BAND_NOTICE")
-        outcome.from_cache = from_cache
-        outcome.source_uri = chosen.uri
-        outcome.verified = True
-        outcome.provider = chosen.provider
-        outcome.retrieved_at = chosen.retrieved_at
-        outcome.status = "RESOLVED" if len(resolved) == len(missing) else "PARTIAL"
-
-        if (
-            self.cache is not None
-            and not from_cache
-            and chosen.verified
-            and chosen.raw_bytes is not None
-            and outcome.document_class == "PRICE_BAND_NOTICE"
-        ):
-            # The snapshot cache re-parses with the notice parser; only
-            # notice-class documents are cached.
-            self.cache.put(ipo_id, chosen)
-        return outcome
+        from .issue_term_fields import resolve_fields
+        return resolve_fields(self, outcome, candidates, company_name, ipo_id, missing_fields, from_cache, issue_context or {})
 
 
 class ConfigurationDiagnosticProvider:
@@ -1259,6 +1341,13 @@ def build_resolver_from_env() -> IssueTermsResolver:
         providers.append(HttpProspectusProvider(prospectus_urls))
     if os.getenv("IPO_OFFICIAL_DISCOVERY", "1").strip().lower() not in ("0", "false", "no"):
         providers.append(OfficialDiscoveryProvider())
+    from .issue_platforms import PublicPlatformProvider, PLATFORM_LISTINGS
+    enabled = {x.strip().lower() for x in os.getenv("IPO_TERM_PLATFORM_PROVIDERS", "").split(",") if x.strip()}
+    for name in sorted(enabled):
+        if name in PLATFORM_LISTINGS:
+            providers.append(PublicPlatformProvider(name))
+        else:
+            providers.append(ConfigurationDiagnosticProvider(name, "unknown platform provider"))
     dirs = [d for d in os.getenv("IPO_PRICE_BAND_NOTICE_DIR", "").split(os.pathsep) if d]
     if dirs:
         providers.append(RetainedNoticeProvider(dirs))

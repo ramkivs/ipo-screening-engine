@@ -46,7 +46,10 @@ from ipo_screening.presentation.service import PresentationConfig, PresentationS
 
 VISHAL_RHP_PDF = REPO_ROOT / "handoff" / "reference" / "U01122MH1994PLC185445-vishal nirmiti.pdf"
 RK_RHP_PDF = REPO_ROOT / "handoff" / "reference" / "U18109WB2010PLC144256-R.K Fashion accessories.pdf"
-NOTICE_BYTES = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes()
+# Synthetic transport only: match the unchanged RHP cover issue window.
+NOTICE_BYTES = (REPO_ROOT / "fixtures" / "notices" / "clean_notice.txt").read_bytes().replace(
+    b"Tuesday, October 06, 2026", b"Wednesday, September 30, 2026"
+).replace(b"Thursday, October 08, 2026", b"Monday, October 05, 2026")
 OFFICIAL_URL = "https://www.nseindia.com/announcements/vishal-price-band"
 GOLDEN_HASH = "e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1"
 

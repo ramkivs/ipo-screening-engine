@@ -170,7 +170,18 @@ def test_section_extractor_objects_of_offer_fail_closed_gcp():
 
     extractor = SectionExtractor(doc, reader)
     uop_res = extractor.extract_objects_of_offer(page_ranges)
-    assert len(uop_res) == 1
+    # 2026-10-23: the schedule container is accompanied by one page-anchored
+    # candidate per disclosed allocation row, so the debt amount and the GCP
+    # placeholder each carry their own source page and verbatim quote. GCP is
+    # still fail-closed (no amount is invented).
+    assert len(uop_res) == 4
+    assert [r.field_path for r in uop_res[1:]] == [
+        "use_of_proceeds[0].amount",
+        "use_of_proceeds[1].amount",
+        "use_of_proceeds[2].amount",
+    ]
+    assert all(r.page for r in uop_res[1:])
+    assert uop_res[3].candidate_value is None  # GCP placeholder stays unknown
     uop_list = uop_res[0].candidate_value
 
     wc = next((u for u in uop_list if u["category"] == "working_capital"), None)
