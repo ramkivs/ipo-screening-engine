@@ -21,6 +21,40 @@ from .sections import _find_ofs_nil
 
 _SOURCE_PLACEHOLDER = re.compile(r'\[\s*(?:[●•.\-]+)?\s*\]|\bTBD\b', re.I)
 
+#: A placeholder that occupies the **money slot** -- ``Rs. [●]``, ``₹ [•]``,
+#: ``[●] million``, ``aggregating up to [ ]``.  Only this makes the amount
+#: unknown.  A placeholder in a *share-count* slot ("Up to [●] Equity Shares
+#: of face value of ₹1 each aggregating up to ₹ 9,500.00 million") leaves the
+#: money amount explicitly stated, and treating it as unknown discarded a
+#: disclosed Offer for Sale amount.
+#: Anything that makes the *amount itself* unknown.
+_AMOUNT_UNKNOWN_MARKER = re.compile(
+    r'(?:₹|Rs\.?|INR)\s*[\[\(][^\]\)]{0,6}[\]\)]'
+    r'|[\[\(][^\]\)]{0,6}[\]\)]\s*(?:lakhs?|millions?|crores?)\b'
+    r'|aggregating\s+(?:up\s+)?to\s*[\[\(][^\]\)]{0,6}[\]\)]'
+    r'|\bTBD\b|UNREADABLE_OCR_LINE',
+    re.I,
+)
+
+_AMOUNT_SLOT_PLACEHOLDER = re.compile(
+    r'(?:₹|Rs\.?|INR)\s*[\[\(][^\]\)]{0,6}[\]\)]'
+    r'|[\[\(][^\]\)]{0,6}[\]\)]\s*(?:lakhs?|millions?|crores?)\b'
+    r'|aggregating\s+(?:up\s+)?to\s*[\[\(][^\]\)]{0,6}[\]\)]',
+    re.I,
+)
+
+#: A component label that is immediately preceded by another component label
+#: (or by a header cell naming several) says nothing about which column the
+#: following numbers belong to: "TYPE FRESH ISSUE SIZE  OFFER FOR SALE SIZE
+#: TOTAL OFFER SIZE", or a merged cell "Fresh Issue and Offer for Sale".
+#: Reading the next amount in text order would bind the *fresh-issue* amount
+#: to the Offer for Sale.  Refuse to guess instead.
+_COMPONENT_MERGED_PREFIX = re.compile(
+    r'(?:fresh\s+(?:issue|offer)(?:\s+size)?|offer\s+for\s+sale(?:\s+size)?'
+    r'|total\s+(?:issue|offer)(?:\s+size)?)\s*(?:and|&|/|\+|,)?\s*$',
+    re.I,
+)
+
 def explicit_amounts(result, pages, table_columns=()):
     if not isinstance(result, ExchangeIssueTermsResult):
         result = ExchangeIssueTermsResult(**{f.name: getattr(result, f.name)
@@ -48,16 +82,34 @@ def explicit_amounts(result, pages, table_columns=()):
                 amount = re.search(r'aggregating\s+(?:up\s+to\s+|to\s+)?(?:₹|Rs\.?|INR)\s*'
                                    r'(\d[\d,]*(?:\.\d+)?)\s*(lakhs?|millions?|crores?)', segment, re.I)
                 assertion = re.split(r'fresh\s+(?:issue|offer)|offer\s+for\s+sale|total\s+(?:issue|offer)|reservation|employee|shareholder|anchor', segment, maxsplit=1, flags=re.I)[0]
-                if _SOURCE_PLACEHOLDER.search(assertion):
+                # Report SOURCE_PLACEHOLDER only when the *amount* is unknown:
+                # a placeholder in the money slot, TBD, or an unreadable run.
+                # A placeholder share count with a stated money amount is not
+                # an unknown amount, and reporting it as one contradicted the
+                # value the parser had just extracted.
+                if _AMOUNT_UNKNOWN_MARKER.search(assertion):
                     diagnostics.append({'code': 'SOURCE_PLACEHOLDER', 'field': name,
                         'page': page, 'quote': cell['text'] if cell else text[m.start():m.end()+len(assertion)],
                         'method': 'NATIVE_TABLE' if cell else ('OCR' if ('ocr' in result.metadata or 'ocr_header_excerpt' in result.metadata) else 'NATIVE_TEXT'),
                         'coordinates': {'x': cell['x'], 'y': cell['y']} if cell else None})
                 if not amount:
                     continue
+                # A merged/header cell ("TYPE FRESH ISSUE SIZE  OFFER FOR SALE
+                # SIZE  TOTAL OFFER SIZE", or "Fresh Issue and Offer for Sale")
+                # does not say which column the following amounts belong to.
+                # Reading the next amount in text order would bind the
+                # fresh-issue amount to the Offer for Sale, so refuse to guess.
+                # The placeholder diagnostic above is still reported: it names
+                # the field the document leaves open, not a value.
+                if _COMPONENT_MERGED_PREFIX.search(text[max(0, m.start() - 60):m.start()]):
+                    continue
                 before = segment[:amount.start()]
-                if re.search(r'offer\s+for\s+sale|fresh\s+(?:issue|offer)|reservation|employee|shareholder|anchor|total\s+(?:issue|offer)|UNREADABLE_OCR_LINE|[●]|\bTBD\b|\[\s*\]', before, re.I) or _SOURCE_PLACEHOLDER.search(before):
-                    continue  # another component, reservation, or a placeholder intervened
+                if re.search(r'offer\s+for\s+sale|fresh\s+(?:issue|offer)|reservation|employee|shareholder|anchor|total\s+(?:issue|offer)|UNREADABLE_OCR_LINE|\bTBD\b|\[\s*\]', before, re.I) or _AMOUNT_SLOT_PLACEHOLDER.search(before):
+                    # Another component, a reservation/subtotal, unreadable OCR,
+                    # or a placeholder *in the money slot* intervened. A
+                    # placeholder share count does not disqualify a stated
+                    # amount (see _AMOUNT_SLOT_PLACEHOLDER).
+                    continue
                 from .exchange_issue_page import _number
                 value = _number(amount.group(1))
                 if not math.isfinite(value):
@@ -133,6 +185,22 @@ def _rhp_issue_terms(result, pages):
     ):
         if field_obj is not None:
             setattr(result, field_name, field_obj)
+    # The term pages, not only the cover: an RHP states "Price Band"/"Bid
+    # Lot" as defined terms in its abbreviations/definitions pages, which is
+    # where a placeholder is visible as a placeholder.
+    _record_pricing_placeholders(
+        result,
+        term_pages,
+        [
+            name
+            for name, field_obj in (
+                ("price_band_low", band_low),
+                ("price_band_high", band_high),
+                ("lot_size", lot_field),
+            )
+            if field_obj is None
+        ],
+    )
     findings = list(band_findings) + list(lot_findings) + list(date_findings)
     result.metadata['issue_term_findings'] = [
         {'code': f.code, 'message': f.message, 'location': getattr(f, 'location', None)}
@@ -211,6 +279,51 @@ def _rhp_role(cover: str) -> Optional[str]:
     if re.search(r'FRESH\s+ISSUE\s+SIZE\s+OFFER\s+FOR\s+SALE\s+SIZE\s+TOTAL\s+ISSUE\s+SIZE', cover, re.I):
         return 'offer-table header'
     return None
+
+
+
+#: The label each unresolved pricing term is disclosed under.
+_PRICING_PLACEHOLDER_LABEL = {
+    "price_band_low": r"price\s+band",
+    "price_band_high": r"price\s+band",
+    "lot_size": r"(?:bid|market)\s+lot",
+}
+_PLACEHOLDER_TOKEN = re.compile(r"\[\s*(?:[●•.\-]+)?\s*\]")
+
+
+def _record_pricing_placeholders(result, pages, missing):
+    """Say that the document *states* a pricing term as a placeholder.
+
+    An RHP published before the price band is fixed states the band and the
+    bid lot as ``[●]``.  Without this, the field is indistinguishable from a
+    parsing failure, and the operator's diagnostic says only that the document
+    "does not state" it.  Recording the placeholder does not create, infer or
+    default any value: the field stays ``None``.
+    """
+    if not missing:
+        return
+    diagnostics = result.metadata.setdefault("issue_term_diagnostics", [])
+    for name in missing:
+        label = _PRICING_PLACEHOLDER_LABEL[name]
+        for page, text in pages:
+            found = None
+            for match in re.finditer(label, text, re.IGNORECASE):
+                window = text[match.end(): match.end() + 160]
+                if _PLACEHOLDER_TOKEN.search(window):
+                    found = (page, " ".join(text[match.start(): match.end() + 160].split())[:200])
+                    break
+            if found:
+                diagnostics.append(
+                    {
+                        "code": "SOURCE_PLACEHOLDER",
+                        "field": name,
+                        "page": found[0],
+                        "quote": found[1],
+                        "method": "NATIVE_TEXT",
+                        "coordinates": None,
+                    }
+                )
+                break
 
 
 def parse_official_rhp(raw, url):

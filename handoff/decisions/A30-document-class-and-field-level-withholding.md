@@ -37,6 +37,18 @@
 | **D3** | every issue-term conflict (dates, band, lot) raised and discarded the whole document, including undisputed fields | field-level withholding with findings and `issue_term_errors`; inverted window withholds both dates |
 | **D4** | `parse_official_rhp` required a final-Prospectus-style dated marker, so an RHP without one yielded no RHP-authorised terms at all; and its rejection reason did not distinguish "not an RHP" from "an RHP rejected for another reason" | `_rhp_role()` role test (title form / responsibility statement / offer-table header, refusing DRHP, GID and explicit notice titles); `_rhp_issue_terms()` publishes the RHP's own band, lot, window, fresh-issue and OFS field by field; a term-level failure is recorded and does not discard the document; the provider reason carries the class verdict |
 
+Added in revision 2, after the actual 651-page RHP was recovered and read (the rows above had been established on the code path and on other filings):
+
+| ID | Confirmed defect (on the real document) | Correction |
+|---|---|---|
+| **D5** | `_DOCUMENT_DATE` required a colon, so a cover written `Dated October 14, 2026` produced **no document date** and the plausibility window was inert for the whole filing | colon optional, anchored to the start of a line; a mid-sentence "certificate of incorporation dated December 21, 1987" cannot become the document date |
+| **D6** | a defined-term entry (`"Closing Date" shall mean 14 July 2017`, Articles p590) was eligible to become the issue close date — this is the literal origin of the trace's `2017-07-14` | `_DEFINITION_FRAME`: a date inside a `"term" shall mean/means/has the meaning` definition is not a statement about this issue; exclusion reasons are recorded per signal |
+| **D7** | the colon form `Price Band: Rs. X to Rs. Y` matched nothing (the range pattern required `is`/`of` after the label) | label separator (colon/dash) and dash ranges accepted; label + both amounts + separator still required; a trailing `-NN` (date-like) refused |
+| **D8** | the band extractor used `.search` — only the first declaration per page — so two different bands on one page resolved to the first: a first-wins violation | every explicit declaration is a candidate; differing ones produce `CONFLICTING_PRICE_BANDS` and both ends are withheld |
+| **D9** | `explicit_amounts` treated any `[●]` in the preceding text as an unknown **amount**, discarding a disclosed OFS where only the **share count** was a placeholder (the reported `issue.ofs` failure on the real filing) | `_AMOUNT_SLOT_PLACEHOLDER`: only a money-slot placeholder withholds; merged/header cells naming several components still refuse to bind |
+| **D10** | `SOURCE_PLACEHOLDER` fired on share-count placeholders, contradicting the amount just extracted | emitted only for markers that make the amount unknown; RHP price-band/bid-lot placeholders recorded per field with page and quote |
+| **D11** | an unresolved field's diagnostic said only "unresolved" | additive `why_unresolved` / `inspected_sources` / `required_evidence`; existing `state` values, required-term contract and eligibility unchanged |
+
 ## 4. Consequences
 
 * **What can now resolve:** price band, bid lot and issue window from an RHP's own cover/offer summary (previously unreachable); OFS and fresh-issue amounts from the RHP's offer table (previously unreachable when the document was rejected); each with its own page, locator, quote and verification, rather than a single document-level verdict.
@@ -46,14 +58,14 @@
 
 ## 5. Tests — NOT RUN
 
-Added `tests/test_official_rhp_terms_and_dates.py` (21 cases) and rewrote two tests in `tests/test_price_band_notice.py` whose assertions encoded the old contract (`test_conflicting_price_bands_rejected` → `…_withhold_the_band_not_the_document`; `test_inverted_date_order_rejected` → `…_withholds_both_dates`). The rewrites keep the failure assertion (the conflicting value is never published) and add the survival assertion (the undisputed fields are).
+Added `tests/test_official_rhp_terms_and_dates.py` (36 cases after revision 2) and `tests/test_paras_evidence_regression.py` (10 cases against the retained 651-page filing, skipped when the artifact is absent), and rewrote two tests in `tests/test_price_band_notice.py` whose assertions encoded the old contract (`test_conflicting_price_bands_rejected` → `…_withhold_the_band_not_the_document`; `test_inverted_date_order_rejected` → `…_withholds_both_dates`). The rewrites keep the failure assertion (the conflicting value is never published) and add the survival assertion (the undisputed fields are).
 
 **Execution status: NOT RUN — deferred to the separate regression pass** (full backend suite ≈ 3 h, excluded by explicit instruction). Static compilation only.
 
 ## 6. Residual risks and open items
 
-1. **Not verified against the original failing document** — the Paras PDF and trace are absent from the repository. The defects are confirmed on the shipped code path and reproduced on other retained filings.
-2. **`Price Band: Rs X to Rs Y` (colon form) is not matched** by the band range pattern. Recorded as a **proposal**, not adopted: widening it changes notice behaviour (one band vs. a conflict) in a way this pass cannot regression-check. It is the reason a cover whose only band statement uses the colon form leaves the band `None`.
+1. **The failing document is verified; the trace is not.** The Paras RHP was recovered (sha256 `e0a3187f…570e74`, evidence commit `1dd6e14e`) and the original failure is reproduced on it exactly — the pre-correction patterns yield `['2017-07-14', '2026-10-23']` from p590 and p3. The ingestion trace `ing-42ded42dde7a41b2` itself is still absent from the repository, so the run's own payloads cannot be diffed.
+2. ~~`Price Band: Rs X to Rs Y` (colon form) is not matched.~~ **Resolved in revision 2 (D7)** once the actual documents were available: the colon form is now read, conflicting declarations are withheld rather than first-won, and unrelated numeric ranges are still refused.
 3. **Operator diagnostic for an absent OFS** is unchanged at resolution level; only the provider reason string now carries the class verdict.
 4. **Retention of the old conflict contract elsewhere** — any sibling branch or tool that catches `PriceBandNoticeParseError` to detect "conflicting notice" will now see a successful parse with `issue_term_errors`. In this branch the four call sites were reviewed: each treats an exception as "not a notice", which is still correct, and none depends on the conflict raise.
 

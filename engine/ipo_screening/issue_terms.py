@@ -1271,9 +1271,17 @@ class IssueTermsResolver:
                 for r in outcome.provider_reports
             )
             outcome.status = "UNPUBLISHED" if searched else "UNAVAILABLE"
-            outcome.field_diagnostics = {f: {"state": "NOT_DISCLOSED_IN_EXAMINED_SOURCES" if searched else "SOURCE_UNAVAILABLE",
-                                           "candidates": [], "detail": "Eligible providers exhausted; listing silence is not proof of non-publication."}
-                                         for f in missing_fields}
+            from .issue_term_fields import _REQUIRED_EVIDENCE
+            outcome.field_diagnostics = {f: {
+                "state": "NOT_DISCLOSED_IN_EXAMINED_SOURCES" if searched else "SOURCE_UNAVAILABLE",
+                "candidates": [],
+                "detail": "Eligible providers exhausted; listing silence is not proof of non-publication.",
+                "inspected_sources": [],
+                "why_unresolved": (["ABSENT_FROM_INSPECTED_DOCUMENT: an official listing was searched and no "
+                                    "issuer-matched document states this field"] if searched else
+                                   ["NO_QUALIFYING_SOURCE: no eligible provider could be searched"]),
+                "required_evidence": _REQUIRED_EVIDENCE.get(f, "an issuer-matched official document that states this field"),
+            } for f in missing_fields}
             return outcome
 
         from .issue_term_fields import resolve_fields

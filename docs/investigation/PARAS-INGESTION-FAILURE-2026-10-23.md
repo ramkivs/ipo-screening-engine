@@ -6,6 +6,7 @@
 - **Baseline this pass:** `8939b05be00a23d5733163cdb6a280b0578cfd10`.
 - **Scope:** the extraction path that produced a rejected official document and an unresolved `issue.ofs`: Price Band Notice classification, current-issue date extraction, field-conflict handling, the RHP document class, and the OFS resolution chain. Corrections are issuer-independent.
 - **Execution status:** **regression tests NOT RUN** — deferred to the separate regression pass by explicit instruction. No ingestion, no evaluation, no scored artifact was produced or modified. Behaviour statements below come from read-only extraction probes on retained filings and on synthetic text; they are **not** a substitute for the regression run.
+- **Revision 2 (2026-10-23):** the actual Paras RHP was recovered from the evidence branch and verified. §1's "the document is not present" limitation is **superseded**; the document-specific findings are in **§11**, which distinguishes them from the earlier synthetic reproduction. Sections 1–10 are left as written (they record what was known before the document was available) with this pointer.
 
 ---
 
@@ -228,3 +229,154 @@ PYTHONPATH=engine python -m pytest -q tests/
 | `tests/test_official_rhp_terms_and_dates.py` | **new** — 21 cases across dates, classification, partial resolution, OFS states, RHP boundaries and provenance |
 | `handoff/decisions/A30-document-class-and-field-level-withholding.md` | **new** — implementation record for the contract change (no new policy) |
 | `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` | tracker entry for this pass |
+
+---
+
+# 11. Revision 2 — the actual document, verified (2026-10-23)
+
+Everything in this section was produced from the **real Paras Healthcare RHP**, not from a synthetic reproduction. Where a statement is still general (synthetic or structural), it says so.
+
+## 11.1 Evidence recovery and integrity
+
+| Item | Value |
+|---|---|
+| Branch | `evidence/jio-score-33-recovery-20261023` |
+| Commit | `1dd6e14e7fa50a677beefba9ca7d0d1a7b322c58` |
+| Path at that commit | `docs/investigations/paras-healthcare/U85110HR1987PLC035823 _ParasHealthcare.pdf` |
+| Blob | `f62a80f5e69702885da59462464023ca300ade0d` |
+| Bytes | 11,577,075 |
+| SHA-256 | `e0a3187fe18d1c12f88f29170291972714cf15be7946e8a7f4a7d8c914570e74` — **matches the expected value exactly** |
+| Pages | 651 |
+| PDF metadata | `Producer: Microsoft® Word for Microsoft 365`, `Author: AZB & Partners`, `CreationDate 2026-10-14T09:36:26+05:30`, `ModDate 2026-10-14T12:15:32+05:30` |
+| Retained at | `evidence/non-authoritative/paras-healthcare/U85110HR1987PLC035823 _ParasHealthcare.pdf` (original filename and bytes preserved) |
+
+The bytes are asserted in `tests/test_paras_evidence_regression.py`, so a substituted or truncated artifact fails loudly. The document is **investigation evidence only**; it is not registered as official evaluation evidence, and no evaluation was produced.
+
+**Trace provenance.** The ingestion trace `ing-42ded42dde7a41b2` is **not in the repository** — it is not in the evidence branch, not in any local ref and not in a GitHub code search. Only what was supplied in the investigation context is used: the trace identifier, the two competing close dates (`2026-10-23`, `2017-07-14`), the document-rejection reasons (`Prospectus classification failed: no 'Prospectus Dated:' title marker found`; `Price band notice parsing failed: the parser found conflicting close dates`; `RHP terms not established (no recognised RHP cover…)`), `blockedFields: ['fresh_issue']` with `issue.ofs` unresolved, and the discovered official documents list. No missing trace field was reconstructed or invented.
+
+## 11.2 What the document is
+
+`RED HERRING PROSPECTUS — Dated October 14, 2026` (title on **page 3**, not page 1), 100% Book Building Offer, 651 pages, CIN `U85110HR1987PLC035823`.
+
+Current implementation:
+
+| Question | Actual result |
+|---|---|
+| Classified as a Price Band Notice? | **No.** `_classify_document` → `(False, 'document title establishes a prospectus (Red Herring Prospectus), not a Price Band Notice')`, both on pages 1–5 and on the full 651-page text. `PriceBandNoticeParser.parse_from_file` raises `PriceBandNoticeClassificationError`. |
+| Classified as an RHP? | **Yes** — `parse_official_rhp` → `document_class = OFFICIAL_RHP_TERMS`, role basis `RHP title`, issuer `PARAS HEALTHCARE LIMITED`, CIN from the document. |
+| Treated as a final Prospectus? | **No.** `ProspectusTermsParser` refuses it by class ("… is a Red Herring Prospectus / DRHP, not a final Prospectus"). It is not relabelled to pass a validation. |
+
+This is exactly the conflation RC-1 described, now measured on the real filing: before the correction, `_classify_document` returned `True` for any RHP (all five semantic tokens are present in a prospectus), and the notice contract then rejected it.
+
+## 11.3 The dates, and where they come from
+
+| Candidate | Page | Source text (verbatim) | Verdict |
+|---|---|---|---|
+| open `2026-10-21` | 3 | `BID/OFFER OPENS ON WEDNESDAY OCTOBER 21, 2026 BID/OFFER CLOSES ON# FRIDAY OCTOBER 23, 2026` | **current issue open date** — published, page 3, quote, `VERIFIED` |
+| close `2026-10-23` | 3 | `BID/OFFER CLOSES ON# FRIDAY OCTOBER 23, 2026` | **current issue close date** — published, page 3, quote, `VERIFIED` |
+| close `2026-10-23` | 535 | `BID/OFFER CLOSES ON FRIDAY, OCTOBER 23, 2026(2)` | same value — corroborates, no conflict |
+| close `2017-07-14` | 590 | `"Closing Date" shall mean 14 July 2017;` (Articles of Association, definitions) | **not a candidate**: page 590 is not an issue-term page |
+
+**Where the historical date comes from — the precise mechanism, reproduced.** Applying the *pre-correction* close-date patterns to the real document yields exactly three candidates:
+
+```
+p3   → 2026-10-23   'BID/OFFER CLOSES ON# FRIDAY OCTOBER 23, 2026'
+p535 → 2026-10-23   'BID/OFFER CLOSES ON FRIDAY, OCTOBER 23, 2026(2)'
+p590 → 2017-07-14   'Closing Date" shall mean 14 July 2017;'
+unique close dates: ['2017-07-14', '2026-10-23']
+```
+
+That is precisely the pair in the reported trace, produced by an unanchored `closing\s+date\s*[:\-]?\s*([^\n\r]+)` pattern that treated a **defined term in the Articles** as the issue's closing date, and then raised on disagreement. The 2017 date is a Series A CCPS allotment/transfer date (also at pp. 66, 110, 113, 115), never an issue date.
+
+**Actual current behaviour** (read-only probe): the issue window resolves to `2026-10-21` / `2026-10-23` with no findings, over the whole 651 pages and over the cover alone. The 2017 date never enters the candidate set: the Articles page carries no issue-term label, so the term-page rule excludes it structurally. The defined-term guard and the document-date window are the defence if such a line ever appears on a term page (see 11.5 and the synthetic tests).
+
+## 11.4 `issue.ofs` — the disclosure, and what happened to it
+
+The RHP **does disclose the Offer for Sale amount**, three ways:
+
+| Page | Text |
+|---|---|
+| 1 | `DETAILS OF THE OFFER TO THE PUBLIC … Offer for Sale Size … Up to [●] Equity Shares of face value of ₹1 each aggregating up to ₹ 9,500.00 million` |
+| 1 | per seller: Dr. Dharminder Kumar Nagar `₹ 3,000.00 million`, Commelina Ltd `₹ 6,500.00 million` (sum = ₹9,500.00 million) |
+| 3 | `… AND AN OFFER FOR SALE OF UP TO [●] EQUITY SHARES OF FACE VALUE OF ₹ 1 EACH ("OFFERED SHARES") AGGREGATING UP TO ₹ 9,500.00 MILLION …` |
+| 12 | `"Offer for Sale" The offer for sale comprising of up to [●] Equity Shares aggregating up to ₹ 9,500.00 million …` |
+
+**Field disposition of the six states for this document**
+
+| State | Applies? | Evidence |
+|---|---|---|
+| explicit zero OFS | no | no NIL wording; two positive amounts stated |
+| explicit positive OFS | **yes** — ₹9,500.00 million | p1, p3, p12 |
+| absent from the document | no | stated on three pages |
+| placeholder `[●]` | only for the **share count**, not the amount | `Up to [●] Equity Shares … aggregating up to ₹ 9,500.00 million` |
+| present but unparseable | no | parses exactly |
+| conflicting credible values | no | p1/p3/p12 all give ₹9,500.00 million; seller rows sum to it |
+| no qualifying source | no | the RHP is issuer-matched and official |
+
+**Why it was unresolved in the original trace — two causes, both technical, neither a missing disclosure**
+
+1. **Document-level rejection (dominant).** The RHP was rejected by the notice parser (date conflict) and by the prospectus parser (no `Prospectus Dated:` marker), and `parse_official_rhp` did not recognise the cover (the RHP-role test demanded a dated-title/responsibility-statement shape this cover does not carry). Its offer terms were therefore never read at all.
+2. **Placeholder guard too coarse (independent).** Even when the RHP path was reached, `explicit_amounts` discarded any amount whose preceding text contained `[●]`. Every OFS statement in this filing has a `[●]` **share count** immediately before the money amount, so the disclosed ₹9,500.00 million was treated as an unknown amount.
+
+**Measured before/after on the real document**
+
+| | Before this pass | After |
+|---|---|---|
+| `fresh_issue_amount` | `None` | **5,000.0 `INR_MILLIONS`**, page 3, quote, `VERIFIED` |
+| `ofs_amount` | `None` | **9,500.0 `INR_MILLIONS`**, page 3, quote, `VERIFIED` |
+| `open_date` / `close_date` | conflict → document rejected | `2026-10-21` / `2026-10-23`, pages 3/3 |
+| `price_band_low/high`, `lot_size` | `None` (document rejected before reading) | `None` — **and now diagnosed as `[●]` placeholders** (p11 / p11 / p9), i.e. genuinely undisclosed at RHP stage, not a parse failure |
+
+`issue.ofs` is resolved for this document by its own explicit disclosure. Nothing was inferred: the value is a verbatim cell of the offer summary, and an explicit NIL is still the only route to zero.
+
+## 11.5 Additional global corrections made in this revision
+
+Each is issuer-independent and was found by working the real document.
+
+| ID | Defect (confirmed) | Correction |
+|---|---|---|
+| **D5** | `_DOCUMENT_DATE` required a colon (`Dated:`), so a cover written `Dated October 14, 2026` produced **no document date** and the plausibility window was inert for the entire filing | colon optional, anchored to the **start of a line** (a cover date stands alone; this also stops a mid-sentence "certificate of incorporation dated December 21, 1987" being read as the document's date). Verified: Paras `2026-10-14`, R.K Fashion `2026-09-29`, Vishal Nirmiti `2026-09-24`, Moneyview `2026-09-28` |
+| **D6** | a **defined-term entry** (`"Closing Date" shall mean 14 July 2017`) was eligible to become the issue close date | `_DEFINITION_FRAME` — a date inside a `"term" shall mean / means / has the meaning` definition is not a statement about this issue; exclusions now record *which* signal fired |
+| **D7** | colon-form price band `Price Band: Rs. X to Rs. Y` matched **nothing** (the range pattern required the literal `is`/`of` after the label), so a standard notice wording yielded no band | label separator (colon or dash) and en-dash/em-dash ranges accepted; label + both amounts + a range separator still required, and a trailing `-NN` (a date written `2026-10-23`) is refused |
+| **D8** | `_extract_price_band` used `.search`, i.e. only the **first** declaration per page, so two different bands on one page silently resolved to the first — a first-wins violation | every explicit declaration on the page is a candidate; identical repeats collapse, differing ones produce `CONFLICTING_PRICE_BANDS` and both ends are withheld |
+| **D9** | `explicit_amounts` treated **any** `[●]` in the preceding text as an unknown amount, discarding disclosed OFS/fresh-issue money where only the *share count* was a placeholder | `_AMOUNT_SLOT_PLACEHOLDER`: only a placeholder in the **money slot** (`₹ [●]`, `[●] million`, `aggregating up to [ ]`) withholds the amount. A merged/header cell naming several components (`Fresh Issue and Offer for Sale`, `TYPE FRESH ISSUE SIZE  OFFER FOR SALE SIZE …`) still refuses to bind, because column order is not recoverable from text |
+| **D10** | `SOURCE_PLACEHOLDER` diagnostics fired on share-count placeholders, reporting an "unknown amount" for an amount the parser had just extracted | the diagnostic is emitted only for markers that make the *amount* unknown (money-slot placeholder, `TBD`, unreadable OCR); RHP price-band/bid-lot placeholders are recorded per field with page and quote |
+| **D11** | an unresolved field's diagnostic said only *unresolved* | additive `why_unresolved` (`ABSENT_FROM_INSPECTED_DOCUMENT`, `PLACEHOLDER_IN_QUALIFIED_DOCUMENT: page N`, `CONFLICTING_EVIDENCE_IN_DOCUMENT: …`, `HISTORICAL_VALUE_EXCLUDED: …`, `NO_QUALIFYING_SOURCE`), `inspected_sources` (provider, document class, URI, verification) and `required_evidence` per field. Existing `state` values, the required-term contract and evaluation eligibility are unchanged |
+
+**Real-document effect of D5/D6 on the original failure:** with the document date now available (`2026-10-14`), a 2017 date anywhere on a term page falls outside the −60/+400-day window, so the historical value would be excluded even without the term-page rule. Verified synthetically: `[('2017-07-14', 590, 'defined-term entry, not a statement about this issue')]` and, with an issue-labelled line, `'outside the document's own date window (2017-07-14 vs document date 2026-10-14, -3379 days)'`.
+
+**D7 verification** (probe, not a test run): `Price Band: Rs. 100 to Rs. 110`, `PRICE BAND: Rs 100 to Rs 110`, `Price Band: ₹100 – ₹110`, `Price Band: Rs. 100 - Rs. 110` → `100/110`; two colon-form declarations on one page → `None/None` + `CONFLICTING_PRICE_BANDS`; `Lot sizes range from 100 to 110 Equity Shares`, `The Offer opens 2026-10-21 to 2026-10-23`, `Bid/offer period 100 to 110 days` → no band. All ten notice fixtures keep their pre-correction values (`clean_notice` 208/220, `alternative_notice` 475/500, `conflicting_notice` withheld band with lot and window intact, both collar-invalid fixtures still raise).
+
+## 11.6 Regression of the other retained filings (probe, not a test run)
+
+| Filing | Result after revision 2 |
+|---|---|
+| R.K Fashion (496 pp RHP) | `open 2026-10-05`, `close 2026-10-07`, `ofs 0.0 INR_LAKHS` (explicit NIL), `fresh None`, band/lot `None` with placeholder diagnostics — **unchanged** from revision 1 |
+| Vishal Nirmiti (551 pp RHP) | `open 2026-09-30`, `close 2026-10-05`, `fresh 14,500.0 INR_LAKHS`, `ofs None` with placeholder diagnostics — **unchanged** values |
+| Moneyview final Prospectus (537 pp) | still not a notice, not an RHP; prospectus path unchanged |
+| `fixtures/notices/*` (10 files) | bands, lots, windows and collisions unchanged; the two collar-invalid fixtures still fail closed |
+
+## 11.7 Tests added — NOT EXECUTED
+
+`tests/test_official_rhp_terms_and_dates.py` gains 15 cases (36 total): colon-form band, en-dash/rupee band, colon-form conflict withheld, unrelated numeric ranges rejected, document date without a colon, mid-sentence certificate date not adopted, defined-term close date excluded, out-of-window issue date excluded, share-count placeholder does not hide a stated OFS amount, money-slot placeholders still withheld, merged header does not bind the wrong amount, two explicit component sentences resolve independently, OFS absent is diagnosed not zeroed, unresolved-field diagnostic names sources and required evidence, and every discoverable term has required-evidence text.
+
+`tests/test_paras_evidence_regression.py` (new, 10 cases) asserts the artifact hash and pins the real document's behaviour: not a notice, RHP class and identity, cover read for the issue window, the p590 defined term not competing, the ₹9,500.00 million OFS and ₹5,000.00 million fresh issue with page/quote provenance, and price band/bid lot staying `None` as diagnosed placeholders. It is skipped when the evidence artifact is absent.
+
+**Execution status: NOT RUN — deferred to the separate regression pass.**
+
+```bash
+cd /home/user/jio-k15
+PYTHONPATH=engine python -m pytest -q tests/test_paras_evidence_regression.py \
+    tests/test_official_rhp_terms_and_dates.py tests/test_price_band_notice.py \
+    tests/test_offer_table_boundaries.py tests/test_ofs_nil_binding.py \
+    tests/test_phase5j_hardening.py tests/test_official_prospectus_pathway.py \
+    tests/test_issue_terms_multisource.py tests/test_automatic_official_issue_discovery.py
+PYTHONPATH=engine python -m pytest -q tests/          # full suite
+```
+
+## 11.8 What is still open
+
+1. **The trace itself.** `ing-42ded42dde7a41b2` remains unavailable; the reconstruction matches its reported symptoms exactly (the two close dates, with the mechanism now known), but the run's own request/discovery payload cannot be diffed against this pass's probes.
+2. **Price band and bid lot for this filing are genuinely undisclosed.** The RHP states `[●]` at pp. 9 and 11. A separate price band notice or the final Prospectus would be required; the engine now says exactly that instead of "absent".
+3. **No ingestion was run end to end.** The resolution was exercised at the field-resolution layer with the real document as the candidate; the service gate, the `AWAITING_ISSUE_TERMS` payload it would now produce and any evaluation remain unexecuted by instruction.
+4. **Regression execution pending.**

@@ -36,13 +36,18 @@ from __future__ import annotations
 
 import pytest
 
-from ipo_screening.extraction.official_offer_amounts import parse_official_rhp
+from ipo_screening.extraction.exchange_issue_page import ExchangeIssueTermsResult
+from ipo_screening.extraction.official_offer_amounts import explicit_amounts, parse_official_rhp
 from ipo_screening.extraction.price_band_notice import (
     PriceBandNoticeClassificationError,
     PriceBandNoticeParser,
 )
 
 FIXTURES = __import__("pathlib").Path(__file__).resolve().parents[1] / "fixtures" / "notices"
+
+
+def _blank_exchange_result() -> ExchangeIssueTermsResult:
+    return ExchangeIssueTermsResult(source=None, source_ref=None, is_classified_notice=False)
 
 
 def _notice(text: str) -> object:
@@ -348,3 +353,210 @@ def test_historical_date_inside_the_rhp_path_is_excluded():
         item["value"] == "2017-07-14"
         for item in (result.metadata.get("historical_dates_excluded") or [])
     )
+
+
+# ---------------------------------------------------------------------------
+# 6. Price-band syntax: the colon form (2026-10-23 follow-up)
+# ---------------------------------------------------------------------------
+#
+# `Price Band: Rs. X to Rs. Y` is a standard notice/offer-document wording and
+# produced **no band at all** before this pass: the range pattern required the
+# literal words "is"/"of" after "price band", so the label separator was the
+# missing token. The correction accepts the label separator and dash forms
+# while still requiring the label, both amounts and a range separator.
+
+
+def test_colon_form_price_band_is_read():
+    low, high, findings = PriceBandNoticeParser()._extract_price_band(
+        [(1, "Price Band: Rs. 100 to Rs. 110 per Equity Share")]
+    )
+    assert (low.value, high.value) == (100.0, 110.0)
+    assert findings == []
+
+
+def test_en_dash_and_rupee_glyph_price_band_is_read():
+    low, high, _ = PriceBandNoticeParser()._extract_price_band(
+        [(1, "Price Band: \u20b9100 \u2013 \u20b9110 per Equity Share")]
+    )
+    assert (low.value, high.value) == (100.0, 110.0)
+
+
+def test_colon_form_conflicting_bands_are_withheld_not_chosen():
+    text = (
+        "Price Band: Rs. 100 to Rs. 110 per Equity Share\n"
+        "Price Band: Rs. 120 to Rs. 130 per Equity Share\n"
+    )
+    low, high, findings = PriceBandNoticeParser()._extract_price_band([(1, text)])
+    assert low is None and high is None
+    assert "CONFLICTING_PRICE_BANDS" in {finding.code for finding in findings}
+
+
+def test_unrelated_numeric_range_is_not_a_price_band():
+    for text in (
+        "Lot sizes range from 100 to 110 Equity Shares",
+        "The Offer opens 2026-10-21 to 2026-10-23",
+        "Bid/offer period 100 to 110 days",
+    ):
+        low, high, _ = PriceBandNoticeParser()._extract_price_band([(1, text)])
+        assert low is None and high is None, text
+
+
+# ---------------------------------------------------------------------------
+# 7. Document date and defined terms (found on the real 651-page RHP)
+# ---------------------------------------------------------------------------
+
+
+def test_document_date_without_a_colon_is_read():
+    """A real RHP cover reads "Dated October 14, 2026" -- no colon."""
+    parser = PriceBandNoticeParser()
+    pages = [
+        (1, "PARAS-STYLE COVER\nDated October 14, 2026\n(Please read Section 32)\n"),
+        (2, "ISSUE OPENS ON: OCTOBER 21, 2026\nISSUE CLOSES ON: OCTOBER 23, 2026\n"),
+    ]
+    assert parser._document_date(pages) == "2026-10-14"
+
+
+def test_mid_sentence_certificate_date_is_not_the_document_date():
+    """The cover date is line-anchored; a certificate date mid-sentence is not."""
+    parser = PriceBandNoticeParser()
+    pages = [
+        (1, "Our Company was incorporated pursuant to a certificate of incorporation "
+            "dated December 21, 1987 issued by the Registrar.\n"),
+        (2, "Red Herring Prospectus\nDated October 14, 2026\n"),
+    ]
+    assert parser._document_date(pages) == "2026-10-14"
+
+
+def test_defined_term_closing_date_is_not_the_issue_close_date():
+    """'"Closing Date" shall mean 14 July 2017' defines a word; it is not the window."""
+    parser = PriceBandNoticeParser()
+    definitions = (
+        'BID/OFFER CLOSING DATE\n"Closing Date" shall mean 14 July 2017;\n'
+        '"Bid/Offer Closing Date" means the date on which the Offer closes.\n'
+    )
+    pages = [
+        (1, "Dated October 14, 2026\nISSUE OPENS ON: OCTOBER 21, 2026\n"
+            "ISSUE CLOSES ON: OCTOBER 23, 2026\n"),
+        (590, definitions),
+    ]
+    open_field, close_field, findings = parser._extract_dates(pages)
+    assert (open_field.value, close_field.value) == ("2026-10-21", "2026-10-23")
+    excluded = parser._last_excluded_dates
+    assert [(item["value"], item["page"]) for item in excluded] == [("2017-07-14", 590)]
+    assert "defined-term entry" in excluded[0]["reason"]
+    assert "HISTORICAL_DATES_EXCLUDED" in {finding.code for finding in findings}
+
+
+def test_issue_date_far_outside_the_document_date_window_is_excluded():
+    parser = PriceBandNoticeParser()
+    pages = [
+        (1, "Dated October 14, 2026\nISSUE CLOSES ON: OCTOBER 23, 2026\n"),
+        (40, "ISSUE CLOSING DATE: 14 July 2017\n"),
+    ]
+    open_field, close_field, _ = parser._extract_dates(pages)
+    assert close_field.value == "2026-10-23"
+    assert any("date window" in item["reason"] for item in parser._last_excluded_dates)
+
+
+# ---------------------------------------------------------------------------
+# 8. OFS: a share-count placeholder does not hide a stated amount
+# ---------------------------------------------------------------------------
+#
+# The real RHP states "Up to [●] Equity Shares of face value of ₹1 each
+# aggregating up to ₹ 9,500.00 million". The engine treated any placeholder in
+# the preceding text as an unknown *amount* and discarded a disclosed OFS.
+
+
+def test_share_count_placeholder_does_not_hide_a_stated_ofs_amount():
+    text = (
+        "Offer for Sale of up to [\u25cf] Equity Shares of face value of \u20b91 each "
+        "aggregating up to \u20b9 9,500.00 million"
+    )
+    result = explicit_amounts(_blank_exchange_result(), [(1, text)])
+    assert result.ofs_amount is not None and result.ofs_amount.value == 9500.0
+    assert result.ofs_amount_unit == "INR_MILLIONS"
+    assert result.ofs_amount.quote
+    assert result.metadata.get("issue_term_diagnostics") == []
+
+
+def test_placeholders_in_the_money_slot_still_withhold_the_amount():
+    for token in ("[\u25cf]", "[]", "[--]", "[...]"):
+        text = f"Fresh Issue aggregating up to Rs. {token} million. Later aggregating up to Rs. 600 million"
+        result = explicit_amounts(_blank_exchange_result(), [(1, text)])
+        assert result.fresh_issue_amount is None, token
+        assert result.metadata["issue_term_diagnostics"][0]["code"] == "SOURCE_PLACEHOLDER"
+
+
+def test_merged_component_header_does_not_bind_the_wrong_amount():
+    """A header cell naming both components must not be read in text order."""
+    text = (
+        "TYPE FRESH ISSUE SIZE   OFFER FOR SALE SIZE  TOTAL OFFER SIZE\n"
+        "Fresh Issue and \nOffer for Sale \nUp to [\u25cf] \nEquity Shares of face value of \u20b91 each \n"
+        "aggregating up to \u20b9 \n5,000.00 million \nUp to [\u25cf] Equity Shares \nof face value of \u20b91 each \n"
+        "aggregating up to \u20b9 \n9,500.00 million \n"
+    )
+    result = explicit_amounts(_blank_exchange_result(), [(1, text)])
+    assert result.ofs_amount is None  # never the 5,000 fresh-issue amount
+    assert result.fresh_issue_amount is None
+
+
+def test_two_explicit_component_sentences_resolve_independently():
+    text = (
+        "The Offer comprises a Fresh Issue of up to [\u25cf] Equity Shares aggregating up to \u20b9 5,000.00 million "
+        "and an Offer for Sale of up to [\u25cf] Equity Shares aggregating up to \u20b9 9,500.00 million"
+    )
+    result = explicit_amounts(_blank_exchange_result(), [(1, text)])
+    assert result.fresh_issue_amount.value == 5000.0
+    assert result.ofs_amount.value == 9500.0
+
+
+def test_ofs_absent_from_an_examined_document_is_diagnosed_not_zeroed():
+    result = parse_official_rhp(
+        (
+            "Red Herring Prospectus\nDated: October 20, 2026\nACME HEALTHCARE LIMITED\n"
+            "CIN: U85110HR1987PLC035823\n"
+            "ISSUE CLOSES ON: OCTOBER 23, 2026\n"
+        ).encode(),
+        "https://nseindia.com/x/RHP.pdf",
+    )
+    assert result.ofs_amount is None
+    diagnostics = result.metadata.get("issue_term_diagnostics") or []
+    assert all(item["field"] != "ofs" for item in diagnostics)
+
+
+def test_unresolved_field_diagnostic_names_sources_and_required_evidence():
+    from ipo_screening.issue_term_fields import resolve_fields
+    from ipo_screening.issue_terms import NoticeCandidate, ResolutionOutcome
+
+    result = parse_official_rhp(
+        (
+            "Red Herring Prospectus\nDated: October 20, 2026\nACME HEALTHCARE LIMITED\n"
+            "CIN: U85110HR1987PLC035823\n"
+            "ISSUE CLOSES ON: OCTOBER 23, 2026\n"
+            "The Offer comprises a Fresh Issue aggregating up to \u20b9 10,000 lakhs and an "
+            "Offer for Sale aggregating up to \u20b9 [\u25cf] lakhs by the Selling Shareholder.\n"
+        ).encode(),
+        "https://nseindia.com/x/RHP.pdf",
+    )
+    candidate = NoticeCandidate(
+        result=result, provider="official-archive", uri="https://nseindia.com/x/RHP.pdf",
+        retrieved_at="2026-10-23T00:00:00Z", verified=True,
+    )
+    outcome = resolve_fields(
+        type("R", (), {"cache": None})(), ResolutionOutcome(status="UNPUBLISHED"),
+        [candidate], "Acme Healthcare Limited", "ACME-HEALTHCARE-LIMITED",
+        ["ofs", "fresh_issue"], False, {},
+    )
+    ofs = outcome.field_diagnostics["ofs"]
+    assert outcome.resolved_fields == ["fresh_issue"]
+    assert ofs["state"] != "VERIFIED"
+    assert any("PLACEHOLDER_IN_QUALIFIED_DOCUMENT" in reason for reason in ofs["why_unresolved"])
+    assert ofs["inspected_sources"] and ofs["inspected_sources"][0]["document_class"] == "OFFICIAL_RHP_TERMS"
+    assert "explicit NIL" in ofs["required_evidence"]
+
+
+def test_every_discoverable_term_has_required_evidence_text():
+    from ipo_screening.issue_term_fields import _REQUIRED_EVIDENCE
+    from ipo_screening.issue_terms import DISCOVERABLE_TERMS
+
+    assert set(_REQUIRED_EVIDENCE) == set(DISCOVERABLE_TERMS)

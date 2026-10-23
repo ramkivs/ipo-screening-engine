@@ -7,6 +7,23 @@ from datetime import date
 from typing import Any
 
 
+#: What evidence would satisfy each required/discoverable field.  Descriptive
+#: only: it states which authoritative document establishes the field and
+#: never widens, narrows or reorders the requirement itself.
+_REQUIRED_EVIDENCE = {
+    "fresh_issue": "an issuer-matched official RHP, final Prospectus or exchange issue page that states the "
+                   "fresh-issue monetary amount explicitly (a placeholder share count does not by itself "
+                   "prevent a stated amount being read)",
+    "ofs": "an issuer-matched official RHP, final Prospectus or exchange issue page that states the Offer for "
+           "Sale amount explicitly, or an explicit NIL for the Offer for Sale; absence is never read as zero",
+    "price_band_low": "an official price band notice or offer document stating the floor price",
+    "price_band_high": "an official price band notice or offer document stating the cap price",
+    "lot_size": "an official price band notice or offer document stating the bid lot / market lot",
+    "open_date": "an official document stating the current issue's bid opening date",
+    "close_date": "an official document stating the current issue's bid closing date",
+}
+
+
 def resolve_fields(resolver, outcome, candidates, company_name, ipo_id, missing_fields, from_cache, issue_context):
     from .issue_terms import DISCOVERABLE_TERMS, PRICING_TERMS, ProviderReport, _norm_name, _values_valid
 
@@ -112,6 +129,51 @@ def resolve_fields(resolver, outcome, candidates, company_name, ipo_id, missing_
             selected.pop(name, None)
             outcome.field_diagnostics[name]["state"] = "MALFORMED_OR_AMBIGUOUS"
         outcome.provider_reports.append(ProviderReport("field-resolver", "REJECTED", invalid or "close_date precedes open_date"))
+
+    # Explain every field that did not resolve.  This is additive reporting:
+    # the states above and the required-term contract are unchanged, but an
+    # operator can now see *which* qualified sources and document types were
+    # inspected, whether the field was absent, a placeholder, unreadable or
+    # contradictory, and what evidence would satisfy it -- instead of a bare
+    # "unresolved" list.
+    for name in DISCOVERABLE_TERMS:
+        diag = outcome.field_diagnostics.get(name)
+        if diag is None or name in selected:
+            continue
+        inspected = []
+        reasons = set()
+        for candidate in candidates:
+            if _norm_name(candidate.result.company_name) != _norm_name(company_name):
+                continue
+            metadata = getattr(candidate.result, "metadata", {}) or {}
+            document_class = getattr(candidate.result, "document_class", "PRICE_BAND_NOTICE")
+            inspected.append({"provider": candidate.provider, "document_class": document_class,
+                              "uri": candidate.uri, "verified": bool(candidate.verified)})
+            if name in (metadata.get("issue_term_errors") or {}):
+                reasons.add("CONFLICTING_EVIDENCE_IN_DOCUMENT: " + str(metadata["issue_term_errors"][name]))
+            for item in metadata.get("issue_term_diagnostics") or []:
+                if item.get("field") == name and item.get("code") == "SOURCE_PLACEHOLDER":
+                    reasons.add(f"PLACEHOLDER_IN_QUALIFIED_DOCUMENT: page {item.get('page')}")
+            for item in metadata.get("issue_term_findings") or []:
+                code = str(item.get("code") or "")
+                if name in ("price_band_low", "price_band_high") and code == "CONFLICTING_PRICE_BANDS":
+                    reasons.add("CONFLICTING_EVIDENCE_IN_DOCUMENT: " + str(item.get("message")))
+                if name == "lot_size" and code == "CONFLICTING_LOT_SIZES":
+                    reasons.add("CONFLICTING_EVIDENCE_IN_DOCUMENT: " + str(item.get("message")))
+                if name in ("open_date", "close_date") and code in (
+                        "CONFLICTING_OPEN_DATES", "CONFLICTING_CLOSE_DATES", "INVALID_ISSUE_DATE_ORDER"):
+                    reasons.add("CONFLICTING_EVIDENCE_IN_DOCUMENT: " + str(item.get("message")))
+            for item in metadata.get("historical_dates_excluded") or []:
+                if name in ("open_date", "close_date") and item.get("field") == name:
+                    reasons.add(
+                        "HISTORICAL_VALUE_EXCLUDED: " + str(item.get("value")) + " on page "
+                        + str(item.get("page")) + " (" + str(item.get("reason")) + ")"
+                    )
+        if not reasons and inspected:
+            reasons.add("ABSENT_FROM_INSPECTED_DOCUMENT: the issuer-matched documents examined do not state this field")
+        diag["inspected_sources"] = inspected
+        diag["why_unresolved"] = sorted(reasons) or ["NO_QUALIFYING_SOURCE: no issuer-matched official source was available"]
+        diag["required_evidence"] = _REQUIRED_EVIDENCE.get(name, "an issuer-matched official document that states this field")
 
     # Build one contract payload with each original field's own source id.
     # No copied fact is attributed to the primary document.

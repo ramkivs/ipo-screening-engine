@@ -317,12 +317,34 @@ _ISSUE_TERM_PAGE_COUNT = 5
 #: A cover date.  Used to separate a *current* issue date from a historical
 #: one without guessing: an issue cannot close years before the document that
 #: announces it, and a document does not announce an issue decades ahead.
+#:
+#: Two forms occur in real filings and both must be read:
+#:   ``Dated: July 10, 2017``        (notice, US-style)
+#:   ``Dated October 14, 2026``      (RHP cover; no colon -- a dated colon-only
+#:                                    pattern silently produced no document
+#:                                    date at all for such a filing)
+#:
+#: The anchor is the *start of a line*, because a cover date stands alone on
+#: its own line.  Scanning mid-sentence would read the first "dated December
+#: 21, 1987" (a certificate of incorporation) as the document's own date and
+#: then treat the genuine issue window as implausible.
 _DOCUMENT_DATE = re.compile(
-    r"(?:Prospectus|Price\s+Band\s+Notice)?\s*(?:Dated|Date)\s*[:\-]\s*([^\n\r]{4,40})",
+    r"(?m)^[ \t]*(?:(?:Draft\s+)?(?:Red\s+Herring\s+)?Prospectus|Price\s+Band\s+Notice)?"
+    r"[ \t]*(?:Dated|Date)\s*[:\-]?\s*([^\n\r]{4,40})",
     re.IGNORECASE,
 )
 _DATE_WINDOW_DAYS_BEFORE = 60
 _DATE_WINDOW_DAYS_AFTER = 400
+
+#: A defined-term entry is a definition, not a statement about this issue.
+#: Articles/definitions sections commonly carry entries such as
+#: ``"Closing Date" shall mean 14 July 2017``; the date belongs to the term
+#: being defined and can never be the current issue's window.
+_DEFINITION_FRAME = re.compile(
+    r"[\"\u201c\u201d\u2018\u2019'][^\"\u201c\u201d\u2018\u2019']{2,80}"
+    r"[\"\u201c\u201d\u2018\u2019']\s*(?:shall\s+mean|means|has\s+the\s+meaning)\b",
+    re.IGNORECASE,
+)
 
 #: Wording that frames a date as historical: a previous offer, an earlier
 #: filing, the listing that already happened.
@@ -602,8 +624,19 @@ class PriceBandNoticeParser:
             r"floor\s+price\s+(?:is\s+)?(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*]).*?cap\s+price\s+(?:is\s+)?(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*])",
             re.IGNORECASE | re.DOTALL,
         )
+        # A price band is stated in several shapes in official material:
+        #   "Price band of Rs 100 to Rs 110"   (classic notice wording)
+        #   "Price Band: Rs. 100 to Rs. 110"   (colon form; the label separator
+        #                                       was the missing token, so this
+        #                                       form yielded no band at all)
+        #   "Price Band: ₹100 – ₹110"          (en dash, rupee glyph)
+        # The label, both amounts and a range separator are still required, so
+        # an unrelated numeric range elsewhere in a document cannot match; a
+        # trailing "-NN" (a date written 2026-10-23) is refused.
         pat_range = re.compile(
-            r"price\s+band\s+(?:is\s+)?(?:of\s+)?(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*])\s*to\s*(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*])",
+            r"price\s+band\s*(?:is|of|[:\-–—])?\s*(?:rs\.?|inr|₹)?\s*"
+            r"([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*])\s*(?:to|\-|–|—)\s*"
+            r"(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*])(?!\s*[\-/]\s*\d)",
             re.IGNORECASE,
         )
         pat_lu = re.compile(
@@ -619,11 +652,14 @@ class PriceBandNoticeParser:
             re.IGNORECASE,
         )
 
-        # Scan each page
+        # Scan each page.  *Every* explicit declaration on the page is a
+        # candidate, not just the first one: a page that states two different
+        # bands is a conflict, and taking the first would silently pick a
+        # winner.  Identical repeats (running headers, restated table cells)
+        # collapse later because candidates are compared as a set of pairs.
         for page_num, text in pages:
             # Pattern A: Explicit Floor and Cap sentences
-            m_fc = pat_fc.search(text)
-            if m_fc:
+            for m_fc in pat_fc.finditer(text):
                 f_val = parse_indian_number(m_fc.group(1))
                 c_val = parse_indian_number(m_fc.group(2))
                 if f_val and c_val:
@@ -631,8 +667,7 @@ class PriceBandNoticeParser:
                     candidates.append((f_val, c_val, page_num, quote, "Explicit Floor and Cap phrase"))
 
             # Pattern B: Range phrase: "Price Band of Rs. X to Rs. Y"
-            m_range = pat_range.search(text)
-            if m_range:
+            for m_range in pat_range.finditer(text):
                 f_val = parse_indian_number(m_range.group(1))
                 c_val = parse_indian_number(m_range.group(2))
                 if f_val and c_val:
@@ -640,8 +675,7 @@ class PriceBandNoticeParser:
                     candidates.append((f_val, c_val, page_num, quote, "Price Band range phrase"))
 
             # Pattern C: Lower end and Upper end
-            m_lu = pat_lu.search(text)
-            if m_lu:
+            for m_lu in pat_lu.finditer(text):
                 f_val = parse_indian_number(m_lu.group(1))
                 c_val = parse_indian_number(m_lu.group(2))
                 if f_val and c_val:
@@ -847,13 +881,17 @@ class PriceBandNoticeParser:
         yb, mb, db = (int(part) for part in b.split("-"))
         return (_date(ya, ma, da) - _date(yb, mb, db)).days
 
-    def _is_historical_candidate(
+    def _historical_reason(
         self, line: str, value: str, document_date: Optional[str]
-    ) -> bool:
-        """True when a matched date belongs to the document's history, not its issue.
+    ) -> Optional[str]:
+        """Why a matched date belongs to the document's history, or None.
 
-        Three independent signals, any one of which is enough:
+        Four independent signals, any one of which is enough, each reported
+        separately so the exclusion is auditable rather than a bare "skipped":
 
+        * the enclosing line is a **defined-term entry** ("Closing Date" shall
+          mean 14 July 2017) -- a definition of a word, not a statement about
+          this issue;
         * the enclosing line is framed as past (a previous/earlier offer, the
           listing that already happened);
         * the line states the date in the past tense with a year
@@ -862,17 +900,22 @@ class PriceBandNoticeParser:
           date, which is what catches a historical or example date whose
           sentence carries no other cue.
         """
+        if _DEFINITION_FRAME.search(line):
+            return "defined-term entry, not a statement about this issue"
         if _HISTORICAL_FRAME.search(line):
-            return True
+            return "wording frames the date as a previous/earlier offer"
         if re.search(r"\b(?:was|were|had\s+been)\b", line, re.IGNORECASE) and re.search(
             r"\b(?:19|20)\d{2}\b", line
         ):
-            return True
+            return "past-tense statement"
         if document_date:
             offset = self._days_between(value, document_date)
             if offset < -_DATE_WINDOW_DAYS_BEFORE or offset > _DATE_WINDOW_DAYS_AFTER:
-                return True
-        return False
+                return (
+                    "outside the document's own date window ("
+                    + f"{value} vs document date {document_date}, {offset} days)"
+                )
+        return None
 
     def _extract_dates(
         self, pages: Sequence[Tuple[int, str]]
@@ -938,7 +981,8 @@ class PriceBandNoticeParser:
                         line_start = text.rfind("\n", 0, match.start()) + 1
                         line_end = text.find("\n", match.end())
                         line = text[line_start: line_end if line_end != -1 else len(text)]
-                        if self._is_historical_candidate(line, date_str, document_date):
+                        reason = self._historical_reason(line, date_str, document_date)
+                        if reason:
                             # One sentence often matches two label patterns
                             # ("Closing Date" and "closes on"); report it once.
                             key = (label, date_str, page_num)
@@ -949,7 +993,7 @@ class PriceBandNoticeParser:
                                         "field": label,
                                         "value": date_str,
                                         "page": page_num,
-                                        "reason": "historical or outside the document's own date window",
+                                        "reason": reason,
                                         "line": " ".join(line.split())[:200],
                                     }
                                 )
