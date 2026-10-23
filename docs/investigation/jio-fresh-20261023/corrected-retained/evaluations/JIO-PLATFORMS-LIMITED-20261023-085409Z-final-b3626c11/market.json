@@ -1,0 +1,41 @@
+{
+  "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-085409Z-final-b3626c11",
+  "market_snapshot_hash": "c595db55360d53c902ed30deb8aab6ba01dfd6c42294ae47585121227d7e5f53",
+  "snapshot": {
+    "as_of": "2026-10-23T08:54:09Z",
+    "blocks": [
+      {
+        "as_of": null,
+        "block": "anchor",
+        "reason": "block not supplied",
+        "status": "MISSING",
+        "values": {}
+      },
+      {
+        "as_of": null,
+        "block": "subscription",
+        "reason": "block not supplied",
+        "status": "MISSING",
+        "values": {}
+      },
+      {
+        "as_of": null,
+        "block": "gmp",
+        "reason": "block not supplied",
+        "status": "MISSING",
+        "values": {}
+      },
+      {
+        "as_of": null,
+        "block": "regime",
+        "reason": "block not supplied",
+        "status": "MISSING",
+        "values": {}
+      }
+    ],
+    "captured_at": "2026-10-23T08:54:09Z",
+    "content_hash": "c595db55360d53c902ed30deb8aab6ba01dfd6c42294ae47585121227d7e5f53",
+    "snapshot_id": "MARKET-1",
+    "staleness_hours": 24
+  }
+}

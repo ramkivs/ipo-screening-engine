@@ -1,0 +1,921 @@
+{
+  "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-085055Z-final-4220b641",
+  "ipo_id": "JIO-PLATFORMS-LIMITED",
+  "company_name": "JIO PLATFORMS LIMITED",
+  "evaluation_mode": "FINAL",
+  "result_hash": "4220b641d224c8be382aeca7ab1317da21dbcd800c6fdd6a8a2ed588851e3d93",
+  "final_score": 33.0,
+  "verdict": "INSUFFICIENT_DATA",
+  "confidence": "Low",
+  "is_duplicate": false,
+  "message": "Filing evaluated using THIRD_PARTY_AGGREGATOR_OVERRIDE; third-party terms are NOT official disclosures.",
+  "evaluation_url": "/#evaluations/JIO-PLATFORMS-LIMITED-20261023-085055Z-final-4220b641",
+  "evaluation": {
+    "authority_warnings": [
+      "THIRD_PARTY_AGGREGATOR_OVERRIDE: issue.fresh_issue used PA-authorized third-party data, NOT official disclosure.",
+      "THIRD_PARTY_AGGREGATOR_OVERRIDE: issue.lot_size used PA-authorized third-party data, NOT official disclosure.",
+      "THIRD_PARTY_AGGREGATOR_OVERRIDE: issue.price_band_high used PA-authorized third-party data, NOT official disclosure.",
+      "THIRD_PARTY_AGGREGATOR_OVERRIDE: issue.price_band_low used PA-authorized third-party data, NOT official disclosure."
+    ],
+    "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-085055Z-final-4220b641",
+    "ipo_id": "JIO-PLATFORMS-LIMITED",
+    "company_name": "JIO PLATFORMS LIMITED",
+    "evaluation_mode": "FINAL",
+    "evaluation_timestamp": "2026-10-23T08:50:55Z",
+    "engine_version": "1.5.0",
+    "spec_version": "1.5",
+    "config_version": "1.5.0",
+    "config_hash": "4a5d92e867aea681127352c628522f9a9c5841b89ea7a47736bf55e617526d2b",
+    "input_snapshot_hash": "7fd3a0cd72d52529dd637465e0e278f990738be8d437e6163d15555d095c649a",
+    "source_manifest_hash": "5563cf1dbfb58d48e16eb42bcf2d2ca618af14bf2145da89a3144df4f169f928",
+    "market_snapshot_hash": "cb2cf135481c7af8264e29105cd4ec5b2997455853decf470eff810bf21933ec",
+    "peer_snapshot_hash": "61f5c9132e97baf987f2693568ab5b4b5ec748136b05453f0e2d155b842edb9b",
+    "market_blocks": [
+      {
+        "block": "anchor",
+        "status": "MISSING",
+        "as_of": null,
+        "source_id": null,
+        "reason": "block not supplied"
+      },
+      {
+        "block": "subscription",
+        "status": "MISSING",
+        "as_of": null,
+        "source_id": null,
+        "reason": "block not supplied"
+      },
+      {
+        "block": "gmp",
+        "status": "MISSING",
+        "as_of": null,
+        "source_id": null,
+        "reason": "block not supplied"
+      },
+      {
+        "block": "regime",
+        "status": "MISSING",
+        "as_of": null,
+        "source_id": null,
+        "reason": "block not supplied"
+      }
+    ],
+    "result_hash": "4220b641d224c8be382aeca7ab1317da21dbcd800c6fdd6a8a2ed588851e3d93",
+    "score": {
+      "final_score": 33.0,
+      "base_score": 33.0,
+      "penalties_total": 0.0,
+      "lower_bound": 23.0,
+      "upper_bound": 76.0,
+      "available_points": 57.0,
+      "unknown_points": 43.0,
+      "total_evaluable_points": 100.0,
+      "confidence": "Low",
+      "completeness_pct": 56.99999999999999,
+      "modules": [
+        {
+          "id": "A",
+          "name": "Financial Quality",
+          "max": 25.0,
+          "score": 17.0,
+          "criteria": [
+            {
+              "id": "revenue_cagr",
+              "label": "Revenue CAGR (2Y from 3 FY observations)",
+              "max": 6.0,
+              "score": 4.0,
+              "metric": "revenue_cagr_2y_from_3fy",
+              "value": 15.788898186863264,
+              "state": "SCORED",
+              "reason": "matched >= 15",
+              "capped_by": null
+            },
+            {
+              "id": "margin_trend",
+              "label": "Profit trend (EBITDA/PAT margin)",
+              "max": 5.0,
+              "score": 3.0,
+              "metric": "margin_trend",
+              "value": "stable",
+              "state": "SCORED",
+              "reason": "matched stable",
+              "capped_by": null
+            },
+            {
+              "id": "roce",
+              "label": "ROCE",
+              "max": 5.0,
+              "score": 1.0,
+              "metric": "roce_latest",
+              "value": 10.76,
+              "state": "SCORED",
+              "reason": "matched >= 10",
+              "capped_by": null
+            },
+            {
+              "id": "cfo_quality",
+              "label": "Cash flow quality (cumulative CFO / cumulative PAT)",
+              "max": 5.0,
+              "score": 5.0,
+              "metric": "cfo_pat_cumulative",
+              "value": 2.6205574239437164,
+              "state": "SCORED",
+              "reason": "matched > 0.8",
+              "capped_by": null
+            },
+            {
+              "id": "leverage",
+              "label": "Leverage (D/E, interest cover)",
+              "max": 4.0,
+              "score": 4.0,
+              "metric": "leverage_bucket",
+              "value": "strong",
+              "state": "SCORED",
+              "reason": "matched strong",
+              "capped_by": null
+            }
+          ]
+        },
+        {
+          "id": "B",
+          "name": "Valuation",
+          "max": 20.0,
+          "score": 1.0,
+          "criteria": [
+            {
+              "id": "pe_vs_peers",
+              "label": "P/E (post-issue EPS) vs peer median",
+              "max": 8.0,
+              "score": 0.0,
+              "metric": "pe_premium_pct",
+              "value": 53.43890313809292,
+              "state": "SCORED",
+              "reason": "matched else",
+              "capped_by": null
+            },
+            {
+              "id": "second_multiple",
+              "label": "EV/EBITDA (or P/B) vs peers",
+              "max": 4.0,
+              "score": 0.0,
+              "metric": "second_multiple_premium_pct",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "no VALID peer multiple is available; valuation cannot be scored as current. Rejected peers: none supplied",
+              "capped_by": null
+            },
+            {
+              "id": "peg",
+              "label": "PEG",
+              "max": 4.0,
+              "score": 1.0,
+              "metric": "peg",
+              "value": 1.8627215745378736,
+              "state": "SCORED",
+              "reason": "matched <= 2.5",
+              "capped_by": null
+            },
+            {
+              "id": "sector_ipo_relative",
+              "label": "Valuation vs recent same-sector IPOs",
+              "max": 4.0,
+              "score": 0.0,
+              "metric": "sector_ipo_relative",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "no recent same-sector IPO valuations were supplied, so the relative test cannot be evaluated",
+              "capped_by": null
+            }
+          ]
+        },
+        {
+          "id": "C",
+          "name": "Offer Structure, Proceeds & Pre-IPO",
+          "max": 15.0,
+          "score": 11.0,
+          "criteria": [
+            {
+              "id": "fresh_share",
+              "label": "Fresh issue share of offer",
+              "max": 3.0,
+              "score": 3.0,
+              "metric": "fresh_share_pct",
+              "value": 100.0,
+              "state": "SCORED",
+              "reason": "matched > 70",
+              "capped_by": null
+            },
+            {
+              "id": "ofs_seller_type",
+              "label": "OFS seller type",
+              "max": 2.0,
+              "score": 2.0,
+              "metric": "ofs_seller_bucket",
+              "value": "none_or_small",
+              "state": "SCORED",
+              "reason": "matched none_or_small",
+              "capped_by": null
+            },
+            {
+              "id": "promoter_ofs_pct",
+              "label": "Promoter stake sold in OFS",
+              "max": 2.0,
+              "score": 2.0,
+              "metric": "promoter_ofs_pct_of_holding",
+              "value": 0.0,
+              "state": "SCORED",
+              "reason": "matched == 0",
+              "capped_by": null
+            },
+            {
+              "id": "dilution",
+              "label": "Dilution from fresh issue",
+              "max": 1.0,
+              "score": 1.0,
+              "metric": "dilution_ok",
+              "value": true,
+              "state": "SCORED",
+              "reason": "matched true",
+              "capped_by": null
+            },
+            {
+              "id": "use_of_proceeds",
+              "label": "Use of proceeds",
+              "max": 4.0,
+              "score": 0.0,
+              "metric": "use_of_proceeds_bucket",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "the blind_heavy test ((GCP + unidentified acquisition)/fresh > 20%) cannot be evaluated because a GCP or unidentified-acquisition amount is undisclosed. The legal maximum is not substituted, and an undisclosed amount is not read as zero, because either would let a blind-heavy offer pass the test",
+              "capped_by": null
+            },
+            {
+              "id": "pre_ipo_placement",
+              "label": "Pre-IPO placements / discounted allotments",
+              "max": 2.0,
+              "score": 2.0,
+              "metric": "pre_ipo_placement_bucket",
+              "value": "none_or_near_ipo",
+              "state": "SCORED",
+              "reason": "matched none_or_near_ipo",
+              "capped_by": null
+            },
+            {
+              "id": "lockin",
+              "label": "Lock-in",
+              "max": 1.0,
+              "score": 1.0,
+              "metric": "lockin_bucket",
+              "value": "intact",
+              "state": "SCORED",
+              "reason": "matched intact",
+              "capped_by": null
+            }
+          ]
+        },
+        {
+          "id": "D",
+          "name": "Promoter & Governance",
+          "max": 15.0,
+          "score": 4.0,
+          "criteria": [
+            {
+              "id": "promoter_post_holding",
+              "label": "Post-issue promoter holding",
+              "max": 4.0,
+              "score": 0.0,
+              "metric": "promoter_post_pct",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "post-issue promoter holding is not disclosed",
+              "capped_by": null
+            },
+            {
+              "id": "litigation",
+              "label": "Promoter track record & litigation",
+              "max": 4.0,
+              "score": 0.0,
+              "metric": "litigation_bucket",
+              "value": "criminal_or_regulatory",
+              "state": "SCORED",
+              "reason": "matched criminal_or_regulatory",
+              "capped_by": null
+            },
+            {
+              "id": "rpt",
+              "label": "Related-party transactions (% revenue/costs)",
+              "max": 3.0,
+              "score": 3.0,
+              "metric": "rpt_pct_revenue",
+              "value": 4.3094,
+              "state": "SCORED",
+              "reason": "matched < 5",
+              "capped_by": null
+            },
+            {
+              "id": "auditor",
+              "label": "Auditor quality & remarks",
+              "max": 2.0,
+              "score": 0.0,
+              "metric": "auditor_bucket",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "it is not established whether the auditor changed within the last three years",
+              "capped_by": null
+            },
+            {
+              "id": "board_kmp",
+              "label": "Board independence & KMP stability",
+              "max": 2.0,
+              "score": 1.0,
+              "metric": "board_kmp_bucket",
+              "value": "other",
+              "state": "SCORED",
+              "reason": "matched other",
+              "capped_by": null
+            }
+          ]
+        },
+        {
+          "id": "E",
+          "name": "Business & Moat",
+          "max": 15.0,
+          "score": 0.0,
+          "criteria": [
+            {
+              "id": "industry_growth",
+              "label": "Industry growth outlook",
+              "max": 5.0,
+              "score": 0.0,
+              "metric": "industry_cagr_pct",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "the forward industry CAGR is not disclosed",
+              "capped_by": null
+            },
+            {
+              "id": "moat",
+              "label": "Market position & moat",
+              "max": 5.0,
+              "score": 0.0,
+              "metric": "moat_rating",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "the market-position and moat assessment is not recorded",
+              "capped_by": null
+            },
+            {
+              "id": "concentration",
+              "label": "Customer/supplier concentration (top 5)",
+              "max": 3.0,
+              "score": 0.0,
+              "metric": "top5_concentration_pct",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "neither top-5 customer nor top-5 supplier concentration is disclosed",
+              "capped_by": null
+            },
+            {
+              "id": "visibility",
+              "label": "Capacity / order-book visibility",
+              "max": 2.0,
+              "score": 0.0,
+              "metric": "visibility_rating",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "the capacity and order-book visibility assessment is not recorded",
+              "capped_by": null
+            }
+          ]
+        },
+        {
+          "id": "F",
+          "name": "Market & Demand Signals",
+          "max": 10.0,
+          "score": 0.0,
+          "criteria": [
+            {
+              "id": "anchor_quality",
+              "label": "Anchor investor quality",
+              "max": 3.0,
+              "score": 0.0,
+              "metric": "anchor_bucket",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "anchor market data is not usable: block not supplied",
+              "capped_by": null
+            },
+            {
+              "id": "qib_subscription",
+              "label": "QIB subscription (final day)",
+              "max": 3.0,
+              "score": 0.0,
+              "metric": "qib_x",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "subscription market data is not usable: block not supplied",
+              "capped_by": null
+            },
+            {
+              "id": "gmp_trend",
+              "label": "GMP trend (sentiment only)",
+              "max": 2.0,
+              "score": 0.0,
+              "metric": "gmp_bucket",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "gmp market data is not usable: block not supplied",
+              "capped_by": null
+            },
+            {
+              "id": "market_regime",
+              "label": "Market regime",
+              "max": 2.0,
+              "score": 0.0,
+              "metric": "market_regime_bucket",
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "regime market data is not usable: block not supplied",
+              "capped_by": null
+            },
+            {
+              "id": "retail_nii_penalty",
+              "label": "Retail/NII under-subscription (Final mode)",
+              "max": 0.0,
+              "score": 0.0,
+              "metric": null,
+              "value": null,
+              "state": "UNKNOWN",
+              "reason": "the penalty trigger could not be evaluated from the supplied inputs",
+              "capped_by": null
+            }
+          ]
+        }
+      ]
+    },
+    "knockouts": {
+      "status": "UNVERIFIED",
+      "rules": [
+        {
+          "id": "K1",
+          "label": "Qualified/adverse/disclaimer opinion, going concern, or negative net worth",
+          "state": "UNVERIFIED",
+          "missing_inputs": [
+            "going_concern_uncertainty"
+          ]
+        },
+        {
+          "id": "K2",
+          "label": "Promoter pledge >25% or active SEBI/ED action",
+          "state": "UNVERIFIED",
+          "missing_inputs": [
+            "sebi_ed_action_active"
+          ]
+        },
+        {
+          "id": "K3",
+          "label": "OFS >80% with declining profits",
+          "state": "CLEAR",
+          "missing_inputs": []
+        },
+        {
+          "id": "K4",
+          "label": "Promoters + PE/VC sell >50% of combined holding, promoters exit/<20%, and weak financials",
+          "state": "CLEAR",
+          "missing_inputs": []
+        },
+        {
+          "id": "K5",
+          "label": "Contingent liabilities >50% of net worth (or unquantified)",
+          "state": "UNVERIFIED",
+          "missing_inputs": [
+            "contingent_liab_unquantified"
+          ]
+        },
+        {
+          "id": "K6",
+          "label": "Related parties drive >40% of revenue growth",
+          "state": "CLEAR",
+          "missing_inputs": []
+        }
+      ]
+    },
+    "penalties": [
+      {
+        "id": "margin_spike",
+        "label": "Margin up >500 bps YoY in either of the last two FYs",
+        "points": 0.0,
+        "state": "SCORED",
+        "trigger": null,
+        "reason": "not triggered"
+      },
+      {
+        "id": "receivable_days_up",
+        "label": "Receivable days up >30% YoY",
+        "points": 0.0,
+        "state": "SCORED",
+        "trigger": null,
+        "reason": "not triggered"
+      },
+      {
+        "id": "auditor_cfo_exit",
+        "label": "Auditor/CFO resignation in last 2 years",
+        "points": 0.0,
+        "state": "UNKNOWN",
+        "trigger": null,
+        "reason": "the trigger could not be evaluated; the penalty is neither applied nor ignored, and is carried in the lower bound"
+      },
+      {
+        "id": "discounted_allotments",
+        "label": "Heavy non-pro-rata discounted allotments/ESOPs within 18 months before DRHP (pro-rata bonus/rights excluded)",
+        "points": 0.0,
+        "state": "SCORED",
+        "trigger": null,
+        "reason": "not triggered"
+      },
+      {
+        "id": "unreconciled_metrics",
+        "label": "Adjusted metrics with no Ind AS reconciliation",
+        "points": 0.0,
+        "state": "UNKNOWN",
+        "trigger": null,
+        "reason": "the trigger could not be evaluated; the penalty is neither applied nor ignored, and is carried in the lower bound"
+      },
+      {
+        "id": "regulatory_dependence",
+        "label": "Regulatory dependence (single licence, price control)",
+        "points": 0.0,
+        "state": "UNKNOWN",
+        "trigger": null,
+        "reason": "the trigger could not be evaluated; the penalty is neither applied nor ignored, and is carried in the lower bound"
+      },
+      {
+        "id": "eom_caro",
+        "label": "Emphasis of Matter / CARO remarks",
+        "points": 0.0,
+        "state": "UNKNOWN",
+        "trigger": null,
+        "reason": "materiality metric eom_materiality is UNKNOWN; the penalty is neither applied nor ignored, and is carried in the lower bound"
+      }
+    ],
+    "verdict": {
+      "band_score": "AVOID",
+      "insufficient_data": true,
+      "mode_label": "final",
+      "uncertain": true,
+      "verdict": "INSUFFICIENT_DATA"
+    },
+    "missing_unverified": [
+      {
+        "category": "CRITERION",
+        "item": "second_multiple",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "sector_ipo_relative",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "use_of_proceeds",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "promoter_post_holding",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "auditor",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "industry_growth",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "moat",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "concentration",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "visibility",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "anchor_quality",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "qib_subscription",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "gmp_trend",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "market_regime",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITERION",
+        "item": "retail_nii_penalty",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "KNOCKOUT",
+        "item": "K1",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "KNOCKOUT",
+        "item": "K2",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "KNOCKOUT",
+        "item": "K5",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "MARKET",
+        "item": "anchor",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "MARKET",
+        "item": "subscription",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "MARKET",
+        "item": "gmp",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "MARKET",
+        "item": "regime",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "PENALTY",
+        "item": "auditor_cfo_exit",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "PENALTY",
+        "item": "unreconciled_metrics",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "PENALTY",
+        "item": "regulatory_dependence",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "PENALTY",
+        "item": "eom_caro",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITICAL_DATA",
+        "item": "going_concern_uncertainty",
+        "rule_id": null,
+        "description": null
+      },
+      {
+        "category": "CRITICAL_DATA",
+        "item": "sebi_ed_action_active",
+        "rule_id": null,
+        "description": null
+      }
+    ],
+    "lifecycle_state": "ACTIVE",
+    "visibility_state": "VISIBLE",
+    "operational_status": "ACTIVE",
+    "superseded_by": null,
+    "supersedes": null,
+    "lifecycle": {
+      "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-085055Z-final-4220b641",
+      "ipo_id": "JIO-PLATFORMS-LIMITED",
+      "mode": "final",
+      "lifecycle_state": "ACTIVE",
+      "visibility_state": "VISIBLE",
+      "operational_status": "ACTIVE",
+      "superseded_by": null,
+      "supersedes": null,
+      "lifecycle_version": "1.0.0",
+      "created_at": "2026-10-23T08:50:55Z",
+      "updated_at": "2026-10-23T08:50:55Z",
+      "actor": "system_ingest",
+      "transition_reason": "statutory_filing_ingest",
+      "transition_timestamp": "2026-10-23T08:50:55Z"
+    }
+  },
+  "issue_terms": {
+    "status": "UNAVAILABLE",
+    "fields": {
+      "price_band_low": {
+        "state": "SOURCE_UNAVAILABLE",
+        "candidates": [],
+        "detail": "Eligible providers exhausted; listing silence is not proof of non-publication."
+      },
+      "price_band_high": {
+        "state": "SOURCE_UNAVAILABLE",
+        "candidates": [],
+        "detail": "Eligible providers exhausted; listing silence is not proof of non-publication."
+      },
+      "lot_size": {
+        "state": "SOURCE_UNAVAILABLE",
+        "candidates": [],
+        "detail": "Eligible providers exhausted; listing silence is not proof of non-publication."
+      },
+      "fresh_issue": {
+        "state": "SOURCE_UNAVAILABLE",
+        "candidates": [],
+        "detail": "Eligible providers exhausted; listing silence is not proof of non-publication."
+      }
+    },
+    "verified": false,
+    "resolved_fields": [],
+    "unresolved_fields": [
+      "price_band_low",
+      "price_band_high",
+      "lot_size",
+      "fresh_issue"
+    ],
+    "conflicts": [],
+    "from_cache": false,
+    "source_uri": null,
+    "provider": null,
+    "retrieved_at": null,
+    "document_class": null,
+    "providers": [],
+    "remaining_required_fields": [],
+    "ready": true,
+    "aggregator_override": {
+      "policy": "pa-aggregator-issue-terms-v1",
+      "authority": "THIRD_PARTY_AGGREGATOR_OVERRIDE",
+      "verified": false,
+      "attempts": [
+        {
+          "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/",
+          "outcome": "ISSUER_AND_PERIOD_MATCHED",
+          "content_hash": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe"
+        }
+      ],
+      "fields": {
+        "fresh_issue": [
+          {
+            "value": 30213.0,
+            "unit": "INR_CRORES",
+            "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+            "quote": "27,00,00,000 shares (agg. up to ₹30,213 Cr)",
+            "locator": "HTML table row 11, Fresh Issue",
+            "extraction_method": "TABLE_EXTRACTION",
+            "verification": "UNVERIFIED",
+            "authority": "THIRD_PARTY_AGGREGATOR_OVERRIDE",
+            "issuer": "JIO PLATFORMS LIMITED",
+            "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/",
+            "content_hash": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+            "retrieved_at": "2026-10-23T08:50:55.013488Z",
+            "open_date": "2026-10-21",
+            "close_date": "2026-10-23",
+            "source": {
+              "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+              "source_type": "MARKET_DATA",
+              "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/",
+              "content_hash": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+              "retrieval_timestamp": "2026-10-21T20:19:43.817744Z"
+            }
+          }
+        ],
+        "price_band_low": [
+          {
+            "value": 1065.0,
+            "unit": "INR",
+            "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+            "quote": "₹1065 to ₹1119",
+            "locator": "HTML table row 4, Price Band",
+            "extraction_method": "TABLE_EXTRACTION",
+            "verification": "UNVERIFIED",
+            "authority": "THIRD_PARTY_AGGREGATOR_OVERRIDE",
+            "issuer": "JIO PLATFORMS LIMITED",
+            "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/",
+            "content_hash": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+            "retrieved_at": "2026-10-23T08:50:55.013488Z",
+            "open_date": "2026-10-21",
+            "close_date": "2026-10-23",
+            "source": {
+              "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+              "source_type": "MARKET_DATA",
+              "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/",
+              "content_hash": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+              "retrieval_timestamp": "2026-10-21T20:19:43.817744Z"
+            }
+          }
+        ],
+        "price_band_high": [
+          {
+            "value": 1119.0,
+            "unit": "INR",
+            "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+            "quote": "₹1065 to ₹1119",
+            "locator": "HTML table row 4, Price Band",
+            "extraction_method": "TABLE_EXTRACTION",
+            "verification": "UNVERIFIED",
+            "authority": "THIRD_PARTY_AGGREGATOR_OVERRIDE",
+            "issuer": "JIO PLATFORMS LIMITED",
+            "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/",
+            "content_hash": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+            "retrieved_at": "2026-10-23T08:50:55.013488Z",
+            "open_date": "2026-10-21",
+            "close_date": "2026-10-23",
+            "source": {
+              "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+              "source_type": "MARKET_DATA",
+              "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/",
+              "content_hash": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+              "retrieval_timestamp": "2026-10-21T20:19:43.817744Z"
+            }
+          }
+        ],
+        "lot_size": [
+          {
+            "value": 12.0,
+            "unit": "SHARES",
+            "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+            "quote": "12 Shares",
+            "locator": "HTML table row 5, Lot Size",
+            "extraction_method": "TABLE_EXTRACTION",
+            "verification": "UNVERIFIED",
+            "authority": "THIRD_PARTY_AGGREGATOR_OVERRIDE",
+            "issuer": "JIO PLATFORMS LIMITED",
+            "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/",
+            "content_hash": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+            "retrieved_at": "2026-10-23T08:50:55.013488Z",
+            "open_date": "2026-10-21",
+            "close_date": "2026-10-23",
+            "source": {
+              "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+              "source_type": "MARKET_DATA",
+              "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/",
+              "content_hash": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+              "retrieval_timestamp": "2026-10-21T20:19:43.817744Z"
+            }
+          }
+        ]
+      },
+      "conflicts": [],
+      "applied_fields": [
+        "fresh_issue",
+        "price_band_low",
+        "price_band_high",
+        "lot_size"
+      ],
+      "remaining_fields": [],
+      "rejected_sources": []
+    }
+  },
+  "ingestion_id": "ing-fc0ce8366cbc430c",
+  "correlation_id": "ing-fc0ce8366cbc430c"
+}

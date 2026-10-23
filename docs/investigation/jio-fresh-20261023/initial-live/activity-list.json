@@ -1,0 +1,25 @@
+[
+  {
+    "contract_version": 1,
+    "ingestion_id": "ing-1c55b52a23574673",
+    "correlation_id": "ing-1c55b52a23574673",
+    "filename": "U72900GJ2019PLC110816_JIO.pdf",
+    "mode": "final",
+    "status": "BLOCKED",
+    "started_at": "2026-10-23T08:50:00.523150Z",
+    "finished_at": "2026-10-23T08:50:22.724271Z",
+    "evaluation_id": null,
+    "evaluation_run": false,
+    "persisted": false,
+    "is_duplicate": false,
+    "error_code": "AWAITING_ISSUE_TERMS",
+    "error_message": "AWAITING_ISSUE_TERMS: required issue terms are unavailable: issue.price_band_low, issue.price_band_high, issue.lot_size, issue.fresh_issue. The uploaded filing does not disclose them and no usable official listing was searched: official sources could not be retrieved, or returned unusable content (this is not evidence that the terms are unpublished). No evaluation was produced, no values were assumed, and nothing was persisted. Retry automatic official discovery or upload an applicable authoritative filing that establishes the unresolved fields. A retrieved price band alone does not establish ",
+    "missing_fields": [
+      "issue.price_band_low",
+      "issue.price_band_high",
+      "issue.lot_size",
+      "issue.fresh_issue"
+    ],
+    "result": null
+  }
+]

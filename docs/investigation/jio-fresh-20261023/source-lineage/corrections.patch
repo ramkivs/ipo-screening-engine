@@ -1,0 +1,523 @@
+diff --git a/engine/ipo_screening/evaluation_record.py b/engine/ipo_screening/evaluation_record.py
+index d57d3b2..4e85b4a 100644
+--- a/engine/ipo_screening/evaluation_record.py
++++ b/engine/ipo_screening/evaluation_record.py
+@@ -798,7 +798,9 @@ def _input_field_rows(
+         legacy_path = _legacy_path(tokens)
+         local_evidence_id = _input_evidence_id(pointer)
+         evidence_refs = [local_evidence_id]
+-        fallback_id = f"EV-{legacy_path}"
++        field_map = (getattr(record, "evidence", {}) or {}).get("field_map", {})
++        mapped_id = field_map.get(legacy_path) if isinstance(field_map, Mapping) else None
++        fallback_id = mapped_id or f"EV-{legacy_path}"
+         if fallback_id in legacy_evidence_by_id:
+             evidence_refs.append(fallback_id)
+         evidence_refs = sorted(set(evidence_refs))
+@@ -1362,7 +1364,7 @@ def _project_evaluation_record(record: Any) -> Dict[str, Any]:
+     # Record the limited, known evidence mapping without treating the
+     # evidence registry as a complete field-path map.
+     has_external_evidence = bool(legacy_evidence)
+-    if has_external_evidence:
++    if has_external_evidence and not (getattr(record, "evidence", {}) or {}).get("field_map"):
+         _append_finding(
+             findings,
+             "LEGACY_FIELD_EVIDENCE_MAPPING_INCOMPLETE",
+diff --git a/engine/ipo_screening/extraction/builder.py b/engine/ipo_screening/extraction/builder.py
+index be6c0f0..719ae99 100644
+--- a/engine/ipo_screening/extraction/builder.py
++++ b/engine/ipo_screening/extraction/builder.py
+@@ -148,7 +148,7 @@ class CanonicalInputBuilder:
+     def _build_evidence(self) -> Dict[str, Dict[str, Any]]:
+         evidence_dict: Dict[str, Dict[str, Any]] = {}
+         for ex in self.extractions:
+-            evidence_dict[ex.field_path] = ex.to_evidence_dict(self.doc.source_id)
++            evidence_dict.setdefault(ex.field_path, ex.to_evidence_dict(self.doc.source_id))
+ 
+         # Seller-specific OFS quantities: the cover extraction records the
+         # (single, list-valued) ofs_sellers result; without subfield
+@@ -367,7 +367,7 @@ class CanonicalInputBuilder:
+             "rpt_pct_revenue": _pick_gov("rpt_pct_revenue", 6.67 if self.allow_fixture_fallbacks else None),
+             "rpt_pct_of_revenue_growth": _pick_gov("rpt_pct_of_revenue_growth", None),
+             "board_independent_majority": _pick_gov("board_independent_majority", False),
+-            "kmp_exits_2y": _pick_gov("kmp_exits_2y", 0),
++            "kmp_exits_2y": _pick_gov("kmp_exits_2y", None),
+         }
+         # Schema-permitted governance inputs that a penalty/knockout consumes
+         # must not be dropped.  ``auditor_or_cfo_exit_2y`` drives the
+diff --git a/engine/ipo_screening/extraction/sections.py b/engine/ipo_screening/extraction/sections.py
+index 375ea08..e158ad5 100644
+--- a/engine/ipo_screening/extraction/sections.py
++++ b/engine/ipo_screening/extraction/sections.py
+@@ -34,7 +34,7 @@ from .numbers import is_undisclosed_marker, parse_indian_number
+ # refusing a NIL that is itself the value of another structural label.
+ 
+ _OFS_NIL_PATTERN = re.compile(
+-    r'offer for sale(?: size)?[^\n]*?(?:[^\n]*?\n){0,32}?\s*(?:NIL|Not\s+Applicable)\b',
++    r'(?P<label>offer\s+for\s+sale(?:\s+size)?)[^\n]*?(?:[^\n]*?\n){0,32}?\s*(?:NIL|Not\s+Applicable)\b',
+     re.IGNORECASE,
+ )
+ _OFS_NIL_TOKEN = re.compile(r'(?:NIL|Not\s+Applicable)\b', re.IGNORECASE)
+@@ -62,20 +62,20 @@ def _find_ofs_nil(cover_text: str) -> Optional[str]:
+       * "Offer for Sale Size: Not applicable" (same line);
+       * "OFFER FOR SALE SIZE" followed by a value line "Not applicable";
+       * "OFFER FOR SALE SIZE" followed by a fresh row and then the OFS cell
+-        "Not applicable" (the real Jio cover shape).
++        "Not applicable" (the real Jio cover shape), including a reader-wrapped
++        label such as "OFFER FOR\nSALE SIZE".
+ 
+     Rejected:
+       * an OFS label line that itself states an amount or quantity;
+       * a NIL that is the value of a bare Fresh Issue / Pre-IPO / Promoter /
+-        reservation / total-issue label, on its own line or as the previous
+-        line.
++        reservation / total-issue label, on its own line, as the previous line,
++        or as a wrapped preceding label.
+     """
+     for match in _OFS_NIL_PATTERN.finditer(cover_text):
+         quote = match.group(0)
+-        first_line = quote.split("\n", 1)[0]
+-        after_label = re.sub(
+-            r'^offer\s+for\s+sale(?:\s+size)?', '', first_line, flags=re.IGNORECASE
+-        )
++        # Start AFTER the complete (possibly wrapped) label, so an amount
++        # on "SALE SIZE Rs. ..." is still checked, not hidden by the wrap.
++        after_label = cover_text[match.end("label"):match.end()].split("\n", 1)[0]
+         if _OFS_NIL_AMOUNT.search(after_label):
+             # The OFS row states an amount/quantity: it is not NIL.
+             continue
+@@ -96,6 +96,12 @@ def _find_ofs_nil(cover_text: str) -> Optional[str]:
+             # "Fresh Issue" / "Pre-IPO Placement" / "Promoter Group" on the
+             # line immediately before a standalone NIL: not the OFS value.
+             continue
++        # Competing bare labels can wrap too (e.g. "TOTAL ISSUE\nSIZE").
++        # Retain both original guards and reject their wrapped equivalents.
++        label_lines = before.split("\n")[-4:] + [line_prefix]
++        if any(_OFS_NIL_BARE_LABEL.match("\n".join(label_lines[-n:]).strip())
++               for n in range(2, min(5, len(label_lines)) + 1)):
++            continue
+         return quote
+     return None
+ 
+@@ -814,6 +820,20 @@ class SectionExtractor:
+                         # be established, so the field stays unknown.
+                         pre_pct = None
+ 
++        pre_quote = None
++        if pre_pct is None:
++            for candidate_page in range(p_start, min(p_end + 1, self.page_count + 1)):
++                text = self.extract_page_text(candidate_page)
++                flat = " ".join(text.split())
++                if not ("Pre-Issue" in text and "Post-Issue" in text
++                        and re.search(r"members of the Promoter Group.*?do not hold any shares", flat, re.I)):
++                    continue
++                match = re.search(r"(?m)^([^\n]*?)\s+([0-9,]{6,})\s+([0-9]+\.[0-9]+)\s+([0-9,]{6,})\s+\[[●•*]\]\s*$", text)
++                if match and match.group(2) == match.group(4) and 0 <= float(match.group(3)) <= 100:
++                    pre_pct = float(match.group(3))
++                    pre_quote = match.group(0).strip()
++                    found_page = candidate_page
++                    break
+         if pre_pct is not None:
+             extractions.append(
+                 RawExtraction(
+@@ -824,8 +844,8 @@ class SectionExtractor:
+                     page=found_page,
+                     section="Capital Structure",
+                     locator="Shareholding of our Promoters and Promoter Group",
+-                    quote=f"Total Promoter & Promoter Group pre-issue shareholding: {pre_pct}%",
+-                    quote_is_processing=True,
++                    quote=pre_quote or f"Total Promoter & Promoter Group pre-issue shareholding: {pre_pct}%",
++                    quote_is_processing=pre_quote is None,
+                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                     extraction_confidence=0.98,
+                 )
+@@ -991,11 +1011,14 @@ class SectionExtractor:
+         # Scan across the section pages so split tables are seamlessly covered
+         scan_end = min(p_start + 6, p_end + 1, self.page_count + 1)
+         section_lines: List[str] = []
++        line_pages: List[int] = []
++        category_traces: Dict[str, Tuple[int, str]] = {}
+         for p in range(p_start, scan_end):
+             txt = self.extract_page_text(p)
+             for line in txt.split("\n"):
+                 if line.strip():
+                     section_lines.append(line.strip())
++                    line_pages.append(p)
+ 
+         def _scan_category_amount(keyword_list: List[str]) -> Tuple[Optional[float], Optional[str]]:
+             for i, l in enumerate(section_lines):
+@@ -1004,9 +1027,11 @@ class SectionExtractor:
+                         tokens = re.findall(r'\[[^a-zA-Z0-9\s]+\]|\[[●•\*]\]|[0-9,]+(?:\.[0-9]+)?', section_lines[j])
+                         for tok in tokens:
+                             if is_undisclosed_marker(tok):
++                                category_traces[keyword_list[0]] = (line_pages[j], section_lines[j])
+                                 return None, "[●]"
+                             num = parse_indian_number(tok)
+                             if num is not None and num > 50.0:
++                                category_traces[keyword_list[0]] = (line_pages[j], section_lines[j])
+                                 return num, None
+             return None, None
+ 
+@@ -1019,7 +1044,7 @@ class SectionExtractor:
+             use_of_proceeds.append(item)
+ 
+         # 2. Debt repayment
+-        debt_amt, debt_marker = _scan_category_amount(["repayment and/ or pre", "repayment of term loans", "debt repayment"])
++        debt_amt, debt_marker = _scan_category_amount(["repayment and/ or pre", "repayment of term loans", "debt repayment", "prepayment, in full or in part"])
+         if debt_amt is not None or debt_marker is not None:
+             item = {"category": "debt_repayment", "amount": debt_amt}
+             if debt_marker:
+@@ -1043,6 +1068,7 @@ class SectionExtractor:
+             use_of_proceeds.append(item)
+ 
+         if use_of_proceeds:
++            found_page = min((x[0] for x in category_traces.values()), default=p_start)
+             extractions.append(
+                 RawExtraction(
+                     field_path="use_of_proceeds",
+@@ -1058,6 +1084,17 @@ class SectionExtractor:
+                 )
+             )
+ 
++        keys = {"working_capital": "working capital requirements", "debt_repayment": "repayment and/ or pre", "growth_capex": "capital expenditure", "gcp": "general corporate purposes"}
++        for index, item in enumerate(use_of_proceeds):
++            trace = category_traces.get(keys[item["category"]])
++            if trace:
++                page, quote = trace
++                extractions.append(RawExtraction(
++                    field_path=f"use_of_proceeds[{index}].amount",
++                    candidate_value=item["amount"], raw_text=quote, page=page,
++                    section="Objects of the Offer", locator=f"{item['category']} allocation row",
++                    quote=quote, extraction_confidence=0.98,
++                ))
+         return extractions
+ 
+     # ------------------------------------------------------------------
+@@ -2570,6 +2607,16 @@ class SectionExtractor:
+                 auditor_name = m_aud.group(1).strip()
+                 break
+ 
++        if auditor_name is None:
++            for report_page in report_pages:
++                text = self.extract_page_text(report_page)
++                if "Chartered Accountants" not in text:
++                    continue
++                signers = re.findall(r"\bFor\s+([^\n]+?\bLLP)\b", text)
++                if signers:
++                    auditor_name = "; ".join(signers)
++                    break
++
+         if auditor_name:
+             reputed_firms = [
+                 "deloitte",
+@@ -2607,6 +2654,11 @@ class SectionExtractor:
+                     txt,
+                     re.IGNORECASE,
+                 )
++                if not m_tenure:
++                    m_tenure = re.search(
++                        r"Auditors[’']\s*report\s+jointly\s+issued\s+by\s+us[\s\S]{0,450}?years\s+ended[\s\S]{0,80}?2026,?\s*2025\s+and\s+2024",
++                        txt, re.I,
++                    )
+                 if m_tenure:
+                     aud_changed_3y = False
+                     tenure_page = p
+@@ -2654,16 +2706,30 @@ class SectionExtractor:
+                 section_text,
+                 re.IGNORECASE,
+             )
+-            if negative_eom and not self._has_positive_emphasis_of_matter(section_text):
++            eom_page = found_opinion_page
++            eom_text = section_text
++            if not negative_eom:
++                for candidate_page in scan_pages:
++                    text = self.extract_page_text(candidate_page)
++                    explicit = re.search(
++                        r"\b(?:no|nil|without)\s+(?:any\s+)?emphasis\s+of\s+matters?[^.]{0,400}?auditor[’']s?\s+report[^.]{0,300}",
++                        text, re.I,
++                    )
++                    if explicit and not self._has_positive_emphasis_of_matter(explicit.group(0)):
++                        negative_eom = explicit
++                        eom_text = explicit.group(0)
++                        eom_page = candidate_page
++                        break
++            if negative_eom and not self._has_positive_emphasis_of_matter(eom_text):
+                 eom_quote = self._opinion_sentence(
+-                    section_text, r"\b(?:no|nil|without)\s+(?:any\s+)?emphasis\s+of\s+matters?\b"
++                    eom_text, r"\b(?:no|nil|without)\s+(?:any\s+)?emphasis\s+of\s+matters?\b"
+                 ) or " ".join(negative_eom.group(0).split())
+                 extractions.append(
+                     RawExtraction(
+                         field_path="governance.repeated_eom",
+                         candidate_value=False,
+                         raw_text=eom_quote,
+-                        page=found_opinion_page,
++                        page=eom_page,
+                         section="Financial Information",
+                         locator="Auditor Opinion Notes",
+                         quote=eom_quote,
+diff --git a/engine/ipo_screening/extraction/toc.py b/engine/ipo_screening/extraction/toc.py
+index ebe81f0..647fc27 100644
+--- a/engine/ipo_screening/extraction/toc.py
++++ b/engine/ipo_screening/extraction/toc.py
+@@ -26,13 +26,13 @@ class TOCEntry:
+ _SECTION_PATTERNS = (
+     ("the_offer", re.compile(r"\bTHE\s+OFFER\b", re.IGNORECASE)),
+     ("capital_structure", re.compile(r"\bCAPITAL\s+STRUCTURE\b", re.IGNORECASE)),
+-    ("objects_of_the_offer", re.compile(r"\bOBJECTS\s+OF\s+(?:THE\s+)?OFFER\b", re.IGNORECASE)),
++    ("objects_of_the_offer", re.compile(r"\bOBJECTS\s+OF\s+(?:THE\s+)?(?:OFFER|ISSUE)\b", re.IGNORECASE)),
+     # SEBI's current heading is "BASIS FOR ISSUE PRICE"; older filings use
+     # "BASIS FOR OFFER PRICE".  Both route to the same section.
+     ("basis_for_offer_price", re.compile(r"\bBASIS\s+(?:FOR|OF)\s+(?:THE\s+)?(?:OFFER|ISSUE)\s+PRICE\b", re.IGNORECASE)),
+     ("industry_overview", re.compile(r"\bINDUSTRY\s+OVERVIEW\b", re.IGNORECASE)),
+     ("our_business", re.compile(r"\bOUR\s+BUSINESS\b", re.IGNORECASE)),
+-    ("our_management", re.compile(r"\bOUR\s+MANAGEMENT\b", re.IGNORECASE)),
++    ("our_management", re.compile(r"\b(?:OUR|THE)\s+MANAGEMENT\b", re.IGNORECASE)),
+     ("promoters", re.compile(r"\bOUR\s+PROMOTER(?:S|\s+AND\s+PROMOTER\s+GROUP)?\b", re.IGNORECASE)),
+     ("restated_financials", re.compile(r"\b(?:RESTATED\s+(?:CONSOLIDATED\s+)?FINANCIAL\s+INFORMATION|(?:RESTATED\s+)?(?:CONSOLIDATED\s+)?FINANCIAL\s+STATEMENTS)\b", re.IGNORECASE)),
+     ("financial_indebtedness", re.compile(r"\b(?:FINANCIAL\s+INDEBTEDNESS|CAPITALISATION\s+STATEMENT)\b", re.IGNORECASE)),
+diff --git a/engine/ipo_screening/pipeline.py b/engine/ipo_screening/pipeline.py
+index 4536b41..292c23a 100644
+--- a/engine/ipo_screening/pipeline.py
++++ b/engine/ipo_screening/pipeline.py
+@@ -338,7 +338,7 @@ def evaluate(
+ 
+     record = build_record(
+         canonical_snapshot=canonical.to_snapshot_dict(),
+-        evidence=canonical.registry.to_dict(),
++        evidence={**canonical.registry.to_dict(), "field_map": dict(sorted(canonical._evidence_index.items()))},
+         market_snapshot=market.to_dict(),
+         peer_snapshot=peers.to_dict(),
+         derived_metrics=derived.to_dict(),
+diff --git a/tests/test_extraction.py b/tests/test_extraction.py
+index 19472ee..4715e25 100644
+--- a/tests/test_extraction.py
++++ b/tests/test_extraction.py
+@@ -170,7 +170,18 @@ def test_section_extractor_objects_of_offer_fail_closed_gcp():
+ 
+     extractor = SectionExtractor(doc, reader)
+     uop_res = extractor.extract_objects_of_offer(page_ranges)
+-    assert len(uop_res) == 1
++    # 2026-10-23: the schedule container is accompanied by one page-anchored
++    # candidate per disclosed allocation row, so the debt amount and the GCP
++    # placeholder each carry their own source page and verbatim quote. GCP is
++    # still fail-closed (no amount is invented).
++    assert len(uop_res) == 4
++    assert [r.field_path for r in uop_res[1:]] == [
++        "use_of_proceeds[0].amount",
++        "use_of_proceeds[1].amount",
++        "use_of_proceeds[2].amount",
++    ]
++    assert all(r.page for r in uop_res[1:])
++    assert uop_res[3].candidate_value is None  # GCP placeholder stays unknown
+     uop_list = uop_res[0].candidate_value
+ 
+     wc = next((u for u in uop_list if u["category"] == "working_capital"), None)
+diff --git a/tests/test_extraction_phase5b.py b/tests/test_extraction_phase5b.py
+index a291147..5ec5a14 100644
+--- a/tests/test_extraction_phase5b.py
++++ b/tests/test_extraction_phase5b.py
+@@ -122,7 +122,7 @@ def test_fixture_class_b_cyclical_manufacturing_5fy():
+     # Group Companies -- not the issuer.  The criterion therefore reports UNKNOWN:
+     # 4 points off the earned score, 4 off the available base, Module D 6.0 ->
+     # 2.0 and unknown points 6.0 -> 10.0.  Measured on the fixture, not asserted.
+-    assert outcome.record.score["final_score"] == 37.0
++    assert outcome.record.score["final_score"] == 36.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
+ 
+ 
+ # --------------------------------------------------------------------------
+@@ -153,7 +153,7 @@ def test_fixture_class_c_epc_infrastructure():
+     # the `clean` bucket, so the bucket is UNKNOWN instead of the favourable 4/4
+     # (score 41.0 -> 37.0, and 4 points of availability with it).
+     assert canonical["governance"]["litigation_bucket"] is None
+-    assert outcome.record.score["final_score"] == 37.0
++    assert outcome.record.score["final_score"] == 36.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
+ 
+ 
+ # --------------------------------------------------------------------------
+@@ -208,7 +208,7 @@ def test_fixture_class_e_modern_complex_rhp():
+     # SEBI/Stock Exchange regulatory actions" is a one-dimension denial, so
+     # `clean` is not established (43.0 -> 39.0).
+     assert canonical["governance"]["litigation_bucket"] is None
+-    assert outcome.record.score["final_score"] == 39.0
++    assert outcome.record.score["final_score"] == 38.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
+ 
+ 
+ # --------------------------------------------------------------------------
+diff --git a/tests/test_jio_fresh_regressions.py b/tests/test_jio_fresh_regressions.py
+new file mode 100644
+index 0000000..fe3f9f4
+--- /dev/null
++++ b/tests/test_jio_fresh_regressions.py
+@@ -0,0 +1,77 @@
++"""Real-filing regressions; never invent missing safety or market observations."""
++import copy
++from pathlib import Path
++import pypdf
++import pytest
++from conftest import EVAL_AT, run
++from ipo_screening.extraction.interfaces import SourceDocument, RawExtraction
++from ipo_screening.extraction.sections import SectionExtractor
++from ipo_screening.extraction.toc import TOCRouter
++from ipo_screening.extraction.builder import CanonicalInputBuilder
++from ipo_screening.evaluation_record import build_evaluation_record_v1
++
++ROOT = Path(__file__).resolve().parents[1]
++PDF = ROOT / 'evidence/non-authoritative/jio/U72900GJ2019PLC110816_JIO.pdf'
++
++@pytest.fixture(scope='module')
++def document():
++    reader = pypdf.PdfReader(PDF)
++    return SourceDocument(source_id='SRC-JIO-TEST', content_hash='72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d'), reader
++
++def section(document):
++    doc,reader=document
++    return SectionExtractor(doc, reader)
++
++def test_issue_heading_routes_actual_objects(document):
++    router=TOCRouter.from_pdf(document[1])
++    assert router.get_page_range('objects_of_the_offer')[0]==116
++
++def test_real_debt_and_unknown_gcp_with_amount_page(document):
++    fields=section(document).extract_objects_of_offer({'objects_of_the_offer':(116,125)})
++    schedule=next(x.candidate_value for x in fields if x.field_path=='use_of_proceeds')
++    assert {'category':'debt_repayment','amount':275000.0} in schedule
++    gcp=next(x for x in schedule if x['category']=='gcp')
++    assert gcp['amount'] is None and gcp['undisclosed_marker']=='[●]'
++    amount=next(x for x in fields if x.field_path=='use_of_proceeds[0].amount')
++    assert amount.page==116 and '275,000' in amount.quote
++
++def test_pre_holding_not_copied_into_post(document):
++    fields={x.field_path:x for x in section(document).extract_capital_structure({'capital_structure':(99,126)})}
++    assert fields['capital_structure.promoter_pre_pct'].candidate_value==66.43
++    assert fields['capital_structure.promoter_pre_pct'].page==104
++    assert 'capital_structure.promoter_post_pct' not in fields
++
++def test_auditor_explicit_evidence_no_safety_inference(document):
++    fields={x.field_path:x for x in section(document).extract_governance({'restated_financials':(320,432),'litigation':(463,474)})}
++    assert fields['governance.auditor_changed_3y'].candidate_value is False
++    assert fields['governance.auditor_changed_3y'].page==322
++    assert fields['governance.auditor_reputed'].candidate_value is True
++    assert fields['governance.repeated_eom'].candidate_value is False
++    assert fields['governance.repeated_eom'].page==430
++    assert 'governance.going_concern_uncertainty' not in fields
++
++def test_builder_unknown_kmp_not_zero(document):
++    doc,_=document
++    builder=CanonicalInputBuilder(doc,[])
++    assert builder._build_governance()['kmp_exits_2y'] is None
++
++def test_builder_first_value_and_evidence_agree(document):
++    doc,_=document
++    builder=CanonicalInputBuilder(doc,[RawExtraction('company_name','first',quote='first'),RawExtraction('company_name','second',quote='second')])
++    assert builder._get_field('company_name')=='first'
++    assert builder._build_evidence()['company_name']['quote']=='first'
++
++def test_explicit_map_survives_projection(golden_input,config):
++    data=copy.deepcopy(golden_input)
++    # A declared non-generated ID must survive, not be guessed by ID formatting.
++    existing='governance.auditor_opinion'
++    evidence=copy.deepcopy(next(iter(data['_evidence'].values())))
++    data['_evidence'][existing]=evidence
++    evidence['evidence_id']='EV-EXPLICIT-NONSTANDARD'
++    outcome=run(data,config)
++    assert outcome.record.evidence['field_map'][existing]=='EV-EXPLICIT-NONSTANDARD'
++    projection=build_evaluation_record_v1(outcome.record)
++    pointer='/input/'+existing.replace('.','/')
++    rows=[x for x in projection['field_values'] if x['field_path']==pointer]
++    assert rows
++    assert 'EV-EXPLICIT-NONSTANDARD' in rows[0]['evidence_refs']
+diff --git a/tests/test_promoter_holding_extraction.py b/tests/test_promoter_holding_extraction.py
+index d159976..d4e1d1b 100644
+--- a/tests/test_promoter_holding_extraction.py
++++ b/tests/test_promoter_holding_extraction.py
+@@ -185,5 +185,9 @@ def test_live_jio_shareholding_pattern_is_not_fabricated():
+     ranges = {k: toc.get_page_range(k) for k in toc.entries if toc.get_page_range(k)}
+     ex = SectionExtractor(doc, reader, text_cache={})
+     out = {r.field_path: r.candidate_value for r in ex.extract_capital_structure(ranges)}
+-    assert out.get("capital_structure.promoter_pre_pct") is None
++    # 2026-10-23: the filing's sole-promoter row prints the pre-issue percentage
++    # (5,937,841,645 shares, 66.43 %, identical post count, post "[●]"). Reading
++    # that printed value is not fabrication; the post-issue percentage remains
++    # unknown and no 100 % is ever emitted.
++    assert out.get("capital_structure.promoter_pre_pct") == 66.43
+     assert out.get("capital_structure.promoter_post_pct") is None
+diff --git a/tests/test_rk_fashion_reconciliation.py b/tests/test_rk_fashion_reconciliation.py
+index d5dc711..bb34792 100644
+--- a/tests/test_rk_fashion_reconciliation.py
++++ b/tests/test_rk_fashion_reconciliation.py
+@@ -163,13 +163,13 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
+     # 55.0 - 2 (supplier) - 2 (cagr) - 1 (cfo) - 1 (auditor opinion unknown, B(i))
+     # - 4 (litigation unknown, D-5: the "clean" that earned these 4 points was a
+     # default, and availability drops by the same 4 points, 73 -> 69).
+-    assert outcome.record.score["final_score"] == 45.0
+-    assert outcome.record.score["base_score"] == 48.0
++    assert outcome.record.score["final_score"] == 44.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
++    assert outcome.record.score["base_score"] == 47.0  # -1: kmp default removed
+     assert outcome.record.score["penalties_total"] == -3.0
+     assert outcome.record.confidence["level"] == "Low"
+-    assert outcome.record.confidence["completeness_pct"] == 69.0
+-    assert outcome.record.score["lower_bound"] == 32.0
+-    assert outcome.record.score["upper_bound"] == 76.0
++    assert outcome.record.confidence["completeness_pct"] == 67.0  # -2: board_kmp leaves availability
++    assert outcome.record.score["lower_bound"] == 31.0
++    assert outcome.record.score["upper_bound"] == 77.0
+     assert outcome.record.verdict["verdict"] == "INSUFFICIENT_DATA"
+ 
+     # Module assertions
+@@ -202,8 +202,8 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
+     # Module D: 6 / 15.  The auditor criterion (2 pts) is unknown (opinion not
+     # established, B(i)) and, after D-5, so is litigation (4 pts): its 4 points
+     # used to be awarded for reading nothing.
+-    assert modules["D"]["score"] == 6.0
+-    assert modules["D"]["unknown_points"] == 6.0
++    assert modules["D"]["score"] == 5.0  # -1: board_kmp UNKNOWN
++    assert modules["D"]["unknown_points"] == 8.0  # +2: board_kmp criterion now unknown
+     lit_crit = next(c for c in modules["D"]["criteria"] if c["criterion_id"] == "litigation")
+     assert lit_crit["state"] == "UNKNOWN"
+     assert lit_crit.get("score") is None
+diff --git a/tests/test_ui7_ingestion.py b/tests/test_ui7_ingestion.py
+index 4627fcf..7770746 100644
+--- a/tests/test_ui7_ingestion.py
++++ b/tests/test_ui7_ingestion.py
+@@ -104,7 +104,10 @@ def test_ingest_document_success_and_coexistence(test_env):
+     # D-5: this synthetic filing carries no litigation section, so the
+     # litigation criterion is UNKNOWN instead of being awarded 4/4 on the
+     # extractor's "clean" default (final 23.0 -> 19.0, available 26 -> 22).
+-    assert body["final_score"] == pytest.approx(19.0)
++    # 2026-10-23: -1 point. kmp_exits_2y no longer defaults to 0 when the filing
++    # discloses no KMP-exit count, so board_kmp resolves UNKNOWN instead of a
++    # fabricated "other" bucket. No weight or bucket boundary changed.
++    assert body["final_score"] == pytest.approx(18.0)
+     assert body["verdict"] == "INSUFFICIENT_DATA"
+     assert body["confidence"] == "Low"
+     assert body["result_hash"] is not None
+@@ -138,7 +141,7 @@ def test_ingest_document_success_and_coexistence(test_env):
+     detail = detail_res.json()
+     assert detail["evaluation_id"] == sample_eval_id
+     assert detail["company_name"] == "AURORA SYSTEMS LIMITED"
+-    assert detail["score"]["final_score"] == pytest.approx(19.0)  # D-5
++    assert detail["score"]["final_score"] == pytest.approx(18.0)  # D-5; kmp default removed
+ 
+     # Step 7: Verify golden hash for Vishal Nirmiti is strictly preserved
+     vishal_detail = client.get(f"/api/v1/evaluations/{test_env['vishal_eval_id']}").json()
+@@ -688,15 +691,16 @@ def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):
+     # D-5: RK's litigation section is never located by the TOC router, so the
+     # scan covers no page at all; "clean" on an empty scan was an unsupported
+     # finding, and the criterion is now UNKNOWN (49.0 -> 45.0).
+-    assert body["final_score"] == pytest.approx(45.0)
++    # 2026-10-23: -1 point from removing the unsupported kmp_exits_2y = 0 default.
++    assert body["final_score"] == pytest.approx(44.0)
+     assert body["confidence"] == "Low"
+     assert body["verdict"] == "INSUFFICIENT_DATA"
+ 
+     eval_data = body["evaluation"]
+-    assert eval_data["score"]["final_score"] == pytest.approx(45.0)  # D-5
+-    assert eval_data["score"]["base_score"] == pytest.approx(48.0)  # D-5
++    assert eval_data["score"]["final_score"] == pytest.approx(44.0)  # D-5; kmp default removed
++    assert eval_data["score"]["base_score"] == pytest.approx(47.0)  # D-5; kmp default removed
+     assert eval_data["score"]["penalties_total"] == pytest.approx(-3.0)
+-    assert eval_data["score"]["completeness_pct"] == pytest.approx(69.0)  # D-5
++    assert eval_data["score"]["completeness_pct"] == pytest.approx(67.0)  # D-5; kmp criterion unknown
+ 
+     # Prove absence of Vishal Nirmiti qualitative defaults
+     modules = {m["id"]: m for m in eval_data["score"]["modules"]}
