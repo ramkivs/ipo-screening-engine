@@ -229,3 +229,12 @@ No engine, test, schema, config, frontend or evidence file was modified in this 
 | Evaluation decision | no re-run; hash-level equivalence to the published 34/100 demonstrated |
 
 **Overall:** integration is verified and the published engine behaves as expected; the remaining blockers are external evidence, four governance decisions (plus one test-fixture/CI remedy), and one environmental limitation (browser session). CI is honestly red on one environment-dependent OCR fixture test that passes locally on the same commit — it is fail-closed, unrelated to Jio, and was not papered over. No safety gate was cleared or weakened to change any of that.
+
+---
+
+## Addendum — publication receipt (2026-10-23, verified remotely)
+
+- **Commit:** `97b970e7df696e2fea90ca039bd24911b2dd0974`, parent `589e468e06b49c8066bbdb2e3f0729c4d09cd929`, 8 files (7 added, 1 modified), pushed to `arena/07f3439f-ipo-screening-engine`; branch head read back from the API equals that commit.
+- **Remote ↔ local byte match:** this report (sha256 `55c7c211…`), the tracker (sha256 `46a86ee1…`) and `ci-failure-analysis.json` (sha256 `8e0d10c7…`) were re-downloaded from the commit and hashed locally: all three identical.
+- **CI on this documentation-only commit:** run [39947292394](https://github.com/ramkivs/ipo-screening-engine/actions/runs/39947292394) — 1670 tests, **1 failure**, the same `test_image_only_official_notice_…` OCR test (1296 s); every other step and the clean-tree assertion green. Third consecutive reproduction of the same environment-dependent failure, and it confirms that no source file changed here: the only difference from `589e468` is documentation.
+- **Nothing promoted:** `main` untouched, PR #6 untouched, no tag or release, no evaluation record added.
