@@ -1,0 +1,36 @@
+{
+  "scope": "Retained GMP material re-examined for an issuer-matched Jio observation. Investigation evidence only; nothing here is a source qualification, qualifying snapshot or A9 required hash.",
+  "retained_row": {
+    "container": "evidence/gmp-observations/investorgain-tonbo-20261015/source-captures/investorgain-ipo-gmp-live-331-chunk-0.md",
+    "publisher": "investorgain.com",
+    "page": "https://www.investorgain.com/report/live-ipo-gmp/331/ (listing index)",
+    "issuer_label": "Jio Platforms",
+    "issue_link": "https://www.investorgain.com/gmp/jio-platforms-ipo/2306/",
+    "printed": "₹227 (20.29%) | 148 ↓ / 227 ↑ | price 1,119 | size ₹30,213.00 Cr | lot 12 | open 21-Oct | close 23-Oct | BoA 26-Oct | listing 28-Oct | Updated-On 15-Oct 17:37 | anchor ✅",
+    "capture_date": "2026-10-15",
+    "capture_representation": "rendered Markdown text; not provider bytes, no response headers, no exact receipt time (see that directory's capture-manifest.json)"
+  },
+  "second_retained_reference": {
+    "container": "evidence/gmp-observations/marketliveipogmp-tonbo-20261015/source-captures/marketliveipogmp-home-chunk-0.md",
+    "issuer_label": "Jio Platforms",
+    "printed_gmp": "— (no value shown)",
+    "observation": "Listing entry only; no GMP number for Jio in that capture."
+  },
+  "why_not_qualifying": [
+    "The publisher is NOT QUALIFIED under A9 (investorgain is recorded NOT QUALIFIED in the A9 inventory and qualification documents).",
+    "The row is a listing-index line, not a captured issue-page observation with publisher version/receipt identity.",
+    "The printed observation is dated 15-Oct 17:37, eight days before the 23-Oct evaluation; A17 caps GMP age at 24 h relative to the evaluation timestamp.",
+    "No A28.1 qualification binding and no A9 required hash subject exist for it.",
+    "No accepting/verifier branch consumes a binding in this engine, so even a structurally valid binding would not admit it."
+  ],
+  "minimum_evidence_to_unblock": [
+    "A RAMKI/PA A28-scope source-qualification decision naming the publisher, the issue-page scope and the observation semantics (timestamp, timezone, value definition).",
+    "An observation captured through the existing capture contract (provider bytes + headers + receipt window + observation time with explicit offset + issuer/issue match) within the A17 24 h cutoff of the evaluation instant.",
+    "A valid A28.1 binding whose hash subject is that observation, and the separately authorized accepting verifier that consumes it.",
+    "Only then can a fresh FINAL evaluation be eligible for a terminal A9 outcome."
+  ],
+  "not_done": [
+    "No GMP value was ingested, inferred from price/issue size, or substituted into the market block.",
+    "A9 remains fail-closed."
+  ]
+}
