@@ -5,7 +5,8 @@
 - **Branch:** `arena/07f3439f-ipo-screening-engine` (working branch; `main` untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`).
 - **Baseline this pass:** `8939b05be00a23d5733163cdb6a280b0578cfd10`.
 - **Scope:** the extraction path that produced a rejected official document and an unresolved `issue.ofs`: Price Band Notice classification, current-issue date extraction, field-conflict handling, the RHP document class, and the OFS resolution chain. Corrections are issuer-independent.
-- **Execution status:** **regression tests NOT RUN** — deferred to the separate regression pass by explicit instruction. No ingestion, no evaluation, no scored artifact was produced or modified. Behaviour statements below come from read-only extraction probes on retained filings and on synthetic text; they are **not** a substitute for the regression run.
+- **Execution status:** the two focused regression modules were **executed and passed on 2026-10-23** (45 collected / 45 passed / 0 skipped, commit `4b1c67f`) — see **§11.8**, which records the command, the one test-side defect that was fixed, and the checks performed. The **full backend suite (~3 h) was NOT run**, and **no ingestion, evaluation or scored artifact** was produced or modified. Statements in §§1–10 that predate the document remain as written; where they say "not executed", §11.8 supersedes them for these two modules only.
+- **Revision 3 (2026-10-23):** controlled validation pass — the focused modules were run, one test-side defect corrected, and the behavioural checks A–F executed against the retained artifact (§11.8). No production code was changed in this revision.
 - **Revision 2 (2026-10-23):** the actual Paras RHP was recovered from the evidence branch and verified. §1's "the document is not present" limitation is **superseded**; the document-specific findings are in **§11**, which distinguishes them from the earlier synthetic reproduction. Sections 1–10 are left as written (they record what was known before the document was available) with this pointer.
 
 ---
@@ -143,9 +144,9 @@ Now:
 
 ---
 
-## 6. Tests added or updated — **NOT EXECUTED**
+## 6. Tests added or updated — **EXECUTED (revision 3)**
 
-Execution status: **NOT RUN — deferred to the separate regression pass.** The full backend suite takes roughly three hours and was excluded by explicit instruction for this pass. Nothing below is claimed as passing.
+Execution status: these cases now form part of `tests/test_official_rhp_terms_and_dates.py`, which was **executed green** (36/36) on 2026-10-23 — see §11.8 for the command, environment and counts. The full backend suite (~3 h) remains unexecuted.
 
 **Added** — `tests/test_official_rhp_terms_and_dates.py` (21 cases):
 
@@ -356,13 +357,15 @@ Each is issuer-independent and was found by working the real document.
 | Moneyview final Prospectus (537 pp) | still not a notice, not an RHP; prospectus path unchanged |
 | `fixtures/notices/*` (10 files) | bands, lots, windows and collisions unchanged; the two collar-invalid fixtures still fail closed |
 
-## 11.7 Tests added — NOT EXECUTED
+## 11.7 Tests added — EXECUTED (revision 3)
 
 `tests/test_official_rhp_terms_and_dates.py` gains 15 cases (36 total): colon-form band, en-dash/rupee band, colon-form conflict withheld, unrelated numeric ranges rejected, document date without a colon, mid-sentence certificate date not adopted, defined-term close date excluded, out-of-window issue date excluded, share-count placeholder does not hide a stated OFS amount, money-slot placeholders still withheld, merged header does not bind the wrong amount, two explicit component sentences resolve independently, OFS absent is diagnosed not zeroed, unresolved-field diagnostic names sources and required evidence, and every discoverable term has required-evidence text.
 
-`tests/test_paras_evidence_regression.py` (new, 10 cases) asserts the artifact hash and pins the real document's behaviour: not a notice, RHP class and identity, cover read for the issue window, the p590 defined term not competing, the ₹9,500.00 million OFS and ₹5,000.00 million fresh issue with page/quote provenance, and price band/bid lot staying `None` as diagnosed placeholders. It is skipped when the evidence artifact is absent.
+`tests/test_paras_evidence_regression.py` (new, 9 cases) asserts the artifact hash and pins the real document's behaviour: not a notice, RHP class and identity, cover read for the issue window, the p590 defined term not competing, the ₹9,500.00 million OFS and ₹5,000.00 million fresh issue with page/quote provenance, and price band/bid lot staying `None` as diagnosed placeholders. It is skipped when the evidence artifact is absent.
 
-**Execution status: NOT RUN — deferred to the separate regression pass.**
+**Execution status: EXECUTED on 2026-10-23 — 45 collected, 45 passed, 0 failed, 0 skipped (see §11.8).**
+
+The broader focused command below (notice parser, offer-table boundaries, OFS NIL binding, prospectus pathway, multi-source issue terms, automatic discovery) was **not** run in this pass — only the two modules named in the first command. The full suite is likewise **not run**.
 
 ```bash
 cd /home/user/jio-k15
@@ -374,9 +377,78 @@ PYTHONPATH=engine python -m pytest -q tests/test_paras_evidence_regression.py \
 PYTHONPATH=engine python -m pytest -q tests/          # full suite
 ```
 
-## 11.8 What is still open
+## 11.8 Validation pass (revision 3) — executed results
+
+**Date:** 2026-10-23. **Commit under test:** `4b1c67f70047bbb5dbac10d18e53502a3c95c068` on `arena/07f3439f-ipo-screening-engine` (`main` untouched at `01ba66c`). **Environment:** CPython 3.11.2, pytest 9.1.1, `PYTHONPATH=engine`, interpreter `/home/user/ev/bin/python` (the repository `.venv` has no `pypdf`).
+
+### Evidence integrity re-checked before the run
+
+| Check | Result |
+|---|---|
+| SHA-256 of the working-tree artifact | `E0A3187FE18D1C12F88F29170291972714CF15BE7946E8A7F4A7D8C914570E74` — matches the published value |
+| Size / page count | 11,577,075 bytes / 651 pages |
+| Source | commit `1dd6e14e7fa50a677beefba9ca7d0d1a7b322c58`, path `docs/investigations/paras-healthcare/…pdf`, blob `f62a80f5e69702885da59462464023ca300ade0d`; re-verified from `origin` after publication |
+| Fixture uses that artifact | yes — the module resolves the single committed path, and the fixture asserts the hash before any test body runs |
+
+**The hash guard is effective, not decorative** (probed both ways on throwaway copies):
+
+* artifact absent ⇒ **9 skipped** at module scope — the module reports *skipped*, never passed;
+* one byte of the same-length artifact flipped ⇒ **9 errors**, each `AssertionError` at the hash line in the fixture — a substituted or truncated file fails loudly instead of quietly testing different bytes.
+
+A skip is therefore not evidence of correctness; the numbers below are the run **with** the artifact present at the published hash.
+
+### Command and results
+
+```bash
+cd /home/user/jio-k15
+PYTHONPATH=engine /home/user/ev/bin/python -m pytest \
+    tests/test_official_rhp_terms_and_dates.py \
+    tests/test_paras_evidence_regression.py -q
+```
+
+| Run | Collected | Passed | Failed | Skipped | Exit |
+|---|---|---|---|---|---|
+| 1 (first execution) | 45 | 44 | 1 | 0 | 1 |
+| 2 (after the test-side fix) | 45 | **45** | 0 | 0 | 0 |
+
+Case counts: 36 in `tests/test_official_rhp_terms_and_dates.py`, 9 in `tests/test_paras_evidence_regression.py`.
+
+### The one failure — a defect in the test, not in the engine
+
+`test_the_historical_2017_defined_term_is_not_the_close_date` (real-artifact module), line 128:
+
+```
+TypeError: 'PriceBandField' object is not subscriptable
+    assert all(item["value"] != "2017-07-14" for item in [close_field])
+```
+
+**Root cause:** the assertion was written against a dict shape; `_extract_dates` returns `PriceBandField` dataclasses. This was a transcription error in a test written during revision 2 and never executed. **The production behaviour it asserted was already correct** — the run had printed `close_field.value == "2026-10-23"` and `open_field.value == "2026-10-21"` on the two preceding assertions.
+
+**Correction (test only):** attribute access (`close_field.value != "2017-07-14"`), plus an added assertion that the structural exclusion left `_last_excluded_dates` with no `2017-07-14` entry — which records *why* the date never competes (p590 is a definitions page, so no candidate is ever produced) rather than only that it lost. No assertion was weakened, no test removed or converted to a skip, and **no production module was touched** in this revision.
+
+### Behavioural checks executed (A–F)
+
+Run as read-only probes against the retained artifact plus the synthetic cases in the executed module.
+
+| Check | Executed result |
+|---|---|
+| **A** Document class | `parse_official_rhp` ⇒ `source_type=RHP`, `document_class=OFFICIAL_RHP_TERMS`, basis "RHP title". Not a price-band notice; not promoted to a final Prospectus. The notice parser refuses it **by class** (`PriceBandNoticeClassificationError` naming the prospectus title), while genuine notice fixtures still classify. A missing `Prospectus Dated:` is not disqualifying (the synthetic RHP without that line is still an RHP); GID and DRHP are still refused. |
+| **B** Dates | open `2026-10-21`, close `2026-10-23`, both from p3 with quote/locator. The p590 `"Closing Date" shall mean 14 July 2017` definition never enters the candidate set (`historical_dates_excluded: []` — structural exclusion, not a rejected candidate). Synthetic cases show an in-window historical sentence *is* excluded with `HISTORICAL_DATES_EXCLUDED` and that two credible current close dates still yield `close_date=None` + `CONFLICTING_CLOSE_DATES`. No date is excluded merely for being old: the same 2017-style window is read normally when it *is* the current issue. |
+| **C** Offer amounts | OFS `9500.0 INR_MILLIONS`, fresh `5000.0 INR_MILLIONS`, both `DETERMINISTIC_PDF` / `VERIFIED`, p3, with the seller rows (₹3,000 + ₹6,500 million) as the corroborating disclosure. The `[●]` **share count** in the same sentence does not discard the monetary amount (`_AMOUNT_SLOT_PLACEHOLDER` only withholds a money-slot placeholder). The rule is general: the amount-binding test uses an issuer other than Paras. |
+| **D** Band / bid lot | `price_band_low=None`, `price_band_high=None`, `lot_size=None`, `collar_spread_pct=None`, `collar_valid=None`; three `SOURCE_PLACEHOLDER` diagnostics (band low p11, band high p11, bid lot p9) each with quote. No substitution from the seller price (₹3,000/₹6,500 million) or any unrelated range; nothing inferred from dates. Colon-form bands parse real numerics, unrelated numeric ranges are refused, and two differing declarations are withheld rather than first-won (synthetic cases) — cross-issuer values were never consulted. |
+| **E** Resolution | `resolve_fields` ⇒ `status=PARTIAL`; resolved `open_date`, `close_date`, `ofs`, `fresh_issue`; unresolved `price_band_low`, `price_band_high`, `lot_size`. `issue_term_errors: {}`. Undisclosed OFS in a different document stays unresolved rather than zero (synthetic); only an explicit NIL binds `0.0`; a conflicting field withholds that field alone. |
+| **F** Operator diagnostics | each unresolved field carries `state=UNRESOLVED_AFTER_DISCOVERY`, `why_unresolved=["PLACEHOLDER_IN_QUALIFIED_DOCUMENT: page 11"]` (p9 for `lot_size`), `inspected_sources=[{document_class: OFFICIAL_RHP_TERMS, …}]` and a `required_evidence` sentence. The absent / placeholder / conflicting / historical-excluded / no-source states are distinguishable in the synthetic cases. `_REQUIRED_EVIDENCE` covers every member of `DISCOVERABLE_TERMS`. These are **additive** keys: existing `state` values, required-term contract and eligibility are unchanged, and an unresolved field is never reported as verified. |
+
+### What this run does **not** establish
+
+* It is **not** an ingestion run. The service gate, the `AWAITING_ISSUE_TERMS` payload, discovery, provider fetch and any evaluation were not executed; "the parser reads this document" is not "the ingestion path works".
+* It is **not** the full regression suite (~3 h, `PYTHONPATH=engine python -m pytest -q tests/`) — not run, no claim made.
+* Price band and bid lot remain **unresolved** for this filing, because the document prints `[●]`; no separate official band notice or final Prospectus was consulted.
+* Trace `ing-42ded42dde7a41b2` remains unavailable.
+
+## 11.9 What is still open
 
 1. **The trace itself.** `ing-42ded42dde7a41b2` remains unavailable; the reconstruction matches its reported symptoms exactly (the two close dates, with the mechanism now known), but the run's own request/discovery payload cannot be diffed against this pass's probes.
 2. **Price band and bid lot for this filing are genuinely undisclosed.** The RHP states `[●]` at pp. 9 and 11. A separate price band notice or the final Prospectus would be required; the engine now says exactly that instead of "absent".
 3. **No ingestion was run end to end.** The resolution was exercised at the field-resolution layer with the real document as the candidate; the service gate, the `AWAITING_ISSUE_TERMS` payload it would now produce and any evaluation remain unexecuted by instruction.
-4. **Regression execution pending.**
+4. **Regression execution is partial by design.** The two focused modules are green (§11.8); the full backend suite (~3 h) was not run and no claim is made about it. The ingestion path was not exercised end to end, so "parser tests pass" is not "ingestion validated".

@@ -25,8 +25,10 @@ runnable in a checkout that does not carry the artifact.  General behaviour is
 covered issuer-independently in ``tests/test_official_rhp_terms_and_dates.py``;
 this module pins the actual document.
 
-Execution status: NOT RUN in the pass that added it — deferred to the separate
-regression pass.
+Execution status: RUN 2026-10-23 on commit 4b1c67f -- 9/9 passed with the artifact
+present at the published hash.  Both guard directions were verified: with the
+artifact absent the module reports 9 *skipped* (never passed), and with a single
+byte changed at constant length all 9 error at the fixture hash assertion.
 """
 
 from __future__ import annotations
@@ -125,7 +127,11 @@ def test_the_historical_2017_defined_term_is_not_the_close_date(raw, parsed):
     # Nothing on the definitions page becomes a close-date candidate, and no
     # conflict is reported: 2017 never enters the candidate set.
     assert all("2017" not in finding.message for finding in findings)
-    assert all(item["value"] != "2017-07-14" for item in [close_field])
+    assert close_field.value != "2017-07-14"
+    # The exclusion is structural (p590 is not an issue-term page), so the
+    # value is never even examined; if it ever is, the defined-term guard and
+    # the document-date window are pinned by the synthetic cases.
+    assert all(item["value"] != "2017-07-14" for item in parser._last_excluded_dates)
     assert parsed.close_date.value == "2026-10-23"
 
 

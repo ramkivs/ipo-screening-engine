@@ -29,7 +29,8 @@ issuer-specific: no company name, CIN, date, URL or expected value from the
 Paras filing appears in production code, and the tests below use synthetic
 documents that exercise the *behaviour*.
 
-Execution status: NOT RUN -- deferred to the separate regression pass.
+Execution status: RUN 2026-10-23 on commit 4b1c67f -- 36/36 passed (CPython 3.11.2,
+``PYTHONPATH=engine``).  The full backend suite was not run.
 """
 
 from __future__ import annotations

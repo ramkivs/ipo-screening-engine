@@ -3,11 +3,11 @@
 - **Decision ID:** A30
 - **Title:** a document is read under its own class, and a conflicting field is withheld rather than rejecting the document
 - **Record type:** **IMPLEMENTATION RECORD — no new policy, no new criterion, no scoring change.** Per `handoff/decisions/CONVENTION.md` rule 4, the approved text below is the correction contract that the investigation was authorised to implement; the analysis and residual risks are Arena's and are recorded, not decided.
-- **Decision status:** **IMPLEMENTED 2026-10-23; regression execution PENDING.**
+- **Decision status:** **IMPLEMENTED 2026-10-23; FOCUSED REGRESSION EXECUTED AND GREEN 2026-10-23** (45/45 passed, 0 skipped — §5). Full backend suite (~3 h) and end-to-end ingestion remain unexecuted.
 - **Decision authority:** RAMKI — 2026-10-23 investigation directive for the Paras Healthcare ingestion failure (general, issuer-independent correction; no hardcoding, no policy change).
 - **Decision date:** 2026-10-23 (Asia/Calcutta).
 - **Repository:** `ramkivs/ipo-screening-engine`
-- **Baseline identity:** branch `arena/07f3439f-ipo-screening-engine`, tip `8939b05be00a23d5733163cdb6a280b0578cfd10`; `main` untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`.
+- **Baseline identity:** branch `arena/07f3439f-ipo-screening-engine`, tip `4b1c67f70047bbb5dbac10d18e53502a3c95c068` at the validation pass (was `8939b05` when the correction contract was implemented); `main` untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`.
 - **Scope:** document-class recognition (`DRHP` / `RHP` / `Final Prospectus` / `Price Band Notice` / `General Information Document`), issue-term extraction authority per class, and the handling of a field whose candidates conflict.
 - **Out of scope and unchanged:** `config/ipo-config.v1.5.0.json` and `v1.6.0`, `schema/`, `derived.py`, `knockouts.py`, `scoring.py`, `confidence.py`, A9 / GMP qualification and Final-withholding, K1–K5 semantics, the A23/A24/A25 litigation and regulatory rules, the A29 status meaning, required-term policy, issue-term qualification/verification rules, issuer matching, official-source allow-lists, fixtures, the golden record and every historical evaluation.
 
@@ -56,11 +56,25 @@ Added in revision 2, after the actual 651-page RHP was recovered and read (the r
 * **Rejection semantics changed for two cases only:** a notice with a conflicting band/lot/window is now accepted with that field withheld (it used to throw the document away), and an RHP is accepted as an RHP. Every other rejection path (collar, identity, placeholder-only, GID, DRHP, unqualified source) is unchanged.
 * **No criterion moves on its own.** Issue terms feed `AWAITING_ISSUE_TERMS`; a withheld field cannot satisfy a required term, so a run that could not resolve terms still cannot.
 
-## 5. Tests — NOT RUN
+## 5. Tests — EXECUTED
 
-Added `tests/test_official_rhp_terms_and_dates.py` (36 cases after revision 2) and `tests/test_paras_evidence_regression.py` (10 cases against the retained 651-page filing, skipped when the artifact is absent), and rewrote two tests in `tests/test_price_band_notice.py` whose assertions encoded the old contract (`test_conflicting_price_bands_rejected` → `…_withhold_the_band_not_the_document`; `test_inverted_date_order_rejected` → `…_withholds_both_dates`). The rewrites keep the failure assertion (the conflicting value is never published) and add the survival assertion (the undisputed fields are).
+Added `tests/test_official_rhp_terms_and_dates.py` (36 cases after revision 2) and `tests/test_paras_evidence_regression.py` (9 cases against the retained 651-page filing, skipped when the artifact is absent), and rewrote two tests in `tests/test_price_band_notice.py` whose assertions encoded the old contract (`test_conflicting_price_bands_rejected` → `…_withhold_the_band_not_the_document`; `test_inverted_date_order_rejected` → `…_withholds_both_dates`). The rewrites keep the failure assertion (the conflicting value is never published) and add the survival assertion (the undisputed fields are).
 
-**Execution status: NOT RUN — deferred to the separate regression pass** (full backend suite ≈ 3 h, excluded by explicit instruction). Static compilation only.
+**Execution status: RUN 2026-10-23 and GREEN.** Command, environment and counts:
+
+```bash
+cd /home/user/jio-k15
+PYTHONPATH=engine /home/user/ev/bin/python -m pytest \
+    tests/test_official_rhp_terms_and_dates.py tests/test_paras_evidence_regression.py -q
+# commit 4b1c67f, CPython 3.11.2, pytest 9.1.1
+# 45 collected -> 45 passed, 0 failed, 0 skipped  (exit 0)
+```
+
+The first execution produced 44 passed / 1 failed: `test_the_historical_2017_defined_term_is_not_the_close_date` raised `TypeError: 'PriceBandField' object is not subscriptable` — the assertion had been written against a dict shape, a transcription error in an unexecuted test, not a defect in the engine (the value it asserted, close `2026-10-23` / open `2026-10-21`, was already correct on the preceding lines). Corrected in the test only: attribute access, plus an added assertion that `_last_excluded_dates` carries no `2017-07-14` entry, so the test now records *why* the 2017 definition never competes. **No production module was changed in the validation pass; no assertion was weakened; no test was deleted or converted to a skip.**
+
+The evidence guard was verified in both failure directions on throwaway copies: artifact absent ⇒ 9 skipped (reported as skipped, never as passing); one byte flipped at constant length ⇒ 9 errors at the fixture's hash assertion. The retained artifact's sha256, size (11,577,075 bytes) and page count (651) were re-checked against the published values before the run.
+
+**Not run, and not claimed:** the broader focused command (notice parser, offer-table boundaries, OFS NIL binding, prospectus pathway, multi-source issue terms, automatic discovery) and the full backend suite (`PYTHONPATH=engine python -m pytest -q tests/`, ≈ 3 h). No ingestion and no evaluation.
 
 ## 6. Residual risks and open items
 
