@@ -4,6 +4,13 @@
 **Reference evaluation:** `JIO-PLATFORMS-LIMITED-20261023-085751Z-final-29d9a601` (34.0 / 100, interval 24–77, `INSUFFICIENT_DATA`, A9 `NONTERMINAL_UNRESOLVED`)
 **Retained source:** `evidence/non-authoritative/jio/U72900GJ2019PLC110816_JIO.pdf`, sha256 `72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d`, 591 pages
 
+> **Revision 2 — 2026-10-23 (later same day):** Ramki authorised **K2-A** and the
+> K2 extraction corrections. Sections 1–9 below are the *analysis* record of
+> Revision 1 and are preserved as such; **§10** records the authorised decision
+> (`A29`), the implementation, the published decision records A19–A27, the K5
+> citation change and the deferred regression run. Where §2.5/§2.6 list options
+> and proposals, §10 states which of them became authorised work.
+
 This pass was **evidence and governance only**. No regression test was run, no ingestion was performed, no evaluation was created, and no application, test, schema, config or frontend file was modified. The engine's own extractor and regexes were applied read-only to the retained PDF, in a probe script, to establish where evidence stops travelling.
 
 ---
@@ -13,7 +20,7 @@ This pass was **evidence and governance only**. No regression test was run, no i
 | Criterion | State | Why |
 |---|---|---|
 | **K1** `going_concern_uncertainty` | UNKNOWN (governed) | The filing contains **no** going-concern statement of either polarity. A19 (approved) forbids deriving a negative from silence, from an unmodified opinion, or from a negated statement. No evidence was lost — the pages were read. |
-| **K2** `sebi_ed_action_active` | UNKNOWN (fail-closed, but **evidence was lost**) | The filing discloses a **pending SEBI proceeding against the Promoter and a Director** plus concluded SEBI penalties against the Promoter, inside a TOC-located, fully-readable litigation window. The extractor discards all of it: **all twelve** SEBI/ED-actor spans in the window exceed its 600-character cap, and four further mechanical filters would each have blocked the survivors. This is the only one of the three where the record understates the filing. |
+| **K2** `sebi_ed_action_active` | UNKNOWN (fail-closed, but **evidence was lost**) — **Revision 2: extracted as `true` under A29; see §10** | The filing discloses a **pending SEBI proceeding against the Promoter and a Director** plus concluded SEBI penalties against the Promoter, inside a TOC-located, fully-readable litigation window. The extractor discards all of it: **all twelve** SEBI/ED-actor spans in the window exceed its 600-character cap, and four further mechanical filters would each have blocked the survivors. This is the only one of the three where the record understates the filing. |
 | **K5** `contingent_liab_unquantified` | UNKNOWN (governed) | Note 37 is fully quantified (15,021 INR million at 31 March 2026), the ratio reproduces exactly at 0.4470843085 %, and the flag is absent only because A20 rule 8 permits a `True` from a positive in-section statement and nothing else. No parsing or arithmetic error exists. |
 
 Two findings are new relative to the 2026-10-23 validation report: **note 47.4 on p430** (a scoped five-period negative for audit qualifications, other legal/regulatory matters and Emphasis of Matter) and the **complete mechanical explanation of the K2 null** (§2.4).
@@ -264,3 +271,132 @@ The emitted evidence for `financials.contingent_liabilities` quotes only the row
 | `docs/investigation/jio-k125-20261023/k2-extraction-reproduction.json` | Page-level reproduction of the twelve discarded spans and each mechanism |
 | `docs/investigation/jio-k125-20261023/k5-contingent-liability.json` | K5 rule, verified arithmetic on three bases, provenance defect, scope question |
 | `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` | Tracker entry |
+
+---
+
+# 10. Revision 2 — K2-A authorised and implemented (2026-10-23)
+
+## 10.1 The decision
+
+Ramki authorised **K2-A**, recorded durably as **`handoff/decisions/A29-k2-active-action-pending-appeal.md`**:
+
+> A regulator's pending appeal qualifies as an active action at the evaluation cutoff, subject to the existing party-scope rules and evidence requirements.
+
+A29 is a **clarification of the status meaning of "active"**, not a change to the party population (A23/A24) and not a change to the `false` rule (A23 §6A.2, A25). K2-B (a penalty still in force) and K2-C (issuer-only) were **not** adopted and remain open questions for Ramki. Nothing in A29 re-scores, re-runs or edits a historical evaluation.
+
+## 10.2 Each failure mode, confirmed against the current implementation
+
+| ID | As reported in Revision 1 | Confirmed in code before editing | Status now |
+|---|---|---|---|
+| P1 | 600-character cap applied to a line span | `_sebi_ed_action_finding` positive route: `if len(sentence) > 600: continue`, where `sentence` came from `_lit_span` (line-assembled). 12/12 SEBI/ED candidates in the Jio window measured 715–1,804 characters | **corrected** — `_lit_sentence_bounds()` narrows the span to the sentence containing the match; the cap now measures a sentence. A match may not cross a masked region (`_LIT_MASKED_REGION`) |
+| P2 | `[^.\n]` breaks on a hard wrap | `_REG_ACTION` excludes `\n` in every branch; p468 reads `SEBI \nfiled` | **corrected** — `_lit_match_text()` replaces a *single* newline with a space at identical offsets (paragraph breaks preserved), so every emitted quotation is still a verbatim slice |
+| P3 | party literal does not recognise `RIL` | `_LIT_PARTY` lists company / promoter / director / subsidiary / KMP / senior management only — deliberately **not** widened | **corrected without widening scope** — heading attribution, see §10.3 |
+| P4 | boilerplate veto rejects a genuine action citing a regulation | `_REG_BOILERPLATE` contained `regulations,?\s*20\d\d` and `regulation\s+\d`, so the 24 March 2017 SEBI order sentence was vetoed | **corrected** — citation forms moved to `_REG_BOILERPLATE_CITE` and vetoed only when the sentence reports no adjudicative event (`_REG_ADJUDICATIVE_EVENT`) |
+| P5 | regulator-first verb list omits `filed` | confirmed (the list had `initiated|issued|passed|imposed|conducted|attached|registered|served`), and the action-noun list had no `appeal` / `revision application` | **corrected** — `filed|preferred|moved|referred` added, plus the nouns a regulator files; the action noun is still required |
+
+**One further defect was found during implementation and fixed before publication.** P1 made the p463 section preamble — *"this section also provides the details of all disciplinary actions initiated or taken and penalties imposed by SEBI or the Stock Exchanges …"* — quotable for the first time, and the probe emitted it as a finding. It describes the section, not an event. `_REG_META_DISCOURSE` now rejects statements *about* the disclosure. This is the class of false positive the fail-closed design exists to prevent, and it was caught by probing the real filing rather than by reasoning about the regex.
+
+## 10.3 P3 — heading attribution, kept separable
+
+Party scope is stated by the filing in its section headings ("IV. Outstanding litigation involving RIL, the Promoter") and the sentence names only a short name. P3 attributes the heading's party to a sentence that names none, under four constraints: (1) section-level headings only (`I.` … `XVIII.` + title), never a lettered sub-heading; (2) the heading must name **exactly one** A24 group; (3) the sentence itself must name no party; (4) the heading must precede the sentence in document order — and a heading that names no single group **clears** the earlier attribution instead of inheriting it. The attribution is exported in the evidence note, and the `quote` remains the sentence.
+
+**Separability is mechanical:** the behaviour sits behind one class flag, `SectionExtractor._LIT_HEADING_PARTY_ATTRIBUTION = True`; setting it to `False` restores the pre-A29 party test exactly (probe on the retained filing: flag on ⇒ `true`, flag off ⇒ no field), with no other behaviour touched. P3 is confined to `_lit_section_party_map` / `_lit_party_from_heading` and one call site plus one branch in the evidence note. Reverting it leaves every sentence that names no party with no finding — i.e. K2 returns to UNKNOWN — and cannot create a `false`, clear a flag, or convert a denial into an action. The other four corrections do not depend on it.
+
+## 10.4 P3 negative tests added — NOT EXECUTED
+
+Added to `tests/test_litigation_regulatory_defaults.py` (section "A29 (K2-A)"):
+
+| Test | Guards against |
+|---|---|
+| `test_a29_p3_ambiguous_heading_attributes_nothing` | attributing through a heading that names several groups (the filing's §VIII tax heading) |
+| `test_a29_p3_heading_below_the_sentence_attributes_nothing` | a heading scoping a paragraph above it |
+| `test_a29_p3_heading_on_a_later_page_attributes_nothing` | section scope carried backwards across a page break |
+| `test_a29_p3_lettered_subheading_never_attributes` | a `c) …` sub-heading scoping more than its own item |
+| `test_a29_p3_a_no_party_heading_clears_the_earlier_attribution` | inheriting an earlier attribution past an ambiguous heading |
+| `test_a29_an_unrelated_sebi_reference_is_not_an_action` | every SEBI mention becoming an action (P5 over-reach) |
+| `test_a29_section_meta_discourse_is_not_a_finding` | the p463-style preamble being reported as a disclosure |
+
+Positive/behavioural cases added alongside: pending appeal under a single-party heading (with the evidence-note assertions), hard-wrapped sentence, long paragraph quoted by sentence, dated order citing a regulation, citation without an event, and concluded-action status.
+
+**Execution status: NOT RUN — deferred to the separate regression pass.** No `pytest`, backend or frontend run was made in this pass.
+
+## 10.5 What the corrected extractor produces for this filing
+
+Read-only application of the published extractor to the retained PDF (an extraction probe, **not** a test run and **not** an evaluation):
+
+```
+field:  governance.sebi_ed_action_active
+value:  true
+page:   468
+quote:  "Against the said order of the Special Court, SEBI filed a revision application
+         before the Hon'ble High Court of Bombay and the same is currently pending."
+notes:  SEBI/ED action disclosed by the filing; action status stated in the quotation: pending;
+        A29 (K2-A): a proceeding pending at the evaluation cut-off is an active action, subject
+        to the existing party-scope rules; party attributed under A29 (P3) from the section
+        heading "III. Outstanding litigation involving the Directors" -> Directors; the quoted
+        sentence does not itself name an A24 party group; search basis: litigation section
+        located via the filing's table of contents; all pages in the window read
+verbatim: yes (checked against the page text)
+```
+
+`governance.litigation_bucket` is unchanged (`criminal_or_regulatory`). The seven fixture filings under `fixtures/filings/` were probed the same way and **all still emit no `sebi_ed_action_active`**, so no fixture's K2 changes.
+
+**Consequence, stated but not executed:** K2 is a knockout; `true` ⇒ `TRIGGERED` ⇒ A7 / `config.verdict.knockout_verdict` ⇒ **`AVOID`**. The retained evaluation `JIO-PLATFORMS-LIMITED-20261023-085751Z-final-29d9a601` (34.0, 24–77, `INSUFFICIENT_DATA`, A9 nonterminal) predates the correction and is untouched; it still carries `sebi_ed_action_active = null`. A future evaluation would be a new record.
+
+## 10.6 A19–A27 published
+
+All nine records were retrieved byte-for-byte from `ebb8a6c` (`handoff/decisions/` there) and published into this branch under the same names, then verified by comparing sha256 of the retrieved blob with the written file — **all nine identical**:
+
+| Record | sha256 (source = published) |
+|---|---|
+| A19-k1-going-concern-positive-evidence | `1a70bfb3…a4b91a4` |
+| A20-k5-contingent-liability-numerator | `4b844acd…4252dbd` |
+| A21-promoter-post-issue-holding | `42f4cddb…8c84a16` |
+| A22-auditor-tenure-and-repeated-eom | `e21a63cc…12dd3240` |
+| A23-litigation-regulatory-evidence-defaults | `448336d9…71fce5c` |
+| A24-litigation-party-coverage-standard | `47091803…eeb769` |
+| A25-sebi-ed-absence-source-coverage-standard | `854a281b…3904b` |
+| A26-tax-only-proceedings-classification | `6254003b…55a894` |
+| A27-auditor-bucket-unconsumed-clauses | `9aaad4ad…64b448` |
+
+No text was reconstructed from a summary and none was corrected. Code and documentation citations to A19–A27 now resolve inside this branch. **Still absent from this branch and from `ebb8a6c`'s publication set:** `A8-R-REGULATOR-SOURCE-COVERAGE-DEPENDENCY-REQUEST-2026-10-20.md` (present at `ebb8a6c`) and `2026-10-22-pa-aggregator-issue-terms.md` — both were outside the authorised A19–A27 scope and are recorded here rather than copied.
+
+## 10.7 K5 evidence citation
+
+`financials.contingent_liabilities` now cites the disclosed amount and its column:
+
+```
+before:  Claims / disputed liabilities against the Group not acknowledged as debts*
+after:   Claims / disputed liabilities against the Group not acknowledged as debts* |
+         15,021 as at 31 March 2026
+```
+
+The record also carries a `notes` line stating that the citation is *assembled* — the verbatim row label(s) followed by the selected cell in the record's `raw_unit`, from the 31 March 2026 column — so a reader can tell the difference between a contiguous quotation and a label-plus-cell citation.
+
+**Unchanged:** the value (15,021), the flag (`unquantified = None`), the numerator definition (A20 r6, commitments excluded), the denominator, the column selection rule, the 50 % threshold, the ratio (0.4471 %) and K5's disposition (**UNVERIFIED**). The net-worth-basis question remains separate and unresolved. One existing expectation in `tests/test_contingent_liabilities_extraction.py` was updated from an exact-equality assertion on the label-only quote to a prefix + amount assertion, because the label-only form is what this change replaces.
+
+## 10.8 K1 and K5 remain unchanged
+
+Nothing in this pass adds evidence about going-concern uncertainty, and nothing changes K5's classification rule. **K1 stays UNKNOWN** (A19; no statement of either polarity; note 47.4 on p430 is silent on going concern and an SA 570 section is neither a qualification nor an EOM). **K5 stays UNKNOWN** (A20 r8; the note is fully quantified). Neither is "resolved" by this record.
+
+## 10.9 Remaining factual limitation
+
+The finding rests on **what the filing states**, not on an independently verified procedural status. Direct retrieval of SEBI and Bombay High Court material remains blocked by this sandbox's egress, so:
+
+* the engine asserts that the filing reports a revision application pending before the Bombay High Court — that is what the quotation establishes;
+* neither this report nor the engine asserts where that revision stands today, whether it has since been decided, or whether any other proceeding exists;
+* A29 adds no cutoff input and no clock: the evidence note records the **status stated in the quotation**, and no inference is drawn from the filing date to a later date.
+
+## 10.10 Regression plan (separate pass)
+
+1. Run `tests/test_litigation_regulatory_defaults.py` first — it holds every A29 case plus the D-5/A23/A24/A25 pins that must not move.
+2. Then `tests/test_contingent_liabilities_extraction.py` and `tests/test_jio_evidence_remediation.py` for the K5 citation change.
+3. Then the full backend suite (the ~3-hour run) and the frontend `node --test` suite.
+4. Expected **zero** behavioural change for: the seven fixture filings' `sebi_ed_action_active` (all absent), `litigation_bucket` scoring, the golden result hash `e84f8bc0…`, and every knockout/verdict path that does not read a corrected K2 input.
+5. Watch specifically for: a fixture or golden evaluation whose litigation text contains a numbered section heading plus a SEBI sentence (P3 is the only change that can *add* a party), and any test that asserts an exact quotation string from `_extract_contingent_liabilities` (the K5 citation shape changed deliberately — one such assertion was already updated).
+
+## 10.11 Scope statement for this pass
+
+Implemented: A29 record; five extraction corrections plus the meta-discourse guard; the K5 citation; nine published decision records; the report and tracker updates; the focused tests above.
+
+**Not done, deliberately:** no regression test was executed (including the full backend suite), no ingestion, no new evaluation, no re-score, no edit to any historical evaluation artifact, no change to A9/GMP qualification or Final-withholding, no change to K1 or K5 semantics, no widening of party scope, no conversion of missing evidence into a negative, no manufactured regulator or court status, no scoring or config change, and nothing merged into `main`.

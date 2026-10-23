@@ -250,6 +250,12 @@ class FinancialTableExtractor:
                     section="Notes to Restated Financials",
                     locator="Contingent Liabilities and Commitments (claims not acknowledged as debts, latest fiscal year)",
                     quote=cl_quote or str(cl_amount),
+                    notes=(
+                        "assembled citation: the verbatim row label(s) of the "
+                        "contingent-liability section followed by the selected "
+                        f"cell in {unit} and the fiscal-year column it was read "
+                        "from; the section total excludes commitments (A20 r6)"
+                    ),
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.95,
                 )
@@ -704,7 +710,7 @@ class FinancialTableExtractor:
                 ]
                 if not march_columns:
                     continue
-                column, _ = max(march_columns, key=lambda item: item[1])
+                column, column_year = max(march_columns, key=lambda item: item[1])
 
                 rows: List[Tuple[str, float]] = []
                 ambiguous = False
@@ -772,7 +778,16 @@ class FinancialTableExtractor:
                     used = contingent
                 else:
                     continue
-                quote = " | ".join(" ".join(label.split()) for label, _ in used)
+                # A29 (K5 evidence presentation): the label alone is not
+                # verifiable evidence -- a reader cannot confirm 15,021 from
+                # "claims / disputed liabilities ... not acknowledged as
+                # debts".  The citation carries the selected cell and the
+                # column it came from, so the quantified amount, the period it
+                # belongs to and the criterion's own classification stay
+                # distinguishable.  No value, threshold, numerator, denominator,
+                # column choice or the ``unquantified`` flag is changed.
+                labels = " | ".join(" ".join(label.split()) for label, _ in used)
+                quote = f"{labels} | {amount:,.0f} as at 31 March {column_year}"
                 return p, amount, unquantified, quote
         return None, None, None, ""
 

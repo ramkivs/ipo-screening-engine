@@ -1561,6 +1561,49 @@ class SectionExtractor:
     #: (the D-1 ``_GOING_CONCERN_NEGATION`` technique).
     _LIT_NEGATION = re.compile(r"\b(?:no|not|none|nil|without|nothing)\b", re.IGNORECASE)
 
+    #: Abbreviations after which a period does **not** end a sentence.  Used
+    #: only when narrowing a line span to one sentence (A29 P1); treating
+    #: ``Limited.`` as a sentence end is correct, treating ``Rs.`` or ``Mr.`` as
+    #: one is not.
+    _LIT_SENTENCE_ABBREV = frozenset(
+        {
+            "mr", "mrs", "ms", "dr", "shri", "smt", "rs", "no", "nos", "co",
+            "pvt", "inc", "corp", "ltd", "viz", "approx", "cf", "vs", "st",
+            "jr", "sr", "u/s", "w.e.f", "i.e", "e.g",
+        }
+    )
+
+    #: The party groups A24 admits -- the same population ``_LIT_PARTY``
+    #: recognises, read as *named groups* so that a filing heading can be
+    #: classified only when it identifies exactly one of them.
+    _LIT_PARTY_GROUPS: Tuple[Tuple[str, str], ...] = (
+        ("Company", r"\bour\s+company\b|\bthe\s+company\b|\bcompany\b"),
+        ("Promoters", r"\bpromoters?\b"),
+        ("Directors", r"\bdirectors?\b"),
+        ("Subsidiaries", r"\bsubsidiar(?:y|ies)\b"),
+        ("KMP", r"\bkey\s+managerial\s+personnel\b|\bKMP\b"),
+        ("Senior management", r"\bsenior\s+management\b"),
+    )
+
+    #: A29 P3 kill switch.  Heading attribution is the one correction in this
+    #: pass that can *add* a party to a finding, so it is isolated behind a
+    #: single flag: setting this to ``False`` restores the pre-A29 party test
+    #: exactly (a sentence that names no party emits nothing, and K2 returns to
+    #: UNKNOWN), with no other behaviour affected.  The P3 tests in
+    #: ``tests/test_litigation_regulatory_defaults.py`` are the cases to
+    #: re-baseline if it is ever turned off.
+    _LIT_HEADING_PARTY_ATTRIBUTION = True
+
+    #: A *section-level* heading inside the litigation section, of the form the
+    #: ICDR Schedule-VI layout prints: ``IV. Outstanding litigation involving
+    #: RIL, the Promoter``.  Only these carry party scope across a page break;
+    #: a lettered sub-heading (``c) Actions by statutory/ regulatory
+    #: authorities against ...``) scopes one item and is not used (A29 P3).
+    _LIT_SECTION_HEADING = re.compile(
+        r"^[ \t]*(?:SECTION[ \t]+)?(?P<num>[IVX]{1,6})[.)][ \t]+(?P<title>[A-Z][^.\n]{2,160})$",
+        re.MULTILINE,
+    )
+
     #: Adverse-proceeding vocabulary for the prose route, deliberately
     #: *unchanged* from the baseline so that no filing is newly condemned by
     #: this pass; only the favourable default is removed.  The table and
@@ -1710,7 +1753,7 @@ class SectionExtractor:
     #: penalty, not a fine").
     _REG_ACT_VERB = re.compile(
         r"\b(?:initiated|issued|passed|imposed|conducted|attached|registered|taken|served|filed|raised"
-        r"|recorded|framed|pending)\b",
+        r"|recorded|framed|pending|preferred|moved|referred)\b",
         re.IGNORECASE,
     )
     #: An action of a regulator, in either word order, within one sentence.
@@ -1727,11 +1770,17 @@ class SectionExtractor:
         r"\b(?:against|upon|on)\b[^.\n]{0,60}?(?:SEBI|Enforcement Directorate|\bED\b|PMLA)"
         # ... or in the natural order, regulator first.  The action noun is
         # required so that a bare "SEBI has approved the offer document" is not
-        # an action against anybody.
+        # an action against anybody.  A29 (K2-A) adds the procedural verbs a
+        # regulator uses when it *appeals* an order -- ``filed``, ``preferred``,
+        # ``moved``, ``referred`` -- and the appeal/petition nouns that name the
+        # thing filed.  The action noun is still required, so a filing
+        # reference whose object is not an action of the regulator cannot be
+        # turned into a finding by the verb alone.
         r"|\b(?:SEBI|Securities and Exchange Board of India|Enforcement Directorate|\bED\b|PMLA)\b"
-        r"[^.\n]{0,60}?\b(?:has|have|had|is|was)?\s*(?:initiated|issued|passed|imposed|conducted"
-        r"|attached|registered|served)\b[^.\n]{0,60}?"
-        r"\b(?:proceedings?|notice|order|orders|summons|show\s+cause|penalt|attachment|charge\s?sheet)"
+        r"[^.\n]{0,60}?\b(?:has|have|had|is|was|were)?\s*(?:initiated|issued|passed|imposed|conducted"
+        r"|attached|registered|served|filed|preferred|moved|referred)\b[^.\n]{0,60}?"
+        r"\b(?:proceedings?|notice|order|orders|summons|show\s+cause|penalt|attachment|charge\s?sheet"
+        r"|revision\s+application|appeal|petition|complaint)"
         # ... or a matter stated as pending before the regulator.
         r"|\b(?:proceedings?|case[s]?|appeal|matter|enquiry|investigation)\b[^.\n]{0,50}?"
         r"\bpending\s+before\b[^.\n]{0,50}?(?:SEBI|Enforcement Directorate|\bED\b|PMLA)",
@@ -1752,11 +1801,61 @@ class SectionExtractor:
     )
 
     #: Boilerplate that names SEBI without describing any action (the cover
-    #: page, "not been recommended or approved by SEBI", bare regulation cites).
+    #: page, "not been recommended or approved by SEBI").  A29 (P4) separates
+    #: the *citation* forms out of this veto: a bare regulation cite is never an
+    #: action by itself, but a sentence that reports a specific adjudicative
+    #: event and happens to cite the regulation it was decided under is a
+    #: genuine action statement and must not be discarded for the citation.
     _REG_BOILERPLATE = re.compile(
-        r"\bICDR\b|\bregulations,?\s*20\d\d\b|\bnot\s+been\s+recommended\b|\bguarantee\s+the\s+accuracy\b"
-        r"|\bregistration\s+no\b|\bregulation\s+\d|\bSEBI\s+(?:ICDR|LODR|PFRR|DAP|Listing)\b"
+        r"\bICDR\b|\bnot\s+been\s+recommended\b|\bguarantee\s+the\s+accuracy\b"
+        r"|\bregistration\s+no\b|\bSEBI\s+(?:ICDR|LODR|PFRR|DAP|Listing)\b"
         r"|\blimitation\s+act\b",
+        re.IGNORECASE,
+    )
+    #: A bare regulation citation ("... Regulations, 2003", "Regulation 3(a)").
+    #: Vetoed only when the sentence reports no adjudicative event, so that the
+    #: citation cannot be the whole case for a finding and cannot veto one
+    #: either.
+    _REG_BOILERPLATE_CITE = re.compile(
+        r"\bregulations,?\s*20\d\d\b|\bregulation\s+\d", re.IGNORECASE
+    )
+    #: A dated or forked adjudicative event: the marker that a sentence is
+    #: reporting what a forum actually did, rather than restating the law.
+    _REG_ADJUDICATIVE_EVENT = re.compile(
+        r"\b(?:order|notice|complaint|summons|direction|circular)\s+dated\b"
+        r"|\bdated\s+\d{1,2}\s+(?:January|February|March|April|May|June|July|August"
+        r"|September|October|November|December)\b"
+        r"|\b(?:High\s+Court|Supreme\s+Court|Special\s+Court|Securities\s+Appellate"
+        r"|Tribunal|SAT|Adjudicating\s+Officer|Whole\s*time\s+Member|Division\s+Bench"
+        r"|Single\s+Judge)\b",
+        re.IGNORECASE,
+    )
+    #: Meta-discourse about the disclosure itself ("this section also provides
+    #: the details of all disciplinary actions ... including outstanding
+    #: actions").  Narrowing a span to a sentence (A29 P1) makes statements
+    #: *about* the section quotable for the first time, and such a sentence
+    #: describes the document, not an event: the action nouns it contains are
+    #: the object of "provides the details of".
+    _REG_META_DISCOURSE = re.compile(
+        r"\bthis\s+section\b|\bdetails\s+of\s+(?:all\s+|the\s+)?(?:disciplinary|actions?"
+        r"|proceedings?|penalt|litigation)"
+        r"|\b(?:are|is)\s+(?:set\s+out|disclosed|described|provided)\s+(?:below|above)\b"
+        r"|\bdisclosed\s+(?:below|above)\b|\bset\s+out\s+below\b",
+        re.IGNORECASE,
+    )
+    #: Where the action stands, as the quotation itself states it.  A29 (K2-A)
+    #: makes the distinction explicit in the evidence note rather than letting a
+    #: reader infer "active" from a past-tense verb: a proceeding pending at the
+    #: cutoff qualifies, and a concluded one is reported as concluded.
+    _REG_STATUS_PENDING = re.compile(
+        r"\b(?:is|are|was|were|has\s+been|have\s+been|remains?)\s+(?:currently\s+|still\s+)?pending\b"
+        r"|\bcurrently\s+pending\b|\bpending\s+before\b|\bsub\s*judice\b|\bawaiting\s+(?:the\s+)?(?:final\s+)?"
+        r"(?:order|judgment|decision|adjudication)\b",
+        re.IGNORECASE,
+    )
+    _REG_STATUS_CONCLUDED = re.compile(
+        r"\b(?:disposed|dismissed|set\s+aside|quashed|upheld|allowed|rejected|withdrawn"
+        r"|concurred|no\s+penalty|without\s+(?:the\s+)?levy|absolved|acquitted)\b",
         re.IGNORECASE,
     )
 
@@ -1884,6 +1983,13 @@ class SectionExtractor:
                 joined = joined[:lo] + " " * (hi - lo) + joined[hi:]
             for match in cls._LIT_HEADING.finditer(joined):
                 joined = joined[: match.start()] + " " * (match.end() - match.start()) + joined[match.end():]
+            # A numbered section heading ("IV. Outstanding litigation involving
+            # RIL, the Promoter") is scope, not disclosure: masking it keeps the
+            # heading out of every quotation and stops a line span from joining
+            # it to the sentence below it.  Its party scope is read from the
+            # original text by ``_lit_section_party_map`` (A29 P3).
+            for match in cls._LIT_SECTION_HEADING.finditer(joined):
+                joined = joined[: match.start()] + " " * (match.end() - match.start()) + joined[match.end():]
             out.append((page, joined))
         return out
 
@@ -1980,6 +2086,132 @@ class SectionExtractor:
         """The line-spanning sentence around a match, whitespace-normalised."""
         left, right = cls._lit_span(text, start, end)
         return " ".join(text[left:right].split())[:400]
+
+    #: A single newline inside a paragraph is a PDF *rendering* artefact, not a
+    #: syntactic break.  Two consecutive newlines are a paragraph break and are
+    #: left alone, so a match can never join unrelated paragraphs.
+    _LIT_WRAP = re.compile(r"(?<!\n)\n(?!\n)")
+
+    #: A run of blanked characters: summary-table rows, section headings and
+    #: nil labels are replaced by spaces at their original width, so a match
+    #: that touches one has walked out of the prose it belongs to.
+    _LIT_MASKED_REGION = re.compile(r"\s{3,}")
+
+    @classmethod
+    def _lit_match_text(cls, masked: str) -> str:
+        """``masked`` with hard line wraps turned into spaces *at the same
+        offsets*.
+
+        The extractor's regulatory patterns exclude ``\\n`` so that a match
+        cannot run across a sentence; on a hard-wrapped PDF line that exclusion
+        also breaks a single sentence in half (A29 P2: ``SEBI \\nfiled`` matched
+        nothing).  Replacing a lone newline with one space keeps every offset
+        identical, so a span computed on this text is still a span on the page
+        and the emitted quotation is still a verbatim slice.
+        """
+        return cls._LIT_WRAP.sub(" ", masked)
+
+    @classmethod
+    def _lit_sentence_bounds(
+        cls, masked: str, lo: int, hi: int, start: int
+    ) -> Tuple[int, int]:
+        """Narrow ``[lo, hi)`` to the sentence containing ``start``.
+
+        A line span is bounded by the lines a match happens to touch, and a
+        filing paragraph of 800-1,800 characters is one line span.  This finds
+        the sentence inside it so that the 600-character quotability rule (A29
+        P1) measures a sentence rather than an accident of typesetting.  A
+        period only ends a sentence when the next character starts a new one and
+        the period is not part of a known abbreviation, and a sentence never
+        crosses a blank line.
+        """
+        if hi <= lo or not (lo <= start < hi):
+            return lo, hi
+        breaks: List[int] = []
+        window = masked[lo:hi]
+        for match in re.finditer(r"[.!?](?=\s)", window):
+            pos = lo + match.start()
+            following = pos + 1
+            while following < hi and masked[following].isspace():
+                following += 1
+            if following >= hi:
+                continue
+            if not (masked[following].isupper() or masked[following] in "(\"'\u201c\u2018"):
+                continue
+            word = re.search(r"([A-Za-z]{1,6})$", masked[lo:pos])
+            if word is not None and word.group(1).lower() in cls._LIT_SENTENCE_ABBREV:
+                continue
+            breaks.append(pos)
+        left = lo
+        right = hi
+        for pos in breaks:
+            if pos < start:
+                left = pos + 1
+            else:
+                right = pos + 1
+                break
+        return left, right
+
+    @classmethod
+    def _lit_party_groups(cls, text: str) -> List[str]:
+        """Which A24 party groups ``text`` names (headings are classified)."""
+        return [
+            label
+            for label, pattern in cls._LIT_PARTY_GROUPS
+            if re.search(pattern, text, re.IGNORECASE)
+        ]
+
+    @classmethod
+    def _lit_section_party_map(
+        cls, lit_pages: Sequence[Tuple[int, str]]
+    ) -> List[Tuple[int, int, str, str]]:
+        """Section headings in the litigation section that name exactly one party.
+
+        A29 P3.  Only a heading that identifies precisely one A24 group is
+        usable: "Outstanding litigation involving the Directors" is a party
+        statement for everything under it, while "Outstanding tax claims
+        involving the Company, Promoter, Subsidiaries and Directors" is
+        ambiguous and contributes nothing.  Heading lines are read from the
+        *original* page text because the prose routes mask them.
+        """
+        out: List[Tuple[int, int, str, str]] = []
+        for page, text in lit_pages:
+            if not text:
+                continue
+            for match in cls._LIT_SECTION_HEADING.finditer(text):
+                groups = cls._lit_party_groups(match.group("title"))
+                # An empty group means "this heading does not identify one
+                # party" -- it is recorded so that it *clears* whatever an
+                # earlier heading established, which is the fail-closed reading
+                # of an ambiguous scope.
+                out.append(
+                    (page, match.start(), match.group(0).strip(), groups[0] if len(groups) == 1 else "")
+                )
+        return out
+
+    @staticmethod
+    def _lit_party_from_heading(
+        headings: Sequence[Tuple[int, int, str, str]], page: int, start: int
+    ) -> Optional[Tuple[str, str]]:
+        """The last section heading at or before ``(page, start)``, if any."""
+        found: Optional[Tuple[int, int, str, str]] = None
+        for heading in headings:
+            if (heading[0], heading[1]) <= (page, start):
+                found = heading
+            else:
+                break
+        if found is None or not found[3]:
+            return None
+        return found[2], found[3]
+
+    @classmethod
+    def _reg_action_status(cls, sentence: str) -> str:
+        """``pending`` / ``concluded`` / ``unspecified``, as the quotation states."""
+        if cls._REG_STATUS_PENDING.search(sentence):
+            return "pending"
+        if cls._REG_STATUS_CONCLUDED.search(sentence):
+            return "concluded"
+        return "unspecified"
 
     @classmethod
     def _lit_agencies(cls, sentence: str) -> Tuple[bool, bool]:
@@ -2126,7 +2358,7 @@ class SectionExtractor:
 
     def _sebi_ed_table_finding(
         self, lit_pages: Sequence[Tuple[int, str]]
-    ) -> Optional[Tuple[bool, int, str]]:
+    ) -> Optional[Tuple[bool, int, str, Dict[str, str]]]:
         """A non-nil SEBI / stock-exchange cell on an adverse table row.
 
         The ICDR summary table is where an outstanding disciplinary action by
@@ -2156,7 +2388,12 @@ class SectionExtractor:
                 if not self._LIT_CELL_COUNT.match(cell):
                     continue  # Nil / NA / unreadable: no action stated
                 if float(cell.replace(",", "").rstrip("%")) > 0:
-                    return (True, page, " ".join(row.group(0).split())[:400])
+                    return (
+                        True,
+                        page,
+                        " ".join(row.group(0).split())[:400],
+                        {"status": "unspecified", "party_basis": "table"},
+                    )
         return None
 
     def _litigation_table_finding(
@@ -2326,7 +2563,7 @@ class SectionExtractor:
 
     def _sebi_ed_labelled_finding(
         self, lit_pages: Sequence[Tuple[int, str]]
-    ) -> Optional[Tuple[bool, int, str]]:
+    ) -> Optional[Tuple[bool, int, str, Dict[str, str]]]:
         """A labelled category line naming SEBI or the ED, with a count.
 
         "Disciplinary actions by SEBI ... involving our Company" followed by
@@ -2352,12 +2589,17 @@ class SectionExtractor:
                 sebi_named, ed_named = self._lit_agencies(label)
                 if not (sebi_named or ed_named):
                     continue
-                return (True, page, " ".join(match.group(0).split())[:400])
+                return (
+                    True,
+                    page,
+                    " ".join(match.group(0).split())[:400],
+                    {"status": "unspecified", "party_basis": "labelled"},
+                )
         return None
 
     def _sebi_ed_action_finding(
         self, lit_pages: Sequence[Tuple[int, str]], allow_absence: bool = True
-    ) -> Optional[Tuple[bool, int, str]]:
+    ) -> Optional[Tuple[bool, int, str, Dict[str, str]]]:
         """Establish an active SEBI/ED action -- or its explicit absence.
 
         ``True`` requires a regulator to be named as the actor of an action
@@ -2375,24 +2617,46 @@ class SectionExtractor:
         established, so ``False`` is withheld and the field stays absent
         (K2 UNVERIFIED).  ``True`` never depends on this: a disclosed action is
         evidence whoever found it.
+
+        A29 (K2-A) changes four things in the *positive* route, none of them a
+        relaxation of what counts as evidence:
+
+        * the 600-character quotability cap measures the **sentence** around the
+          match, not the line span a paragraph happened to produce (P1);
+        * a hard line wrap is treated as a space for matching only, at identical
+          offsets, so a sentence the PDF broke in half still matches (P2);
+        * a sentence that names no party may take its party from the last
+          section-level heading that names exactly one A24 group, and the
+          attribution is carried in the evidence note (P3);
+        * a bare regulation citation no longer vetoes a sentence that reports a
+          dated or forked adjudicative event (P4), and a regulator's own
+          ``filed`` / ``preferred`` appeal of an order is recognised (P5).
+
+        The fourth element of the returned tuple is the A29 metadata: the status
+        the quotation states (``pending`` / ``concluded`` / ``unspecified``) and
+        how the party was established.  It is evidence presentation only -- the
+        boolean is decided exactly as before.
         """
         negative: Optional[Tuple[int, str]] = None
+        headings = self._lit_section_party_map(lit_pages)
         for page, text in self._lit_prose_pages(lit_pages):
             if not text:
                 continue
             original = dict(lit_pages).get(page, text)
+            match_text = self._lit_match_text(text)
             # An explicit *absence* statement naming both regulators needs no
             # act verb: "there are no active SEBI or ED regulatory proceedings
             # against our Company" is the whole finding.  Collected rather than
             # returned, because a positive statement anywhere in the range
             # outranks a general denial elsewhere.
-            for match in list(self._LIT_ABSENCE.finditer(text)) + list(
-                self._LIT_ABSENCE_NONE_OF.finditer(text)
+            for match in list(self._LIT_ABSENCE.finditer(match_text)) + list(
+                self._LIT_ABSENCE_NONE_OF.finditer(match_text)
             ):
                 gap = match.groupdict().get("gap")
                 if gap and self._LIT_ABSENCE_GAP_VERB.search(gap):
                     continue
                 lo, hi = self._lit_span(text, match.start(), match.end())
+                lo, hi = self._lit_sentence_bounds(text, lo, hi, match.start())
                 statement = " ".join(original[lo:hi].split())
                 if len(statement) > 600:
                     continue
@@ -2411,18 +2675,54 @@ class SectionExtractor:
             if not text:
                 continue
             original = dict(lit_pages).get(page, text)
-            for match in self._REG_ACTION.finditer(text):
+            match_text = self._lit_match_text(text)
+            for match in self._REG_ACTION.finditer(match_text):
+                # P2 lets a match cross a hard wrap; it must never cross a
+                # masked region (summary table, section heading, nil label),
+                # which survives as a run of blanked characters.
+                if self._LIT_MASKED_REGION.search(match.group(0)):
+                    continue
                 lo, hi = self._lit_span(text, match.start(), match.end())
+                segment = self._lit_sentence_bounds(text, lo, hi, match.start())
+                if segment[0] <= match.start() and segment[1] >= match.end():
+                    lo, hi = segment
                 sentence = " ".join(original[lo:hi].split())
                 if len(sentence) > 600:
-                    continue  # a span that wide is not one sentence: not quotable
+                    continue  # still not one quotable sentence: fail closed
                 sebi_named, ed_named = self._lit_agencies(sentence)
                 if not (sebi_named or ed_named):
                     continue
                 if self._REG_BOILERPLATE.search(sentence):
                     continue
-                if not self._LIT_PARTY.search(sentence):
+                if self._REG_META_DISCOURSE.search(sentence):
+                    continue  # a statement about the section, not an event
+                if self._REG_BOILERPLATE_CITE.search(
+                    sentence
+                ) and not self._REG_ADJUDICATIVE_EVENT.search(sentence):
                     continue
+                meta: Dict[str, str] = {
+                    "status": self._reg_action_status(sentence),
+                    "party_basis": "quoted",
+                }
+                if not self._LIT_PARTY.search(sentence):
+                    # A29 P3: the filing states party scope in its section
+                    # heading ("Outstanding litigation involving the
+                    # Directors") and then names the party by its own short name
+                    # in the sentence.  Attribute only when the heading names
+                    # exactly one A24 group, and record the heading so the
+                    # attribution is auditable and separable.  With the P3 flag
+                    # off, a sentence that names no party emits nothing -- the
+                    # pre-A29 behaviour, bit for bit.
+                    attributed = (
+                        self._lit_party_from_heading(headings, page, match.start())
+                        if self._LIT_HEADING_PARTY_ATTRIBUTION
+                        else None
+                    )
+                    if attributed is None:
+                        continue
+                    meta["party_basis"] = "heading"
+                    meta["heading"] = attributed[0]
+                    meta["party"] = attributed[1]
                 # Negation is tested over the sentence *up to the regulator
                 # mention*, not only over the raw prefix before the matched
                 # noun: the noun can sit on a heading line while the negation
@@ -2458,11 +2758,16 @@ class SectionExtractor:
                         and allow_absence
                         and not self._REG_ABSENT_CLOSED.search(sentence)
                     ):
-                        return (False, page, sentence)
+                        return (
+                            False,
+                            page,
+                            sentence,
+                            {"status": "absent", "party_basis": meta["party_basis"]},
+                        )
                     continue
-                return (True, page, sentence)
+                return (True, page, sentence, meta)
         if negative is not None and allow_absence:
-            return (False, negative[0], negative[1])
+            return (False, negative[0], negative[1], {"status": "absent", "party_basis": "quoted"})
         return None
 
     def extract_governance(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
@@ -2844,7 +3149,43 @@ class SectionExtractor:
                     sebi_finding = extra
                     break
         if sebi_finding is not None:
-            sebi_active, sebi_page, sebi_quote = sebi_finding
+            sebi_active, sebi_page, sebi_quote, sebi_meta = sebi_finding
+            sebi_notes = (
+                # A25-D1: a `false` means "no SEBI/ED action is disclosed
+                # on the searched pages", never that the engine verified
+                # none exists.  The wording the record carries is the
+                # difference, so the stronger claim cannot be rebuilt
+                # downstream from a bare boolean.
+                "SEBI/ED action disclosed by the filing"
+                if sebi_active
+                else "issuer-authored denial that any SEBI or ED action exists; "
+                "no external or regulator-source check was performed, so this is "
+                "absence of disclosure, not verified absence"
+            )
+            if sebi_active:
+                # A29 (K2-A) makes the *status* of the disclosed action part of
+                # the evidence rather than something a reader has to infer from
+                # a past-tense verb: a proceeding the filing states is pending
+                # at the cut-off is an active action, and a concluded one is
+                # reported as concluded so the two are never conflated.
+                sebi_notes += (
+                    f"; action status stated in the quotation: {sebi_meta.get('status', 'unspecified')}"
+                )
+                if sebi_meta.get("status") == "pending":
+                    sebi_notes += (
+                        "; A29 (K2-A): a proceeding pending at the evaluation cut-off is an "
+                        "active action, subject to the existing party-scope rules"
+                    )
+                if sebi_meta.get("party_basis") == "heading":
+                    sebi_notes += (
+                        f"; party attributed under A29 (P3) from the section heading "
+                        f"\"{sebi_meta.get('heading', '')}\" -> {sebi_meta.get('party', '')}; "
+                        "the quoted sentence does not itself name an A24 party group"
+                    )
+            sebi_notes += (
+                f"; search basis: {lit_coverage}; parties named in the quoted text: "
+                + self._lit_parties_named(sebi_quote)
+            )
             extractions.append(
                 RawExtraction(
                     field_path="governance.sebi_ed_action_active",
@@ -2854,20 +3195,7 @@ class SectionExtractor:
                     section="Outstanding Litigation",
                     locator="Disciplinary actions by SEBI or Stock Exchanges",
                     quote=sebi_quote,
-                    notes=(
-                        # A25-D1: a `false` means "no SEBI/ED action is disclosed
-                        # on the searched pages", never that the engine verified
-                        # none exists.  The wording the record carries is the
-                        # difference, so the stronger claim cannot be rebuilt
-                        # downstream from a bare boolean.
-                        "SEBI/ED action disclosed by the filing"
-                        if sebi_active
-                        else "issuer-authored denial that any SEBI or ED action exists; "
-                        "no external or regulator-source check was performed, so this is "
-                        "absence of disclosure, not verified absence"
-                    )
-                    + f"; search basis: {lit_coverage}; parties named in the quoted text: "
-                    + self._lit_parties_named(sebi_quote),
+                    notes=sebi_notes,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.92,
                 )

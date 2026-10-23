@@ -1373,3 +1373,185 @@ def test_the_labelled_list_route_cannot_award_clean_on_partial_coverage():
     }
     out = _govern(pages)
     assert "governance.litigation_bucket" not in out
+
+
+# ---------------------------------------------------------------------------
+# A29 (K2-A, approved 2026-10-23): a pending appeal is an active action
+# ---------------------------------------------------------------------------
+#
+# ``handoff/decisions/A29-k2-active-action-pending-appeal.md``.  The decision
+# settles the *status* meaning of "active" -- a proceeding the filing states is
+# pending, including one the regulator itself appealed -- and authorises five
+# extraction corrections.  Party scope (A23/A24) and the ``false`` rule (A25) are
+# untouched, so every negative case below stays exactly as it was.
+#
+# **Execution status: NOT RUN in the A29 pass** -- recorded there as pending a
+# separate regression run.
+
+#: The p468 sentence, verbatim, as the retained Jio RHP words it.
+JIO_PENDING_REVISION = (
+    "Against the said order of the Special Court, SEBI filed a revision application "
+    "before the Hon'ble High Court of Bombay and the same is currently pending."
+)
+
+
+def test_a29_pending_appeal_under_a_single_party_heading_is_active():
+    """P5 + P3: the regulator's own revision application, party from the heading."""
+    pages = {
+        468: "III. Outstanding litigation involving the Directors\n" + JIO_PENDING_REVISION + "\n"
+    }
+    out = _govern(pages)
+    record = out["governance.sebi_ed_action_active"]
+    assert record.candidate_value is True
+    assert record.page == 468
+    assert _norm(JIO_PENDING_REVISION) in _norm(record.quote)
+    assert "action status stated in the quotation: pending" in record.notes
+    assert "A29 (K2-A)" in record.notes
+    assert "party attributed under A29 (P3)" in record.notes
+    assert "III. Outstanding litigation involving the Directors" in record.notes
+    _assert_verbatim(pages, out)
+
+
+def test_a29_hard_wrapped_regulator_sentence_is_matched():
+    """P2: the PDF broke "SEBI / filed" across two lines; the sentence still matches."""
+    pages = {
+        22: "IV. Outstanding litigation involving our Promoters\n"
+        "Against the said order of the Special Court, SEBI \n"
+        "filed a revision application before the Hon'ble High Court of Bombay and the "
+        "same is currently pending.\n"
+    }
+    out = _govern(pages)
+    record = out["governance.sebi_ed_action_active"]
+    assert record.candidate_value is True
+    assert "revision application" in record.quote
+    _assert_verbatim(pages, out)
+
+
+def test_a29_long_paragraph_is_quoted_by_sentence_not_discarded():
+    """P1: a 700+ character paragraph is not "not one sentence" -- its sentence is."""
+    paragraph = (
+        "RIL had issued debentures with convertible warrants in the year 1994 and allotted "
+        "equity shares against the warrants in the year 2000. In this matter, SEBI has imposed "
+        "a penalty of Rs 3 million on our Promoter for the alleged disclosure breach and "
+        "directed it to deposit the amount within sixty days from the date of the order, and "
+        "the said direction continues to operate against the Promoter of our Company "
+        "notwithstanding the appeal that the Promoter has preferred before the Securities "
+        "Appellate Tribunal in the year 2025, which appeal the tribunal has since admitted and "
+        "listed for final hearing on a date to be notified later in accordance with its own "
+        "practice directions for such appeals."
+    )
+    pages = {22: "IV. Outstanding litigation involving our Promoters\n" + paragraph}
+    out = _govern(pages)
+    record = out["governance.sebi_ed_action_active"]
+    assert record.candidate_value is True
+    assert len(record.quote) <= 600
+    assert "SEBI has imposed a penalty" in record.quote
+    _assert_verbatim(pages, out)
+
+
+def test_a29_regulation_citation_does_not_veto_a_dated_order():
+    """P4: a genuine action sentence that cites the regulation it was decided under."""
+    pages = {
+        22: "IV. Outstanding litigation involving our Promoters\n"
+        "By an order dated March 24, 2017, SEBI imposed a penalty of Rs 3 million on our "
+        "Promoter under the SEBI (PFUTP) Regulations, 2003.\n"
+    }
+    out = _govern(pages)
+    assert out["governance.sebi_ed_action_active"].candidate_value is True
+
+
+def test_a29_regulation_citation_without_an_event_is_still_not_an_action():
+    """P4 is a narrowing, not a removal: a bare citation states law, not an event."""
+    pages = {
+        22: "Any penalty imposed under the SEBI (ICDR) Regulations, 2018 shall be borne by "
+        "our Company.\n"
+    }
+    out = _govern(pages)
+    assert "governance.sebi_ed_action_active" not in out
+
+
+def test_a29_concluded_action_records_its_status_but_stays_a_finding():
+    """A29 distinguishes pending from concluded; it does not delete the concluded case."""
+    pages = {
+        22: "IV. Outstanding litigation involving our Promoters\n"
+        "SEBI passed an order imposing a penalty of Rs 3 million on our Promoters and the "
+        "appeal filed by our Promoters was dismissed by SAT.\n"
+    }
+    out = _govern(pages)
+    record = out["governance.sebi_ed_action_active"]
+    assert record.candidate_value is True
+    assert "action status stated in the quotation: concluded" in record.notes
+    assert "A29 (K2-A)" not in record.notes
+
+
+# --- P3 negative guards: the attribution must never invent a party ----------
+
+
+def test_a29_p3_ambiguous_heading_attributes_nothing():
+    """A heading naming several groups scopes nothing (fail closed)."""
+    pages = {
+        22: "VIII. Outstanding tax claims involving the Company, Promoter, Subsidiaries and "
+        "Directors\n" + JIO_PENDING_REVISION + "\n"
+    }
+    out = _govern(pages)
+    assert "governance.sebi_ed_action_active" not in out
+
+
+def test_a29_p3_heading_below_the_sentence_attributes_nothing():
+    """A heading cannot scope a paragraph that precedes it."""
+    pages = {22: JIO_PENDING_REVISION + "\nIV. Outstanding litigation involving the Promoter\n"}
+    out = _govern(pages)
+    assert "governance.sebi_ed_action_active" not in out
+
+
+def test_a29_p3_heading_on_a_later_page_attributes_nothing():
+    """Section scope is not carried backwards across a page break."""
+    pages = {
+        22: JIO_PENDING_REVISION,
+        23: "IV. Outstanding litigation involving the Promoter\n",
+    }
+    out = _govern(pages, page_range=(22, 23))
+    assert "governance.sebi_ed_action_active" not in out
+
+
+def test_a29_p3_lettered_subheading_never_attributes():
+    """"c) Actions by statutory/ regulatory authorities against RIL" scopes one item."""
+    pages = {
+        22: "c) Actions by statutory/ regulatory authorities against RIL\n"
+        + JIO_PENDING_REVISION
+        + "\n"
+    }
+    out = _govern(pages)
+    assert "governance.sebi_ed_action_active" not in out
+
+
+def test_a29_p3_a_no_party_heading_clears_the_earlier_attribution():
+    """Ambiguity is not inherited: the nearest heading wins, even when it says nothing."""
+    pages = {
+        22: "IV. Outstanding litigation involving the Promoter\n"
+        "IX. Other matters\n" + JIO_PENDING_REVISION + "\n"
+    }
+    out = _govern(pages)
+    assert "governance.sebi_ed_action_active" not in out
+
+
+def test_a29_an_unrelated_sebi_reference_is_not_an_action():
+    """P5 must not turn every filing reference into a regulatory action."""
+    pages = {
+        22: "The Company has filed the draft red herring prospectus with SEBI and SEBI has "
+        "approved the offer document.\n"
+    }
+    out = _govern(pages)
+    assert "governance.sebi_ed_action_active" not in out
+
+
+def test_a29_section_meta_discourse_is_not_a_finding():
+    """The p463 preamble describes the section; it discloses no action of its own."""
+    pages = {
+        463: "Further, this section also provides the details of all disciplinary actions "
+        "initiated or taken and penalties imposed by SEBI or the Stock Exchanges against the "
+        "Promoter in the last five financial years including outstanding actions other than "
+        "matters already covered in (ii) above.\n"
+    }
+    out = _govern(pages)
+    assert "governance.sebi_ed_action_active" not in out

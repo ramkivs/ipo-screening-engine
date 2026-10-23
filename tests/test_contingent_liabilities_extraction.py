@@ -205,7 +205,12 @@ Total contingent liabilities 8,993.00 7,000.00 5,500.00
     )
     _, amount, _, quote = _read({405: note})
     assert amount == 8993.0
-    assert quote == "Total contingent liabilities"
+    # A29: the citation now carries the selected cell and its column after the
+    # verbatim label.  The label is still the first element, so the evidence can
+    # be read back against the note; the earlier exact-equality assertion
+    # pinned the label-only form this pass deliberately replaced.
+    assert quote.startswith("Total contingent liabilities")
+    assert "8,993 as at 31 March 2026" in quote
 
 
 def test_commitments_are_excluded_from_the_numerator():
