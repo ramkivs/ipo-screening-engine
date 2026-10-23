@@ -174,7 +174,7 @@ All runs below use Python 3.11.2 in `/home/user/jio-env` (pinned `requirements.t
 | 1 | The exact failing test, real OCR engine and PDF rendering (fixture geometry corrected) | `pytest -q tests/test_automatic_official_issue_discovery.py -k image_only_official_notice` | **1 passed** (in the 7-test focused run, 5.01 s) |
 | 2 | Focused set: the exact failing test plus all new regression cases | `pytest -q tests/test_automatic_official_issue_discovery.py -k "image_only or heading or segmentation or identical_issue_terms"` | **7 passed** (5.01 s) |
 | 3 | OCR / issuer-identification / official-notice regression files (15 files) | `pytest -q tests/test_automatic_official_issue_discovery.py tests/test_bse_current_listing.py tests/test_cli_phase5i.py tests/test_cross_ipo_issue_term_provenance.py tests/test_enrichment_contract.py tests/test_enrichment_engine.py tests/test_issue_terms_multisource.py tests/test_issue_terms_resolver.py tests/test_offer_table_boundaries.py tests/test_official_discovery.py tests/test_official_prospectus_pathway.py tests/test_phase5j_hardening.py tests/test_price_band_notice.py tests/test_vishal_historical_reconciliation.py tests/test_workstream2_evidence_presentation.py` | **281 passed**, 2 warnings (277.36 s) |
-| 4 | Full backend suite | `pytest -q tests` | **1676 passed**, 25 warnings (1704.21 s, exit 0) — 1670 pre-existing + 6 new |
+| 4 | Full backend suite (final tree) | `pytest -q tests` | **1676 passed**, 25 warnings (1680.78 s, exit 0) — 1670 pre-existing + 6 new |
 | 5 | Frontend | `npm test --prefix frontend` (node v22.22.3) | **93 passed, 0 failed** |
 | 6 | Schema / integrity gates (the CI step, run locally) | `verify_frozen_core`, `verify_golden_result`, `verify_v1_6_implementation` + schema metaschema checks | **PASS** — frozen core 6/6 (including the pinned `price_band_notice.py` digest), golden result `e84f8bc0…` unchanged, v1.6 still inactive |
 | 7 | Compile | `python -m compileall -q engine` | exit 0 |
@@ -198,12 +198,21 @@ After the fix, the same text yields `company_name = 'ACMEFORGE LIMITED'` (normal
 
 | Item | Value |
 |---|---|
-| Commit | @COMMIT@ |
-| Parent | `3cb38a5` (branch tip before the fix) |
-| Files | 3 — engine (1 modified), tests (1 modified), report (1 added) |
-| No frozen/infrastructure file touched | `price_band_notice.py`, `scoring.py`, `knockouts.py`, `snapshots.py`, `derived.py`, `evaluation.py`, `config/`, `schema/`, `frontend/` all unchanged |
-| Remote verification | @REMOTE@ |
-| CI | @CI@ |
+| Fix commit | `a687a15` — merged-heading OCR correction (engine + 6 regression cases + this report) |
+| Fixture commit | `627934b` — image-only fixture geometry (single-tile layout) and report update |
+| Diagnostic commit | `5daf95b` (temporary) and its revert `f4001e0` — retained in history, no effect on the final tree |
+| Ancestry | `3cb38a5` ← `a687a15` ← `5daf95b` ← `f4001e0` ← `627934b` (branch head) |
+| Files changed vs `3cb38a5` | `engine/ipo_screening/extraction/official_notice_ocr.py`, `tests/test_automatic_official_issue_discovery.py`, `docs/investigation/OFFICIAL-NOTICE-OCR-SEGMENTATION-CI-FIX-2026-10-23.md`, `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` |
+| Frozen/infrastructure files | **unchanged** — `price_band_notice.py` still `779afb0b…`, `scoring.py`, `knockouts.py`, `snapshots.py`, `derived.py`, `evaluation.py`, `config/`, `schema/`, `frontend/` untouched |
+| Remote verification | branch head read back from the API equals `627934b`; the engine, test, report and tracker blobs downloaded from the commit hash identically to the local files |
+| `main` / PR | not touched; nothing merged |
 
-`main` was not touched, no PR was merged, and no evaluation record was created or replaced.
+## 7. CI result
 
+| Run | Commit | Result |
+|---|---|---|
+| [39964614650](https://github.com/ramkivs/ipo-screening-engine/actions/runs/39964614650) | `627934b` | **success** — backend **1676 tests, 0 failures** (1846.8 s), frontend ✅, schema/integrity ✅, `compileall` ✅, clean-tree ✅ |
+
+This is the first green run on this branch since the Jio correction integration. The exact test that failed on `e612702`, `589e468`, `97b970e`, `af38fcf` and `3cb38a5` now passes on the runner.
+
+**Status: RESOLVED and CI-confirmed.** The Jio evaluation (`JIO-PLATFORMS-LIMITED-20261023-085751Z-final-29d9a601`, 34.0 / 24–77 / `INSUFFICIENT_DATA`, A9 nonterminal) is untouched: no evaluation-relevant input changed, so no new evaluation was created.
