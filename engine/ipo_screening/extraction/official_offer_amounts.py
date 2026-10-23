@@ -9,6 +9,7 @@ import hashlib
 import io
 import math
 import re
+from typing import Optional
 
 from ..canonical import SourceRef, SourceType
 from .exchange_issue_page import ExchangeIssueTermsResult
@@ -92,6 +93,60 @@ def explicit_amounts(result, pages, table_columns=()):
     return result
 
 
+
+def _rhp_issue_terms(result, pages):
+    """Attach the terms an RHP itself establishes, field by field.
+
+    The cover / offer summary is the only place an RHP states its *current*
+    price band and bid lot; reading them from the whole document would pick up
+    historical issues and worked examples.  A field the document does not state
+    stays None and a field whose current-issue candidates conflict is withheld
+    by the extractor; either way the other fields survive.  A failure inside
+    this block is recorded as "term not established for this field" and never
+    discards a document whose identity and offer amounts are already good.
+    """
+    from .price_band_notice import PriceBandNoticeParser
+
+    parser = PriceBandNoticeParser()
+    try:
+        cover_pages = [(number, text) for number, text in pages if number <= 5]
+        band_low, band_high, band_findings = parser._extract_price_band(cover_pages)
+        lot_field, lot_findings = parser._extract_lot_size(cover_pages)
+        # The issue window may also be restated in a dated issue-summary
+        # section; ``_extract_dates`` applies the term-page and document-date
+        # rules itself.
+        term_pages = [
+            (number, text) for number, text in pages if parser._is_term_page(number, text)
+        ]
+        open_field, close_field, date_findings = parser._extract_dates(term_pages)
+    except Exception as exc:  # a term-level failure is not a document failure
+        result.metadata.setdefault('issue_term_errors', {})['rhp_terms'] = (
+            f"{type(exc).__name__}: {exc}"
+        )
+        return result
+    for field_name, field_obj in (
+        ('price_band_low', band_low),
+        ('price_band_high', band_high),
+        ('lot_size', lot_field),
+        ('open_date', open_field),
+        ('close_date', close_field),
+    ):
+        if field_obj is not None:
+            setattr(result, field_name, field_obj)
+    findings = list(band_findings) + list(lot_findings) + list(date_findings)
+    result.metadata['issue_term_findings'] = [
+        {'code': f.code, 'message': f.message, 'location': getattr(f, 'location', None)}
+        for f in findings
+    ]
+    result.metadata['historical_dates_excluded'] = list(
+        getattr(parser, '_last_excluded_dates', [])
+    )
+    result.metadata.setdefault('issue_term_errors', {}).update(
+        parser._issue_term_errors(findings)
+    )
+    return result
+
+
 def document_pages(raw, max_pages=5, diagnostics=None):
     if raw.startswith(b'%PDF-'):
         from pypdf import PdfReader
@@ -115,23 +170,79 @@ def document_pages(raw, max_pages=5, diagnostics=None):
     return [(1, raw.decode('utf-8', errors='replace'))]
 
 
+#: Titles that name a notice outright.  Deliberately narrower than the notice
+#: parser's full title list: an RHP cover legitimately contains phrases like
+#: "the Floor Price and the Cap Price", which are notice *vocabulary*, not a
+#: notice *title*.
+_EXPLICIT_NOTICE_TITLES = (
+    re.compile(r"price\s+band\s+(?:notice|advertisement|announcement)", re.I),
+    re.compile(r"pre-bid\s+advertisement", re.I),
+    re.compile(r"notice\s+to\s+investors", re.I),
+)
+
+
+def _rhp_role(cover: str) -> Optional[str]:
+    """Why this document is a current-issue RHP, or None.
+
+    A final-Prospectus marker is deliberately NOT required: an RHP is not a
+    final prospectus, and requiring one rejected genuine RHP archive members.
+    What IS required is a current-issue role -- a dated "Red Herring
+    Prospectus" title, the issuer responsibility statement, or a complete
+    offer-table header -- and the document must not be a Draft RHP (whose
+    terms are placeholders by construction) or a General Information
+    Document (a format guide, never issuer terms).
+    """
+    if re.search(r'\bDraft\s+Red\s+Herring\s+Prospectus\b', cover, re.I):
+        return None
+    if re.search(r'GENERAL\s+INFORMATION\s+DOCUMENT', cover[:1500], re.I):
+        return None
+    # A notice is its own class: a notice that happens to quote the RHP's title
+    # must not be re-read as the RHP itself.
+    if any(pattern.search(cover) for pattern in _EXPLICIT_NOTICE_TITLES):
+        return None
+    # Title form, not a mention: the phrase starts a line (how a title is set),
+    # or is directly followed by the "Dated:" field.  A sentence such as "the
+    # Red Herring Prospectus dated ... has been filed" is a reference.
+    if re.search(r'(?m)^[ \t]*(?:Red\s+Herring\s+Prospectus)\b', cover) or \
+            re.search(r'Red\s+Herring\s+Prospectus\s*(?:Dated|Date)\s*:', cover, re.I):
+        return 'RHP title'
+    if re.search(r'this\s+Red\s+Herring\s+Prospectus\s+c\s*ontains\s+all\s+information', cover, re.I):
+        return 'issuer responsibility statement'
+    if re.search(r'FRESH\s+ISSUE\s+SIZE\s+OFFER\s+FOR\s+SALE\s+SIZE\s+TOTAL\s+ISSUE\s+SIZE', cover, re.I):
+        return 'offer-table header'
+    return None
+
+
 def parse_official_rhp(raw, url):
+    """Issue terms an official RHP itself establishes, field by field.
+
+    An RHP is its own document class (never relabelled a final Prospectus and
+    never a Price Band Notice).  Its field authority is the cover / offer
+    summary block: price band, bid lot and the issue window when the document
+    states them, plus the fresh-issue and OFS amounts when the offer table or
+    offer summary states them.  A field the document does not state stays
+    None; a field whose current-issue candidates conflict is withheld.  The
+    remaining fields are still returned, so one bad field cannot discard the
+    document.
+    """
     read_scope = {}
     pages = document_pages(raw, max_pages=30, diagnostics=read_scope)
     cover = '\n'.join(t for page, t in pages if page <= 2)
-    # A dated document title, not a mention of an RHP elsewhere in a notice.
-    if re.search(r'\bDraft\s+Red\s+Herring\s+Prospectus\s*(?:Dated|Date)\s*:', cover, re.I):
-        raise ValueError('Draft Red Herring Prospectus cannot be promoted to current RHP terms')
-    dated = re.search(r'Red\s+Herring\s+Prospectus\s*\n?\s*(?:Dated|Date)\s*:', cover, re.I)
-    # Some filed RHP covers have a graphical (non-text) dated title. Their
-    # explicit issuer responsibility statement and complete offer-table header
-    # establish the document role without inventing a publication date.
-    cover_role = (re.search(r'this\s+Red\s+Herring\s+Prospectus\s+c\s*ontains\s+all\s+information', cover, re.I)
-                  and re.search(r'FRESH\s+ISSUE\s+SIZE\s+OFFER\s+FOR\s+SALE\s+SIZE\s+TOTAL\s+ISSUE\s+SIZE', cover, re.I))
-    if not (dated or cover_role) or re.search(r'GENERAL\s+INFORMATION\s+DOCUMENT', cover[:1500], re.I):
-        raise ValueError('RHP title or issuer responsibility/offer-table role not established')
-    cin = re.search(r'\b[LU]\d{5}[A-Z]{2}\d{4}PLC\d{6}\b', cover)
-    name = ProspectusTermsParser._extract_company_name(cover)
+    identity_scope = '\n'.join(t for page, t in pages if page <= 5)
+    role = _rhp_role(cover) or _rhp_role(identity_scope)
+    if role is None:
+        raise ValueError(
+            'RHP title or issuer responsibility/offer-table role not established'
+        )
+    # Identity is read from the title pages, not only from the first two: a
+    # graphical cover can push the CIN/name block onto page 3-5.  The issuer
+    # match itself is unchanged -- the caller still compares the extracted
+    # name against the filing's, and a mismatch rejects the candidate.
+    cin = re.search(r'\b[LU]\d{5}[A-Z]{2}\d{4}PLC\d{6}\b', identity_scope) or re.search(
+        r'\b[LU]\d{5}[A-Z]{2}\d{4}PLC\d{6}\b', '\n'.join(t for _, t in pages)
+    )
+    name = ProspectusTermsParser._extract_company_name(cover) or \
+        ProspectusTermsParser._extract_company_name(identity_scope)
     if not cin or not name:
         raise ValueError('RHP issuer name/CIN not established')
     digest = hashlib.sha256(raw).hexdigest()
@@ -166,4 +277,7 @@ def parse_official_rhp(raw, url):
     result.metadata['native_read_scope'] = read_scope
     result.metadata['offer_table_columns'] = columns
     result.metadata['linear_text_excluded_table_pages'] = sorted({column['page'] for column in columns})
+    result.metadata['document_role_basis'] = role
+
+    _rhp_issue_terms(result, pages)
     return explicit_amounts(result, eligible_pages, columns)

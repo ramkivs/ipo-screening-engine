@@ -910,10 +910,16 @@ class OfficialDiscoveryProvider:
                 if not members:
                     reasons.append(f"{url}: official archive contains no supported PDF/text members")
                 for member, uri in members:
+                    rhp_reason = ""
                     try:
                         result = parse_official_rhp(member, uri)
-                    except Exception:
+                    except Exception as exc:
+                        # Keep the RHP-class verdict: "not an RHP" and "an RHP
+                        # whose fields conflicted" are different diagnoses, and
+                        # the operator needs the first one even when a later
+                        # provider rejects the member for its own reasons.
                         result = None
+                        rhp_reason = f"{type(exc).__name__}: {exc}"
                     if result is not None:
                         if _norm_name(result.company_name) != _norm_name(company_name):
                             reasons.append(f"{uri}: official RHP names a different issuer")
@@ -933,7 +939,11 @@ class OfficialDiscoveryProvider:
                             break
                         rejected.append(f"{report.provider}: {report.detail}")
                     else:
-                        reasons.append(f"{uri}: attachment rejected; " + "; ".join(rejected))
+                        reasons.append(
+                            f"{uri}: attachment rejected; "
+                            + ("RHP class: " + rhp_reason + "; " if rhp_reason else "")
+                            + "; ".join(rejected)
+                        )
             except Exception as exc:
                 reasons.append(f"{url}: official attachment retrieval/decoding failed ({type(exc).__name__}: {exc})")
         return found, reasons
