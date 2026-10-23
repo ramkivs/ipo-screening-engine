@@ -1,0 +1,38 @@
+﻿[
+    {
+        "evaluation_id":  "JIO-PLATFORMS-LIMITED-20261023-051816Z-final-b79b5794",
+        "endpoint":  "http://127.0.0.1:8000/api/v1/evaluations/JIO-PLATFORMS-LIMITED-20261023-051816Z-final-b79b5794",
+        "status":  200,
+        "saved_path":  "C:\\Users\\USER\\Desktop\\IPO-Evaluation-Recovery-20261023-115835\\api-get-responses\\JIO-PLATFORMS-LIMITED-20261023-051816Z-final-b79b5794\\detail.json",
+        "bytes":  14042,
+        "sha256":  "7ea55a3c58bb8661e2c515ff81dba2aca7ac11dd328713883e0b6771eca2fb40",
+        "outcome":  "SAVED"
+    },
+    {
+        "evaluation_id":  "JIO-PLATFORMS-LIMITED-20261023-051816Z-final-b79b5794",
+        "endpoint":  "http://127.0.0.1:8000/api/v1/evaluations/JIO-PLATFORMS-LIMITED-20261023-051816Z-final-b79b5794/evidence",
+        "status":  200,
+        "saved_path":  "C:\\Users\\USER\\Desktop\\IPO-Evaluation-Recovery-20261023-115835\\api-get-responses\\JIO-PLATFORMS-LIMITED-20261023-051816Z-final-b79b5794\\evidence.json",
+        "bytes":  22895,
+        "sha256":  "238ac38bd3cf6d6091c9daf5c0ee041aba6970641b4fa8289ed423a13ce44915",
+        "outcome":  "SAVED"
+    },
+    {
+        "evaluation_id":  "JIO-PLATFORMS-LIMITED-20261022-101913Z-final-ad5e6872",
+        "endpoint":  "http://127.0.0.1:8000/api/v1/evaluations/JIO-PLATFORMS-LIMITED-20261022-101913Z-final-ad5e6872",
+        "status":  200,
+        "saved_path":  "C:\\Users\\USER\\Desktop\\IPO-Evaluation-Recovery-20261023-115835\\api-get-responses\\JIO-PLATFORMS-LIMITED-20261022-101913Z-final-ad5e6872\\detail.json",
+        "bytes":  14160,
+        "sha256":  "f8b38eea64fe69a005b6bd32ead06ed3228c21bdf72d4428e92cc399562e3f04",
+        "outcome":  "SAVED"
+    },
+    {
+        "evaluation_id":  "JIO-PLATFORMS-LIMITED-20261022-101913Z-final-ad5e6872",
+        "endpoint":  "http://127.0.0.1:8000/api/v1/evaluations/JIO-PLATFORMS-LIMITED-20261022-101913Z-final-ad5e6872/evidence",
+        "status":  200,
+        "saved_path":  "C:\\Users\\USER\\Desktop\\IPO-Evaluation-Recovery-20261023-115835\\api-get-responses\\JIO-PLATFORMS-LIMITED-20261022-101913Z-final-ad5e6872\\evidence.json",
+        "bytes":  22895,
+        "sha256":  "aacf3fda322e5d71212fa07307e2569c82a7e48413eba180658e9d48426a9d1f",
+        "outcome":  "SAVED"
+    }
+]

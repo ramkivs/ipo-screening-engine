@@ -1,0 +1,200 @@
+{
+  "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-051816Z-final-b79b5794",
+  "input_snapshot_hash": "95cbd54abf578169267bd8e46c396d23aa85204dd82a6247ce5cd8d490f4508f",
+  "ipo_id": "JIO-PLATFORMS-LIMITED",
+  "snapshot": {
+    "board": "mainboard",
+    "company_name": "JIO PLATFORMS LIMITED",
+    "icdr_route": "6(1)",
+    "input": {
+      "board": "mainboard",
+      "business": {
+        "industry_cagr_pct": null,
+        "industry_forecast_period": null,
+        "industry_scope": null,
+        "industry_source": null,
+        "moat_rating": null,
+        "regulatory_dependence": null,
+        "top5_customer_pct": null,
+        "top5_supplier_pct": null,
+        "visibility_rating": null
+      },
+      "capital_structure": {
+        "discounted_allotments_18m_before_drhp": false,
+        "large_holders_unlocked_early": false,
+        "pre_ipo_placements": [],
+        "promoter_lockin_in_place": true,
+        "promoter_pledge_pct": 0.0,
+        "promoter_post_pct": null,
+        "promoter_pre_pct": null
+      },
+      "company_name": "JIO PLATFORMS LIMITED",
+      "financials": {
+        "contingent_liabilities": 15021.0,
+        "contingent_liabilities_unquantified": null,
+        "periods": [
+          {
+            "cash_and_equivalents": 24889.0,
+            "cfo": 576616.0,
+            "disclosed_roce_pct": 12.83,
+            "ebit": 322383.0,
+            "ebitda": 543414.0,
+            "fy": "FY2024",
+            "interest_expense": 40476.0,
+            "net_worth": 2782864.0,
+            "pat": 214340.0,
+            "receivable_days": 9.5,
+            "revenue": 1095581.0,
+            "total_debt": 543489.0
+          },
+          {
+            "cash_and_equivalents": 80115.0,
+            "cfo": 681557.0,
+            "disclosed_roce_pct": 12.5,
+            "ebit": 389178.0,
+            "ebitda": 630554.0,
+            "fy": "FY2025",
+            "interest_expense": 49051.0,
+            "net_worth": 3050474.0,
+            "pat": 261203.0,
+            "receivable_days": 7.0,
+            "revenue": 1282184.0,
+            "total_debt": 730603.0
+          },
+          {
+            "cash_and_equivalents": 165570.0,
+            "cfo": 775563.0,
+            "disclosed_roce_pct": 10.76,
+            "ebit": 461327.0,
+            "ebitda": 733816.0,
+            "fy": "FY2026",
+            "interest_expense": 86534.0,
+            "net_worth": 3359769.0,
+            "pat": 300527.0,
+            "receivable_days": 6.3,
+            "revenue": 1468853.0,
+            "total_debt": 707810.0
+          }
+        ],
+        "reporting_unit": "INR_MILLIONS"
+      },
+      "governance": {
+        "auditor_changed_3y": null,
+        "auditor_opinion": "unqualified",
+        "auditor_reputed": null,
+        "board_independent_majority": false,
+        "eom_materiality": null,
+        "going_concern_uncertainty": null,
+        "kmp_exits_2y": 0,
+        "litigation_bucket": "criminal_or_regulatory",
+        "repeated_eom": null,
+        "rpt_pct_of_revenue_growth": -0.1141,
+        "rpt_pct_revenue": 4.3094,
+        "sebi_ed_action_active": null
+      },
+      "icdr_route": "6(1)",
+      "ipo_id": "JIO-PLATFORMS-LIMITED",
+      "issue": {
+        "close_date": "2026-10-23",
+        "fresh_issue": 302130.0,
+        "fresh_shares": 270000000,
+        "lot_size": 12,
+        "ofs": 0.0,
+        "ofs_sellers": [],
+        "open_date": "2026-10-21",
+        "post_issue_eps": 32.63,
+        "post_issue_shares": 9209030830,
+        "pre_issue_shares": 8939030830,
+        "price_band_high": 1119.0,
+        "price_band_low": 1065.0
+      },
+      "market": {},
+      "peers": [
+        {
+          "as_of": "2026-10-13",
+          "business_match": "partial",
+          "listed_years": null,
+          "name": "Bharti Airtel Limited",
+          "pb": null,
+          "pe": 40.71,
+          "roe_pct": 20.32,
+          "source_id": "RHP-FILING-72480c2e"
+        },
+        {
+          "as_of": "2026-10-13",
+          "business_match": "partial",
+          "listed_years": null,
+          "name": "Vodafone Idea Limited",
+          "pb": null,
+          "pe": 3.99,
+          "roe_pct": null,
+          "source_id": "RHP-FILING-72480c2e"
+        }
+      ],
+      "sector": "Diversified / General",
+      "sector_profile": "standard",
+      "use_of_proceeds": [
+        {
+          "amount": null,
+          "category": "gcp",
+          "undisclosed_marker": "[●]"
+        }
+      ]
+    },
+    "ipo_id": "JIO-PLATFORMS-LIMITED",
+    "periods": [
+      {
+        "cash_and_equivalents": 2488.9,
+        "cfo": 57661.600000000006,
+        "disclosed_roce_pct": 12.83,
+        "ebit": 32238.300000000003,
+        "ebitda": 54341.4,
+        "fy": "FY2024",
+        "interest_expense": 4047.6000000000004,
+        "is_stub": false,
+        "net_worth": 278286.4,
+        "pat": 21434.0,
+        "receivable_days": 9.5,
+        "reporting_unit": "INR_MILLIONS",
+        "revenue": 109558.1,
+        "total_debt": 54348.9
+      },
+      {
+        "cash_and_equivalents": 8011.5,
+        "cfo": 68155.7,
+        "disclosed_roce_pct": 12.5,
+        "ebit": 38917.8,
+        "ebitda": 63055.4,
+        "fy": "FY2025",
+        "interest_expense": 4905.1,
+        "is_stub": false,
+        "net_worth": 305047.4,
+        "pat": 26120.300000000003,
+        "receivable_days": 7.0,
+        "reporting_unit": "INR_MILLIONS",
+        "revenue": 128218.40000000001,
+        "total_debt": 73060.3
+      },
+      {
+        "cash_and_equivalents": 16557.0,
+        "cfo": 77556.3,
+        "disclosed_roce_pct": 10.76,
+        "ebit": 46132.700000000004,
+        "ebitda": 73381.6,
+        "fy": "FY2026",
+        "interest_expense": 8653.4,
+        "is_stub": false,
+        "net_worth": 335976.9,
+        "pat": 30052.7,
+        "receivable_days": 6.3,
+        "reporting_unit": "INR_MILLIONS",
+        "revenue": 146885.30000000002,
+        "total_debt": 70781.0
+      }
+    ],
+    "reporting_unit": "INR_MILLIONS",
+    "sector_profile": "standard",
+    "snapshot_grammar": "{\"v\":1}",
+    "unit_factor": 0.1
+  }
+}

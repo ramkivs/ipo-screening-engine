@@ -1,0 +1,450 @@
+{
+  "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-051816Z-final-b79b5794",
+  "evidence": {
+    "evidence": [
+      {
+        "evidence_id": "EV-company_name",
+        "extraction_confidence": 1.0,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Cover page header",
+        "page": 1,
+        "quoted_text": "JIO PLATFORMS LIMITED",
+        "section": "Cover",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-financials-contingent_liabilities",
+        "extraction_confidence": 0.95,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Contingent Liabilities and Commitments (claims not acknowledged as debts, latest fiscal year)",
+        "page": 405,
+        "quoted_text": "Claims / disputed liabilities against the Group not acknowledged as debts*",
+        "section": "Notes to Restated Financials",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-financials-periods",
+        "extraction_confidence": 0.95,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "P&L, Balance Sheet, Cash Flow Annexures",
+        "note": "PROCESSING_SUMMARY: Parsed 3 financial periods from restated statements",
+        "page": 330,
+        "section": "Restated Financial Statements",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-financials-reporting_unit",
+        "extraction_confidence": 1.0,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Restated Statement Header",
+        "note": "PROCESSING_SUMMARY: Detected currency unit: INR_MILLIONS",
+        "page": 330,
+        "section": "Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-auditor_opinion",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Auditor Examination Report — Opinion",
+        "page": 324,
+        "quoted_text": "do not require any adjustment for modification as there is no modification in the underlying audit reports",
+        "section": "Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-board_independent_majority",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Board of Directors Composition",
+        "note": "PROCESSING_SUMMARY: Board independent majority: False",
+        "page": 290,
+        "section": "Our Management",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-litigation_bucket",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Outstanding Litigation and Material Developments",
+        "note": "bucket from the prose disclosure; coverage basis: litigation section located via the filing's table of contents; all pages in the window read; parties named in the quoted text: not stated",
+        "page": 464,
+        "quoted_text": "(iv) RJIL has received one summon dated September 29, 2022 and two summons dated December 26, 2023, from magistrates in Kuthuparamba and Payyanur pursuant to one criminal complaint dated May 16, 2019 and two criminal complaints each dated March 31, 2023, filed by the Secretaries of Malur Gram Panchayat and Cherupuzha Gram Panchayat (“Complainants”) before such magistrates under Section 210 of the ",
+        "section": "Outstanding Litigation",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_0",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — purchase of property, plant and equipment — and Other Intangible Assets Parent — FY2026",
+        "page": 376,
+        "quoted_text": "Parent 19,440 14,237 39,040 37,099 62,246",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_1",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — purchase of property, plant and equipment — and Other Intangible Assets Parent — FY2025",
+        "page": 376,
+        "quoted_text": "Parent 19,440 14,237 39,040 37,099 62,246",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_10",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — sale of property, plant and equipment — Fellow Subsidiaries - - — FY2024",
+        "page": 376,
+        "quoted_text": "Fellow Subsidiaries - - - - 4",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_11",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Parent — FY2026",
+        "page": 376,
+        "quoted_text": "4 Revenue from Operations Parent 9,322 7,972 36,442 35,997 35,449",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_12",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Parent — FY2025",
+        "page": 376,
+        "quoted_text": "4 Revenue from Operations Parent 9,322 7,972 36,442 35,997 35,449",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_13",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Parent — FY2024",
+        "page": 376,
+        "quoted_text": "4 Revenue from Operations Parent 9,322 7,972 36,442 35,997 35,449",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_14",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Fellow Subsidiaries — FY2026",
+        "page": 376,
+        "quoted_text": "Fellow Subsidiaries 5,106 6,695 25,526 19,704 16,654",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_15",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Fellow Subsidiaries — FY2025",
+        "page": 376,
+        "quoted_text": "Fellow Subsidiaries 5,106 6,695 25,526 19,704 16,654",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_16",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Fellow Subsidiaries — FY2024",
+        "page": 376,
+        "quoted_text": "Fellow Subsidiaries 5,106 6,695 25,526 19,704 16,654",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_17",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Associate/JV and Associate/ JV of the Parent — FY2026",
+        "page": 376,
+        "quoted_text": "124 73 447 499 385",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_18",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Associate/JV and Associate/ JV of the Parent — FY2025",
+        "page": 376,
+        "quoted_text": "124 73 447 499 385",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_19",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Associate/JV and Associate/ JV of the Parent — FY2024",
+        "page": 376,
+        "quoted_text": "124 73 447 499 385",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_2",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — purchase of property, plant and equipment — and Other Intangible Assets Parent — FY2024",
+        "page": 376,
+        "quoted_text": "Parent 19,440 14,237 39,040 37,099 62,246",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_20",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Others — FY2026",
+        "page": 376,
+        "quoted_text": "Others 168 184 884 517 390",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_21",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Others — FY2025",
+        "page": 376,
+        "quoted_text": "Others 168 184 884 517 390",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_22",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — revenue from operations — Others — FY2024",
+        "page": 376,
+        "quoted_text": "Others 168 184 884 517 390",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_3",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — purchase of property, plant and equipment — Fellow Subsidiaries — FY2026",
+        "page": 376,
+        "quoted_text": "Fellow Subsidiaries 750 2,352 5,869 14,720 9,458",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_4",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — purchase of property, plant and equipment — Fellow Subsidiaries — FY2025",
+        "page": 376,
+        "quoted_text": "Fellow Subsidiaries 750 2,352 5,869 14,720 9,458",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_5",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — purchase of property, plant and equipment — Fellow Subsidiaries — FY2024",
+        "page": 376,
+        "quoted_text": "Fellow Subsidiaries 750 2,352 5,869 14,720 9,458",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_6",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — purchase of property, plant and equipment — Associate/JV and Associate/ JV of the Parent — FY2026",
+        "page": 376,
+        "quoted_text": "414 192 5,339 5,190 1,121",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_7",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — purchase of property, plant and equipment — Associate/JV and Associate/ JV of the Parent — FY2025",
+        "page": 376,
+        "quoted_text": "414 192 5,339 5,190 1,121",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_8",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — purchase of property, plant and equipment — Associate/JV and Associate/ JV of the Parent — FY2024",
+        "page": 376,
+        "quoted_text": "414 192 5,339 5,190 1,121",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-governance-related_party_transactions_9",
+        "extraction_confidence": 0.9,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Related Party Transactions — sale of property, plant and equipment — and Other Intangible Assets Parent 1 - — FY2026",
+        "page": 376,
+        "quoted_text": "Parent 1 - 98 - -",
+        "section": "Restated Financial Information",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-issue-fresh_shares",
+        "extraction_confidence": 0.98,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Cover page, Fresh Issue Shares",
+        "page": 1,
+        "quoted_text": "FRESH ISSUE \nSIZE \nOFFER FOR \nSALE SIZE \nTOTAL ISSUE \nSIZE ELIGIBILITY AND SHARE RESERVATION \nFresh Issue Up to  \n270,000,000 \nEquity Shares",
+        "section": "Cover",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-issue-ofs",
+        "extraction_confidence": 1.0,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Cover page, Offer for Sale Size",
+        "page": 1,
+        "quoted_text": "OFFER FOR \nSALE SIZE \nTOTAL ISSUE \nSIZE ELIGIBILITY AND SHARE RESERVATION \nFresh Issue Up to  \n270,000,000 \nEquity Shares of \nface value of ₹10 \neach for cash at a \nprice of ₹[●] each \n(including a \nsecurities \npremium of ₹[●] \nper Equity Share) \naggregating up to \n₹[●] million \nNot applicable",
+        "section": "Cover",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-issue-ofs_sellers",
+        "extraction_confidence": 1.0,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Cover page, Offer for Sale Size",
+        "page": 1,
+        "quoted_text": "OFFER FOR \nSALE SIZE \nTOTAL ISSUE \nSIZE ELIGIBILITY AND SHARE RESERVATION \nFresh Issue Up to  \n270,000,000 \nEquity Shares of \nface value of ₹10 \neach for cash at a \nprice of ₹[●] each \n(including a \nsecurities \npremium of ₹[●] \nper Equity Share) \naggregating up to \n₹[●] million \nNot applicable",
+        "section": "Cover",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-issue-pre_issue_shares",
+        "extraction_confidence": 0.95,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Pre-issue Share Capital",
+        "note": "PROCESSING_SUMMARY: Pre-issue Equity Shares: 8939030830",
+        "page": 99,
+        "section": "Capital Structure",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-issue.close_date",
+        "extraction_method": "EXCHANGE_DATA",
+        "locator": "BSE Table[0].End_Dt",
+        "quoted_text": "2026-10-23T00:00:00",
+        "source_id": "SRC-EXCHANGE-2079D39A"
+      },
+      {
+        "evidence_id": "EV-issue.fresh_issue",
+        "extraction_method": "TABLE_EXTRACTION",
+        "locator": "HTML table row 12, Fresh Issue",
+        "note": "THIRD_PARTY_AGGREGATOR_OVERRIDE; PA policy pa-aggregator-issue-terms-v1; UNVERIFIED third-party assertion, NOT official disclosure. Raw amount/value 30213.0 INR_CRORES; normalized to INR_MILLIONS",
+        "quoted_text": "27,00,00,000 shares (agg. up to ₹30,213 Cr)",
+        "source_id": "SRC-AGG-AB6F20DC33FD66BE"
+      },
+      {
+        "evidence_id": "EV-issue.lot_size",
+        "extraction_method": "EXCHANGE_DATA",
+        "locator": "NSE issueInfo.dataList[11] — Bid Lot",
+        "quoted_text": "12 Equity Shares and in multiples thereof",
+        "source_id": "SRC-EXCHANGE-755E240F"
+      },
+      {
+        "evidence_id": "EV-issue.open_date",
+        "extraction_method": "EXCHANGE_DATA",
+        "locator": "BSE Table[0].Start_Dt",
+        "quoted_text": "2026-10-21T00:00:00",
+        "source_id": "SRC-EXCHANGE-2079D39A"
+      },
+      {
+        "evidence_id": "EV-issue.price_band_high",
+        "extraction_method": "EXCHANGE_DATA",
+        "locator": "BSE Table[0].Price_Band",
+        "quoted_text": "1065.00 - 1119.00",
+        "source_id": "SRC-EXCHANGE-2079D39A"
+      },
+      {
+        "evidence_id": "EV-issue.price_band_low",
+        "extraction_method": "EXCHANGE_DATA",
+        "locator": "BSE Table[0].Price_Band",
+        "quoted_text": "1065.00 - 1119.00",
+        "source_id": "SRC-EXCHANGE-2079D39A"
+      },
+      {
+        "evidence_id": "EV-peers",
+        "extraction_confidence": 0.95,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Comparison of Accounting Ratios with Listed Industry Peers",
+        "note": "PROCESSING_SUMMARY: Identified 2 listed peers: ['Bharti Airtel Limited', 'Vodafone Idea Limited']",
+        "page": 126,
+        "section": "Basis for Offer Price",
+        "source_id": "RHP-FILING-72480c2e"
+      },
+      {
+        "evidence_id": "EV-use_of_proceeds",
+        "extraction_confidence": 0.98,
+        "extraction_method": "DETERMINISTIC_PDF",
+        "locator": "Schedule of Implementation and Deployment",
+        "note": "PROCESSING_SUMMARY: Use of proceeds categories: ['gcp']",
+        "page": 120,
+        "section": "Objects of the Offer",
+        "source_id": "RHP-FILING-72480c2e"
+      }
+    ],
+    "manifest_hash": "da76543515f40f69c4f6effad3166a99a0fc63b8bb926c84e1b57e55c15d7202",
+    "sources": [
+      {
+        "content_hash": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+        "retrieval_timestamp": "2026-10-23T05:16:22Z",
+        "source_id": "RHP-FILING-72480c2e",
+        "source_type": "RHP",
+        "uri": "C:\\Users\\USER\\AppData\\Local\\Temp\\ipo_ingest\\72480c2e249eb8da\\filing.pdf"
+      },
+      {
+        "content_hash": "1eeeec0c23e06f508d31a2536bbfe61e3dbcdab12e00fe0a436d75151f4e04f1",
+        "retrieval_timestamp": "2026-10-23T05:18:16.969519Z",
+        "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+        "source_type": "MARKET_DATA",
+        "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/"
+      },
+      {
+        "content_hash": "2079d39a8626f10823217360a96f642925b33bce2008b3f99c84ac5edcf7857e",
+        "retrieval_timestamp": "2026-10-23T05:17:29.846182Z",
+        "source_id": "SRC-EXCHANGE-2079D39A",
+        "source_type": "EXCHANGE",
+        "uri": "https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue_par_updated/w?flag=1"
+      },
+      {
+        "content_hash": "755e240f01c1b4981d594a414daa60d17cc25527a8296b3624e2c4e327a6987d",
+        "retrieval_timestamp": "2026-10-23T05:17:35.708027Z",
+        "source_id": "SRC-EXCHANGE-755E240F",
+        "source_type": "EXCHANGE",
+        "uri": "https://www.nseindia.com/api/ipo-detail?symbol=JPL"
+      },
+      {
+        "content_hash": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+        "retrieval_timestamp": "2026-10-23T05:18:15.648436Z",
+        "source_id": "SRC-OFFICIAL-RHP-72480C2E",
+        "source_type": "RHP",
+        "uri": "https://nsearchives.nseindia.com/content/ipo/RHP_JPL.zip#zip-member=RHP_JPL%2FJio%20Platforms%20Limited_RHP.pdf"
+      }
+    ]
+  },
+  "source_manifest_hash": "da76543515f40f69c4f6effad3166a99a0fc63b8bb926c84e1b57e55c15d7202"
+}

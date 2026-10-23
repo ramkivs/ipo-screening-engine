@@ -1,0 +1,14 @@
+﻿[
+    {
+        "evaluation_id":  "JIO-PLATFORMS-LIMITED-20261023-051816Z-final-b79b5794",
+        "status":  "EXPORTED",
+        "source_directory":  "G:\\ipo-screening-engine\\ipo-screening-engine\\build\\evaluations\\JIO-PLATFORMS-LIMITED-20261023-051816Z-final-b79b5794",
+        "artifacts_exported":  9
+    },
+    {
+        "evaluation_id":  "JIO-PLATFORMS-LIMITED-20261022-101913Z-final-ad5e6872",
+        "status":  "EXPORTED",
+        "source_directory":  "G:\\ipo-screening-engine\\ipo-screening-engine\\build\\evaluations\\JIO-PLATFORMS-LIMITED-20261022-101913Z-final-ad5e6872",
+        "artifacts_exported":  9
+    }
+]
