@@ -1,0 +1,146 @@
+{
+ "purpose": "Auditable reproduction of why the SEBI/ED positive route emits nothing for this filing. Read-only; the engine's own regexes and _lit_span were applied to the exact retained PDF (sha256 72480c2e...).",
+ "window": {
+  "key": "litigation",
+  "pages": [
+   463,
+   478
+  ],
+  "located_via": "filing table of contents",
+  "page_status": "all READ"
+ },
+ "regex_spans_with_a_SEBI_or_ED_actor": [
+  {
+   "page": 463,
+   "length": 1154,
+   "over_600_char_cap": true,
+   "boilerplate": false,
+   "party_token": true,
+   "negated": false,
+   "excerpt": "Directors (collectively \u201cRelevant Parties\u201d); (ii) actions taken by statutory and/ or regulatory authorities ag"
+  },
+  {
+   "page": 463,
+   "length": 1154,
+   "over_600_char_cap": true,
+   "boilerplate": false,
+   "party_token": true,
+   "negated": false,
+   "excerpt": "Directors (collectively \u201cRelevant Parties\u201d); (ii) actions taken by statutory and/ or regulatory authorities ag"
+  },
+  {
+   "page": 463,
+   "length": 1154,
+   "over_600_char_cap": true,
+   "boilerplate": false,
+   "party_token": true,
+   "negated": false,
+   "excerpt": "Directors (collectively \u201cRelevant Parties\u201d); (ii) actions taken by statutory and/ or regulatory authorities ag"
+  },
+  {
+   "page": 470,
+   "length": 801,
+   "over_600_char_cap": true,
+   "boilerplate": false,
+   "party_token": false,
+   "negated": false,
+   "excerpt": "(iii) RIL had issued debentures with convertible warrants in the year 1994 and allotted equity shares against "
+  },
+  {
+   "page": 470,
+   "length": 1804,
+   "over_600_char_cap": true,
+   "boilerplate": true,
+   "party_token": true,
+   "negated": false,
+   "excerpt": "(i) On December 16, 2010, SEBI issued a show cause notice, inter alia to RIL in connection with the trades by "
+  },
+  {
+   "page": 470,
+   "length": 770,
+   "over_600_char_cap": true,
+   "boilerplate": false,
+   "party_token": false,
+   "negated": false,
+   "excerpt": "In the same matter, the adjudicating officer of SEBI (\u201c AO\u201d), while adjudicating the show cause notice dated N"
+  },
+  {
+   "page": 472,
+   "length": 1212,
+   "over_600_char_cap": true,
+   "boilerplate": true,
+   "party_token": false,
+   "negated": false,
+   "excerpt": "actions including penalties imposed by SEBI or stock exchanges in the last five financial years: (i) On Decemb"
+  },
+  {
+   "page": 472,
+   "length": 1115,
+   "over_600_char_cap": true,
+   "boilerplate": true,
+   "party_token": false,
+   "negated": false,
+   "excerpt": "(i) On December 22, 2021, SEBI issued a show cause notice inter alia to RIL asking it to show cause as to why "
+  },
+  {
+   "page": 472,
+   "length": 1115,
+   "over_600_char_cap": true,
+   "boilerplate": true,
+   "party_token": false,
+   "negated": false,
+   "excerpt": "(i) On December 22, 2021, SEBI issued a show cause notice inter alia to RIL asking it to show cause as to why "
+  },
+  {
+   "page": 472,
+   "length": 715,
+   "over_600_char_cap": true,
+   "boilerplate": false,
+   "party_token": false,
+   "negated": false,
+   "excerpt": "(ii) SEBI, on August 8, 2014, had passed an adjudication order on a show cause notice issued to RIL for allege"
+  },
+  {
+   "page": 472,
+   "length": 715,
+   "over_600_char_cap": true,
+   "boilerplate": false,
+   "party_token": false,
+   "negated": false,
+   "excerpt": "(ii) SEBI, on August 8, 2014, had passed an adjudication order on a show cause notice issued to RIL for allege"
+  },
+  {
+   "page": 472,
+   "length": 715,
+   "over_600_char_cap": true,
+   "boilerplate": false,
+   "party_token": false,
+   "negated": false,
+   "excerpt": "(ii) SEBI, on August 8, 2014, had passed an adjudication order on a show cause notice issued to RIL for allege"
+  }
+ ],
+ "counts": {
+  "total": 12,
+  "over_600_char_cap": 12,
+  "passing_all_tests": 0
+ },
+ "finding": "Every SEBI/ED-actor span in this filing exceeds the 600-character cap, so all are discarded before the party, negation and boilerplate tests can matter.",
+ "raw_line_break_reproduction": {
+  "page": 468,
+  "line_wrapped": "Against the said order of the Special Court, SEBI \nfiled a revision application before the Hon'ble High Court of Bombay and the same is currently pending.",
+  "_REG_ACTION_matches_raw": false,
+  "_REG_ACTION_matches_after_joining_the_wrap": true,
+  "matched_text_after_join": "order of the Special Court, SEBI filed"
+ },
+ "party_token_reproduction": {
+  "_LIT_PARTY_on__SEBI_has_filed_a_revision_application_against_RIL": false,
+  "_LIT_PARTY_on__same_with___RIL_the_Promoter": true,
+  "note": "The filing's own defined short name for the Promoter is 'RIL'; sentences at p470/p472 name only 'RIL'."
+ },
+ "boilerplate_reproduction": {
+  "sentence": "By an order dated March 24, 2017, the Whole time Member found RIL acted in a fraudulent manner ... and violated Section 12A of the SEBI Act read with ... Regulations, 2003",
+  "_REG_BOILERPLATE_matches": true,
+  "note": "A genuine action sentence is vetoed because it cites a regulation number."
+ },
+ "verdict": "_sebi_ed_action_finding(litigation pages) returns None"
+}
