@@ -307,6 +307,12 @@ Offer for Sale Size: Not Applicable
     candidate, report = HttpNoticeProvider({'ACME': 'https://www.bseindia.com/notice.pdf'},
         fetcher=lambda url: raw).find(NAME, 'ACME')
     assert candidate is not None, report.detail
+    if candidate.values['price_band_low'] != 100:
+        from ipo_screening.extraction.official_notice_ocr import _ocr_pages
+        raise AssertionError('OCR_DIAGNOSTIC ' + json.dumps({
+            'values': candidate.values,
+            'tiles': [text for _, text in _ocr_pages(raw)['pages']],
+        })[:2200])
     assert candidate.values['price_band_low'] == 100
     assert candidate.values['price_band_high'] == 120 and candidate.values['lot_size'] == 50
     assert candidate.result.fresh_issue_amount.value == 240
