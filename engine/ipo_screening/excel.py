@@ -32,6 +32,8 @@ from __future__ import annotations
 
 import io
 import json
+import re
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -877,12 +879,16 @@ def project(
     workbook = build_workbook(records)
     target = Path(output_path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    workbook.save(target)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    # The file and the hash use the same canonical bytes, so re-projecting
+    # an unchanged store reproduces both.
+    content = deterministic_workbook_bytes(buffer.getvalue())
+    target.write_bytes(content)
     counts = {
         name: max(0, workbook[name].max_row - 1) for name in SHEET_ORDER
     }
-    with target.open("rb") as handle:
-        content_hash = sha256_of({"bytes": handle.read().hex()})
+    content_hash = sha256_of({"bytes": content.hex()})
     return ProjectionResult(
         path=target,
         evaluations=len(records),
@@ -891,12 +897,48 @@ def project(
     )
 
 
+_CORE_MODIFIED = re.compile(rb"(<dcterms:modified[^>]*>)[^<]*(</dcterms:modified>)")
+_ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
+
+
+def deterministic_workbook_bytes(payload: bytes) -> bytes:
+    """Pin the two wall-clock values an OOXML save always injects.
+
+    Pinning ``workbook.properties`` is not enough: at save time openpyxl
+    rewrites ``dcterms:modified`` in ``docProps/core.xml`` to the current
+    instant and writes every ZIP entry with the current DOS timestamp.
+    Both carry a 2-second resolution, so two projections of the same
+    records came out byte-identical only while they happened to fall in
+    the same tick -- the workbook was deterministic in the test, not in
+    fact, and a re-projection could report a different content hash for
+    an unchanged store.
+
+    Re-packing the archive with a fixed epoch and the pinned ``created``
+    stamp makes the bytes a pure function of the records. Compression is
+    preserved per entry, and entry order is preserved.
+    """
+    source = zipfile.ZipFile(io.BytesIO(payload))
+    out = io.BytesIO()
+    stamp = FIXED_TIMESTAMP.strftime("%Y-%m-%dT%H:%M:%SZ").encode()
+    with zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            data = source.read(info.filename)
+            if info.filename == "docProps/core.xml":
+                data = _CORE_MODIFIED.sub(lambda m: m.group(1) + stamp + m.group(2), data)
+            clone = zipfile.ZipInfo(info.filename, date_time=_ZIP_EPOCH)
+            clone.compress_type = info.compress_type
+            clone.external_attr = info.external_attr
+            clone.create_system = info.create_system
+            target.writestr(clone, data)
+    return out.getvalue()
+
+
 def workbook_bytes(records: Sequence[Mapping[str, Any]]) -> bytes:
     """Serialise the workbook to bytes (used by the determinism tests)."""
     workbook = build_workbook(records)
     buffer = io.BytesIO()
     workbook.save(buffer)
-    return buffer.getvalue()
+    return deterministic_workbook_bytes(buffer.getvalue())
 
 
 def build_missing_unverified_rows(record: Mapping[str, Any]) -> List[Dict[str, Any]]:

@@ -1618,3 +1618,35 @@ Commands, the only environment variable required, nine success criteria, and a f
 - `listing.bseindia.com` configured-URL allow-list: **untouched and still RAMKI's decision** (A31 §5).
 
 - **Disposition: WIRING PROVEN AND HARDENED; EGRESS STILL BLOCKED (PROVEN, FOUR ATTEMPTS); FULL SUITE 1846/1846 GREEN; OPERATIONAL HANDOFF COMPLETE; GATE CLOSED; NO EVALUATION.**
+
+## Paras — operator host has egress; handoff made one-command — 2026-10-24 (revision 12)
+
+**No evaluation created, updated, scored or persisted; no durable record written; PR #7 open; `main` untouched at `01ba66c`. Production code changed this pass, so the full suite was re-run in this pass.**
+
+### What the operator's run established
+- The operator's own Windows host retrieved **14,287 bytes** from `https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P`. The `[TRANSPORT]` blocker is a **sandbox** condition, not a project one; the external dependency is now cleared on the host that matters. This is a retrieval fact, **not** a resolution: the bytes have not been through the resolver.
+
+### Two defects that run exposed, both corrected (report §19)
+- **Operator error was being reported as a policy violation.** The configured value arrived as a Markdown link with an HTML-escaped `&` (`…?id=2&amp;Type=P`), and the previous build rejected it as "not an allowed official source host". `normalize_configured_url()` now strips Markdown link syntax, angle brackets and quotes, and unescapes entities **before** validation, for `IPO_OFFICIAL_HISTORICAL_LISTINGS` and the notice/prospectus URL maps. Narrowness is pinned by test: no scheme added, no host or path rewritten, foreign hosts still rejected. **No allow-list was widened** — `listing.bseindia.com` for configured notice URLs remains RAMKI's decision (A31 §5).
+- **A 14 KB response could masquerade as a read listing.** `bse_historical_issue_records(..., diagnostics=…)` now reports `issue_rows` / `issuer_rows` / `bound_rows` / `rejections`, and the archive reader distinguishes *"carried no issue-information links at all … nothing may be concluded from its silence"* from *"carried N issue row(s) but none for this issuer"*. A shell is no longer indistinguishable from an answer.
+
+### The handoff is one command, read-only (A31 §4b)
+- `python engine/tools/ipo_screen.py issue-terms --issuer … --open … --close … [--fields …] [--json]` — prints status, per-source `searched`/`failed`/`historical`/`homepage`, every rejection note, and per field value / verification / URI / quote / locator. Exit `0` = RESOLVED, `1` = not resolved, `2` = usage. Writes nothing, creates nothing.
+- Report §19.2 carries the exact PowerShell block and the expected output, including the `IDENTITY_UNBOUND` refusal when the window is omitted (a closed record is never usable on a name match alone).
+
+### A genuine determinism defect found by the full suite (report §19.5)
+- `test_workbook_bytes_are_deterministic` failed only when two serialisations straddled a two-second boundary: `openpyxl` rewrites `docProps/core.xml`'s `dcterms:modified` **and** every ZIP entry timestamp at `save()`, so pinning `properties.created/modified` never pinned the bytes. That matters beyond the test — the provenance store writes the file and derives the content hash from it.
+- `deterministic_workbook_bytes()` repacks the archive with `dcterms:modified` = `1980-01-01T00:00:00Z` and every entry at `(1980,1,1,0,0,0)`; `workbook_bytes()` and `project_store` both serialise through it, so **the bytes written and the bytes hashed are the same bytes**. Regression case re-serialises across a tick.
+
+### Tests
+- New `tests/test_issue_terms_cli.py` — **19 passed**.
+- `tests/test_reproducibility_store.py` — **33 passed**; the other workbook-writing modules — **85 passed**.
+- **Full backend suite on final code: 1866 collected / 1866 passed / 0 failed / 0 skipped**, exit 0, 22 m 05 s. (First run this pass: 1864/1 — the determinism defect above; fixed in production code, not in the test.) No assertion weakened, nothing skipped or removed.
+
+### Status (unchanged where it must be)
+- Frozen-core pin: **VERIFIED — READY FOR RAMKI RATIFICATION** (not revisited, not ratified).
+- Sandbox egress: still blocked at TLS. **Operator-host egress: works.**
+- `price_band_low` / `price_band_high` / `lot_size`: **UNRESOLVED** — pending the operator run of §19.2; nothing entered any configuration, canonical record or store.
+- Required-term gate: **CLOSED**. Evaluation readiness: **NOT ESTABLISHED**. Evaluation execution: **NOT RUN**.
+
+- **Disposition: OPERATOR EGRESS CONFIRMED; PASTE AND SHELL-RESPONSE DEFECTS FIXED; RESOLUTION NOW ONE READ-ONLY COMMAND; WORKBOOK DETERMINISM DEFECT FOUND AND FIXED; FULL SUITE 1866/1866 GREEN ON FINAL CODE; GATE CLOSED; NO EVALUATION.**

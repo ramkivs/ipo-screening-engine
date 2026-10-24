@@ -1030,12 +1030,29 @@ class OfficialDiscoveryProvider:
             return [], 0, [f"{listing_url}: closed-issue listing returned a non-HTML response"]
 
         expected = IssueIdentity.from_issue_context(issue_context)
+        diagnostics: Dict[str, Any] = {}
         try:
-            records, rejections = bse_historical_issue_records(raw, company_name, expected)
+            records, rejections = bse_historical_issue_records(
+                raw, company_name, expected, diagnostics=diagnostics)
         except Exception as exc:
             return [], 0, [f"{listing_url}: closed-issue listing could not be read "
                            f"({type(exc).__name__}: {exc})"]
         notes.extend(rejections)
+        # A retrieved page is not a read listing.  Say which of the two
+        # happened, because they need different repairs: a page with no
+        # issue rows at all is the wrong document (a JavaScript shell, an
+        # interstitial or an error page), while a page full of issue rows
+        # that does not contain this issuer is the right document with a
+        # different answer.
+        if not diagnostics.get("issue_rows"):
+            notes.append(
+                f"{listing_url}: the served HTML carried no issue-information links at all "
+                f"({len(raw)} bytes, starts {raw.lstrip()[:15]!r}); this is not a usable "
+                "closed-issue listing and nothing may be concluded from its silence")
+        elif not diagnostics.get("issuer_rows"):
+            notes.append(
+                f"{listing_url}: the served page carried {diagnostics['issue_rows']} issue "
+                f"row(s) but none for this issuer")
 
         candidates: List[NoticeCandidate] = []
         for page_url, result in records[: self.max_candidates]:
@@ -1473,6 +1490,35 @@ class ConfigurationDiagnosticProvider:
         return None, ProviderReport(self.name, "UNAVAILABLE", self.detail)
 
 
+def normalize_configured_url(entry: str) -> str:
+    """Undo the paste artifacts an operator URL usually carries.
+
+    Configured source URLs arrive by copy-and-paste from documents, chats
+    and ticket systems, which wrap them in Markdown link syntax, angle
+    brackets or quotes and escape ``&`` as ``&amp;``.  A wrapped URL is
+    not a wrong URL -- rejecting it as "not an official host" would send
+    an operator looking for a policy problem that does not exist, so the
+    wrappers are removed before the value is validated.
+
+    Only presentation artifacts are removed.  The URL itself is otherwise
+    used exactly as given: no scheme is added, no host is rewritten, no
+    path is changed, and an entry that is still not a URL is still
+    rejected by the caller.
+    """
+    from html import unescape
+
+    value = (entry or "").strip().strip("\u200b")
+    if value.startswith("<") and value.endswith(">"):
+        value = value[1:-1].strip()
+    # Markdown link: [label](target)
+    markdown = re.fullmatch(r"\[.*?\]\(\s*(<?[^)\s]+>?)\s*\)", value, re.DOTALL)
+    if markdown:
+        value = markdown.group(1).strip().strip("<>").strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        value = value[1:-1].strip()
+    return unescape(value).strip()
+
+
 def _url_map_from_env(var_name: str) -> tuple[Dict[str, str], Optional[str]]:
     """Parse an IPO-ID -> URL JSON env mapping.
 
@@ -1489,7 +1535,8 @@ def _url_map_from_env(var_name: str) -> tuple[Dict[str, str], Optional[str]]:
         return {}, f"{var_name} is not valid JSON ({type(exc).__name__}: {exc}); expected a JSON object mapping IPO IDs to official URLs"
     if not isinstance(parsed, dict):
         return {}, f"{var_name} must be a JSON object mapping IPO IDs to official URLs, not {type(parsed).__name__}"
-    mapping = {str(k): v for k, v in parsed.items() if isinstance(v, str) and v.strip()}
+    mapping = {str(k): normalize_configured_url(v) for k, v in parsed.items()
+               if isinstance(v, str) and normalize_configured_url(v)}
     if parsed and not mapping:
         return {}, f"{var_name} contains no usable IPO-ID -> URL entries"
     return mapping, None
@@ -1514,7 +1561,7 @@ def _historical_listing_urls_from_env() -> tuple[List[str], List[str]]:
     usable: List[str] = []
     problems: List[str] = []
     for position, entry in enumerate(raw.split(","), start=1):
-        url = entry.strip()
+        url = normalize_configured_url(entry)
         if not url:
             continue
         parsed = urlparse(url)

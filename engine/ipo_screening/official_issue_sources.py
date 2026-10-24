@@ -268,10 +268,15 @@ def _query_identity(url):
     }
 
 
-def bse_historical_issue_records(raw, company_name, expected=None):
+def bse_historical_issue_records(raw, company_name, expected=None, diagnostics=None):
     """Closed-issue BSE listing records, admitted only when identity is bound.
 
-    Returns ``(records, rejections)``.
+    Returns ``(records, rejections)``.  ``diagnostics``, when a dict is
+    passed in, is filled with what the page actually contained
+    (``issue_rows``, ``issuer_rows``, ``bound_rows``) so the caller can
+    tell "the exchange served a shell with no issue rows" apart from "the
+    exchange served the archive and this issuer is not in it".  Neither is
+    evidence of non-publication; they are different problems to fix.
 
     ``records`` are ``(page_url, result)`` pairs in the same shape the live
     record adapter yields, so the caller follows the issue-information page
@@ -310,6 +315,7 @@ def bse_historical_issue_records(raw, company_name, expected=None):
     found, rejections = [], []
     seen_issues = {}
     bound_rows = []
+    issue_rows = issuer_rows = 0
 
     for row in re.findall(r'<tr\b.*?</tr>', text, re.DOTALL | re.IGNORECASE):
         anchors = re.findall(r'<a\b[^>]*href\s*=\s*"([^"]*)"[^>]*>(.*?)</a>',
@@ -324,10 +330,12 @@ def bse_historical_issue_records(raw, company_name, expected=None):
                 break
         if page_url is None:
             continue  # not an issue record
+        issue_rows += 1
         cells = _row_cells(row)
         name = link_text or (cells[0] if cells else '')
         if _norm_name(name) != _norm_name(company_name):
             continue  # never another issuer's row, however similar the name
+        issuer_rows += 1
 
         dates = [(index, _cell_date(cell)) for index, cell in enumerate(cells)]
         dates = [(index, value) for index, value in dates if value is not None]
@@ -443,4 +451,8 @@ def bse_historical_issue_records(raw, company_name, expected=None):
         result.metadata['issue_status'] = identifiers['status'] or 'unknown'
         result.metadata['issue_identity'] = verdict.as_dict()
         found.append((page_url, result))
+
+    if diagnostics is not None:
+        diagnostics.update(issue_rows=issue_rows, issuer_rows=issuer_rows,
+                           bound_rows=len(found), rejections=len(rejections))
     return found, rejections

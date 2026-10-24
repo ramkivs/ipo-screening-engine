@@ -81,3 +81,28 @@ Two ways to close it, and both are RAMKI's call, not the agent's:
 ## 8. Implementation authority
 
 **Granted for this pass** by the standing PA, limited to: the issue-identity model, the opt-in closed-issue search, the configuration knob, the document-naming recognition for exchange advertisement filenames, diagnostics, and tests. **Not granted, and not done:** any change to scoring, criteria, required-term policy, source allow-lists, the live listing set, the RHP placeholder rules, the golden record, or any evaluation.
+
+## 4b. Operator-facing hardening (added 2026-10-24, revision 10)
+
+The rule above is only as usable as the two things an operator does with it: **configure the archive URL** and **ask for the terms**. Both were repaired after the first real operator run.
+
+**The configured URL is normalised before it is validated.** An operator on a Windows host pasted the archive URL out of a rendered document, so what reached the environment variable was a Markdown link with an HTML-escaped ampersand:
+
+```
+[https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&amp;Type=P](https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P)
+```
+
+The previous build rejected that as *"not an allowed official source host"* — an operator mistake reported as a **source-policy violation**, which is the most misleading diagnostic available because it suggests the source is disallowed when in fact it is permitted. `normalize_configured_url()` now strips Markdown link syntax, enclosing angle brackets and quotes, and unescapes `&amp;`/entities **before** validation, for `IPO_OFFICIAL_HISTORICAL_LISTINGS` and for the `IPO_PRICE_BAND_NOTICE_URLS` / `IPO_PROSPECTUS_URLS` maps. It is deliberately narrow, and the tests pin the narrowness: no scheme is added (`www.bseindia.com/x` stays as written), no host or path is rewritten, and a value that resolves to a genuinely foreign host is still rejected with the same reason. Normalisation is a presentation fix, not a policy relaxation — §4's "does not widen any allow-list" applies unchanged.
+
+**A retrieved page is now described by what it contains, not by the fact that it arrived.** A 14 KB response proves bytes; it does not prove the page carried issue rows. `bse_historical_issue_records(..., diagnostics=…)` reports `issue_rows` / `issuer_rows` / `bound_rows` / `rejections`, and `_search_historical_listing` says which case occurred:
+
+* *"the served HTML carried no issue-information links at all (N bytes, starts b'…'); this is not a usable closed-issue listing and nothing may be concluded from its silence"* — wrong document; the operator should check the URL;
+* *"the served page carried N issue row(s) but none for this issuer"* — right document, different answer.
+
+Without the distinction, a shell, an interstitial or an error page produces exactly the silence that §5 says must never be read as absence. This is the same principle applied one layer out.
+
+**The resolution step is a CLI, not a pasted script.** `python engine/tools/ipo_screen.py issue-terms --issuer … --open … --close … [--fields …] [--json]` is read-only: it builds the resolver from the environment, prints per-source `searched` / `failed` / `historical` / `homepage`, every rejection note, and per field the value, verification state, URI, quote and locator. Exit `0` = `RESOLVED`, `1` = not resolved, `2` = usage error. It writes no store, creates no evaluation, and does not touch any durable record. The command and its expected output are in report §19.2; the tests are `tests/test_issue_terms_cli.py`.
+
+**Tests for this section:** `tests/test_issue_terms_cli.py` (19 cases: the paste forms above, the rejection that must survive normalisation, the two diagnostics messages and their counts, exit codes, `--json`, per-source and per-field rendering, and the closed-issue-without-a-window refusal).
+
+**Still unchanged:** the allow-list itself, the default search set, the frozen core, and the gate. `listing.bseindia.com` for *configured* notice URLs remains RAMKI's decision (§5).

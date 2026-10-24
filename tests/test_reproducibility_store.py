@@ -546,3 +546,31 @@ def _flat(sheet):
     body = [r for r in rows[1:] if r and r[0]]
     assert body, "the sheet has no data rows"
     return dict(zip(header, body[0]))
+
+
+def test_workbook_bytes_are_stable_across_the_zip_timestamp_tick(golden_input, config, tmp_path):
+    """A re-projection must not depend on when it ran.
+
+    OOXML saves stamp the archive and ``dcterms:modified`` with the wall
+    clock at a 2-second resolution, so asserting byte equality between two
+    immediate calls could pass while a projection a second later differed.
+    This test crosses that boundary deliberately.
+    """
+    import time
+
+    from ipo_screening.excel import workbook_bytes
+
+    outcome, _ = run_and_store(golden_input, config, tmp_path)
+    first = workbook_bytes([outcome.record.to_dict()])
+    time.sleep(2.1)
+    second = workbook_bytes([outcome.record.to_dict()])
+    assert first == second
+
+    import io
+    import re
+    import zipfile
+
+    archive = zipfile.ZipFile(io.BytesIO(first))
+    assert {info.date_time for info in archive.infolist()} == {(1980, 1, 1, 0, 0, 0)}
+    core = archive.read("docProps/core.xml").decode("utf-8")
+    assert re.search(r"<dcterms:modified[^>]*>1980-01-01T00:00:00Z<", core)

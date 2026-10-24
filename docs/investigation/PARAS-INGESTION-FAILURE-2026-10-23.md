@@ -5,12 +5,16 @@
 - **Branch:** `arena/07f3439f-ipo-screening-engine` (working branch; `main` untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`).
 - **Baseline this pass:** `8939b05be00a23d5733163cdb6a280b0578cfd10`.
 - **Scope:** the extraction path that produced a rejected official document and an unresolved `issue.ofs`: Price Band Notice classification, current-issue date extraction, field-conflict handling, the RHP document class, and the OFS resolution chain. Corrections are issuer-independent.
+- **Execution status (2026-10-24, revision 10 — operator host has egress):** the operator's own Windows host retrieved **14,287 bytes** from the BSE historical listing, so the `[TRANSPORT]` blocker is specific to this sandbox and the external dependency is cleared on the host that matters. That run exposed two defects, both corrected here: a URL pasted as a Markdown link with an HTML-escaped `&` was reported as a *policy violation* (now normalised before validation, with no scheme or host invented), and a retrieved page that carried no issue rows was indistinguishable from one that carried a different answer (the archive reader now reports `issue_rows` / `issuer_rows` / `bound_rows` / `rejections` and distinguishes a shell from a read listing). The resolution step is now a read-only CLI subcommand (`issue-terms`) instead of a pasted Python snippet — §19. Diagnosing a full-suite failure also found a **genuine determinism defect** in workbook serialisation (`dcterms:modified` and ZIP timestamps were rewritten at save, so the same workbook could produce two different hashes); it is fixed and regression-tested — §19.5. **No term is resolved, the gate stays closed and no evaluation exists.**
+- **Execution status (2026-10-24, revision 9 — wiring + operational handoff):** the configuration-to-runtime chain was traced end to end and is now asserted by test; a misconfigured archive variable used to look exactly like a network outage and now surfaces as a configuration diagnostic (variable, position, reason — never the value) — §18. Full suite 1846/1846 on that pass's final code. **No evaluation.**
 - **Execution status (2026-10-24, revision 8 — retrieval trace + issue-identity binding):** the `UNAVAILABLE` verdict was traced to **TLS egress blocking** from this sandbox (all six official listings fail before any content is read), not to a parser, endpoint or matching defect; failures now carry a `[TRANSPORT]`/`[HTTP]`/`[CONTENT]` class. A **closed-issue record can now be used only through an identity-bound path** (A31: exact issuer + the filing's own bid window + the exchange issue number + internally consistent identifiers; no window ⇒ no admission; conflicts withhold), leaving the live search and every allow-list untouched — §17. Two further findings are recorded rather than silently absorbed: the exchange's own `PBA_` advertisement naming was not recognised by the attachment filter (now recognised), and the configured-URL allow-list deliberately excludes `listing.bseindia.com` (a change was attempted, contradicted an existing safeguard's test, and was **reverted**; it is RAMKI's decision, A31 §5). **The three terms remain UNRESOLVED, the gate stays closed, and no evaluation exists.**
 - **Execution status (2026-10-24, revision 7 — ratification evidence + official-source discovery):** the frozen-core re-pin is independently verified against the published bytes and recorded **VERIFIED — READY FOR RAMKI RATIFICATION** (**not ratified**) — §15. Issuer-matched **official** sources for the three `[●]` terms were located and retained with provenance (BSE issue page: price band `660.00-693.00`, market lot `21`; SEBI filing corroborating ₹5,000.00 m / ₹9,500.00 m) — but they are **not admissible through the current contract**: the carrying page is BSE's *historical* view of a closed issue, the engine searches only the live listing, and this sandbox cannot reach any official host at all. **The terms remain unresolved and the gate stays closed**; nothing was written into the engine, a store or an evaluation — §16.
 - **Execution status (2026-10-24, revision 6 — final regression gate):** the **full backend suite was executed** against the corrected tree: **1772 collected / 1772 passed / 0 failed / 0 skipped** (31 m 17 s, exit 0). Ten failures in the first full run were diagnosed: nine were one stale frozen-core pin for the A30-corrected parser, and one was a genuine A30 regression in the snapshot cache that turned a *verified cached Prospectus* into "no evidence". Both are corrected and documented in **§14**; the golden result still reproduces `e84f8bc0…` exactly. Evaluation remains NOT RUN and no evaluation was created.
 - **Execution status (2026-10-24, revision 5):** the **upload path** — the extractor `PresentationService.ingest_document` actually uses — is corrected for all issuers: the closed issue window behind a footnote marker, the disclosed monetary Offer for Sale, and the monetary unit of both issue components. A controlled non-production re-ingestion of the retained RHP now resolves the issuer, opening date, closing date, fresh issue and OFS, and is **correctly blocked** on price band and bid lot alone. No evaluation was created; nothing was persisted. See **§13**. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-24, revision 4):** the **wider focused suites** were executed (221 passed / 0 failed / 0 skipped across nine modules) and a **controlled non-production ingestion** was run against the retained RHP. The ingestion is **correctly blocked** on price band and bid lot, but it **also** leaves `issue.ofs` and `issue.close_date` unresolved — a defect in the *upload* extraction path (`sections.py`) that the A30 corrections never reached. It is diagnosed and documented in **§12**, not corrected in this pass. No evaluation was created, no durable state changed. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-23, revision 3):** the two focused regression modules were **executed and passed on 2026-10-23** (45 collected / 45 passed / 0 skipped, commit `4b1c67f`) — see **§11.8**, which records the command, the one test-side defect that was fixed, and the checks performed. The **full backend suite (~3 h) was NOT run**, and **no ingestion, evaluation or scored artifact** was produced or modified. Statements in §§1–10 that predate the document remain as written; where they say "not executed", §11.8 supersedes them for these two modules only.
+- **Revision 10 (2026-10-24):** operator-host egress confirmed (14,287 bytes from the BSE historical listing); pasted-URL normalisation before allow-list validation; row-count diagnostics that separate a shell response from a read listing with no matching issuer; a read-only `issue-terms` CLI replacing the pasted Python handoff; and a determinism defect in workbook byte serialisation found by the full suite, fixed and regression-tested. No evaluation.
+- **Revision 9 (2026-10-24):** configuration-to-runtime wiring trace and hardening — the archive variable is proven to reach the provider through `create_app`, an ingestion run shows the filing's own bid window reaching the resolver, and unusable entries surface as configuration diagnostics rather than as outages. Full suite green on final code. No evaluation.
 - **Revision 8 (2026-10-24):** end-to-end retrieval trace (transport vs absence), issue-identity binding for closed exchange records (A31, 32 new cases), exchange advertisement-name recognition, a reverted allow-list experiment, and a controlled non-production ingestion confirming the gate. No evaluation.
 - **Revision 7 (2026-10-24):** frozen-core ratification dossier (independent hash, manifest-diff, golden-result, integrity and tamper checks, all reverted) and the official price-band / lot-size evidence workstream (4 official sources retained, 2 not retrieved, contract and transport blockers stated, 17 new focused cases). No code change to extraction or discovery.
 - **Revision 6 (2026-10-24):** final regression gate — full suite run twice (first run 10 failed, final run 1772/1772), two corrections (snapshot-cache document class; frozen-core pin re-established with authority recorded), plus four cache regression cases.
@@ -1194,3 +1198,94 @@ EOF
 ### 18.6 Status, unchanged where it must be
 
 Frozen-core pin: **VERIFIED — READY FOR RAMKI RATIFICATION** (not revisited, not ratified). Official evidence retrieval: **blocked at transport** in this environment. `price_band_low` / `price_band_high` / `lot_size`: **UNRESOLVED**. Required-term gate: **CLOSED**, verified end to end. Evaluation: **NOT RUN**, none created, updated or persisted. Evaluation readiness: **NOT ESTABLISHED**.
+
+---
+
+## 19. Operator host has egress — handoff exercised, and made one-command — 2026-10-24 (revision 10)
+
+Baseline `ce5a238` → this pass's commit. **No evaluation; no store; no ingestion of a resolved filing.**
+
+### 19.1 What changed in the environment picture
+
+The operator's own host (`G:\ipo-screening-engine\ipo-screening-engine`) ran the handoff's transport probe and received **14,287 bytes** from `https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P`. That is a **successful official-source retrieval** — the long-standing `[TRANSPORT]` blocker is specific to the sandbox, not to the project, and the external dependency is now cleared on the host that matters.
+
+Two things about that run needed fixing, and both are fixed here rather than described:
+
+1. **The value pasted into the environment variable was not a URL.** It arrived as a Markdown link with an HTML-escaped ampersand:
+   `[https://…IPOIssues?id=2&amp;Type=P](https://…IPOIssues?id=2&Type=P)`.
+   That is what a URL looks like after being copied out of a rendered document or chat. Fed to the previous build, validation would have rejected it as "not an allowed official source host" — an **operator error reported as a policy problem**, which is the worst possible diagnostic. `normalize_configured_url()` now strips Markdown link syntax, surrounding angle brackets and quotes, and unescapes `&amp;`/entities *before* validation, for both `IPO_OFFICIAL_HISTORICAL_LISTINGS` and the `IPO_PRICE_BAND_NOTICE_URLS` / `IPO_PROSPECTUS_URLS` maps. It removes presentation artifacts only: no scheme is added, no host or path is rewritten, and a genuinely wrong value is still rejected with the same reasons as before.
+2. **A retrieved page could look like a read listing.** A 14 KB response proves bytes arrived; it does not prove the page carried issue rows. If the served HTML is a shell, an interstitial or an error page, the previous build silently produced no candidates and no explanation. The archive reader now reports what the page actually contained: `issue_rows`, `issuer_rows`, `bound_rows`, `rejections`, and the provider says which case happened —
+
+   * *"the served HTML carried no issue-information links at all (14,287 bytes, starts b'<!DOCTYPE …'); this is not a usable closed-issue listing and nothing may be concluded from its silence"* — wrong document, fix the URL; or
+   * *"the served page carried N issue row(s) but none for this issuer"* — right document, different answer.
+
+### 19.2 The one-command diagnostic
+
+The handoff previously required pasting a multi-line Python snippet. It is now a CLI subcommand, read-only, with no evaluation and no writes:
+
+```powershell
+$env:PYTHONPATH = "$PWD\engine"
+$env:IPO_OFFICIAL_HISTORICAL_LISTINGS = "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P"
+python engine\tools\ipo_screen.py issue-terms --issuer "PARAS HEALTHCARE LIMITED" `
+    --open 2026-10-21 --close 2026-10-23
+```
+
+It prints the issuer, the expected window, the requested terms, the resolution status, then every provider with **one line per source** marked `searched` / `failed` / `historical` / `homepage` / `shell`, every rejection note, and for each field the value, its verification state, its URI, its quote and its locator. `--json` prints the full `ResolutionOutcome`. Exit code `0` means `RESOLVED`, `1` means not resolved (the same refusal code the rest of the CLI uses).
+
+**Expected output on a working host:**
+
+```
+status             RESOLVED
+resolved           price_band_low, price_band_high, lot_size
+terms
+  price_band_low     VERIFIED
+    value 660.0  VERIFIED  https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4895&…IPONo=8048…
+      quote: 660.00 - 693.00
+  price_band_high    VERIFIED
+    value 693.0  VERIFIED  …
+  lot_size           VERIFIED
+    value 21  VERIFIED  …
+```
+
+### 19.3 What is still not claimed
+
+* **No live retrieval happened in this repository's own environment.** The retrieval tests remain synthetic or evidence-backed; nothing above is a claim that this sandbox reached BSE.
+* **No term has been resolved by the engine yet.** The operator's 14,287-byte response has not been run through the resolver; §19.2 is the command that does it and the output above is the expected, not the observed, result.
+* **Ingestion is not authorised to proceed past the gate.** Once `issue-terms` prints `RESOLVED`, ingestion would produce an evaluation — a separate authority step, unchanged by this pass.
+
+### 19.4 Status
+
+| Dimension | Status |
+|---|---|
+| Frozen-core pin | **VERIFIED — READY FOR RAMKI RATIFICATION** (untouched) |
+| Sandbox egress | blocked at TLS (unchanged; irrelevant now) |
+| **Operator-host egress** | **WORKS** — 14,287 bytes retrieved from the BSE historical listing |
+| Configuration robustness | paste artifacts normalised; unusable entries diagnosed without echoing the value |
+| Retrieved-page diagnostics | row counts and a shell-vs-answer distinction added |
+| `price_band_low` / `price_band_high` / `lot_size` | **still UNRESOLVED pending the operator run in §19.2** |
+| Required-term gate | CLOSED (fail-closed behaviour unchanged) |
+| Evaluation | **NOT RUN**, none created, updated or persisted |
+
+### 19.5 A determinism defect the full suite found, and what was actually wrong
+
+Running the whole backend suite for this pass produced **one** failure that no focused module reproduces: `test_workbook_bytes_are_deterministic` failed only on a run where the two serialisations happened to straddle a two-second boundary. That is not a flaky test — it is a real defect in the artifact contract, and it was diagnosed rather than retried.
+
+* **Symptom.** Two calls to `workbook_bytes()` for the same `Workbook` a couple of seconds apart differed at byte offset 10 — the local ZIP header's DOS timestamp.
+* **Cause.** `openpyxl` rewrites `docProps/core.xml`'s `dcterms:modified` **and** every ZIP entry's date/time at `save()`. Pinning `workbook.properties.created` / `.modified` (`excel.py:843-844`) therefore does **not** pin the bytes: the writer stamps the moment of saving, at two-second resolution. Two immediate saves agree by luck; a slow run does not.
+* **Consequence for the project, not just the test.** The provenance store writes the workbook file and derives the content hash used to identify it. If the same logical artifact can serialise two ways, the hash does not identify the artifact — a re-run can produce a "different" workbook with identical content, and `dcterms:modified` records the machine's clock rather than the data.
+* **Fix.** `deterministic_workbook_bytes()` serialises to memory and repacks the archive: `dcterms:modified` pinned to `1980-01-01T00:00:00Z` and every entry's timestamp pinned to `(1980, 1, 1, 0, 0, 0)` — the earliest value the ZIP/DOS format can represent, so no writer can silently substitute "now". Both `workbook_bytes()` and `project_store` go through it, so **the bytes written and the bytes hashed are the same bytes**. The archive stays intact (verified entry-by-entry), and a regression case re-serialises across a tick (`tests/test_reproducibility_store.py`).
+
+This is recorded because it is exactly the class of defect a "green focused tests" claim hides: nothing about the feature under test changed, and the failure only appears when the clock is unlucky.
+
+### 19.6 Verification actually run this pass
+
+| Run | Result |
+|---|---|
+| `tests/test_issue_terms_cli.py` (new: normalisation, diagnostics, exit codes, rendering) | **19 passed** |
+| `tests/test_reproducibility_store.py` (workbook determinism, including the tick-crossing case) | **33 passed** |
+| `tests/test_acceptance_matrix.py` + `tests/test_dataset_phase6b.py` (the other modules that import the workbook writer) | **85 passed** |
+| Full backend suite, against the final code | **1866 collected / 1866 passed / 0 failed / 0 skipped**, exit 0, 22 m 05 s |
+
+The first full-suite run of this pass was **1864 passed / 1 failed**; the failure was the determinism defect in §19.5, not a test defect. It was fixed in the production writer, re-tested, and the suite was then run again **in full against the final tree** — the table above is that second run. No assertion was weakened, no test converted to a skip, and no test removed.
+
+A passing suite remains evidence about the code, not about the network: **no test in this repository reached an official host**, and nothing here shows that the operator's retrieval will bind. §19.2 is the step that decides that.
