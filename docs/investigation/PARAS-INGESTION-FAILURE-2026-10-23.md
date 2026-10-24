@@ -5,8 +5,10 @@
 - **Branch:** `arena/07f3439f-ipo-screening-engine` (working branch; `main` untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`).
 - **Baseline this pass:** `8939b05be00a23d5733163cdb6a280b0578cfd10`.
 - **Scope:** the extraction path that produced a rejected official document and an unresolved `issue.ofs`: Price Band Notice classification, current-issue date extraction, field-conflict handling, the RHP document class, and the OFS resolution chain. Corrections are issuer-independent.
+- **Execution status (2026-10-24, revision 5):** the **upload path** — the extractor `PresentationService.ingest_document` actually uses — is corrected for all issuers: the closed issue window behind a footnote marker, the disclosed monetary Offer for Sale, and the monetary unit of both issue components. A controlled non-production re-ingestion of the retained RHP now resolves the issuer, opening date, closing date, fresh issue and OFS, and is **correctly blocked** on price band and bid lot alone. No evaluation was created; nothing was persisted. See **§13**. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-24, revision 4):** the **wider focused suites** were executed (221 passed / 0 failed / 0 skipped across nine modules) and a **controlled non-production ingestion** was run against the retained RHP. The ingestion is **correctly blocked** on price band and bid lot, but it **also** leaves `issue.ofs` and `issue.close_date` unresolved — a defect in the *upload* extraction path (`sections.py`) that the A30 corrections never reached. It is diagnosed and documented in **§12**, not corrected in this pass. No evaluation was created, no durable state changed. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-23, revision 3):** the two focused regression modules were **executed and passed on 2026-10-23** (45 collected / 45 passed / 0 skipped, commit `4b1c67f`) — see **§11.8**, which records the command, the one test-side defect that was fixed, and the checks performed. The **full backend suite (~3 h) was NOT run**, and **no ingestion, evaluation or scored artifact** was produced or modified. Statements in §§1–10 that predate the document remain as written; where they say "not executed", §11.8 supersedes them for these two modules only.
+- **Revision 5 (2026-10-24):** upload-path correction pass — the three defects found by revision 4's ingestion are corrected in the shared extractor and builder, with 27 new upload-path cases and five cross-path cases on the real filing.
 - **Revision 4 (2026-10-24):** wider validation and controlled ingestion pass — four failures across the wider suites diagnosed, two narrow production corrections made (unreadable-OCR marker, Draft-RHP class message), one stale test contract updated, three new regression cases; then a controlled non-production ingestion which surfaced the upload-path gap recorded in **§12**.
 - **Revision 3 (2026-10-23):** controlled validation pass — the focused modules were run, one test-side defect corrected, and the behavioural checks A–F executed against the retained artifact (§11.8). No production code was changed in this revision.
 - **Revision 2 (2026-10-23):** the actual Paras RHP was recovered from the evidence branch and verified. §1's "the document is not present" limitation is **superseded**; the document-specific findings are in **§11**, which distinguishes them from the earlier synthetic reproduction. Sections 1–10 are left as written (they record what was known before the document was available) with this pointer.
@@ -552,3 +554,142 @@ These are **not corrected in this pass**, deliberately. A correct fix touches th
 | Durable or unrelated state changed | **none** — repository diff is the intended files only |
 | Full regression suite | **NOT RUN** |
 | Engine evaluation-ready for this filing | **No** — required terms unresolved |
+
+---
+
+## 13. Upload-path correction — 2026-10-24 (revision 5)
+
+**Baseline:** `231629180b6404dc58b2a90264645af7c36f094f` on `arena/07f3439f-ipo-screening-engine` (`main` untouched at `01ba66c`). **Environment:** CPython 3.11.2, pytest 9.1.1, pypdf 6.20.1, `PYTHONPATH=engine`, interpreter `/home/user/ev/bin/python`.
+
+### 13.1 Why the previous revision's green parser did not help the ingestion
+
+Two extraction paths, deliberately kept separate:
+
+| | Path | Used by |
+|---|---|---|
+| **Parser** | `PriceBandNoticeParser`, `parse_official_rhp` (`extraction/price_band_notice.py`, `official_offer_amounts.py`) | official discovery, the issue-term resolver, the A30 field-level diagnostics |
+| **Upload** | `SectionExtractor.extract_cover_and_offer` (`extraction/sections.py`) → `CanonicalInputBuilder` (`extraction/builder.py`) | every uploaded filing, i.e. `PresentationService.ingest_document` |
+
+A30 corrected the first. The controlled ingestion of revision 4 ran the second and reproduced the original failure. The corrections below are in the **upload** path, are issuer-independent, and change no parser behaviour.
+
+### 13.2 Defect A — the issue window behind a footnote marker
+
+**Symptom.** `issue.close_date` was never extracted from the RHP, while `issue.open_date` was.
+
+**Root cause.** The cover extractor's patterns required whitespace immediately after the label. The filing prints
+
+```
+BID/OFFER OPENS ON WEDNESDAY OCTOBER 21, 2026 BID/OFFER CLOSES ON# FRIDAY OCTOBER 23, 2026
+```
+
+where `#` is the UPI-mandate footnote reference. The opening label carried no marker, the closing label did, so the window arrived half-populated and the field was reported as "not established by filing extraction" — indistinguishable from a document that never states it.
+
+**Correction** (`extraction/sections.py`). The two ad-hoc patterns became named module-level patterns, `_ISSUE_OPENS` / `_ISSUE_CLOSES`, sharing one tail: the label, an optional footnote marker (whitespace, `#`, `*`, `†`, `‡`, `§`, `¶`, a short hyphen, a parenthesised number, or a bare 1–2 digit reference), an optional colon, an optional weekday, then `Month D, YYYY`. Canonical ISO parsing downstream is untouched.
+
+**What did not change.** A date still has to follow the *issue/bid/offer window's own* `opens on` / `closes on` label. A certificate-of-incorporation date, an allotment date, a mid-sentence certificate date, and the Articles' `"Closing Date" shall mean 14 July 2017` remain unreachable from this pattern, which is verified by tests.
+
+### 13.3 Defect B — the disclosed monetary Offer for Sale
+
+**Symptom.** `issue.ofs` was unknown on a filing that states ₹9,500 million three times.
+
+**Root cause.** The upload path only ever set `issue.ofs` from (i) an explicit NIL, or (ii) a *share quantity* attributed to a sole selling shareholder. It had no branch that read a monetary statement of the Offer for Sale at all. The amount was therefore **never extracted** — it was not extracted-then-discarded, and it was not rejected during canonicalization.
+
+**Correction** (`extraction/sections.py`). A single reader, `SectionExtractor._explicit_component_amount`, now resolves `aggregating (up) to ₹ N <unit>` for a component label and is used for **both** `issue.fresh_issue` and `issue.ofs` (the fresh-issue loop it replaces was the same logic inline, so there is one implementation, not two). It enforces:
+
+* **no cross-component binding** — the search stops at the next component label, and a match whose own text runs through an excluded label is rejected, so an Offer-for-Sale amount can never be bound to the fresh issue or the reverse;
+* **no column guessing** — a label immediately preceded by another component label joined by "and"/"&"/"," (a merged header cell, `Fresh Issue and Offer for Sale`, or an adjacent column) is skipped. On the real cover this is what kept the *fresh-issue* cell's ₹5,000 million out of the OFS field;
+* **no inference** — the amount is read independently of the share count, which is a `[●]` placeholder on this filing; nothing is derived from shares × price;
+* **fail closed on conflict** — two different amounts for the same component withhold the field rather than taking the first;
+* **no substitution of a seller row** for the aggregate.
+
+The NIL path is unchanged and takes precedence: an explicit NIL still binds `0.0`, and a missing OFS is still never zero. Provenance follows the existing cover convention: `page=1`, `section="Cover"`, a locator (`Cover page, Offer for Sale Amount` / `Cover page, Fresh Offer`) and the verbatim quotation.
+
+### 13.4 Defect C — monetary unit normalization
+
+**Symptom.** The controlled ingestion persisted `issue.fresh_issue = 5000.0` under `reporting_unit = INR_LAKHS` for a filing that states ₹5,000 **million**. That is ₹5,000 lakh instead of ₹50,000 lakh: a tenfold magnitude error, and not a display problem — `enrichment_engine` derives fresh shares as `fresh_issue × reporting-unit factor ÷ cap price`, so the error would propagate into a derived field the moment a price band existed.
+
+**The canonical contract already answers the question.** `schema/ipo-input.v1.5.schema.json` documents `issue.fresh_issue` and `issue.ofs` as *"in reporting_unit"*, and `enrichment_engine._compute_derivations` consumes them as such. No new semantic or governance decision was needed: the stored value must be expressed in `financials.reporting_unit`.
+
+**Where the boundary is.** `CanonicalInputBuilder` — the only component that knows both the extracted amount (with its `raw_unit`) and the filing's reporting unit. Extraction keeps the document's own wording (`raw_unit='MILLION'`), so the conversion happens **exactly once** and no component can convert twice.
+
+**Conversions** (₹1 million = ₹10 lakh, ₹1 crore = ₹100 lakh):
+
+| Document statement | `raw_unit` | Reporting unit | Stored value |
+|---|---|---|---|
+| ₹5,000.00 million fresh issue | `MILLION` | `INR_LAKHS` | **50,000.0 lakh** |
+| ₹9,500.00 million OFS | `MILLION` | `INR_LAKHS` | **95,000.0 lakh** |
+| ₹14,500.00 lakh (Vishal Nirmiti cover) | `LAKHS` | `INR_LAKHS` | 14,500.0 (identity) |
+| ₹1,100.00 crore | `CRORE` | `INR_LAKHS` | 1,10,000.0 |
+| amount in millions, filing reports in millions | `MILLIONS` | `INR_MILLIONS` | unchanged |
+
+**Rules** (`CanonicalInputBuilder._normalize_issue_amount`): no unit stated ⇒ already canonical, returned unchanged; unit equal to the reporting unit ⇒ unchanged (identity, no double conversion); convertible ⇒ scaled and rounded to 2 decimals; **unconvertible ⇒ `None`**, because a wrong magnitude is worse than an unknown. Only `issue.fresh_issue` and `issue.ofs` pass through it — no other monetary field, no scoring input, and no reference/manual input (which is already canonical) is touched.
+
+### 13.5 Tests
+
+New `tests/test_upload_path_issue_terms.py` — **27 cases**, all synthetic (a stub PDF reader, no fixture dependency):
+
+* **A:** the footnote close date; ten marker variants (`#`, `*`, `†`, `(1)`, `(#)`, `*1`, `:`, ` - `, `#1`); unrelated dated sentences (certificate 1987, allotment 2026-10-27) not adopted; the 2017 Articles definition not adopted.
+* **B:** explicit OFS money read independently of a placeholder share count; the fresh-issue figure never bound to the OFS; seller rows summing to the aggregate not substituted; absent OFS not zero; explicit NIL still `0.0`; two conflicting amounts withheld; a different issuer (`NORTHWIND LOGISTICS LIMITED`, crore-stated) read the same way.
+* **C:** million→lakh conversion for both fields; identity conversion; a millions reporting unit; crore→lakh; a second issuer; unsupported unit → `None`; no unit → unchanged; unrelated monetary fields untouched.
+
+`tests/test_paras_evidence_regression.py` gained **5 cross-path cases** (14 total) that run the real 651-page filing through `DocumentExtractor` and assert that the upload path and the parser path agree once units are normalised.
+
+| Run | Command target | Collected | Passed | Failed | Skipped |
+|---|---|---|---|---|---|
+| targeted | `tests/test_upload_path_issue_terms.py` | 27 | **27** | 0 | 0 |
+| real filing (parser + upload) | `tests/test_paras_evidence_regression.py` | 14 | **14** | 0 | 0 |
+| wider focused (nine modules + the new module) | see below | 253 | **253** | 0 | 0 |
+| upload-path regression | `test_extraction`, `test_fixture_fallback_isolation` | 20 | **20** | 0 | 0 |
+| upload-path regression | `test_rk_fashion_reconciliation`, `test_fresh_issue_manual_entry`, `test_four_field_manual_terms`, `test_ingestion_activity`, `test_ingestion_worker_lifecycle`, `test_ui7_ingestion` | 77 | **77** | 0 | 0 |
+| upload-path regression | `test_extraction_phase5b`, `test_financial_statement_column_mapping`, `test_contingent_liabilities_extraction`, `test_auditor_evidence_section` | 49 | **49** | 0 | 0 |
+| golden / semantics | `test_vishal_golden`, `test_vishal_historical_reconciliation`, `test_core_semantics` | 54 | **54** | 0 | 0 |
+
+```bash
+cd /home/user/jio-k15
+PYTHONPATH=engine /home/user/ev/bin/python -m pytest -q -p no:cacheprovider \
+  tests/test_paras_evidence_regression.py tests/test_official_rhp_terms_and_dates.py \
+  tests/test_price_band_notice.py tests/test_offer_table_boundaries.py \
+  tests/test_ofs_nil_binding.py tests/test_phase5j_hardening.py \
+  tests/test_official_prospectus_pathway.py tests/test_issue_terms_multisource.py \
+  tests/test_automatic_official_issue_discovery.py tests/test_upload_path_issue_terms.py
+# 253 passed
+```
+
+### 13.6 Controlled non-production ingestion — re-run
+
+Same supported path and same safety envelope as revision 4: `PresentationService.ingest_document`, `store_root` on `/tmp/paras-ingest2/evaluations` (disposable, outside the repository), policy directory read-only repository `config/`, `IPO_OFFICIAL_DISCOVERY=0`, input = the committed artifact, hash-checked before and after.
+
+```
+ingestion_id            : ing-5bd0ea97160b409e     mode: final
+status                  : BLOCKED   error: AWAITING_ISSUE_TERMS
+evaluation_run          : False     persisted: False     evaluation_id: None
+missing_fields          : issue.price_band_low, issue.price_band_high, issue.lot_size
+store_root              : never created
+artifact sha256         : E0A3187F…570E74 before and after (unchanged)
+duration                : 47.0 s
+```
+
+| Field | Value recorded | Provenance |
+|---|---|---|
+| issuer | `PARAS HEALTHCARE LIMITED` / `PARAS-HEALTHCARE-LIMITED` | filing extraction |
+| `open_date` | `2026-10-21` | page 1, "Cover page, Issue Opening Date" |
+| `close_date` | **`2026-10-23`** | page 1, "Cover page, Issue Closing Date" |
+| `fresh_issue` | **`50000.0` (INR_LAKHS = ₹5,000 m)** | page 1, "Cover page, Fresh Offer" |
+| `ofs` | **`95000.0` (INR_LAKHS = ₹9,500 m)** | page 1, "Cover page, Offer for Sale Amount" |
+| `price_band_low` / `price_band_high` | unresolved | `[●]` at p11 |
+| `lot_size` | unresolved | `[●]` at p9 |
+| `fresh_shares` | unresolved (not required by the gate) | `[●]` share count |
+
+The gate then blocked on the three genuinely undisclosed terms, ran no evaluation and persisted nothing. **This is the correct safe result:** the filing does not state a price band or a bid lot, and the engine says so instead of inferring one.
+
+### 13.7 Status after this revision
+
+| Claim | State |
+|---|---|
+| Upload path reads the disclosed terms | **yes** — dates, fresh issue and OFS, issuer-independent |
+| Parser path unchanged | **yes** — 36 + 9 cases still green, no file in that path modified |
+| Unit contract | **"in reporting_unit"**, conversions applied once in the builder |
+| Ingestion gate | **correctly blocked** on price band and bid lot |
+| Evaluation created/updated | **none** — store never created, `persisted: False` |
+| Engine evaluation-ready for this filing | **No** — a price band notice or the final Prospectus is required |
+| Full regression suite | **NOT RUN** |

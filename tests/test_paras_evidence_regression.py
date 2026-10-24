@@ -25,10 +25,16 @@ runnable in a checkout that does not carry the artifact.  General behaviour is
 covered issuer-independently in ``tests/test_official_rhp_terms_and_dates.py``;
 this module pins the actual document.
 
-Execution status: RUN 2026-10-23 on commit 4b1c67f -- 9/9 passed with the artifact
-present at the published hash.  Both guard directions were verified: with the
-artifact absent the module reports 9 *skipped* (never passed), and with a single
-byte changed at constant length all 9 error at the fixture hash assertion.
+Execution status: RUN 2026-10-24 -- parser cases and the new *upload-path* cases
+pass with the artifact present at the published hash (the upload fixture extracts
+the 651-page filing through ``DocumentExtractor``, which takes ~45 s).  Both guard
+directions were verified: with the artifact absent the module reports every case
+as *skipped* (never passed), and with a single byte changed at constant length
+all of them error at the fixture hash assertion.
+
+Two extraction paths are pinned here on the *same* evidence: the parser path
+(``parse_official_rhp``) and the upload path (``DocumentExtractor`` →
+``CanonicalInputBuilder``), which previously disagreed about this filing.
 """
 
 from __future__ import annotations
@@ -39,6 +45,7 @@ from pathlib import Path
 
 import pytest
 
+from ipo_screening.extraction.extractor import DocumentExtractor
 from ipo_screening.extraction.official_offer_amounts import parse_official_rhp
 from ipo_screening.extraction.price_band_notice import PriceBandNoticeParser
 
@@ -68,6 +75,19 @@ def raw() -> bytes:
 @pytest.fixture(scope="module")
 def parsed(raw):
     return parse_official_rhp(raw, URL)
+
+
+@pytest.fixture(scope="module")
+def uploaded(raw):
+    """The *upload* path: what ``PresentationService.ingest_document`` builds.
+
+    Same bytes, different extractor.  Extraction is the expensive part (~45 s
+    for 651 pages), so it runs once for the module.
+    """
+    canonical, _report = DocumentExtractor().extract_from_pdf(
+        pdf_path=EVIDENCE, allow_fixture_fallbacks=False
+    )
+    return canonical
 
 
 def test_evidence_bytes_match_the_published_hash(raw):
@@ -171,3 +191,55 @@ def test_no_field_is_defaulted_to_zero_or_guessed(parsed):
         assert getattr(parsed, name) is None
     assert parsed.ofs_amount.value == 9500.0  # stated, not inferred
     assert parsed.fresh_issue_amount.value == 5000.0
+
+
+# ---------------------------------------------------------------------------
+# The upload path (DocumentExtractor -> CanonicalInputBuilder) on the same PDF
+#
+# These are the fields the 2026-10-24 controlled ingestion left unresolved
+# while the parser path had already read them.  Both paths must now agree.
+# ---------------------------------------------------------------------------
+
+def test_upload_path_reads_the_current_issue_window(uploaded):
+    issue = uploaded["issue"]
+    assert issue["open_date"] == "2026-10-21"
+    assert issue["close_date"] == "2026-10-23"
+    # The Articles' "Closing Date" definition (p590, 14 July 2017) is not the
+    # issue window on either path.
+    assert issue["close_date"] != "2017-07-14"
+
+
+def test_upload_path_reads_the_disclosed_monetary_components(uploaded):
+    """₹5,000 m fresh issue and ₹9,500 m OFS, in the filing's reporting unit."""
+    issue = uploaded["issue"]
+    reporting_unit = uploaded["financials"]["reporting_unit"]
+    assert reporting_unit == "INR_LAKHS"
+    # 1 million = 10 lakh: the statement is in millions, the input is in lakhs.
+    assert issue["fresh_issue"] == 50000.0
+    assert issue["ofs"] == 95000.0
+
+
+def test_upload_path_and_parser_path_agree_once_units_are_normalized(uploaded, parsed):
+    """Cross-path consistency: same money, two representations."""
+    issue = uploaded["issue"]
+    assert parsed.ofs_amount_unit == "INR_MILLIONS"
+    assert parsed.fresh_issue_amount_unit == "INR_MILLIONS"
+    assert issue["ofs"] / 10 == parsed.ofs_amount.value
+    assert issue["fresh_issue"] / 10 == parsed.fresh_issue_amount.value
+
+
+def test_upload_path_keeps_the_placeholder_terms_unresolved(uploaded):
+    issue = uploaded["issue"]
+    assert issue["price_band_low"] is None
+    assert issue["price_band_high"] is None
+    assert issue["lot_size"] is None
+
+
+def test_upload_path_records_provenance_for_every_resolved_term(uploaded):
+    evidence = uploaded["_evidence"]
+    for field_path in ("issue.open_date", "issue.close_date",
+                       "issue.ofs", "issue.fresh_issue"):
+        spec = evidence[field_path]
+        assert spec["source_id"] == uploaded["_sources"][0]["source_id"]
+        assert spec.get("locator")
+        assert spec.get("quote")

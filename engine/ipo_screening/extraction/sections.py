@@ -54,6 +54,63 @@ _OFS_NIL_BARE_LABEL = re.compile(
 )
 _OFS_NIL_AMOUNT = re.compile(r'(?:₹|Rs\.?|INR)\s*[\d,]+|\b\d[\d,]{2,}\b', re.IGNORECASE)
 
+# ---------------------------------------------------------------------------
+# Issue window on the cover
+# ---------------------------------------------------------------------------
+# A filed cover prints the window as a labelled row, and a filed cover also
+# carries footnote markers inside that row:
+#     BID/OFFER OPENS ON WEDNESDAY OCTOBER 21, 2026 BID/OFFER CLOSES ON# FRIDAY OCTOBER 23, 2026
+# The ``#`` (or ``*``, ``(1)``) refers to the UPI-mandate footnote below the
+# table.  Requiring whitespace directly after the label made the *closing* date
+# unreadable on such a cover while the opening date -- which carried no marker
+# -- was read normally, so the issue window arrived half-populated.  The
+# marker is now tolerated between the label and the date.
+#
+# This does not widen what counts as an issue date: the date must still follow
+# the ``opens on`` / ``closes on`` label of the issue (or bid/offer) window,
+# so a certificate date, an allotment date or an Articles defined term can
+# never be picked up.
+_FOOTNOTE_CHARS = r"[\s\u2020\u2021\u00a7\u00b6#*-]*"
+_FOOTNOTE_MARKER = (
+    _FOOTNOTE_CHARS
+    + r"(?:\([0-9#*\u2020]+\)|[0-9]{1,2})?"
+    + _FOOTNOTE_CHARS
+)
+_ISSUE_DATE_TAIL = (
+    _FOOTNOTE_MARKER
+    + r":?\s*(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*)?"
+    + r"([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})"
+)
+_ISSUE_WINDOW_LABEL = r"(?:issue|bid(?:\s*/\s*offer)?)\s*"
+_ISSUE_OPENS = re.compile(_ISSUE_WINDOW_LABEL + r"opens?\s*(?:on)?" + _ISSUE_DATE_TAIL, re.IGNORECASE)
+_ISSUE_CLOSES = re.compile(_ISSUE_WINDOW_LABEL + r"closes?\s*(?:on)?" + _ISSUE_DATE_TAIL, re.IGNORECASE)
+
+#: ``aggregating (up) to ₹ N <unit>`` -- the explicit monetary statement of an
+#: offer component.  The currency token is required so an unrelated
+#: "aggregating to 5,000,000 shares" is not read as money.
+_COMPONENT_AMOUNT = re.compile(
+    r"aggregating(?:\s+up)?\s+to\s+(?:\u20b9|Rs\.?|INR)\s*"
+    r"([0-9][0-9,]*(?:\.[0-9]+)?)\s*(lakhs?|crores?|millions?)",
+    re.IGNORECASE,
+)
+#: Labels that end a component's own assertion, so a following component's
+#: amount can never be bound backwards into it.
+_COMPONENT_BOUNDARY = re.compile(
+    r"fresh\s+(?:issue|offer)|offer\s+for\s+sale|total\s+(?:issue|offer)"
+    r"|reservation|employee|shareholder|anchor",
+    re.IGNORECASE,
+)
+#: A component label immediately *before* this one, optionally joined by
+#: "and"/"&"/",": a merged header cell ("Fresh Issue and Offer for Sale") or an
+#: adjacent column label.  Such a label does not say which column the following
+#: money belongs to, so the amount is not bound to this component -- reading it
+#: in text order gave the Offer for Sale the fresh-issue figure on a two-column
+#: cover table.
+_COMPONENT_ADJACENT_LABEL = re.compile(
+    r"(?:" + _COMPONENT_BOUNDARY.pattern + r")\s*(?:and|&|/|\+|,)?\s*$",
+    re.IGNORECASE,
+)
+
 
 def _find_ofs_nil(cover_text: str) -> Optional[str]:
     """Return the matched OFS-NIL quotation, or None when it is ambiguous.
@@ -236,6 +293,50 @@ class SectionExtractor:
         return results
 
     @classmethod
+    def _explicit_component_amount(
+        cls,
+        text: str,
+        label_pattern: str,
+        excluded: Sequence[str],
+    ) -> Optional[Tuple[float, str, str, str]]:
+        """The explicit ``aggregating up to ₹ N <unit>`` for one offer component.
+
+        Returns ``(value, unit, quote, raw_text)`` or ``None``.  Two rules keep
+        the money apart from the shares and from the other component:
+
+        * the search for an amount stops at the next component label, so a
+          following component's amount can never be bound backwards; and
+        * a match whose own text runs through an excluded label (the Offer for
+          Sale for a fresh-issue search, and the reverse) is not a statement
+          about this component.
+
+        Distinct surviving amounts are contradictory evidence and the field is
+        withheld -- the same fail-closed rule the share quantity already
+        follows.  An amount is never inferred from a share count or a price.
+        """
+        found: List[Tuple[float, str, str, str]] = []
+        for label_match in re.finditer(label_pattern + r"\b", text, re.IGNORECASE):
+            if _COMPONENT_ADJACENT_LABEL.search(text[max(0, label_match.start() - 60): label_match.start()]):
+                continue  # merged header cell / adjacent column: column unknown
+            segment = text[label_match.end(): label_match.end() + 300]
+            boundary = _COMPONENT_BOUNDARY.split(segment, maxsplit=1)[0]
+            amount = _COMPONENT_AMOUNT.search(boundary)
+            if not amount:
+                continue
+            between = boundary[: amount.start()].lower()
+            if any(marker in between for marker in excluded):
+                continue
+            value = parse_indian_number(amount.group(1))
+            if value is None:
+                continue
+            quote = text[label_match.start(): label_match.end() + amount.end()]
+            found.append((value, amount.group(2).upper(), quote, amount.group(1)))
+        distinct = {(value, unit) for value, unit, _quote, _raw in found}
+        if len(distinct) > 1:
+            return None
+        return found[0] if found else None
+
+    @classmethod
     def _resolve_labelled_quantity(
         cls,
         text: str,
@@ -303,11 +404,7 @@ class SectionExtractor:
             )
 
         # 1b. Issue Dates from Cover/Notice
-        m_open = re.search(
-            r'(?:issue|bid(?:\s*/\s*offer)?)\s*opens?\s*(?:on)?\s*(?:\([0-9]+\))?:?\s*(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*)?([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})',
-            cover_text,
-            re.IGNORECASE,
-        )
+        m_open = _ISSUE_OPENS.search(cover_text)
         if m_open:
             d_str = m_open.group(1).strip()
             iso_open = None
@@ -333,11 +430,7 @@ class SectionExtractor:
                     )
                 )
 
-        m_close = re.search(
-            r'(?:issue|bid(?:\s*/\s*offer)?)\s*closes?\s*(?:on)?\s*(?:\([0-9]+\))?:?\s*(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*)?([A-Za-z]+\s+[0-9]{1,2},\s*[0-9]{4})',
-            cover_text,
-            re.IGNORECASE,
-        )
+        m_close = _ISSUE_CLOSES.search(cover_text)
         if m_close:
             d_str = m_close.group(1).strip()
             iso_close = None
@@ -485,26 +578,13 @@ class SectionExtractor:
                 )
             )
 
-        m_fresh = None
-        for _label_match in re.finditer(r'fresh\s+(?:offer|issue)\b', cover_text, re.IGNORECASE):
-            _segment = cover_text[_label_match.end(): _label_match.end() + 220]
-            _amount_match = re.search(
-                r'aggregating(?: up)? to ₹\s*([0-9,]+(?:\.[0-9]+)?)\s*(lakhs?|crores?|millions?)',
-                _segment,
-                re.IGNORECASE,
-            )
-            if not _amount_match:
-                continue
-            _between = _segment[: _amount_match.start()].lower()
-            if "offer for sale" in _between or "selling shareholder" in _between:
-                continue  # amount belongs to the OFS clause, not the fresh issue
-            m_fresh = (_label_match, _amount_match)
-            break
+        m_fresh = self._explicit_component_amount(
+            cover_text,
+            r'fresh\s+(?:offer|issue)',
+            excluded=("offer for sale", "selling shareholder", "ofs"),
+        )
         if m_fresh:
-            _label_match, _amount_match = m_fresh
-            raw_val = _amount_match.group(1)
-            unit_val = _amount_match.group(2).upper()
-            num_val = parse_indian_number(raw_val)
+            num_val, unit_val, quote, raw_val = m_fresh
             extractions.append(
                 RawExtraction(
                     field_path="issue.fresh_issue",
@@ -514,7 +594,7 @@ class SectionExtractor:
                     page=1,
                     section="Cover",
                     locator="Cover page, Fresh Offer",
-                    quote=cover_text[_label_match.start(): _label_match.end() + _amount_match.end()],
+                    quote=quote,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=0.98,
                 )
@@ -568,6 +648,39 @@ class SectionExtractor:
                 )
             )
         else:
+            # 3a. The explicit monetary Offer for Sale.
+            # The share count on a filed cover is routinely a ``[●]``
+            # placeholder until the price band is fixed, while the money is
+            # already stated: "OFFER FOR SALE OF UP TO [●] EQUITY SHARES ...
+            # AGGREGATING UP TO ₹ 9,500.00 MILLION".  The upload path used to
+            # read only NIL and (for a sole seller) a share quantity, so a
+            # disclosed monetary OFS never reached the canonical input at all
+            # and ``issue.ofs`` stayed unknown on a filing that discloses it.
+            # The amount is read independently of the share count, never
+            # inferred from it, and withheld when the cover states two
+            # different amounts.
+            m_ofs_amount = self._explicit_component_amount(
+                cover_text,
+                r'offer\s+for\s+sale',
+                excluded=("fresh offer", "fresh issue"),
+            )
+            if m_ofs_amount:
+                ofs_val, ofs_unit, ofs_amount_quote, ofs_raw = m_ofs_amount
+                extractions.append(
+                    RawExtraction(
+                        field_path="issue.ofs",
+                        candidate_value=ofs_val,
+                        raw_text=ofs_raw,
+                        raw_unit=ofs_unit,
+                        page=1,
+                        section="Cover",
+                        locator="Cover page, Offer for Sale Amount",
+                        quote=ofs_amount_quote,
+                        extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                        extraction_confidence=0.98,
+                    )
+                )
+
             ofs_shares_count, ofs_quote = self._resolve_labelled_quantity(
                 cover_text,
                 r'offer\s+for\s+sale\b',

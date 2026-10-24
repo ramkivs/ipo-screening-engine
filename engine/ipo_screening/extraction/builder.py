@@ -183,6 +183,71 @@ class CanonicalInputBuilder:
                 evidence_dict[k] = v
         return evidence_dict
 
+    @classmethod
+    def _canonical_unit(cls, unit: Optional[str]) -> Optional[str]:
+        """Normalise a unit label ("millions", "INR_LAKHS", "Rs") to its code."""
+        if not unit:
+            return None
+        text = str(unit).strip()
+        if not text:
+            return None
+        upper = text.upper().replace(".", "")
+        if upper in cls._AMOUNT_UNIT_TO_RUPEES:
+            return upper
+        return cls._AMOUNT_UNIT_WORDS.get(upper, upper)
+
+    @classmethod
+    def _normalize_issue_amount(
+        cls,
+        value: Any,
+        raw_unit: Optional[str],
+        reporting_unit: Optional[str],
+    ) -> Any:
+        """Express an extracted issue amount in the filing's reporting unit.
+
+        One conversion, at one boundary.  A candidate with no unit, or whose
+        unit already is the reporting unit, is returned unchanged; an amount
+        whose unit cannot be converted is withheld rather than guessed at,
+        because a wrong magnitude is worse than an unknown value.
+        """
+        if value is None:
+            return None
+        source = cls._canonical_unit(raw_unit)
+        if source is None:
+            return value  # no stated unit: already canonical, never scaled
+        target = cls._canonical_unit(reporting_unit)
+        if source not in cls._AMOUNT_UNIT_TO_RUPEES or target not in cls._AMOUNT_UNIT_TO_RUPEES:
+            return None
+        if source == target:
+            return value
+        return round(
+            float(value) * cls._AMOUNT_UNIT_TO_RUPEES[source] / cls._AMOUNT_UNIT_TO_RUPEES[target],
+            2,
+        )
+
+    def _reporting_unit(self) -> Optional[str]:
+        """The filing's monetary reporting unit (as the financials are built)."""
+        fin_base = self.base.get("financials", {})
+        if "reporting_unit" in fin_base:
+            return fin_base["reporting_unit"]
+        return self._get_field("financials.reporting_unit", "INR_LAKHS")
+
+    def _pick_issue_amount(self, key: str, default: Any = None) -> Any:
+        """An issue monetary amount, expressed in the reporting unit."""
+        issue_base = self.base.get("issue", {})
+        if key in issue_base:
+            # A reference/manual input is already in the canonical unit.
+            return issue_base[key]
+        extraction = next(
+            (ex for ex in self.extractions if ex.field_path == f"issue.{key}"),
+            None,
+        )
+        if extraction is None:
+            return default
+        return self._normalize_issue_amount(
+            extraction.candidate_value, extraction.raw_unit, self._reporting_unit()
+        )
+
     def _build_issue(self) -> Dict[str, Any]:
         issue_base = self.base.get("issue", {})
         default_low = 208 if self.allow_fixture_fallbacks else None
@@ -233,8 +298,8 @@ class CanonicalInputBuilder:
             "price_band_low": _pick_issue("price_band_low", default_low),
             "price_band_high": _pick_issue("price_band_high", default_high),
             "lot_size": _pick_issue("lot_size", default_lot),
-            "fresh_issue": _pick_issue("fresh_issue", default_fresh),
-            "ofs": _pick_issue("ofs", default_ofs),
+            "fresh_issue": self._pick_issue_amount("fresh_issue", default_fresh),
+            "ofs": self._pick_issue_amount("ofs", default_ofs),
             "fresh_shares": fresh_shares,
             "post_issue_shares": post_shares,
             "pre_issue_shares": pre_shares,
@@ -408,6 +473,47 @@ class CanonicalInputBuilder:
         "INR_CRORES": 1e7,
         "INR_MILLIONS": 1e6,
         "INR_BILLIONS": 1e9,
+    }
+
+    # ------------------------------------------------------------------
+    # Issue monetary units
+    # ------------------------------------------------------------------
+    # The canonical input contract states that ``issue.fresh_issue`` and
+    # ``issue.ofs`` are "in reporting_unit" (schema/ipo-input.v1.5.schema.json),
+    # and every downstream consumer multiplies by the reporting unit's rupee
+    # factor (``enrichment_engine`` derives fresh shares as
+    # ``fresh_issue * multiplier / cap_price``).  The *document*, however,
+    # states the money in its own unit -- a filed RHP commonly prints
+    # "AGGREGATING UP TO ₹ 5,000.00 MILLION" while its financial statements are
+    # in lakhs.  Writing the document's number straight into a lakh-denominated
+    # field made ₹5,000 million (50,000 lakh) read as ₹5,000 lakh: a tenfold
+    # magnitude error that was invisible because the label said lakhs.
+    #
+    # Conversion therefore happens exactly once, here, when the canonical input
+    # is assembled -- the earliest point at which the filing's reporting unit
+    # is known.  Extraction keeps the document's own wording in ``raw_unit``,
+    # so no component can convert twice: a candidate whose unit already equals
+    # the reporting unit, or that states no unit at all, is left untouched.
+    _AMOUNT_UNIT_WORDS = {
+        "LAKH": "INR_LAKHS",
+        "LAKHS": "INR_LAKHS",
+        "CRORE": "INR_CRORES",
+        "CRORES": "INR_CRORES",
+        "MILLION": "INR_MILLIONS",
+        "MILLIONS": "INR_MILLIONS",
+        "BILLION": "INR_BILLIONS",
+        "BILLIONS": "INR_BILLIONS",
+        "THOUSAND": "INR_THOUSANDS",
+        "THOUSANDS": "INR_THOUSANDS",
+        "RUPEE": "INR",
+        "RUPEES": "INR",
+        "RS": "INR",
+        "INR": "INR",
+    }
+    _AMOUNT_UNIT_TO_RUPEES = {
+        **_ISSUE_UNIT_TO_RUPEES,
+        "INR_THOUSANDS": 1e3,
+        "INR": 1.0,
     }
 
     _RPT_UNIT_TO_RUPEES = {
