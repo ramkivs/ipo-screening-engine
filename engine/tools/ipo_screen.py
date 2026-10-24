@@ -45,6 +45,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 if __package__ in (None, ""):  # allow `python3 engine/tools/ipo_screen.py`
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -1216,9 +1217,45 @@ def cmd_issue_terms(args: argparse.Namespace) -> int:
         issue_context["close_date"] = args.close
 
     resolver = build_resolver_from_env()
+
+    # One-shot official documents for *this process only*.
+    #
+    # The alternative is editing the server's environment and restarting it,
+    # which is why an operator diagnosing one issuer ends up reconfiguring a
+    # deployment.  These flags add exactly the providers the environment would
+    # add, with the same host allow-list and the same document-class rules --
+    # they are a convenience for the operator, not a new authority path.
+    ipo_id = args.ipo_id or args.issuer.upper().replace(" ", "-")
+    extra = []
+    for flag, value, kind in (
+        ("--notice-url", args.notice_url, "notice"),
+        ("--prospectus-url", args.prospectus_url, "prospectus"),
+    ):
+        if not value:
+            continue
+        from ipo_screening.issue_terms import (OFFICIAL_HOSTS,
+                                               normalize_configured_url)
+
+        url = normalize_configured_url(value)
+        host = (urlparse(url).hostname or "").lower() if url else ""
+        if not url or urlparse(url).scheme != "https" or host not in OFFICIAL_HOSTS:
+            print(f"error: {flag} must be an HTTPS URL on an official source host "
+                  f"({', '.join(sorted(OFFICIAL_HOSTS))})", file=sys.stderr)
+            return EXIT_USAGE
+        mapping = {ipo_id: url}
+        if kind == "notice":
+            from ipo_screening.issue_terms import HttpNoticeProvider
+
+            extra.append(HttpNoticeProvider(mapping))
+        else:
+            from ipo_screening.issue_terms import HttpProspectusProvider
+
+            extra.append(HttpProspectusProvider(mapping))
+    if extra:
+        resolver.providers = extra + list(resolver.providers)
     outcome = resolver.resolve(
         company_name=args.issuer,
-        ipo_id=args.ipo_id or args.issuer.upper().replace(" ", "-"),
+        ipo_id=ipo_id,
         missing_fields=list(fields),
         issue_context=issue_context or None,
     )
@@ -1470,6 +1507,12 @@ def build_parser() -> argparse.ArgumentParser:
     terms.add_argument("--close", default=None, help="the filing's bid closing date (YYYY-MM-DD)")
     terms.add_argument("--fields", nargs="+", default=None,
                        help="terms to resolve (default: price_band_low price_band_high lot_size)")
+    terms.add_argument("--notice-url", default=None,
+                       help="one-shot official Price Band Notice URL for this issuer "
+                            "(same official-host allow-list; this process only)")
+    terms.add_argument("--prospectus-url", default=None,
+                       help="one-shot official final-Prospectus URL for this issuer "
+                            "(same official-host allow-list; this process only)")
     terms.add_argument("--json", action="store_true", help="print the full resolution report as JSON")
     terms.set_defaults(func=cmd_issue_terms)
 

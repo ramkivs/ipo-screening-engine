@@ -213,3 +213,75 @@ def test_row_diagnostics_count_what_the_page_carried():
         LISTING, ISSUER, IssueIdentity("2026-10-21", "2026-10-23"), diagnostics=diagnostics)
     assert len(records) == 1
     assert diagnostics == {"issue_rows": 1, "issuer_rows": 1, "bound_rows": 1, "rejections": 0}
+
+
+# ----------------------------------------------------------------------
+# One-shot official documents for a single issuer
+#
+# Setting an environment variable and restarting the server is the wrong
+# unit of work for "why is this one issuer unresolved".  These flags add the
+# same providers the environment would add, under the same allow-list.
+# ----------------------------------------------------------------------
+NOTICE = b"""PRICE BAND ADVERTISEMENT
+INITIAL PUBLIC OFFERING OF PARAS HEALTHCARE LIMITED
+NOTICE TO INVESTORS
+
+THE FLOOR PRICE AND THE CAP PRICE
+The Floor Price is Rs.660 per Equity Share of face value of Rs.1 each and the Cap Price is Rs.693 per Equity Share of face value of Rs.1 each.
+The Price Band is Rs.660 to Rs.693 per Equity Share.
+Bids can be made for a minimum of 21 Equity Shares and in multiples of 21 Equity Shares thereafter.
+
+BID/OFFER PERIOD:
+BID/OFFER OPENS ON: Wednesday, October 21, 2026
+BID/OFFER CLOSES ON: Friday, October 23, 2026
+"""
+
+
+def test_a_one_shot_notice_url_is_used_without_any_environment_configuration(
+        monkeypatch, capsys):
+    monkeypatch.delenv("IPO_PRICE_BAND_NOTICE_URLS", raising=False)
+    monkeypatch.setenv("IPO_OFFICIAL_DISCOVERY", "0")
+    fetched = []
+    monkeypatch.setattr(issue_terms, "_default_http_fetch",
+                        lambda url, *_a, **_k: fetched.append(url) or NOTICE)
+    url = "https://www.bseindia.com/downloads/notices/paras-pba.pdf"
+    code = ipo_screen.main([
+        "issue-terms", "--issuer", "Paras Healthcare Limited",
+        "--open", "2026-10-21", "--close", "2026-10-23",
+        "--notice-url", url,
+    ])
+    out = capsys.readouterr().out
+    assert fetched == [url]
+    assert "price_band_low" in out and "660" in out
+    assert code == ipo_screen.EXIT_OK
+
+
+@pytest.mark.parametrize("bad", [
+    "http://www.bseindia.com/downloads/notices/x.pdf",          # not HTTPS
+    "https://www.chittorgarh.com/ipo/paras/1/",                  # not official
+    "https://listing.bseindia.com/Download/1/PBA.pdf",           # discovery-only host
+])
+def test_a_one_shot_url_outside_the_official_allow_list_is_refused(
+        monkeypatch, capsys, bad):
+    monkeypatch.setattr(issue_terms, "_default_http_fetch",
+                        lambda *_a, **_k: pytest.fail("no retrieval may be attempted"))
+    code = ipo_screen.main(["issue-terms", "--issuer", "Paras Healthcare Limited",
+                            "--notice-url", bad])
+    err = capsys.readouterr().err
+    assert code == ipo_screen.EXIT_USAGE
+    assert "official source host" in err
+
+
+def test_a_one_shot_prospectus_url_uses_the_prospectus_document_class(
+        monkeypatch, capsys):
+    monkeypatch.delenv("IPO_PROSPECTUS_URLS", raising=False)
+    monkeypatch.setenv("IPO_OFFICIAL_DISCOVERY", "0")
+    monkeypatch.setattr(issue_terms, "_default_http_fetch", lambda *_a, **_k: NOTICE)
+    url = "https://www.sebi.gov.in/sebi_data/attachdocs/paras-p.pdf"
+    ipo_screen.main(["issue-terms", "--issuer", "Paras Healthcare Limited",
+                     "--open", "2026-10-21", "--close", "2026-10-23",
+                     "--prospectus-url", url, "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    providers = {report.get("provider") for report in payload.get("providers", [])}
+    assert "official-prospectus" in providers
+    assert "official-url" not in providers

@@ -264,3 +264,33 @@ acknowledged as debts
     pages = {1: PARAS_SUMMARY_DAY_FIRST, 405: note}
     _, amount, _, _ = _extractor(pages)._extract_contingent_liabilities({})
     assert amount == 1200.5
+
+
+def test_a_column_header_split_across_lines_is_still_a_column():
+    """Vishal Nirmiti prints ``As at March 31,`` / ``2026`` on two lines.
+
+    Read line-by-line the header yields no date at all and the whole table
+    becomes unreadable — for a layout reason, not an evidence reason.  A
+    different issuer is exactly how that kind of over-fitting shows up.
+    """
+    text = """SUMMARY OF CONTINGENT LIABILITIES
+Details of the contingent liabilities (as per Ind AS 37) of our Company as at March 31, 2026, March 31, 2025 and March 31, 2024 derived from the Restated Financial Statements are set forth below:
+(Amount in ₹ lakhs)
+Particulars  As at March 31,
+2026
+As at March 31,
+2025
+As at March 31,
+2024
+(i) Claim against the Company not acknowledged as debt
+184.31 157.32 342.30
+(ii) Bank Guarantees issued 2,002.33 2,265.53 2,275.16
+Total 2,186.64 2,422.85 2,617.46
+"""
+    page, amount, unquantified, quote = _extractor({75: text})._read_contingent_liability_summary(
+        [(1, 75)]
+    )
+    assert page == 75
+    assert amount == 2186.64
+    assert unquantified is None
+    assert "31 March 2026" in quote

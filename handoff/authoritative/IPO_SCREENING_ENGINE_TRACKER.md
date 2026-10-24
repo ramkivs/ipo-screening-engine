@@ -1698,3 +1698,45 @@ Also recorded: the run used `THIRD_PARTY_AGGREGATOR_OVERRIDE` for the three pric
 - Required-term gate: **CLOSED**. Evaluation readiness: **NOT ESTABLISHED**. Evaluation execution: **NOT RUN**.
 
 - **Disposition: THE 8.0 WAS A READING FAILURE, NOT A SCORING ONE; FOUR EXTRACTOR DEFECTS CORRECTED; CORRECTED RUN = 9.0 WITH K5 KNOCKOUT (CONTINGENT LIABILITIES 98.88% OF NET WORTH); FROZEN-CORE PROCEEDS GUARD REVERTED AND REFERRED; REMAINING GAP CLASSIFIED WITH PAGES; GATE CLOSED; NO EVALUATION.**
+
+## Vishal blocked — the corrections are not issuance-specific; the missing input is one official document — 2026-10-24 (revision 14)
+
+**No evaluation created, updated, scored or persisted; no store written; PR #7 open; `main` untouched at `01ba66c`. Frozen core untouched.** Full suite re-run on final code this pass.
+
+### The question
+A second issuer (Vishal Nirmiti, `ing-705ae38e44634a52`) blocked on `price_band_low`, `price_band_high`, `lot_size`, `ofs`. Were revision 11's corrections built around Paras?
+
+### The answer: no, and the run demonstrates it two ways
+1. **No production file changed in revision 11 names an issuer** — the readers key off document captions, not names or pages.
+2. **They were still wrong for Vishal**, which is what issuer-specific over-fitting looks like from the inside: Vishal prints `As at March 31,` / `2026` on two lines, the Paras-derived reader matched dates line-by-line, saw no columns, and read nothing. The header is now joined and whitespace-normalised. Both filings now read their section total — **Vishal 2,186.64 (25.2% of net worth; below K5's threshold), Paras 3,905.01 unchanged**.
+
+### All four of Vishal's missing fields are one missing document
+| Field | Why it is missing | Correct? |
+|---|---|---|
+| `price_band_low` / `high`, `lot_size` | the RHP prints `“Cap Price” … ₹[●]` and `“Bid Lot” [●]` (pp. 1, 585, 629) | yes — an RHP cannot supply them |
+| `fresh_shares` | cover reads `UP TO [●] EQUITY SHARES`; 65,90,909 is in the final Prospectus | yes |
+| `ofs` | `issue.ofs` is **derived** as Σ(seller shares) × Cap Price; seller Vaman Prestressing 15,00,000 shares *was* read, so the amount cannot exist without the band | yes — not an independent gap |
+
+### Why it worked before: the official document is not configured
+Vishal has resolved end-to-end via the **Prospectus pathway** (`OFFICIAL_VERIFIED` floor ₹208 / cap ₹220 / lot 68, `SRC-PROSPECTUS-…`) when `IPO_PROSPECTUS_URLS` / `IPO_PRICE_BAND_NOTICE_URLS` name an official document. The failing run's provider list contains **only** `official-discovery`: no notice, no prospectus, no platform, no retained directory. Automatic discovery cannot substitute — NSE and BSE issue pages are JavaScript shells, SEBI's listing 404s, and the BSE/NSE APIs returned no issuer-matched records. Every one of those is reported as *could not be searched*, never as an absence.
+
+### §19.2 retracted
+Revision 10 told the operator to resolve terms from `.../PublicIssues/IPOIssues?id=2&Type=P` and expected 660/693/21 from it. **That was wrong.** The same URL on the operator's own host returns the same 14,287 bytes — a JavaScript application shell with **no issue-information links**, as the revision-10 diagnostic now reports verbatim. "14,287 bytes arrived" was true; "the closed-issue route is therefore usable" was not.
+
+### Also changed
+- **Third-party refusal now states its cause.** One message covered four situations. It is now `IDENTITY_WINDOW_UNREADABLE`, `IDENTITY_UNBOUND`, `STALE_OR_DIFFERENT_ISSUE` (**with both windows printed**), or a host/document-class refusal. A window naming its year once (`30 Sep - 5 Oct 2026`) is read when exactly one interpretation is a plausible bid window (≤ 31 days); underdetermined windows stay unread.
+- **One-shot official documents for a single issuer:** `ipo_screen.py issue-terms --notice-url … | --prospectus-url …` — same official-host allow-list, same document classes, refused as a usage error *before* retrieval if the host is not official (including `listing.bseindia.com`). For the UI path the durable fix is still the environment variable.
+
+### Tests
+- `tests/test_aggregator_issue_terms.py` — **41 passed** (6 new: the four verdicts, year-once windows, underdetermined windows).
+- `tests/test_issue_terms_cli.py` — **24 passed** (3 new: one-shot notice resolves without env config; three out-of-policy URLs refused before any retrieval; one-shot prospectus uses the prospectus document class).
+- `tests/test_paras_extraction_gaps_20261024.py` — **23 passed** (1 new: a column header split across lines).
+- Real-filing Vishal suites (`test_cross_ipo_issue_term_provenance`, `test_derived_evidence_registration`) — **7 passed**, golden hash `e84f8bc0…` unchanged.
+- Full backend suite on final code: see report §21.6/§21.7.
+
+### Status
+- Frozen-core pin: **VERIFIED — READY FOR RAMKI RATIFICATION** (untouched this pass).
+- Vishal and Paras pricing terms: **UNRESOLVED**; the blocker is an official document for the issuer, not the reader.
+- Required-term gate: **CLOSED** and behaved correctly on both issuers. Readiness: **NOT ESTABLISHED**. Evaluation: **NOT RUN**.
+
+- **Disposition: NOT ISSUANCE-SPECIFIC — PROVEN BY RUNNING A SECOND ISSUER, WHICH ALSO EXPOSED A LAYOUT-SPECIFIC READER NOW FIXED; VISHAL'S FOUR BLOCKS ARE ONE MISSING OFFICIAL DOCUMENT; HISTORICAL-LISTING GUIDANCE RETRACTED; THIRD-PARTY REFUSAL NOW STATES ITS CAUSE; ONE-SHOT OFFICIAL URL FLAGS ADDED; GATE CLOSED; NO EVALUATION.**

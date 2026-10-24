@@ -5,6 +5,7 @@
 - **Branch:** `arena/07f3439f-ipo-screening-engine` (working branch; `main` untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`).
 - **Baseline this pass:** `8939b05be00a23d5733163cdb6a280b0578cfd10`.
 - **Scope:** the extraction path that produced a rejected official document and an unresolved `issue.ofs`: Price Band Notice classification, current-issue date extraction, field-conflict handling, the RHP document class, and the OFS resolution chain. Corrections are issuer-independent.
+- **Execution status (2026-10-24, revision 12 — the Vishal block, and whether the fixes were issuance-specific):** a second issuer, Vishal Nirmiti, blocked with `price_band_low` / `price_band_high` / `lot_size` / `ofs` unresolved. **The corrections are not issuance-specific** — no production file changed in revision 11 names an issuer — but the check found that one of them was still *layout*-specific and silently read nothing on Vishal's two-line column header, which is now fixed (both filings read their contingent-liability section total). All four of Vishal's missing fields reduce to **one** absent input: an official document stating the band and lot. The RHP prints `₹[●]` / `Bid Lot [●]`, `fresh_shares` is `[●]` too, and `issue.ofs` is derived as seller shares × Cap Price, so it cannot exist without the band. The failing run had **no** notice or prospectus configured — only automatic discovery, which returned JavaScript shells and a 404. §19.2's instruction to resolve the terms from the BSE historical listing is **withdrawn**: on the operator's host the same URL returns the same 14,287-byte shell with no issue links, which the diagnostics added in revision 10 report verbatim. §21.
 - **Execution status (2026-10-24, revision 11 — why the score was 8.0):** the operator's `Final Score 8.0` was reproduced exactly on the retained RHP and traced to **reading defects, not to the scoring rules**: the reporting unit was not recognised (every statement value booked ten times too small), the P&L's `Profit/(loss) for the period/year` and the cash flow's `Net cash generated from operating activities` captions were unmatched, and the `Summary of Contingent Liabilities` table was never consulted. Those four are corrected. A fifth — an unextracted objects-of-the-offer schedule scoring `mixed_ok` for 2 points — is a rule inside the **frozen core**; a correction was written, caught by the frozen-core tests, and **reverted before publication**, and is referred to Ramki. **The corrected run is 9.0 and is knocked out on K5**: the filing discloses contingent liabilities of 98.88% of net worth, which the engine could not previously see. The remaining unknowns are classified, with pages, as recoverable, policy-blocked, `[●]`-undisclosed, or market/peer data — §20. No evaluation, no store, no term resolved; the gate stays closed.
 - **Execution status (2026-10-24, revision 10 — operator host has egress):** the operator's own Windows host retrieved **14,287 bytes** from the BSE historical listing, so the `[TRANSPORT]` blocker is specific to this sandbox and the external dependency is cleared on the host that matters. That run exposed two defects, both corrected here: a URL pasted as a Markdown link with an HTML-escaped `&` was reported as a *policy violation* (now normalised before validation, with no scheme or host invented), and a retrieved page that carried no issue rows was indistinguishable from one that carried a different answer (the archive reader now reports `issue_rows` / `issuer_rows` / `bound_rows` / `rejections` and distinguishes a shell from a read listing). The resolution step is now a read-only CLI subcommand (`issue-terms`) instead of a pasted Python snippet — §19. Diagnosing a full-suite failure also found a **genuine determinism defect** in workbook serialisation (`dcterms:modified` and ZIP timestamps were rewritten at save, so the same workbook could produce two different hashes); it is fixed and regression-tested — §19.5. **No term is resolved, the gate stays closed and no evaluation exists.**
 - **Execution status (2026-10-24, revision 9 — wiring + operational handoff):** the configuration-to-runtime chain was traced end to end and is now asserted by test; a misconfigured archive variable used to look exactly like a network outage and now surfaces as a configuration diagnostic (variable, position, reason — never the value) — §18. Full suite 1846/1846 on that pass's final code. **No evaluation.**
@@ -14,6 +15,7 @@
 - **Execution status (2026-10-24, revision 5):** the **upload path** — the extractor `PresentationService.ingest_document` actually uses — is corrected for all issuers: the closed issue window behind a footnote marker, the disclosed monetary Offer for Sale, and the monetary unit of both issue components. A controlled non-production re-ingestion of the retained RHP now resolves the issuer, opening date, closing date, fresh issue and OFS, and is **correctly blocked** on price band and bid lot alone. No evaluation was created; nothing was persisted. See **§13**. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-24, revision 4):** the **wider focused suites** were executed (221 passed / 0 failed / 0 skipped across nine modules) and a **controlled non-production ingestion** was run against the retained RHP. The ingestion is **correctly blocked** on price band and bid lot, but it **also** leaves `issue.ofs` and `issue.close_date` unresolved — a defect in the *upload* extraction path (`sections.py`) that the A30 corrections never reached. It is diagnosed and documented in **§12**, not corrected in this pass. No evaluation was created, no durable state changed. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-23, revision 3):** the two focused regression modules were **executed and passed on 2026-10-23** (45 collected / 45 passed / 0 skipped, commit `4b1c67f`) — see **§11.8**, which records the command, the one test-side defect that was fixed, and the checks performed. The **full backend suite (~3 h) was NOT run**, and **no ingestion, evaluation or scored artifact** was produced or modified. Statements in §§1–10 that predate the document remain as written; where they say "not executed", §11.8 supersedes them for these two modules only.
+- **Revision 12 (2026-10-24):** second-issuer check — the Vishal Nirmiti ingestion blocked on the same four terms. The corrections are issuer-neutral (no production file names an issuer), and the check found one of them was still layout-specific: the contingent-liability summary reader saw no columns in Vishal's two-line header and read nothing. Fixed; both filings now read. The third-party refusal was split into four distinct verdicts that state both windows, and §19.2's guidance to resolve terms from the BSE historical listing is **retracted** — that URL is a JavaScript shell on the operator's host too (14,287 bytes, no issue links). `issue-terms` gained one-shot `--notice-url` / `--prospectus-url`. No evaluation.
 - **Revision 11 (2026-10-24):** score-gap analysis of the operator's 8.0 — four reading defects in the shared extractor (reporting unit, PAT caption, CFO caption, the contingent-liability summary table) corrected, and a fifth (an unread proceeds schedule scored as an allocation) identified in the frozen core and **referred, not changed** (§20.3a). The corrected run is **9.0 with knockout K5 TRIGGERED**. The remaining unknowns are classified as recoverable-by-reading, policy-blocked, `[●]`-undisclosed, or market/peer data the filing cannot contain. No evaluation.
 - **Revision 10 (2026-10-24):** operator-host egress confirmed (14,287 bytes from the BSE historical listing); pasted-URL normalisation before allow-list validation; row-count diagnostics that separate a shell response from a read listing with no matching issuer; a read-only `issue-terms` CLI replacing the pasted Python handoff; and a determinism defect in workbook byte serialisation found by the full suite, fixed and regression-tested. No evaluation.
 - **Revision 9 (2026-10-24):** configuration-to-runtime wiring trace and hardening — the archive variable is proven to reach the provider through `create_app`, an ingestion run shows the filing's own bid window reaching the resolver, and unusable entries surface as configuration diagnostics rather than as outages. Full suite green on final code. No evaluation.
@@ -1395,3 +1397,79 @@ One further observation on the run itself, recorded rather than silently absorbe
 * **Full backend suite against the final code: 1892 collected / 1892 passed / 0 failed / 0 skipped**, exit 0, 21 m 00 s (1,866 before this pass + 26 new; the 22 new synthetic cases and four new real-document cases, plus four existing cases whose expectations were corrected). An earlier run of the same suite (1,893 collected) produced **ten failures**, all of them from the frozen-core modification described in §20.3a; that modification was reverted, the file's pinned hash re-verified, and the suite re-run in full — the numbers above are that re-run. No assertion was weakened, no test was converted to a skip, and no test was removed.
 
 **Not claimed:** no evaluation was created, updated, persisted or scored; no store was written; the three required terms are still **UNRESOLVED at runtime** and the issue-term gate is still **CLOSED**; readiness remains **NOT ESTABLISHED**. The retained RHP is non-authoritative evidence, and the knockout described above is the engine's output on that evidence, not a filed or official determination about the issuer.
+
+## 21. Why Vishal is blocked — and whether the corrections were issuance-specific — 2026-10-24 (revision 12)
+
+Baseline `b152038`. The operator ran a second, unrelated issuer (Vishal Nirmiti, `ing-705ae38e44634a52`) and it terminated `AWAITING_ISSUE_TERMS` with `price_band_low`, `price_band_high`, `lot_size` and `ofs` unresolved. The fair question is whether §20's corrections were secretly built around Paras.
+
+**They were not, and the run proves it in both directions.** No production file changed in §20 contains an issuer name, symbol, page number or value; the readers key off document captions (`(All amounts are in INR million…)`, `Profit/(loss) for the period/year`, `Net cash generated from operating activities`, a `Summary of Contingent Liabilities` heading). Two facts confirm it beyond inspection:
+
+* the corrected readers run on the Vishal filing as well (below), and
+* **they were still wrong for Vishal**, which is how issuer-specific over-fitting usually announces itself. Vishal prints its column headers as `As at March 31,` / `2026` on two lines; the Paras-derived reader matched date strings line-by-line and therefore saw *no* columns in Vishal's table and read nothing. The header is now read as one whitespace-normalised string, and both filings produce a section total (`Vishal 2,186.64`, `Paras 3,905.01`, each at 31 March 2026) — §21.3.
+
+### 21.1 Vishal's blocker is a *different stage*, and it is one missing document
+
+The run's own trace shows the filing was read correctly and the engine refused to invent the rest:
+
+| Stage | Observed | Correct? |
+|---|---|---|
+| filing extraction | `fresh_issue` 14,500 lakh, `open_date` 2026-09-30, `close_date` 2026-10-05, OFS seller Vaman Prestressing 15,00,000 shares | yes — these are the filing's own figures |
+| price band / bid lot | not established | **yes**: the RHP prints `“Cap Price” … ₹[●]` and `“Bid Lot” [●] Equity Shares` (pp. 1, 585, 629). An RHP cannot supply them. |
+| `fresh_shares` | not established | **yes**: the cover reads `UP TO [●] EQUITY SHARES`; only the final Prospectus carries 65,90,909 |
+| `ofs` | not established | **yes, and it is not an independent gap**: `issue.ofs` is *derived* as Σ(seller `shares_sold`) × Cap Price (`enrichment_engine.py`, "OFS Monetary Amount Derivation"). With no Cap Price the derivation cannot run, which is why the golden fixture's 3,300 comes from the fallback path and not from the RHP |
+
+So **one** absent input — an official document that states the band and lot — explains all four unresolved fields. Nothing in the extractor is implicated.
+
+### 21.2 Why it worked before and not now: the official document is not configured
+
+Vishal has resolved end-to-end in this repository (and on the operator's host, per the 2026-10-17 record) through the **Prospectus pathway**: `OFFICIAL_VERIFIED` floor ₹208 / cap ₹220 / lot 68 from `SRC-PROSPECTUS-…`. That requires `IPO_PROSPECTUS_URLS` (or `IPO_PRICE_BAND_NOTICE_URLS`) to name an official document for the issuer.
+
+The failing run's provider list contains **only** `official-discovery` — no `official-url`, no `official-prospectus`, no platform provider, no retained-notice directory. So the environment that produced this run has no official document configured, and automatic discovery could not substitute for one:
+
+* `nseindia.com/market-data/all-upcoming-issues-ipo` — JS-populated listing, no rows in the served HTML (the engine said so rather than "no matching issue");
+* `bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P` and `bseindia.com/publicissue.html` — JavaScript application shells;
+* `api.bseindia.com/...GetPublicIssue_par_updated` and `nseindia.com/api/all-upcoming-issues` — no issuer-matched records;
+* `sebi.gov.in` listing — HTTP 404;
+* the historical listing — see §21.4.
+
+Each of those is reported as a *source that could not be searched*, never as an absence of the terms.
+
+### 21.3 What this pass actually changed (both issuer-neutral)
+
+1. **The contingent-liability summary reader is no longer layout-specific** (§20's reader failed on Vishal). The header is joined and whitespace-normalised before dates are read, so a heading split across lines still yields its columns. Vishal: `2,186.64` at 31 March 2026 (25.2% of its FY2026 net worth of 8,678.35) — below K5's threshold, so no knockout; the point is that the table is now read at all. Paras is unchanged at `3,905.01`. Test: `test_a_column_header_split_across_lines_is_still_a_column`, plus the real-document suites which reproduce both filings.
+2. **The third-party refusal now says *why*.** The aggregator rejected the Vishal detail page with one message covering four different situations ("aggregator period differs or official/filing window absent"), which is unactionable: it does not distinguish a broken configuration from a page describing another offering. It is now four distinct verdicts — `IDENTITY_WINDOW_UNREADABLE` (the page's date row is not a readable window), `IDENTITY_UNBOUND` (the filing established no window), `STALE_OR_DIFFERENT_ISSUE` **stating both windows**, and the existing host/document-class refusals. A window that names its year once (`30 Sep - 5 Oct 2026`) is now read when exactly one interpretation is a plausible bid window (≤ 31 days); anything underdetermined stays unread and is reported as such.
+
+**On the next Vishal run**, the aggregator line will therefore say either that the page's window differs (and print both) or that the page could not be bound — which is the information the current message withholds.
+
+### 21.4 A correction to §19.2, and a retraction of its guidance
+
+§19.2 told the operator to configure `IPO_OFFICIAL_HISTORICAL_LISTINGS="https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P"` and expected `660.0 / 693.0 / 21` from it. **That guidance was wrong, and this run proves it on the operator's own host.** The same URL returns exactly 14,287 bytes, and those bytes are a JavaScript application shell — `<!DOCTYPE html>` with **no issue-information links at all**, which the diagnostic added in §19.1 now reports verbatim ("this is not a usable closed-issue listing and nothing may be concluded from its silence").
+
+The §19 statement that "the operator's host retrieved 14,287 bytes" remains factually true; the inference drawn from it — that the closed-issue route was therefore usable — was not. A successful HTTP status and a plausible byte count are not a read listing. The correct configuration for an issuer whose RHP states `[●]` is an **official document for that issuer**: `IPO_PROSPECTUS_URLS` (the route that resolved Vishal before) or `IPO_PRICE_BAND_NOTICE_URLS`. The historical listing remains opt-in and identity-bound (A31) but should not be presented as the expected route to these terms.
+
+### 21.5 Resolving one issuer without reconfiguring the deployment
+
+Setting an environment variable and restarting the service is the wrong unit of work for a single issuer, so `issue-terms` now takes both documents as one-shot flags — same official-host allow-list, same document classes, no new authority path, nothing written:
+
+```powershell
+$env:PYTHONPATH = "$PWD\engine"
+python engine\tools\ipo_screen.py issue-terms `
+    --issuer "VISHAL NIRMITI LIMITED" `
+    --open 2026-09-30 --close 2026-10-05 `
+    --prospectus-url "<official final Prospectus URL>"
+```
+
+`--notice-url` behaves the same way for a Price Band Notice. A URL outside `OFFICIAL_HOSTS` (including `listing.bseindia.com`, which is discovery-only — A31 §5) is refused as a usage error **before any retrieval**, so a wrong host costs nothing. For the deployment itself, the durable fix is still the environment variable, which is what makes the UI ingestion path resolve.
+
+### 21.6 Non-claims and status
+
+* **Nothing here says Vishal's terms are unpublished.** The RHP states them as `[●]` by design; the official document that fills them is a configuration dependency.
+* No evaluation was created, updated or persisted by this pass; no store was written; the `AWAITING_ISSUE_TERMS` gate is unchanged and behaved correctly.
+* The aggregator remains a PA-authorized *third-party* path: even when it accepts a page, the values are `THIRD_PARTY_AGGREGATOR_OVERRIDE`, never official verification.
+* Tests: `tests/test_aggregator_issue_terms.py` **41 passed** (6 new diagnostic cases), `tests/test_issue_terms_cli.py` **24 passed** (3 new one-shot cases), `tests/test_paras_extraction_gaps_20261024.py` **23 passed** (1 new cross-issuer header case), and the two real-filing Vishal suites **7 passed** on the unchanged golden hash.
+
+### 21.7 Full backend suite, against the final code
+
+**1908 collected / 1908 passed / 0 failed / 0 skipped**, exit 0, 30 m 16 s (1,892 before this pass + 16 new). No assertion weakened, no test converted to a skip, no test removed, and no expectation relaxed: the only existing expectations touched in this pass were none — every changed module is covered by tests that were added, and the Vishal golden result hash still reproduces `e84f8bc0…`.
+
+The suite is evidence about the code, never about the network: **no test in this repository reached an official host**, and nothing above shows that Vishal's Prospectus URL will be retrievable on the operator's host. The one-shot command in §21.5 is what decides that.

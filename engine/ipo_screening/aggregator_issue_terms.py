@@ -23,6 +23,9 @@ LISTINGS = ('https://www.chittorgarh.com/ipo/ipo_dashboard.asp',
             'https://www.investorgain.com/report/live-ipo-gmp/331/')
 FIELDS = ('fresh_issue', 'ofs', 'price_band_low', 'price_band_high', 'lot_size')
 SCALES = {'INR_CRORES': 10_000_000, 'INR_MILLIONS': 1_000_000, 'INR_LAKHS': 100_000}
+# Longest span a single offering's bid window can cover (a week plus the
+# extension), used only to disambiguate a window that names its year once.
+BID_WINDOW_MAX_DAYS = 31
 
 
 def eligible_url(uri):
@@ -101,7 +104,28 @@ def issue_dates(value):
         a,b,month,year=match.groups()
         return date_token(f'{a} {month} {year}'),date_token(f'{b} {month} {year}')
     parts=re.split(r'\s+to\s+|\s+-\s+',value,flags=re.I)
-    return tuple(map(date_token,parts)) if len(parts)==2 else (None,None)
+    if len(parts)!=2:return (None,None)
+    opened,closed=map(date_token,parts)
+    if opened or not closed:
+        return opened,closed
+    # A window may name the year once ("30 Sep - 5 Oct 2026").  The missing
+    # year is *not* guessed: the closing date's year and the year before it are
+    # both tried, and the window is accepted only when exactly one candidate is
+    # non-inverted **and** no longer than a bid window can be (BID_WINDOW_MAX_DAYS).
+    # Anything else stays unreadable, because an unbounded interpretation of a
+    # one-year date is exactly the error that binds a page to the wrong issue.
+    tail=re.search(r',?\s*(\d{4})\s*$',parts[1])
+    if not tail:return (None,None)
+    year=int(tail.group(1))
+    candidates=[]
+    for candidate_year in (year,year-1):
+        attempt=date_token(re.sub(r',?\s*\d{4}\s*$','',parts[0]).strip()+f' {candidate_year}')
+        if attempt:
+            candidates.append((attempt,closed))
+    valid=[pair for pair in candidates
+           if pair[0]<=pair[1]
+           and (datetime.strptime(pair[1],'%Y-%m-%d')-datetime.strptime(pair[0],'%Y-%m-%d')).days<=BID_WINDOW_MAX_DAYS]
+    return valid[0] if len(valid)==1 else (None,None)
 
 
 def parse_page(raw, uri, company, context):
@@ -116,9 +140,28 @@ def parse_page(raw, uri, company, context):
     periods={issue_dates(v) for v,_,_ in pairs.get('ipo date',[])}
     if len(periods)!=1:raise ValueError('unique explicit IPO date range not established')
     opened,closed=next(iter(periods))
-    if (not opened or not closed or opened>closed or not context.get('open_date') or not context.get('close_date')
-            or opened!=str(context['open_date']) or closed!=str(context['close_date'])):
-        raise ValueError('STALE_OR_DIFFERENT_ISSUE: aggregator period differs or official/filing window absent')
+    # Four different things used to be reported as one message
+    # ("aggregator period differs or official/filing window absent"), which is
+    # useless to an operator: an unreadable page, a missing filing window and a
+    # genuinely different issue all looked identical.  They are separated here,
+    # and where there are two windows both are stated.
+    filing_open=str(context.get('open_date') or '')
+    filing_close=str(context.get('close_date') or '')
+    if not opened or not closed or opened>closed:
+        raise ValueError(
+            'IDENTITY_WINDOW_UNREADABLE: this page\'s IPO Date row does not state a readable, '
+            'non-inverted bid window, so the page cannot be bound to any issue; nothing on it '
+            'was read and nothing may be concluded from its silence')
+    if not filing_open or not filing_close:
+        raise ValueError(
+            'IDENTITY_UNBOUND: the filing established no bid window '
+            f'(open={filing_open or "absent"}, close={filing_close or "absent"}), so a third-party '
+            'page cannot be bound to this issue; no value was taken')
+    if opened!=filing_open or closed!=filing_close:
+        raise ValueError(
+            f'STALE_OR_DIFFERENT_ISSUE: the page\'s window {opened}..{closed} differs from the '
+            f'filing\'s {filing_open}..{filing_close}; the page describes another offering and no '
+            'value was taken')
     digest=hashlib.sha256(raw).hexdigest(); sid='SRC-AGG-'+digest[:16].upper()
     source={'source_id':sid,'source_type':'MARKET_DATA','uri':uri,'content_hash':digest,
             'retrieval_timestamp':datetime.now(timezone.utc).isoformat().replace('+00:00','Z')}

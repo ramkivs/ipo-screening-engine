@@ -193,3 +193,68 @@ def test_assertion_identity_ignores_only_nonconsumed_html_not_changed_evidence()
     assert changed['source_id']!=one['source_id']
     changed_quote,_=parse_page(page(amount='240.0'),URI,'Acme Forge Limited',CTX)
     assert changed_quote['source_id']!=one['source_id']
+
+
+# ---------------------------------------------------------------------------
+# Diagnosing *why* a third-party page was refused (2026-10-24)
+#
+# One message used to cover four different situations -- an unreadable page, a
+# filing with no window, a genuinely different issue and a parse failure -- so
+# an operator could not tell "my configuration is wrong" from "this page is
+# about another offering".  Each now states its own cause, and where two
+# windows exist both are shown.
+# ---------------------------------------------------------------------------
+
+def _rejection(raw, context=None):
+    r = AggregatorIssueTermsResolver(
+        fetcher=lambda uri: raw, urls={'ACME-FORGE-LIMITED': URI}, listings=()
+    ).resolve(company_name='Acme Forge Limited', ipo_id='ACME-FORGE-LIMITED',
+              issue_context=CTX if context is None else context,
+              missing_fields=['fresh_issue'])
+    detail = next(a['detail'] for a in r['attempts'] if a['outcome'] == 'REJECTED')
+    assert not r['fields']
+    return detail
+
+
+def test_an_unreadable_page_window_is_not_reported_as_a_different_issue():
+    detail = _rejection(page(period='dates to be announced'))
+    assert 'IDENTITY_WINDOW_UNREADABLE' in detail
+    assert 'STALE_OR_DIFFERENT_ISSUE' not in detail
+
+
+def test_a_filing_without_a_window_cannot_bind_a_page():
+    detail = _rejection(page(), context={})
+    assert 'IDENTITY_UNBOUND' in detail
+    assert 'open=absent' in detail
+
+
+def test_a_genuine_window_mismatch_states_both_windows():
+    detail = _rejection(page(period='21 to 23 Oct, 2025'))
+    assert 'STALE_OR_DIFFERENT_ISSUE' in detail
+    assert '2025-10-21..2025-10-23' in detail   # what the page says
+    assert '2026-10-21..2026-10-23' in detail   # what the filing says
+
+
+@pytest.mark.parametrize('stated,expected', [
+    ('30 Sep - 5 Oct 2026', ('2026-09-30', '2026-10-05')),
+    ('28 Dec - 2 Jan 2027', ('2026-12-28', '2027-01-02')),
+    ('24 Sep 2025 to 26 Sep 2025', ('2025-09-24', '2025-09-26')),
+])
+def test_a_window_that_names_its_year_once_is_read(stated, expected):
+    from ipo_screening.aggregator_issue_terms import issue_dates
+
+    assert issue_dates(stated) == expected
+
+
+@pytest.mark.parametrize('stated', ['30 Sep - 5 Oct', '1 to 5', 'dates to be announced'])
+def test_an_underdetermined_window_is_not_guessed(stated):
+    from ipo_screening.aggregator_issue_terms import issue_dates
+
+    assert issue_dates(stated) == (None, None)
+
+
+def test_a_year_is_never_inherited_across_more_than_a_bid_window():
+    """``28 Dec - 2 Jan`` resolved to 2026->2027, never to a 370-day window."""
+    from ipo_screening.aggregator_issue_terms import issue_dates
+
+    assert issue_dates('28 Dec - 2 Jan 2027') == ('2026-12-28', '2027-01-02')

@@ -748,8 +748,8 @@ class FinancialTableExtractor:
                 # above them repeats the same dates inside full sentences.
                 # Only fragment lines are read, so a sentence can never
                 # contribute a column.
-                header_text = "\n".join(
-                    line for line in section[:first_row] if len(line.split()) <= 4
+                header_text = " ".join(
+                    line for line in section[:first_row] if len(line.split()) <= 6
                 )
                 header_dates = self._cl_dates_in(header_text)
                 header_dates = list(dict.fromkeys(header_dates))
@@ -791,8 +791,13 @@ class FinancialTableExtractor:
         """Dated column headers, in document order, either date convention.
 
         ``31 March 2026`` and ``March 31, 2026`` both occur; a summary table
-        may use one and the restated statements the other.
+        may use one and the restated statements the other.  The header is read
+        as one whitespace-normalised string because pdftotext splits a single
+        heading across lines -- Vishal Nirmiti prints ``As at March 31,`` /
+        ``2026`` on consecutive lines, and a line-by-line reader sees no date
+        at all (the same table is then unreadable for no good reason).
         """
+        text = " ".join(text.split())
         found: List[Tuple[int, Tuple[str, str, int]]] = []
         spans: List[Tuple[int, int]] = []
         for match in self._CL_DATE.finditer(text):
