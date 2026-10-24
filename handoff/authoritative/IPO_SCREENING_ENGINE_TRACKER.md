@@ -1650,3 +1650,51 @@ Commands, the only environment variable required, nine success criteria, and a f
 - Required-term gate: **CLOSED**. Evaluation readiness: **NOT ESTABLISHED**. Evaluation execution: **NOT RUN**.
 
 - **Disposition: OPERATOR EGRESS CONFIRMED; PASTE AND SHELL-RESPONSE DEFECTS FIXED; RESOLUTION NOW ONE READ-ONLY COMMAND; WORKBOOK DETERMINISM DEFECT FOUND AND FIXED; FULL SUITE 1866/1866 GREEN ON FINAL CODE; GATE CLOSED; NO EVALUATION.**
+
+## Paras — why the score was 8.0: reading defects, corrected — 2026-10-24 (revision 13)
+
+**No evaluation created, updated, scored or persisted; no store written; PR #7 open; `main` untouched at `01ba66c`. Production code changed this pass, so the full suite was re-run in this pass. Frozen core untouched and re-verified.**
+
+### The question
+The operator's run returned `Final Score 8.0 / Available 29 / Unknown 71 / INSUFFICIENT DATA` after the previous passes' fixes. Reproducing it on the retained 651-page RHP (sha256 `E0A3187F…570E74`) gives **exactly** those numbers, so "what is missing?" is answerable item by item rather than by inference.
+
+### The answer: the engine was reading very little of the filing
+Four **reading** defects in the shared extractor, all "the fact is on the page and the reader does not see it". **No threshold, weight, criterion, knockout or allow-list was changed**, and a value printed as `[●]` still stays unknown.
+
+| # | Filing (page) | Was read | Why |
+|---|---|---|---|
+| 1 | `(All amounts are in INR million, unless otherwise stated)`; `Amount (₹ million)` (pp. 151-157, 372-374) | `INR_LAKHS` | the unit detector's `\b` can never match before `₹` after `(`, and `in INR million` was not an accepted form. **Every statement value was ten times too small** against an issue size normalised on a different path. |
+| 2 | `Profit/(loss) for the period/year (A)` (p. 372) | PAT `None`, all years | only `for the year` / `profit after tax` were accepted |
+| 3 | `Net cash generated from operating activities (A)` (p. 373) | CFO `None`, all years | only `provided by` / `from` / `flow from` were accepted |
+| 4 | `SUMMARY OF CONTINGENT LIABILITIES` … `Total … 3,905.01 …` (p. 91) | `None` → **K5 unverifiable** | the note is captioned `32. Commitments and contingencies` and is prose; the tabular summary was never consulted |
+
+A fifth defect — `use_of_proceeds = []` from an unread `OBJECTS OF THE OFFER` table (pp. 129-130) being read as "no allocation", i.e. `mixed_ok` and 2 of 4 points — sits in `engine/ipo_screening/derived.py`, **frozen core**. The guard was written, the frozen-core tests caught the modification, and the file was restored to its pinned bytes (`0a6ef86a…56237`) **before anything was committed**; the ten resulting failures pass again. The change is **referred to Ramki**, not taken — a frozen-core edit is not this pass's authority, and the rule against changing the core to obtain a result applies to a good-faith correction too.
+
+### The corrected outcome, and the knockout
+```
+before:  final 8.0   available 29.0   unknown 71.0   K5 UNVERIFIED
+after :  final 9.0   available 34.0   unknown 61.0   K5 TRIGGERED
+```
+The number moves by one point; the **verdict** moves from "insufficient data" to "knocked out". The filing discloses contingent liabilities of **3,905.01 against FY2026 net worth of 3,949.41 = 98.88%** — the exact ratio its own risk factor states — far above K5's 50% threshold. K3 becomes decidable (OFS = 65.5% of the offer, so CLEAR), `profit_declining` is a genuine `False`, `margin_trend` scores 1/5 ("volatile": loss → larger loss → profit) and `cfo_quality` is correctly **NOT APPLICABLE** (cumulative PAT is negative), not missing. The 9.0 still includes the 2 frozen-core points described above.
+
+### What remains missing, classified (report §20.4)
+- **Recoverable by reading** (~16 pts): `ofs_seller_type` (p1: Promoter ₹3,000.00 m + Commelina Ltd ₹6,500.00 m), `industry_growth` (p204: 10-12% FY25-30P), `concentration` (pp60-61: top-5 suppliers 21.94%; customers genuinely not disclosed), `auditor` (p99: no change in three years), `board_kmp` (p351), `visibility` (p39: 2,211 → 3,011 beds).
+- **Policy-blocked** (~8 pts): `rpt`/K6 wait on the approved metric definition (2026-10-17 record); `moat` is a qualitative rating.
+- **`[●]`-undisclosed** (~7 pts): `promoter_post_holding` (p123: 72.80% pre, `[●]` post), `dilution`, `promoter_ofs_pct` — all need the post-issue share count; deriving it from price would be shares × price, which policy forbids.
+- **Market/peer data a filing cannot contain** (30 pts): Module B (20) needs a peer snapshot and a post-issue EPS; Module F (10) is post-open observation.
+- **Knockouts needing a negative-disclosure rule**: K1 (unmodified opinion, no going-concern paragraph, p367) and K2 ("no disciplinary actions … by SEBI or the Stock Exchanges against our Promoter in the last five Fiscals", p493). Both are explicit negatives; wiring them without an approved rule risks the mirror image of the Jio failure, where a *positive* SEBI proceeding was lost to a span filter.
+
+Also recorded: the run used `THIRD_PARTY_AGGREGATOR_OVERRIDE` for the three pricing terms although the operator's host can reach the official sources and the identity-bound closed-issue path already exists (§19).
+
+### Tests
+- New `tests/test_paras_extraction_gaps_20261024.py` — **22 passed** (all five unit scales; a body sentence must not declare a unit; PAT/CFO caption variants with interim columns; the summary Total in both date conventions; the lead-in sentence must not become columns; four fail-closed cases).
+- `tests/test_paras_evidence_regression.py` — **18 passed**, pinning the filing's own PAT (`-153.31 / -579.83 / 438.34`), CFO (`924.77 / 861.91 / 1,635.12`), contingent liabilities (`3,905.01` ⇒ 98.88%) and `K5 TRIGGERED` through the engine's own derivation and knockout modules.
+- Two existing assertions were **corrected, not weakened**: the upload path's `reporting_unit == "INR_LAKHS"` with `50,000/95,000` encoded the unit defect itself; it now reads `INR_MILLIONS` with `5,000/9,500` and additionally pins the unchanged 34.48% fresh-issue share.
+- Full backend suite on final code, frozen-core verification and the golden result: see §20.6 of the report.
+
+### Status (unchanged where it must be)
+- Frozen-core pin: **VERIFIED — READY FOR RAMKI RATIFICATION** (unmodified this pass; re-verified after the reversion).
+- `price_band_low` / `price_band_high` / `lot_size`: **UNRESOLVED at runtime** — pending the operator run of report §19.2; nothing entered any configuration, canonical record or store.
+- Required-term gate: **CLOSED**. Evaluation readiness: **NOT ESTABLISHED**. Evaluation execution: **NOT RUN**.
+
+- **Disposition: THE 8.0 WAS A READING FAILURE, NOT A SCORING ONE; FOUR EXTRACTOR DEFECTS CORRECTED; CORRECTED RUN = 9.0 WITH K5 KNOCKOUT (CONTINGENT LIABILITIES 98.88% OF NET WORTH); FROZEN-CORE PROCEEDS GUARD REVERTED AND REFERRED; REMAINING GAP CLASSIFIED WITH PAGES; GATE CLOSED; NO EVALUATION.**

@@ -210,22 +210,35 @@ def test_upload_path_reads_the_current_issue_window(uploaded):
 
 
 def test_upload_path_reads_the_disclosed_monetary_components(uploaded):
-    """₹5,000 m fresh issue and ₹9,500 m OFS, in the filing's reporting unit."""
+    """₹5,000 m fresh issue and ₹9,500 m OFS, in the filing's reporting unit.
+
+    The filing's restated statements are captioned "(All amounts are in INR
+    million, unless otherwise stated)", so the reporting unit of the extracted
+    input **is** millions and the offer components are stated in it directly.
+
+    This assertion previously read ``INR_LAKHS`` with ``50,000/95,000``.  That
+    was not an independent contract but the visible half of a defect: the unit
+    header was not recognised, so the statements were booked as lakhs and every
+    monetary value taken from them was ten times too small against an issue
+    size normalised separately.  The unit is now read (2026-10-24), the offer
+    components are converted with it, and the ratio between them — which never
+    depended on the unit — is unchanged.
+    """
     issue = uploaded["issue"]
     reporting_unit = uploaded["financials"]["reporting_unit"]
-    assert reporting_unit == "INR_LAKHS"
-    # 1 million = 10 lakh: the statement is in millions, the input is in lakhs.
-    assert issue["fresh_issue"] == 50000.0
-    assert issue["ofs"] == 95000.0
+    assert reporting_unit == "INR_MILLIONS"
+    assert issue["fresh_issue"] == 5000.0
+    assert issue["ofs"] == 9500.0
+    assert round(issue["fresh_issue"] / (issue["fresh_issue"] + issue["ofs"]) * 100, 2) == 34.48
 
 
 def test_upload_path_and_parser_path_agree_once_units_are_normalized(uploaded, parsed):
-    """Cross-path consistency: same money, two representations."""
+    """Cross-path consistency: the same money, stated the same way."""
     issue = uploaded["issue"]
     assert parsed.ofs_amount_unit == "INR_MILLIONS"
     assert parsed.fresh_issue_amount_unit == "INR_MILLIONS"
-    assert issue["ofs"] / 10 == parsed.ofs_amount.value
-    assert issue["fresh_issue"] / 10 == parsed.fresh_issue_amount.value
+    assert issue["ofs"] == parsed.ofs_amount.value
+    assert issue["fresh_issue"] == parsed.fresh_issue_amount.value
 
 
 def test_upload_path_keeps_the_placeholder_terms_unresolved(uploaded):
@@ -243,3 +256,89 @@ def test_upload_path_records_provenance_for_every_resolved_term(uploaded):
         assert spec["source_id"] == uploaded["_sources"][0]["source_id"]
         assert spec.get("locator")
         assert spec.get("quote")
+
+
+# ---------------------------------------------------------------------------
+# Reading gaps found by scoring this filing end to end (2026-10-24)
+#
+# The operator's run scored 8.0 with 71 points unknown.  Reproducing it showed
+# that four of those unknowns were *reading* defects, not missing disclosures;
+# the parsers are pinned synthetic-first in
+# ``tests/test_paras_extraction_gaps_20261024.py`` and the filing's own numbers
+# are pinned here, on the same single extraction.
+# ---------------------------------------------------------------------------
+
+
+def test_upload_path_now_reads_pat_for_every_fiscal_year(uploaded):
+    """Restated P&L: "Profit/(loss) for the period/year (A)".
+
+    FY2024 (153.31), FY2025 (579.83) and FY2026 438.34 — losses in the two
+    earlier years, profit in the latest.  These are the filing's own figures
+    and they are what makes the margin trend and the "profit declining" leaf
+    answerable at all.
+    """
+    periods = {p["fy"]: p for p in uploaded["financials"]["periods"]}
+    assert [periods[fy]["pat"] for fy in ("FY2024", "FY2025", "FY2026")] == [
+        -153.31,
+        -579.83,
+        438.34,
+    ]
+
+
+def test_upload_path_now_reads_cash_flow_from_operations(uploaded):
+    """Restated cash flow: "Net cash generated from operating activities (A)"."""
+    periods = {p["fy"]: p for p in uploaded["financials"]["periods"]}
+    assert [periods[fy]["cfo"] for fy in ("FY2024", "FY2025", "FY2026")] == [
+        924.77,
+        861.91,
+        1635.12,
+    ]
+
+
+def test_upload_path_reads_the_contingent_liability_summary_total(uploaded):
+    """The "Summary of Contingent Liabilities" Total row, FY2026 column.
+
+    3,905.01 as at 31 March 2026 — the figure the RHP's own risk factor turns
+    into 98.88% of the FY2026 net worth of 3,949.41.  The reader takes the
+    issuer's Total, never a sum of the parts, and never the June-2026 interim
+    column (which would be divided by a full-year net worth).
+    """
+    financials = uploaded["financials"]
+    assert financials["contingent_liabilities"] == 3905.01
+    assert financials["contingent_liabilities_unquantified"] is None
+    net_worth = {p["fy"]: p["net_worth"] for p in financials["periods"]}["FY2026"]
+    assert round(3905.01 / net_worth * 100, 2) == 98.88
+
+
+def test_the_reading_gaps_are_what_kept_knockout_k5_blind(uploaded):
+    """With the disclosed contingent liabilities read, K5 is TRIGGERED.
+
+    This is the point of the whole correction: the score of 8.0 was not the
+    engine judging a weak issuer, it was the engine unable to see a disclosed
+    knockout.  Contingent liabilities of 3,905.01 against a net worth of
+    3,949.41 is 98.88% — far above K5's 50% threshold — and the RHP states the
+    ratio itself in a risk factor ("contingent liabilities ... constituted
+    89.55% of our net worth" as at 30 June 2026).
+
+    Exercised through the engine's own derivation and knockout modules, not a
+    re-implementation.  ``pipeline.evaluate`` is not used here because the
+    schema correctly refuses an input whose price band and lot are undisclosed
+    — the required-term gate — and no third-party value is substituted to get
+    past it.  K5 does not depend on those terms.
+    """
+    from ipo_screening.canonical_input import build_canonical_input
+    from ipo_screening.derived import derive
+    from ipo_screening.knockouts import evaluate_knockouts
+    from ipo_screening.pipeline import load_config
+
+    config = load_config()
+    derived = derive(build_canonical_input(uploaded), config, None, None)
+    assert round(derived.value_of("contingent_liab_pct_networth"), 2) == 98.88
+    results = {rule.rule_id: rule for rule in evaluate_knockouts(config, derived)}
+    assert results["K5"].state == "TRIGGERED"
+    # The two earlier-year losses are now visible too, so "profit declining"
+    # is answerable and answers False (the trend is improving).
+    assert derived.value_of("profit_declining") is False
+    # The terms the filing states as [●] stay unresolved: this correction
+    # reads disclosed facts, it does not fill placeholders.
+    assert uploaded["issue"]["price_band_low"] is None

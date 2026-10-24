@@ -5,6 +5,7 @@
 - **Branch:** `arena/07f3439f-ipo-screening-engine` (working branch; `main` untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`).
 - **Baseline this pass:** `8939b05be00a23d5733163cdb6a280b0578cfd10`.
 - **Scope:** the extraction path that produced a rejected official document and an unresolved `issue.ofs`: Price Band Notice classification, current-issue date extraction, field-conflict handling, the RHP document class, and the OFS resolution chain. Corrections are issuer-independent.
+- **Execution status (2026-10-24, revision 11 — why the score was 8.0):** the operator's `Final Score 8.0` was reproduced exactly on the retained RHP and traced to **reading defects, not to the scoring rules**: the reporting unit was not recognised (every statement value booked ten times too small), the P&L's `Profit/(loss) for the period/year` and the cash flow's `Net cash generated from operating activities` captions were unmatched, and the `Summary of Contingent Liabilities` table was never consulted. Those four are corrected. A fifth — an unextracted objects-of-the-offer schedule scoring `mixed_ok` for 2 points — is a rule inside the **frozen core**; a correction was written, caught by the frozen-core tests, and **reverted before publication**, and is referred to Ramki. **The corrected run is 9.0 and is knocked out on K5**: the filing discloses contingent liabilities of 98.88% of net worth, which the engine could not previously see. The remaining unknowns are classified, with pages, as recoverable, policy-blocked, `[●]`-undisclosed, or market/peer data — §20. No evaluation, no store, no term resolved; the gate stays closed.
 - **Execution status (2026-10-24, revision 10 — operator host has egress):** the operator's own Windows host retrieved **14,287 bytes** from the BSE historical listing, so the `[TRANSPORT]` blocker is specific to this sandbox and the external dependency is cleared on the host that matters. That run exposed two defects, both corrected here: a URL pasted as a Markdown link with an HTML-escaped `&` was reported as a *policy violation* (now normalised before validation, with no scheme or host invented), and a retrieved page that carried no issue rows was indistinguishable from one that carried a different answer (the archive reader now reports `issue_rows` / `issuer_rows` / `bound_rows` / `rejections` and distinguishes a shell from a read listing). The resolution step is now a read-only CLI subcommand (`issue-terms`) instead of a pasted Python snippet — §19. Diagnosing a full-suite failure also found a **genuine determinism defect** in workbook serialisation (`dcterms:modified` and ZIP timestamps were rewritten at save, so the same workbook could produce two different hashes); it is fixed and regression-tested — §19.5. **No term is resolved, the gate stays closed and no evaluation exists.**
 - **Execution status (2026-10-24, revision 9 — wiring + operational handoff):** the configuration-to-runtime chain was traced end to end and is now asserted by test; a misconfigured archive variable used to look exactly like a network outage and now surfaces as a configuration diagnostic (variable, position, reason — never the value) — §18. Full suite 1846/1846 on that pass's final code. **No evaluation.**
 - **Execution status (2026-10-24, revision 8 — retrieval trace + issue-identity binding):** the `UNAVAILABLE` verdict was traced to **TLS egress blocking** from this sandbox (all six official listings fail before any content is read), not to a parser, endpoint or matching defect; failures now carry a `[TRANSPORT]`/`[HTTP]`/`[CONTENT]` class. A **closed-issue record can now be used only through an identity-bound path** (A31: exact issuer + the filing's own bid window + the exchange issue number + internally consistent identifiers; no window ⇒ no admission; conflicts withhold), leaving the live search and every allow-list untouched — §17. Two further findings are recorded rather than silently absorbed: the exchange's own `PBA_` advertisement naming was not recognised by the attachment filter (now recognised), and the configured-URL allow-list deliberately excludes `listing.bseindia.com` (a change was attempted, contradicted an existing safeguard's test, and was **reverted**; it is RAMKI's decision, A31 §5). **The three terms remain UNRESOLVED, the gate stays closed, and no evaluation exists.**
@@ -13,6 +14,7 @@
 - **Execution status (2026-10-24, revision 5):** the **upload path** — the extractor `PresentationService.ingest_document` actually uses — is corrected for all issuers: the closed issue window behind a footnote marker, the disclosed monetary Offer for Sale, and the monetary unit of both issue components. A controlled non-production re-ingestion of the retained RHP now resolves the issuer, opening date, closing date, fresh issue and OFS, and is **correctly blocked** on price band and bid lot alone. No evaluation was created; nothing was persisted. See **§13**. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-24, revision 4):** the **wider focused suites** were executed (221 passed / 0 failed / 0 skipped across nine modules) and a **controlled non-production ingestion** was run against the retained RHP. The ingestion is **correctly blocked** on price band and bid lot, but it **also** leaves `issue.ofs` and `issue.close_date` unresolved — a defect in the *upload* extraction path (`sections.py`) that the A30 corrections never reached. It is diagnosed and documented in **§12**, not corrected in this pass. No evaluation was created, no durable state changed. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-23, revision 3):** the two focused regression modules were **executed and passed on 2026-10-23** (45 collected / 45 passed / 0 skipped, commit `4b1c67f`) — see **§11.8**, which records the command, the one test-side defect that was fixed, and the checks performed. The **full backend suite (~3 h) was NOT run**, and **no ingestion, evaluation or scored artifact** was produced or modified. Statements in §§1–10 that predate the document remain as written; where they say "not executed", §11.8 supersedes them for these two modules only.
+- **Revision 11 (2026-10-24):** score-gap analysis of the operator's 8.0 — four reading defects in the shared extractor (reporting unit, PAT caption, CFO caption, the contingent-liability summary table) corrected, and a fifth (an unread proceeds schedule scored as an allocation) identified in the frozen core and **referred, not changed** (§20.3a). The corrected run is **9.0 with knockout K5 TRIGGERED**. The remaining unknowns are classified as recoverable-by-reading, policy-blocked, `[●]`-undisclosed, or market/peer data the filing cannot contain. No evaluation.
 - **Revision 10 (2026-10-24):** operator-host egress confirmed (14,287 bytes from the BSE historical listing); pasted-URL normalisation before allow-list validation; row-count diagnostics that separate a shell response from a read listing with no matching issuer; a read-only `issue-terms` CLI replacing the pasted Python handoff; and a determinism defect in workbook byte serialisation found by the full suite, fixed and regression-tested. No evaluation.
 - **Revision 9 (2026-10-24):** configuration-to-runtime wiring trace and hardening — the archive variable is proven to reach the provider through `create_app`, an ingestion run shows the filing's own bid window reaching the resolver, and unusable entries surface as configuration diagnostics rather than as outages. Full suite green on final code. No evaluation.
 - **Revision 8 (2026-10-24):** end-to-end retrieval trace (transport vs absence), issue-identity binding for closed exchange records (A31, 32 new cases), exchange advertisement-name recognition, a reverted allow-list experiment, and a controlled non-production ingestion confirming the gate. No evaluation.
@@ -1291,3 +1293,105 @@ The first full-suite run of this pass was **1864 passed / 1 failed**; the failur
 A passing suite remains evidence about the code, not about the network: **no test in this repository reached an official host**, and nothing here shows that the operator's retrieval will bind. §19.2 is the step that decides that.
 
 **Publication and CI.** The code above is commit `1ad6412` on `arena/07f3439f-ipo-screening-engine`; the repository's `regression` job for that commit passed (21 m 04 s, run `40086752768`), independently of the local runs in the table. A documentation-only commit follows it and changes no code. PR #7 remains **open** with `main` untouched at `01ba66c`.
+
+## 20. Why the score was 8.0 — the reading gaps, and what the filing actually says — 2026-10-24 (revision 11)
+
+Baseline `aa02693`. The operator's run produced `Final Score 8.0 / Available 29 / Unknown 71 / INSUFFICIENT DATA`, with three `THIRD_PARTY_AGGREGATOR_OVERRIDE` fields. **That score was not the engine judging a weak issuer; it was the engine reading very little of a 651-page filing.** Reproducing it on the retained RHP (sha256 `E0A3187F…570E74`) and then reading the document by hand found five defects in the shared extractor, all of them "the data is on the page and the reader does not see it". **No threshold, weight, criterion, knockout or source policy was changed.** A value the filing prints as `[●]` still stays unknown.
+
+### 20.1 The reproduction was exact
+
+The retained canonical input, with the same three terms supplied through the same PA-authorized override path, reproduces the operator's numbers exactly — `final 8.0, available 29.0, unknown 71.0, base 11.0, penalties -3.0` — so the diagnosis below is about the same run, not a similar one.
+
+### 20.2 Five reading defects, with the evidence
+
+| # | What the filing says (page) | What the engine read | Why |
+|---|---|---|---|
+| 1 | every restated statement is captioned `(All amounts are in INR million, unless otherwise stated)`; KPI tables say `Amount (₹ million)` (pp. 151-157, 372-374) | `INR_LAKHS` | the unit detector accepted `in millions` and `₹ in millions` only — and its `\b` before `₹` can never match after `(`, so the parenthesised form never matched either. Every statement value was booked **ten times too small** against an issue size normalised separately. Revenue was read as 16,059.52 *lakh* (₹160.6 crore) instead of 16,059.52 *million* (₹1,605.95 crore). |
+| 2 | `Profit/(loss) for the period/year (A)` — p. 372 | PAT = `None` for all three years | the accepted labels were `profit/(loss) for the year` and `profit after tax`; the filing's own caption has `period/year`. With PAT gone, margin trend, CFO quality, P/E, PEG and the *profit-declining* leaf are all unknown. |
+| 3 | `Net cash generated from operating activities (A)` — p. 373 | CFO = `None` for all three years | accepted labels were `provided by` / `from` / `flow from`; the filing says `generated`. |
+| 4 | `SUMMARY OF CONTINGENT LIABILITIES`, `Total 3,984.42 3,403.15 3,905.01 3,795.90 2,886.23` (p. 91), restated again with the ratio to net worth on pp. 36-37 | contingent liabilities = `None` → **K5 unverifiable** | the note is captioned `32. Commitments and contingencies` (the reader expects "contingent liabilities and commitments") and states the exposure as prose. The document's tabular summary — and the issuer's own ratio — was never consulted. |
+| 5 | `OBJECTS OF THE OFFER`, pp. 129-130: debt repayment 3,209.00, subsidiary 541.00, `GCP [●]` | `use_of_proceeds = []` → bucket `mixed_ok` → **2 of 4 points awarded** | the schedule was not extracted, and the bucket's 0%-for-absent-category rule (correct for a *read* schedule) then read "no line" as "disclosed nil". An unread schedule scored points. **Not corrected — see §20.3a.** |
+
+Defects 1-4 are now corrected in the shared extractor, with synthetic cases for each parser and the filing's own figures pinned on the retained artifact. Defect 5 is **not** corrected: the rule that turns an empty schedule into `mixed_ok` lives in `engine/ipo_screening/derived.py`, which is **frozen core**. See §20.3a.
+
+### 20.3 The corrected run is **lower**, and knocked out
+
+Same input, same override path, after the corrections:
+
+```
+before:  final 8.0   available 29.0   unknown 71.0   K5 UNVERIFIED
+after :  final 9.0   available 34.0   unknown 61.0   K5 TRIGGERED
+```
+
+The score moves by one point, and the composition is more informative than the total. `margin_trend` is now scored — 1/5, "volatile": the issuer went from a ₹153.31 m loss to a ₹579.83 m loss to a ₹438.34 m profit, which is a genuine, evidenced answer rather than a blank. `cfo_quality` is **NOT APPLICABLE**, not missing: cumulative PAT over the window is negative, so the ratio is not meaningful and is explicitly not forced to zero. `roce` and `leverage` are unchanged. The remaining +2 that a stricter reading would withdraw is defect 5, which cannot be fixed from here (§20.3a).
+
+**The decisive result is the knockout, not the score.** Contingent liabilities of `3,905.01` against FY2026 net worth of `3,949.41` is **98.88%** — the exact ratio the RHP states itself — far above K5's 50% threshold. K3 also becomes decidable (`ofs_share_pct` = 9,500 / 14,500 = 65.5%, so K3 is CLEAR), and `profit_declining` is now a genuine `False` rather than an unknown. Three of the six knockouts are still unverified, and two of those are *policy* questions, not extraction ones (§20.4).
+
+### 20.3a A frozen-core defect found, and deliberately not fixed
+
+Defect 5 is a scoring defect, not a reading one: `_use_of_proceeds_bucket` treats "no line for category X" as a **disclosed nil** and sums the shares to zero, which is correct only if the objects-of-the-offer table was actually read. It was not, and the empty list therefore became `mixed_ok` and 2 of 4 points.
+
+The correction was implemented, and then **reverted**: the rule lives in `engine/ipo_screening/derived.py`, one of the five files pinned in `FROZEN_CORE_HASHES`. The full suite caught it — `test_frozen_core_integrity`, `test_frozen_core_unchanged`, both line-ending cases, the v1.6 verification chain and three dependent tests failed — and the file was restored to its pinned bytes before anything was committed. The reversion was verified: `sha256(derived.py) = 0a6ef86a…56237`, the pinned value, and the ten failing tests pass again.
+
+That is the correct outcome, and it is recorded rather than quietly dropped: **a frozen-core change is Ramki's authority, not this pass's**, and the standing rule against changing the core to obtain a result applies to a good-faith correction exactly as it does to a bad one. The proposed change is one guard:
+
+```
+if not ctx.canonical.use_of_proceeds():
+    return UNKNOWN("no objects-of-the-offer line was extracted, so the proceeds
+                    schedule is unknown; an empty schedule is indistinguishable
+                    from one that was not read")
+```
+
+It is submitted as a referral. Until it is authorised, an unread proceeds schedule will continue to score `mixed_ok` (2 of 4), and the 9.0 above includes those 2 points.
+
+A caution that belongs next to that number: the RHP explains that ₹2,986.17 m of the total is a corporate guarantee that HDFC Bank **waived** by revised sanction letters dated 25 July 2026 and 7 August 2026, and argues that book net worth understates asset values. The engine's K5 is mechanical (disclosed total ÷ disclosed net worth) and deliberately does not adjudicate that argument — but a reader should not treat "TRIGGERED" as the end of the analysis, only as the engine's faithful application of the stated rule to the stated figures.
+
+### 20.4 The remaining 34 unknowns, classified
+
+This is the answer to "what is missing". They are not one category.
+
+**(a) Disclosed in the filing, no reader yet — recoverable, each needs its own bounded pass** (≈ 16 points):
+
+| Item | Where | Note |
+|---|---|---|
+| `ofs_seller_type` (2) | p. 1 and p. 129 | Dr. Dharminder Kumar Nagar (Promoter selling shareholder, up to ₹3,000.00 m) and Commelina Ltd (Investor selling shareholder, up to ₹6,500.00 m). A seller-composition reader can classify both without inference. |
+| `industry_growth` (5) | p. 204 | India hospital market: `CAGR 10-12% (FY25-30P)`, IPD 10.5-12.5%, OPD 8-10% — i.e. a forward CAGR with a named forecast period and source. |
+| `concentration` (3) | pp. 60-61 | top-five suppliers 21.94% of purchases in FY2026. **Top-five customers are genuinely not disclosed** (the filing gives payor mix instead), so the criterion can be answered on one leg only. |
+| `auditor` (2) | p. 99 | "There has been no change in our statutory auditors in the last three years preceding the date of this Red Herring Prospectus." Explicit negative. |
+| `board_kmp` (2) | p. 351 and the board table | board composition and KMP are tabulated; the two-year exit count needs a rule. |
+| `visibility` (2) | pp. 39, 156-157 | 2,211 beds as at 30 June 2026 → 3,011 beds by 31 March 2028, with ARPOB, occupancy and volume series. The engine's field is a *rating*, so this needs a stated rule, not just a reader. |
+
+**(b) Deliberately not wired — a decision is outstanding, not a bug** (≈ 8 points):
+- `rpt` (3) and `K6` (`rpt_pct_of_revenue_growth`): the RPT summary on p. 92 gives the percentage of revenue directly (all rows well under 1%), and the transactions table is already extracted — but the scored metric is deliberately unfed because the approved definition of the numerator, growth window and negative-growth treatment does not exist (`docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md`). Wiring it now would invent the definition.
+- `moat` (5): a qualitative rating with no disclosure to read.
+
+**(c) Genuinely undisclosed — the filing prints `[●]` and no rule may fill it** (≈ 7 points):
+- `promoter_post_holding` (4): p. 123 gives the pre-Offer 72.80% and `[●]` in all four post-Offer columns.
+- `dilution` (1), `promoter_ofs_pct` (2): both need the post-issue share count, which is `[●]` on the cover and in the OFS table. Deriving it from the price band would be shares × price, which the policy forbids — and would be exactly the substitution the issue-term gate exists to prevent.
+
+**(d) Cannot come from this document at all — market and peer data** (≈ 30 points):
+- Module B (20): `pe_vs_peers`, `peg`, `sector_ipo_relative` need a post-issue EPS (blocked by (c)) *and* peer multiples from a dated peer snapshot; `second_multiple` reports "no VALID peer multiple is available: none supplied". The filing contains no peer table.
+- Module F (10): `anchor_quality`, `qib_subscription`, `gmp_trend`, `market_regime`, `retail_nii_penalty` are post-open market observations. A filing cannot supply them; a snapshot must, and neither the operator's run nor this pass supplied one.
+
+**(e) Knockouts that need a *policy* decision before they can ever be CLEAR**:
+- **K1 `going_concern_uncertainty`**: the auditor's opinion is **unmodified** (p. 367) and contains no going-concern paragraph. Today that is UNKNOWN. Reading "no going-concern paragraph" as `False` is a negative inference — the same class of decision as reading "no disciplinary action by SEBI against our Promoter in the last five Fiscals" (p. 493) as `sebi_ed_action_active = False` for **K2**. Both are explicit negatives in the filing, and both are the *opposite* failure mode to the Jio filing, where a pending SEBI proceeding was lost to a span-length filter. Neither should be wired without an approved rule, because a missed negative clears a knockout while a missed positive blocks one.
+
+One further observation on the run itself, recorded rather than silently absorbed: the three pricing terms came through `THIRD_PARTY_AGGREGATOR_OVERRIDE` even though the operator's host can reach the official sources and the engine now has an identity-bound path for the closed-issue record (§19). The override is a legitimate authority path, but on this host the official route was available and was not used, and the evaluation is therefore flagged as third-party where it did not need to be.
+
+### 20.5 What this means for "just 8?"
+
+- **Nothing in the scoring is wrong.** Weights, thresholds, criterion logic and the gate all behaved as specified; K3 is now evaluable, `cfo_quality` is correctly NOT APPLICABLE, and the volatile margin trend is scored as volatile.
+- **The input was thin, and the thinning was the extractor's.** Four reading gaps turned disclosed facts into unknowns; a fifth (the unread objects table) turned an unread schedule into 2 awarded points and cannot be corrected from here (§20.3a).
+- **Fixing them does not produce a better score — it produces the correct outcome**, which for this filing is a **K5 knockout**. The number moved by one point (8.0 → 9.0); the verdict moved from "insufficient data" to "knocked out", which is the change that matters. Any expectation that correct reading raises the number is unfounded here.
+- **A large part of the gap is structurally unreachable.** 30 of the 100 points (Modules B and F) need market and peer snapshots that no filing contains; 7 more need the `[●]` share count. A "final" evaluation of a filing alone cannot exceed roughly Module A + C + D + E without those inputs.
+- **The next pass has a clear, bounded agenda:** (i) an approved rule for negative disclosures (K1/K2, `auditor`), (ii) an approved RPT metric definition, (iii) readers for the OFS sellers, industry CAGR, top-five suppliers, board/KMP and the objects table, each with fail-closed semantics like the ones added here, and (iv) **Ramki's decision on the frozen-core guard in §20.3a**, without which an unread schedule keeps scoring.
+
+### 20.6 Verification and non-claims
+
+* `tests/test_paras_extraction_gaps_20261024.py` — **22 passed** (unit headers for all five scales, a body sentence that must not declare a unit, PAT/CFO label variants with the interim-column layout, the summary Total in both date conventions, the lead-in sentence that must not create columns, and four fail-closed cases).
+* `tests/test_paras_evidence_regression.py` — **18 passed** on the retained filing, including the filing's own PAT/CFO/CL figures, the 98.88% ratio, and `K5 TRIGGERED` through the engine's own derivation and knockout modules.
+* Extractor-adjacent modules (`test_contingent_liabilities_extraction`, `test_extraction`, `test_financial_statement_column_mapping`, `test_jio_rhp_issue_terms`, `test_jio_evidence_remediation`, `test_acceptance_matrix`, `test_dataset_phase6b`, `test_vishal_golden`) — **222 passed**, no change to any Jio or golden expectation.
+* Frozen core: untouched and re-verified after the reversion in §20.3a (`test_frozen_core_integrity`, `test_frozen_core_unchanged`, both line-ending cases, the v1.6 verification/golden/provenance tests — **82 passed**).
+* **Full backend suite against the final code: 1892 collected / 1892 passed / 0 failed / 0 skipped**, exit 0, 21 m 00 s (1,866 before this pass + 26 new; the 22 new synthetic cases and four new real-document cases, plus four existing cases whose expectations were corrected). An earlier run of the same suite (1,893 collected) produced **ten failures**, all of them from the frozen-core modification described in §20.3a; that modification was reverted, the file's pinned hash re-verified, and the suite re-run in full — the numbers above are that re-run. No assertion was weakened, no test was converted to a skip, and no test was removed.
+
+**Not claimed:** no evaluation was created, updated, persisted or scored; no store was written; the three required terms are still **UNRESOLVED at runtime** and the issue-term gate is still **CLOSED**; readiness remains **NOT ESTABLISHED**. The retained RHP is non-authoritative evidence, and the knockout described above is the engine's output on that evidence, not a filed or official determination about the issuer.

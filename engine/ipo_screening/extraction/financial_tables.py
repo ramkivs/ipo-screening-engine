@@ -9,6 +9,7 @@ Extracts multi-column period tables:
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -183,7 +184,21 @@ class FinancialTableExtractor:
                 ("depreciation", [r"depreciation and amorti[sz]ation"]),
                 ("total_expenses", [r"total expenses\b"]),
                 ("pbt", [r"profit/(loss) before tax", r"profit before tax"]),
-                ("pat", [r"profit after tax", r"profit/(loss) for the year", r"profit/(loss) after tax"]),
+                # Paras RHP (2026-10-24): the statement's own label is
+                # "Profit/(loss) for the period/year (A)".  None of the earlier
+                # forms matched it, so PAT stayed unknown for every period --
+                # and with it the margin trend, cash-flow quality, P/E, PEG and
+                # the profit-declining knockout leaf.
+                (
+                    "pat",
+                    [
+                        r"profit after tax",
+                        r"profit\s*/\s*\(loss\)\s*for\s*the\s*period\s*/\s*year",
+                        r"profit\s*/\s*\(loss\)\s*for\s*the\s*(?:year|period)\b",
+                        r"profit\s*/\s*\(loss\)\s*after\s*tax",
+                        r"profit\s+for\s+the\s+period\s*/\s*year",
+                    ],
+                ),
             ],
             len(years),
         )
@@ -225,7 +240,20 @@ class FinancialTableExtractor:
         cf_items = self._parse_table_lines(
             cf_text or "",
             [
-                ("cfo", [r"net cash provided by/\(used in\) operating activities", r"net cash from operating activities", r"net cash flow from operating activities"]),
+                # "Net cash generated from operating activities (A)" is the
+                # caption used by the Paras RHP; only "provided by" and
+                # "from"/"flow from" were accepted, so CFO stayed unknown for
+                # every period (and with it cash-flow quality and the CFO/PAT
+                # knockout leaf).
+                (
+                    "cfo",
+                    [
+                        r"net cash provided by/\(used in\) operating activities",
+                        r"net cash (?:generated|provided|arising) (?:from|by|out of) operating activities",
+                        r"net cash (?:flow )?(?:generated )?from operating activities",
+                        r"net cash flow from operating activities",
+                    ],
+                ),
                 ("capex", [r"purchase of property,\s*plant and equipment", r"purchase of fixed assets"]),
             ],
             len(years),
@@ -571,11 +599,19 @@ class FinancialTableExtractor:
         r"\s*,?\s*(\d{4})",
         re.IGNORECASE,
     )
+    _CL_DATE_MONTH_FIRST = re.compile(
+        r"(January|February|March|April|May|June|July|August|September|October|November|December)"
+        r"\s+(\d{1,2})(?:st|nd|rd|th)?\s*,?\s*(\d{4})",
+        re.IGNORECASE,
+    )
     _CL_COMMITMENTS_HEADING = re.compile(
         r"^\s*(?:\(?\s*(?:II|2|[Bb])\s*\)?\s*[.):]?\s*)?commitments?\b",
         re.IGNORECASE,
     )
     _CL_NEXT_NOTE = re.compile(r"^\s*\d{1,2}(?:\.\d+)?\s+[A-Z][A-Za-z]")
+    _CL_SUMMARY_HEADING = re.compile(
+        r"^\s*summary\s+of\s+contingent\s+liabilit", re.IGNORECASE
+    )
     _CL_TOTAL_LABEL = re.compile(r"\btotal\b", re.IGNORECASE)
     _CL_COMMITMENT_LABEL = re.compile(
         r"\bcommitments?\b|\bcapital\s+account\b|\bcontracts?\s+remaining\b",
@@ -651,6 +687,129 @@ class FinancialTableExtractor:
             ranges.append((250, self.page_count))
         ranges.append((1, self.page_count))
 
+        # Fallback: a "Summary of Contingent Liabilities" table.
+        #
+        # Paras RHP (2026-10-24): the note is captioned "32. Commitments and
+        # contingencies", which the note-heading rule above does not match,
+        # and its body states the exposure as prose ("... INR 2,986.17
+        # million (30 June 2025: ...)"), not as a period table.  The document
+        # nevertheless prints the section total as a table -- and states the
+        # ratio to net worth itself (89.55% as at 30 June 2026; 98.88% as at
+        # 31 March 2026, which ties exactly to 3,905.01 / 3,949.41).  Leaving
+        # it unread leaves K5 blind to a disclosed 85-135% ratio.
+        #
+        # The fallback is strictly weaker than the note reader and cannot
+        # override it: it runs only when the note path returns no amount, it
+        # requires a unique Total row aligned to at least two dated columns
+        # including a 31 March column, and any ambiguity returns None.
+        note_result = self._read_contingent_liability_note(ranges)
+        if note_result[1] is not None:
+            return note_result
+        summary_result = self._read_contingent_liability_summary(ranges)
+        if summary_result[1] is not None:
+            return summary_result
+        return None, None, note_result[2], ""
+
+    def _read_contingent_liability_summary(
+        self,
+        ranges: List[Tuple[int, int]],
+    ) -> Tuple[Optional[int], Optional[float], Optional[bool], str]:
+        """Read the Total row of a "Summary of Contingent Liabilities" table.
+
+        Fails closed (amount ``None``) unless the page carries the summary
+        heading, the Total row's cells align one-for-one with the dated
+        columns printed immediately above the table, and one of those columns
+        is a 31 March (full-year, hence net-worth-consistent) column.  The
+        amount is never summed from constituents: the summary's Total is the
+        issuer's own aggregate, which is why this reader cannot double count.
+        """
+        seen_pages: set = set()
+        for start, end in ranges:
+            for p in range(max(1, start), min(end, self.page_count) + 1):
+                if p in seen_pages:
+                    continue
+                seen_pages.add(p)
+                lines = [l.strip() for l in self.extract_page_text(p).splitlines() if l.strip()]
+                if not any(self._CL_SUMMARY_HEADING.match(line) for line in lines):
+                    continue
+                section = list(lines)
+                for extra in range(p + 1, min(p + 2, self.page_count) + 1):
+                    section.extend(
+                        l.strip() for l in self.extract_page_text(extra).splitlines() if l.strip()
+                    )
+                first_row = next(
+                    (i for i, line in enumerate(section) if self._cl_row_amounts(line)),
+                    None,
+                )
+                if first_row is None:
+                    continue
+                # Column headers are printed as short fragments ("As at 30",
+                # "June, 2026", "As at", "March 31,", "2026"), while prose
+                # above them repeats the same dates inside full sentences.
+                # Only fragment lines are read, so a sentence can never
+                # contribute a column.
+                header_text = "\n".join(
+                    line for line in section[:first_row] if len(line.split()) <= 4
+                )
+                header_dates = self._cl_dates_in(header_text)
+                header_dates = list(dict.fromkeys(header_dates))
+
+                totals: List[Tuple[str, float, int]] = []
+                for line in section:
+                    amounts = self._cl_row_amounts(line)
+                    if amounts is None:
+                        continue
+                    label_match = self._CL_AMOUNT.search(line)
+                    label = line[: label_match.start()] if label_match else line
+                    if not self._CL_TOTAL_LABEL.search(label):
+                        continue
+                    count = len(amounts)
+                    if count < 2 or count != len(header_dates):
+                        # A total whose width does not match the dated
+                        # columns cannot be aligned.  Taking "the last N"
+                        # here would read the June-2026 interim cell under a
+                        # March-2026 heading, so it fails closed instead.
+                        break
+                    columns = header_dates
+                    march = [
+                        (index, year)
+                        for index, (_, month, year) in enumerate(columns)
+                        if month.lower() == "march"
+                    ]
+                    if not march:
+                        break
+                    column, column_year = max(march, key=lambda item: item[1])
+                    totals.append((label.strip(), amounts[column], column_year))
+                if len(totals) != 1:
+                    continue
+                label, amount, column_year = totals[0]
+                quote = f"{' '.join(label.split())} | {amount:,.2f} as at 31 March {column_year}"
+                return p, amount, None, quote
+        return None, None, None, ""
+
+    def _cl_dates_in(self, text: str) -> List[Tuple[str, str, int]]:
+        """Dated column headers, in document order, either date convention.
+
+        ``31 March 2026`` and ``March 31, 2026`` both occur; a summary table
+        may use one and the restated statements the other.
+        """
+        found: List[Tuple[int, Tuple[str, str, int]]] = []
+        spans: List[Tuple[int, int]] = []
+        for match in self._CL_DATE.finditer(text):
+            found.append((match.start(), (match.group(1), match.group(2), int(match.group(3)))))
+            spans.append(match.span())
+        for match in self._CL_DATE_MONTH_FIRST.finditer(text):
+            if any(match.start() < end and start < match.end() for start, end in spans):
+                continue  # the same header read by the other convention
+            found.append((match.start(), (match.group(2), match.group(1), int(match.group(3)))))
+        found.sort(key=lambda item: item[0])
+        return [value for _, value in found]
+
+    def _read_contingent_liability_note(
+        self,
+        ranges: List[Tuple[int, int]],
+    ) -> Tuple[Optional[int], Optional[float], Optional[bool], str]:
+        """The note-anchored reader (behaviour unchanged since 2026-10-20)."""
         seen_pages: set = set()
         for start, end in ranges:
             for p in range(max(1, start), min(end, self.page_count) + 1):
