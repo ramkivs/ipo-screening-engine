@@ -5,7 +5,9 @@
 - **Branch:** `arena/07f3439f-ipo-screening-engine` (working branch; `main` untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`).
 - **Baseline this pass:** `8939b05be00a23d5733163cdb6a280b0578cfd10`.
 - **Scope:** the extraction path that produced a rejected official document and an unresolved `issue.ofs`: Price Band Notice classification, current-issue date extraction, field-conflict handling, the RHP document class, and the OFS resolution chain. Corrections are issuer-independent.
-- **Execution status:** the two focused regression modules were **executed and passed on 2026-10-23** (45 collected / 45 passed / 0 skipped, commit `4b1c67f`) — see **§11.8**, which records the command, the one test-side defect that was fixed, and the checks performed. The **full backend suite (~3 h) was NOT run**, and **no ingestion, evaluation or scored artifact** was produced or modified. Statements in §§1–10 that predate the document remain as written; where they say "not executed", §11.8 supersedes them for these two modules only.
+- **Execution status (2026-10-24, revision 4):** the **wider focused suites** were executed (221 passed / 0 failed / 0 skipped across nine modules) and a **controlled non-production ingestion** was run against the retained RHP. The ingestion is **correctly blocked** on price band and bid lot, but it **also** leaves `issue.ofs` and `issue.close_date` unresolved — a defect in the *upload* extraction path (`sections.py`) that the A30 corrections never reached. It is diagnosed and documented in **§12**, not corrected in this pass. No evaluation was created, no durable state changed. The **full backend suite (~3 h) was still NOT run**.
+- **Execution status (2026-10-23, revision 3):** the two focused regression modules were **executed and passed on 2026-10-23** (45 collected / 45 passed / 0 skipped, commit `4b1c67f`) — see **§11.8**, which records the command, the one test-side defect that was fixed, and the checks performed. The **full backend suite (~3 h) was NOT run**, and **no ingestion, evaluation or scored artifact** was produced or modified. Statements in §§1–10 that predate the document remain as written; where they say "not executed", §11.8 supersedes them for these two modules only.
+- **Revision 4 (2026-10-24):** wider validation and controlled ingestion pass — four failures across the wider suites diagnosed, two narrow production corrections made (unreadable-OCR marker, Draft-RHP class message), one stale test contract updated, three new regression cases; then a controlled non-production ingestion which surfaced the upload-path gap recorded in **§12**.
 - **Revision 3 (2026-10-23):** controlled validation pass — the focused modules were run, one test-side defect corrected, and the behavioural checks A–F executed against the retained artifact (§11.8). No production code was changed in this revision.
 - **Revision 2 (2026-10-23):** the actual Paras RHP was recovered from the evidence branch and verified. §1's "the document is not present" limitation is **superseded**; the document-specific findings are in **§11**, which distinguishes them from the earlier synthetic reproduction. Sections 1–10 are left as written (they record what was known before the document was available) with this pointer.
 
@@ -452,3 +454,101 @@ Run as read-only probes against the retained artifact plus the synthetic cases i
 2. **Price band and bid lot for this filing are genuinely undisclosed.** The RHP states `[●]` at pp. 9 and 11. A separate price band notice or the final Prospectus would be required; the engine now says exactly that instead of "absent".
 3. **No ingestion was run end to end.** The resolution was exercised at the field-resolution layer with the real document as the candidate; the service gate, the `AWAITING_ISSUE_TERMS` payload it would now produce and any evaluation remain unexecuted by instruction.
 4. **Regression execution is partial by design.** The two focused modules are green (§11.8); the full backend suite (~3 h) was not run and no claim is made about it. The ingestion path was not exercised end to end, so "parser tests pass" is not "ingestion validated".
+
+---
+
+## 12. Wider validation and controlled ingestion — 2026-10-24 (revision 4)
+
+**Baseline:** `deb19bab08525a6dd143677c3669d6a6e98ea46f` on `arena/07f3439f-ipo-screening-engine` (`main` untouched at `01ba66c`). **Environment:** CPython 3.11.2, pytest 9.1.1, pypdf 6.20.1, `PYTHONPATH=engine`, interpreter `/home/user/ev/bin/python` (the previous sandbox virtualenv was gone; it was rebuilt from `requirements.txt`).
+
+### 12.1 Evidence, re-verified before the run
+
+sha256 `E0A3187FE18D1C12F88F29170291972714CF15BE7946E8A7F4A7D8C914570E74`, 11,577,075 bytes, 651 pages — unchanged, and unchanged again after the ingestion run.
+
+### 12.2 Wider focused suites — executed
+
+```bash
+cd /home/user/jio-k15
+PYTHONPATH=engine /home/user/ev/bin/python -m pytest -q -p no:cacheprovider \
+  tests/test_paras_evidence_regression.py tests/test_official_rhp_terms_and_dates.py \
+  tests/test_price_band_notice.py tests/test_offer_table_boundaries.py \
+  tests/test_ofs_nil_binding.py tests/test_phase5j_hardening.py \
+  tests/test_official_prospectus_pathway.py tests/test_issue_terms_multisource.py \
+  tests/test_automatic_official_issue_discovery.py
+```
+
+| Run | Collected | Passed | Failed | Skipped | Exit |
+|---|---|---|---|---|---|
+| 1 (baseline) | 219 | 215 | **4** | 0 | 1 |
+| 2 (after corrections) | 221 | **221** | 0 | 0 | 0 |
+
+The PDF-backed module ran with the artifact present at the published hash: its nine cases are **passes, not skips**, and the synthetic cases in `test_official_rhp_terms_and_dates.py` remain distinguishable from them. Coverage by area: price-band-notice parsing and classification (`test_price_band_notice.py`, 20 cases); offer-table boundaries and explicit amounts (`test_offer_table_boundaries.py`); OFS NIL/placeholder binding (`test_ofs_nil_binding.py`); prospectus/RHP pathways (`test_official_prospectus_pathway.py`, `test_official_rhp_terms_and_dates.py`); multi-source resolution and conflict withholding (`test_issue_terms_multisource.py`, `test_phase5j_hardening.py`); automatic official discovery (`test_automatic_official_issue_discovery.py`); the Paras regression modules.
+
+A further **91 cases** across adjacent extraction/resolution modules (`test_extraction.py`, `test_extraction_phase5b.py`, `test_generic_issue_terms_extraction.py`, `test_issue_terms_resolver.py`, `test_jio_rhp_issue_terms.py`, `test_rk_fashion_reconciliation.py`, `test_cross_ipo_issue_term_provenance.py`, `test_issue_terms_runtime_path.py`, `test_official_discovery.py`) were run to bound the blast radius of the two production edits: **91 passed**.
+
+### 12.3 The four failures, and what each was
+
+| # | Failure | Root cause | Correction |
+|---|---|---|---|
+| 1 | `test_automatic_official_issue_discovery.py::test_image_only_official_notice_uses_real_offline_ocr_and_preserves_original_pdf_hash` — `ModuleNotFoundError: PIL` | **environment**, not code: the rebuilt sandbox venv lacked the OCR stack that `requirements.txt` pins | installed `pypdfium2 5.14.0`, `rapidocr 3.10.0`, `onnxruntime 1.24.4`, `pillow`; the case then **passed** against the real offline OCR models. No test or production change. |
+| 2 | `test_offer_table_boundaries.py::test_unreadable_is_not_a_placeholder_or_cash` | **production defect** (introduced with D9/D10): `_AMOUNT_UNKNOWN_MARKER` still contained `UNREADABLE_OCR_LINE`, which the *pipeline itself* emits on low OCR confidence, so a reading failure was reported to the operator as `SOURCE_PLACEHOLDER` — the document was said to print a placeholder it never printed | `UNREADABLE_OCR_LINE` removed from the *source* marker; the amount is still withheld by the intervening-text guard. Two regression cases: the unreadable run reports no placeholder, and it still yields no amount and no unit. |
+| 3 | `test_automatic_official_issue_discovery.py::test_draft_offer_document_is_never_promoted_to_current_rhp_authority` — expected `Draft Red Herring Prospectus cannot be promoted`, got `RHP title or issuer responsibility/offer-table role not established` | **production regression** from the revision-2 rewrite of `parse_official_rhp`: the DRHP guard became a silent `None` role, so a DRHP was refused with the wrong reason. Refusal itself was never lost | DRHP checked explicitly after the role test, and refused with its own message. Two regression cases: the DRHP gets the class-specific message, an unrelated attachment keeps the role message. |
+| 4 | `test_phase5j_hardening.py::test_adversarial_d_conflicting_price_sources` — `DID NOT RAISE` | **stale test contract**: it asserted the pre-A30 behaviour (a conflicting band throws and discards the document). A30 changed that deliberately | test updated to the current contract **without weakening it**: the parse succeeds, the band is `None` at both ends, `CONFLICTING_PRICE_BANDS` is reported, and the conflicting notice still **fails closed at the final-mode evaluation gate** (`EnrichmentValidationError`). The adversarial property it guards — a conflicting band never reaches an evaluation — is unchanged. |
+
+### 12.4 Controlled ingestion — executed, and what it showed
+
+Path: `PresentationService.ingest_document` — the repository's supported upload ingestion (extraction → canonical builder → issue-term resolution → eligibility gate). **Non-production and non-mutating by construction:** `store_root` was pointed at `/tmp/paras-ingest/evaluations` (disposable), the policy directory stayed the read-only repository `config/`, and `IPO_OFFICIAL_DISCOVERY=0` disabled network discovery (egress is blocked in this sandbox anyway). The input was the committed artifact, hash-checked immediately before and after.
+
+```
+ingestion_id : ing-55319ecccdc243e4
+mode         : final        status: BLOCKED        error: AWAITING_ISSUE_TERMS
+evaluation_run: False       persisted: False       duration: 48.8 s
+missing_fields: issue.price_band_low, issue.price_band_high, issue.lot_size,
+                issue.ofs, issue.close_date
+store_root   : /tmp/paras-ingest/evaluations — never created (nothing persisted)
+```
+
+Activity trace: `/tmp/paras-ingest/ingestion-activity/ing-55319ecccdc243e4.json` (27 events, outside the repository).
+
+**What the trace shows (`filing_extraction` → `term_resolution`):**
+
+| Field | Ingestion result | Expected from the RHP | Verdict |
+|---|---|---|---|
+| company / ipo_id | `PARAS HEALTHCARE LIMITED` / `PARAS-HEALTHCARE-LIMITED` | same | ✅ |
+| `open_date` | `2026-10-21` (page 1, quote) | 21 Oct 2026 | ✅ |
+| `close_date` | **not established** | 23 Oct 2026 | ❌ **defect** |
+| `ofs` | **not established** | ₹9,500 million | ❌ **defect** |
+| `fresh_issue` | `5000.0` labelled `INR_LAKHS` | ₹5,000 million | ⚠️ **value read, unit wrong** |
+| `price_band_low/high` | not established | `[●]` placeholder | ✅ correct |
+| `lot_size` | not established | `[●]` placeholder | ✅ correct |
+
+The gate then blocked (`evaluation_eligibility/blocked`, `evaluation/not_run`, `persistence/not_attempted`) and nothing was written. **No evaluation was created or updated, no unrelated record changed, and the evidence artifact's hash is unchanged.**
+
+### 12.5 Why ingestion still fails where the parser succeeds — the upload path
+
+The A30 corrections live in `PriceBandNoticeParser` and `parse_official_rhp`, which the **discovery/resolver** path uses. The **upload** path uses a different, older extractor — `SectionExtractor.extract_cover_and_offer` in `extraction/sections.py` plus `CanonicalInputBuilder`. That path was never part of the A30 change, and it has three independent defects on this document:
+
+1. **Close date not read.** The RHP cover prints `BID/OFFER CLOSES ON# FRIDAY OCTOBER 23, 2026`. The extractor's pattern requires whitespace after `CLOSES ON`, so the footnote marker `#` defeats it. The opening date, which has no footnote marker, is read normally.
+2. **No monetary OFS extraction.** The upload path only ever sets `issue.ofs` from an explicit NIL (0.0) or from derived seller/share data. It has no branch that reads "…an Offer for Sale aggregating up to ₹ 9,500.00 million" at all, so a disclosed OFS is unreachable there regardless of placeholders. This is the **original reported symptom, still live on the ingestion path**.
+3. **Monetary unit not converted.** `issue.fresh_issue` is extracted as `5000.0` with `raw_unit='MILLION'` and stored in a canonical input whose `reporting_unit` is `INR_LAKHS`, with no conversion anywhere in the builder. ₹5,000 million is 50,000 lakh, so the stored figure is **ten times too small**. It is harmless only while the run is blocked; it would mis-scale the offer if the terms were ever completed.
+
+These are **not corrected in this pass**, deliberately. A correct fix touches the shared upload extractor and the builder's unit conversion — code that every issuer's ingestion runs through (`Vishal Nirmiti`, `R.K Fashion`, `Jio`, the fixtures) — and the only adequate validation of that blast radius is the full regression suite, which this pass is forbidden to run. Making an unvalidated cross-issuer change to a monetary path would breach the "preserve existing behaviour for unrelated issuers" and "no broad rewrites" constraints far more seriously than leaving the ingestion gate blocked, which is the safe state. They are recorded here as **required corrections with a named blast radius**, to be done in a pass where the full suite can run.
+
+### 12.6 What the ingestion run does and does **not** establish
+
+* **Establishes:** the upload ingestion path accepts this filing, identifies the issuer, reads the opening date, refuses to invent a price band or bid lot, blocks at `AWAITING_ISSUE_TERMS`, runs no evaluation, and persists nothing.
+* **Does not establish:** that the reported failure is resolved end to end. It is **not** — `issue.ofs` and `issue.close_date` are still unresolved on the ingestion path, for reasons that are now known exactly (§12.5). Parser-level green is not ingestion-level green, and this section exists because the difference turned out to be real.
+* **Trace equivalence:** `ing-42ded42dde7a41b2` remains unavailable, so this run cannot be diffed against it. It reproduces its *documented symptoms* — OFS unresolved on a filing that discloses it, issue dates not resolved — but identity with the historical run cannot be asserted.
+
+### 12.7 Status after this revision
+
+| Claim | State |
+|---|---|
+| Wider focused suites | **GREEN** — 221/221, 0 skipped; 91/91 adjacent modules |
+| Parser-level Paras behaviour (§11.8) | unchanged and green |
+| Ingestion gate | **correctly blocked** — price band and bid lot are genuinely `[●]` |
+| `issue.ofs` / `issue.close_date` at ingestion | **unresolved — defect diagnosed, not corrected** (§12.5) |
+| Evaluation created/updated | **none** — verified: store never created, `persisted: False` |
+| Durable or unrelated state changed | **none** — repository diff is the intended files only |
+| Full regression suite | **NOT RUN** |
+| Engine evaluation-ready for this filing | **No** — required terms unresolved |

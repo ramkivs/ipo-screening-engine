@@ -27,12 +27,18 @@ _SOURCE_PLACEHOLDER = re.compile(r'\[\s*(?:[●•.\-]+)?\s*\]|\bTBD\b', re.I)
 #: of face value of ₹1 each aggregating up to ₹ 9,500.00 million") leaves the
 #: money amount explicitly stated, and treating it as unknown discarded a
 #: disclosed Offer for Sale amount.
-#: Anything that makes the *amount itself* unknown.
+#: A *source* marker that makes the amount itself unknown: the document prints
+#: the money slot as a placeholder, or as ``TBD``.  ``[UNREADABLE_OCR_LINE]`` is
+#: deliberately **not** here: that marker is produced by this pipeline when OCR
+#: confidence is low, so reporting it as ``SOURCE_PLACEHOLDER`` attributes a
+#: reading failure to the issuer's document.  An unreadable run still withholds
+#: the amount (see the intervening-text guard below) -- it just is not called a
+#: placeholder.
 _AMOUNT_UNKNOWN_MARKER = re.compile(
     r'(?:₹|Rs\.?|INR)\s*[\[\(][^\]\)]{0,6}[\]\)]'
     r'|[\[\(][^\]\)]{0,6}[\]\)]\s*(?:lakhs?|millions?|crores?)\b'
     r'|aggregating\s+(?:up\s+)?to\s*[\[\(][^\]\)]{0,6}[\]\)]'
-    r'|\bTBD\b|UNREADABLE_OCR_LINE',
+    r'|\bTBD\b',
     re.I,
 )
 
@@ -344,6 +350,13 @@ def parse_official_rhp(raw, url):
     identity_scope = '\n'.join(t for page, t in pages if page <= 5)
     role = _rhp_role(cover) or _rhp_role(identity_scope)
     if role is None:
+        # A Draft RHP is refused by class, and says so: its terms are
+        # placeholders by construction, which is a different operator problem
+        # from "this attachment is not an RHP at all".
+        if re.search(r'\bDraft\s+Red\s+Herring\s+Prospectus\b', cover + '\n' + identity_scope, re.I):
+            raise ValueError(
+                'Draft Red Herring Prospectus cannot be promoted to current RHP terms'
+            )
         raise ValueError(
             'RHP title or issuer responsibility/offer-table role not established'
         )

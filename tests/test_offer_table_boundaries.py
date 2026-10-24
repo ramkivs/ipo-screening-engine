@@ -116,9 +116,24 @@ def test_face_value_clause_does_not_hide_valid_fresh_aggregate():
 
 
 def test_unreadable_is_not_a_placeholder_or_cash():
+    """A reading failure is not attributed to the issuer's document.
+
+    ``[UNREADABLE_OCR_LINE]`` is produced by this pipeline when OCR confidence
+    is low.  Reporting it as ``SOURCE_PLACEHOLDER`` told the operator the
+    document prints a placeholder, which is a different (and untrue) claim.
+    The amount is still withheld -- see the next test.
+    """
     r = extract('Fresh Issue [UNREADABLE_OCR_LINE] aggregating up to Rs. 240 million')
     assert r.fresh_issue_amount is None
     assert not r.metadata['issue_term_diagnostics']
+
+
+def test_unreadable_run_still_withholds_the_amount_that_follows_it():
+    """Narrowing the placeholder marker did not turn an unreadable run into a value."""
+    r = extract('Fresh Issue [UNREADABLE_OCR_LINE] aggregating up to Rs. 240 million')
+    assert r.fresh_issue_amount is None
+    assert r.fresh_issue_amount_unit is None
+    assert 'fresh_issue' not in (r.metadata.get('issue_term_errors') or {})
 
 
 def test_table_nil_quote_is_original_cell_not_synthetic_heading():

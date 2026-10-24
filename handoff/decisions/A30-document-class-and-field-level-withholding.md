@@ -3,7 +3,7 @@
 - **Decision ID:** A30
 - **Title:** a document is read under its own class, and a conflicting field is withheld rather than rejecting the document
 - **Record type:** **IMPLEMENTATION RECORD — no new policy, no new criterion, no scoring change.** Per `handoff/decisions/CONVENTION.md` rule 4, the approved text below is the correction contract that the investigation was authorised to implement; the analysis and residual risks are Arena's and are recorded, not decided.
-- **Decision status:** **IMPLEMENTED 2026-10-23; FOCUSED REGRESSION EXECUTED AND GREEN 2026-10-23** (45/45 passed, 0 skipped — §5). Full backend suite (~3 h) and end-to-end ingestion remain unexecuted.
+- **Decision status:** **IMPLEMENTED 2026-10-23; FOCUSED AND WIDER REGRESSION EXECUTED AND GREEN 2026-10-24** (45/45 focused; 221/221 wider across nine modules, 0 skipped — §5). A controlled non-production ingestion was then run: it is **correctly blocked** on price band and bid lot, and it exposed a **separate defect in the upload extractor** (`issue.ofs` and `issue.close_date` unreachable there) recorded in §5.3 and left uncorrected by design. Full backend suite (~3 h) still unexecuted.
 - **Decision authority:** RAMKI — 2026-10-23 investigation directive for the Paras Healthcare ingestion failure (general, issuer-independent correction; no hardcoding, no policy change).
 - **Decision date:** 2026-10-23 (Asia/Calcutta).
 - **Repository:** `ramkivs/ipo-screening-engine`
@@ -74,7 +74,22 @@ The first execution produced 44 passed / 1 failed: `test_the_historical_2017_def
 
 The evidence guard was verified in both failure directions on throwaway copies: artifact absent ⇒ 9 skipped (reported as skipped, never as passing); one byte flipped at constant length ⇒ 9 errors at the fixture's hash assertion. The retained artifact's sha256, size (11,577,075 bytes) and page count (651) were re-checked against the published values before the run.
 
-**Not run, and not claimed:** the broader focused command (notice parser, offer-table boundaries, OFS NIL binding, prospectus pathway, multi-source issue terms, automatic discovery) and the full backend suite (`PYTHONPATH=engine python -m pytest -q tests/`, ≈ 3 h). No ingestion and no evaluation.
+### 5.3 Wider validation and controlled ingestion — 2026-10-24
+
+**Wider focused command** (`tests/test_paras_evidence_regression.py`, `test_official_rhp_terms_and_dates.py`, `test_price_band_notice.py`, `test_offer_table_boundaries.py`, `test_ofs_nil_binding.py`, `test_phase5j_hardening.py`, `test_official_prospectus_pathway.py`, `test_issue_terms_multisource.py`, `test_automatic_official_issue_discovery.py`): first run **215 passed / 4 failed**, after correction **221 passed / 0 failed / 0 skipped**. Nine adjacent extraction/resolution modules were run to bound the blast radius of the production edits: **91 passed**.
+
+**Corrections in this revision (two production, both narrow and general):**
+
+* `_AMOUNT_UNKNOWN_MARKER` no longer contains `UNREADABLE_OCR_LINE`. That marker is emitted by this pipeline on low OCR confidence, so reporting it as `SOURCE_PLACEHOLDER` told the operator the issuer's document printed a placeholder. The amount is still withheld; only the false attribution is gone.
+* `parse_official_rhp` refuses a Draft RHP with the class-specific message again (the revision-2 role rewrite had collapsed it into "role not established"). The refusal itself never regressed.
+
+One stale test contract was updated: `test_adversarial_d_conflicting_price_sources` asserted the pre-A30 raise. It now asserts the A30 contract — band withheld at both ends, conflict reported — **and** that the conflicting notice still fails closed at the final-mode evaluation gate, which is the adversarial property it exists to guard. No assertion was weakened, deleted or skipped.
+
+**Controlled ingestion** (`PresentationService.ingest_document`, `store_root=/tmp/...`, `IPO_OFFICIAL_DISCOVERY=0`, committed artifact hash-checked before and after): `ing-55319ecccdc243e4`, **BLOCKED**, `AWAITING_ISSUE_TERMS`, `evaluation_run: False`, `persisted: False`, evaluation store never created. Opening date resolved (`2026-10-21`); price band and bid lot correctly withheld; **`issue.ofs` and `issue.close_date` unresolved**, and `issue.fresh_issue` stored as `5000.0` in a lakh-denominated input although the filing states ₹5,000 million.
+
+**Why:** the upload path does not use `PriceBandNoticeParser` / `parse_official_rhp` at all — it uses `SectionExtractor.extract_cover_and_offer` and `CanonicalInputBuilder`, which A30 never touched. There, (i) a footnote marker after `CLOSES ON#` defeats the close-date pattern, (ii) no branch reads a monetary Offer-for-Sale amount, and (iii) no conversion exists between an extracted `MILLION` and the canonical `INR_LAKHS` reporting unit. **Not corrected in this pass:** the fix spans shared code every issuer's ingestion runs through, and its blast radius can only be validated by the full suite, which this pass was forbidden to run. Left blocked, which is safe; recorded as required work with a named blast radius.
+
+**Still not run, and not claimed:** the full backend suite (`PYTHONPATH=engine python -m pytest -q tests/`, ≈ 3 h); any evaluation; any production ingestion. **Parser-level green is not ingestion-level green** — §12.5 of the investigation report says exactly where the two part company.
 
 ## 6. Residual risks and open items
 

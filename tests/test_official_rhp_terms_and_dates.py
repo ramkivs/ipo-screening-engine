@@ -272,12 +272,29 @@ def test_general_information_document_is_not_an_rhp():
 
 
 def test_draft_red_herring_prospectus_is_not_promoted():
+    """A DRHP is refused *by class*, and the message says which class.
+
+    Refusing it as "role not established" was true but unhelpful: a DRHP's
+    terms are placeholders by construction, which is a different operator
+    problem from "this attachment is not an RHP at all".  The refusal itself
+    is unchanged -- no field is read from a draft.
+    """
     text = (
         "Draft Red Herring Prospectus\nDated: October 20, 2026\nACME HEALTHCARE LIMITED\n"
         "CIN: U85110HR1987PLC035823\n"
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Draft Red Herring Prospectus cannot be promoted"):
         parse_official_rhp(text.encode(), "https://nseindia.com/x/DRHP.pdf")
+
+
+def test_a_non_rhp_attachment_is_refused_for_role_not_as_a_draft():
+    """The draft message is specific: an unrelated attachment keeps the role error."""
+    with pytest.raises(ValueError, match="role not established"):
+        parse_official_rhp(
+            b"Some unrelated exchange circular\nACME HEALTHCARE LIMITED\n"
+            b"CIN: U85110HR1987PLC035823\n",
+            "https://nseindia.com/x/circular.pdf",
+        )
 
 
 def test_rhp_without_identity_is_not_accepted():
