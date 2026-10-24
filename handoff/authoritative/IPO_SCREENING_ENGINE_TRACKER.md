@@ -1588,3 +1588,33 @@ Two separate workstreams this pass. **No evaluation created, updated or scored; 
 - **Capability needed to finish live:** egress to `*.bseindia.com` / `nseindia.com` / `sebi.gov.in`, then `IPO_OFFICIAL_HISTORICAL_LISTINGS="https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P"` — the filing supplies the window, the archive row binds by issue number 8048, and the issue page supplies 660.00 / 693.00 / lot 21. No code change required.
 
 - **Disposition: TRANSPORT BLOCKED AND PROVEN; CLOSED-ISSUE EVIDENCE NOW ADMISSIBLE ONLY BY IDENTITY BINDING (A31); ALLOW-LIST WIDENING REVERTED AND REFERRED TO RAMKI; 589 FOCUSED TESTS GREEN; GATE CLOSED; NO EVALUATION.**
+
+## Paras — configuration-to-runtime wiring + operational handoff — 2026-10-24 (revision 11)
+
+**No evaluation created, updated, scored or persisted; no durable record written; PR #7 open; `main` untouched at `01ba66c`. Production code changed this pass, so the full suite was re-run in this pass.**
+
+### Egress re-checked (still closed)
+- `curl` to the BSE historical listing, the BSE public-issue API and the price-band advertisement: `http=000`, `(35) SSL_ERROR_SYSCALL` in all three. Engine transport: `URLError: TLS/SSL connection has been closed (EOF)`. Agent proxy on the advertisement: **HTTP 500** (fourth attempt across two passes, three routes).
+- Classified **transport failure**; not retried again without a change in conditions. Never `NOT_FOUND`, never `UNPUBLISHED`, never evidence that the document does not exist.
+
+### Wiring trace and the two gaps closed
+- **Verified chain:** `create_app()` → `PresentationService` (no injected resolver) → `build_resolver_from_env()` → `IPO_OFFICIAL_HISTORICAL_LISTINGS` → `OfficialDiscoveryProvider(historical_listing_urls=…)` → `_search_historical_listing` → `bse_historical_issue_records` → identity binding → linked issue page → parser → resolver → required-term gate → ingestion. Every link exercised.
+- **Gap 1 — the chain was unproven.** New integration test builds the service exactly as `create_app` does and asserts the configured archive reaches the provider; and a run of the retained 651-page RHP through `ingest_document` with a recording resolver shows the filing's own window (`2026-10-21`..`2026-10-23`) and exactly the three pricing fields arriving at the resolver, then `AWAITING_ISSUE_TERMS` with no evaluation written. The identity rule is unusable without that window, so this is now guaranteed rather than assumed.
+- **Gap 2 — misconfiguration looked like an outage.** A plain-HTTP entry, non-official host or IP literal in `IPO_OFFICIAL_HISTORICAL_LISTINGS` now registers a configuration-diagnostic provider (variable, entry position, reason; the value is never echoed). Usable entries still reach the provider, and a bad entry never disables discovery.
+
+### Tests
+- New `tests/test_historical_listing_wiring.py` — **14 passed** (env→provider, blank/extra entries, three unusable-entry classes, discovery-disabled, service construction, ingestion context delivery, evidence-backed resolution from the retained capture, foreign-issuer exclusion, prior-offering exclusion).
+- Identity + wiring + issue-page modules: **74 passed**.
+- **Full backend suite on final code: 1846 collected / 1846 passed / 0 failed / 0 skipped**, exit 0, 21 m 04 s (1832 previous + 14 new). No assertion weakened, skipped or removed.
+
+### Operational handoff (report §18.4)
+Commands, the only environment variable required, nine success criteria, and a failure-signature table (`[TRANSPORT]`, `IDENTITY_UNBOUND`, `STALE_OR_DIFFERENT_ISSUE`, `IDENTITY_CONFLICT`/`IDENTITY_INCOMPLETE`, `UNPUBLISHED`) so an egress-capable host cannot misread a transport failure as non-publication. Ingestion past the gate would create an evaluation and is explicitly not authorised.
+
+### Status (unchanged where it must be)
+- Frozen-core pin: **VERIFIED — READY FOR RAMKI RATIFICATION** (not revisited, not ratified).
+- Official evidence: **retrieval blocked at transport** here; evidence retained and admissible by identity binding (A31).
+- `price_band_low` / `price_band_high` / `lot_size`: **UNRESOLVED** — nothing entered any configuration, canonical record or store.
+- Required-term gate: **CLOSED** (verified end to end). Evaluation readiness: **NOT ESTABLISHED**. Evaluation execution: **NOT RUN**.
+- `listing.bseindia.com` configured-URL allow-list: **untouched and still RAMKI's decision** (A31 §5).
+
+- **Disposition: WIRING PROVEN AND HARDENED; EGRESS STILL BLOCKED (PROVEN, FOUR ATTEMPTS); FULL SUITE 1846/1846 GREEN; OPERATIONAL HANDOFF COMPLETE; GATE CLOSED; NO EVALUATION.**

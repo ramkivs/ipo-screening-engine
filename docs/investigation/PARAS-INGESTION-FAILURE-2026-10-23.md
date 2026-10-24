@@ -1071,3 +1071,126 @@ PYTHONPATH=engine python -m pytest -q tests/   # or a normal ingestion of the re
 ```
 
 The filing supplies the expected window (`2026-10-21`..`2026-10-23`), the historical row binds to it by issue number `8048`, and the issue page supplies `660.00` / `693.00` / lot `21`. Until then the gate stays closed and nothing is inferred from the RHP's `[●]`.
+
+---
+
+## 18. Configuration-to-runtime trace, wiring completion and the operational handoff — 2026-10-24 (revision 9)
+
+Baseline `be531fc` → this pass's commit. Same environment as §17.
+
+### 18.1 Egress re-checked (and still closed)
+
+Re-tested at the start of this pass rather than assumed:
+
+```
+curl https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P          → http=000  (35) SSL_ERROR_SYSCALL
+curl https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue_par_updated/w?flag=1 → http=000  (35)
+curl https://listing.bseindia.com/Download/8888888/PreAnchor/PBA_2026101518…pdf   → http=000  (35)
+engine _default_http_fetch(...)                                                   → URLError: TLS/SSL connection has been closed (EOF)
+```
+
+The agent-side retrieval proxy was also re-tried on the price-band advertisement (the one document class still unread): **HTTP 500**. Four independent attempts across two passes, three different routes, no change in conditions — the operation is not retried again blindly. **Transport failure, classified as such; not `NOT_FOUND`, not `UNPUBLISHED`, and not evidence that the advertisement does not exist.**
+
+### 18.2 The wiring trace, layer by layer
+
+| Step | Where | Verified |
+|---|---|---|
+| Configuration → provider | `build_resolver_from_env()` reads `IPO_OFFICIAL_HISTORICAL_LISTINGS` and builds `OfficialDiscoveryProvider(historical_listing_urls=…)` | ✅ test + live call |
+| Provider construction in the **application** | `create_app()` → `PresentationService(cfg)` with **no resolver injected** → `build_resolver_from_env()` (`service.py:161-166`) | ✅ asserted by constructing the service exactly as `create_app` does |
+| Dispatcher | `IssueTermsResolver.resolve` → `_provider_find` inspects the provider signature and passes `issue_context` only where declared | ✅ |
+| Retrieval | same transport, allow-list and TLS rules as every other official source | ✅ |
+| Historical discovery | `_search_historical_listing` → `bse_historical_issue_records` | ✅ |
+| Identity binding | `issue_identity.check_issue_identity` (A31) | ✅ 35 cases |
+| Linked issue page | `_from_issue_page` on the bound record's disclosure URL | ✅ |
+| Field parsing | `ExchangeIssuePageParser` (unchanged) | ✅ |
+| Resolver / gate | `issue_term_fields.resolve_fields`, `REQUIRED_ISSUE_TERMS` | ✅ |
+| Ingestion | `PresentationService.ingest_document` → `AWAITING_ISSUE_TERMS` when unresolved | ✅ real filing |
+
+**The gap this pass closed.** Everything above was individually proven in §17, but nothing proved the *chain*: that the application an operator runs actually builds the provider with the configured archive, and that the ingest path actually delivers the filing's own bid window — the one input identity binding cannot work without — to that provider. Both are now asserted by `tests/test_historical_listing_wiring.py`, including a run of the real 651-page RHP through `ingest_document` where the resolver records what it received:
+
+```
+company_name  : PARAS HEALTHCARE LIMITED
+missing_fields: ['price_band_low', 'price_band_high', 'lot_size']
+issue_context : open_date '2026-10-21', close_date '2026-10-23'  → binds_window True
+outcome       : AWAITING_ISSUE_TERMS (transport offline by construction), no evaluation, no store
+```
+
+**A second gap closed: configuration errors are now visible.** An unusable `IPO_OFFICIAL_HISTORICAL_LISTINGS` entry (plain HTTP, a non-official host, an IP literal) previously surfaced only as a per-ingestion note, so a typo produced an identical "unavailable" verdict to an unreachable network on every run. `_historical_listing_urls_from_env()` now validates each entry at build time and registers a `ConfigurationDiagnosticProvider` naming the variable, the entry's position and the reason — without echoing the value. Usable entries still reach the provider; a broken entry never disables discovery itself.
+
+### 18.3 What is *not* claimed
+
+- **No live official-source retrieval occurred in this environment.** Every retrieval test in this repository is synthetic or evidence-backed; the transport is injected.
+- **No term was resolved by the engine.** `660.00` / `693.00` / `21` appear only as investigation evidence and as test input.
+- **The `listing.bseindia.com` allow-list question remains open** and untouched (A31 §5). The route that works — discovery following the exchange's own link, §17.3 — needed no such change.
+
+### 18.4 Operational handoff — exactly what an egress-capable host runs
+
+**Prerequisites:** this repository at the published tip; `python -m venv` from `requirements.txt`; outbound HTTPS to `*.bseindia.com`, `*.nseindia.com`, `*.sebi.gov.in`.
+
+```bash
+cd <repo>
+python -m venv .venv && .venv/bin/pip install -r requirements.txt
+export PYTHONPATH=engine
+
+# 1. Prove egress BEFORE interpreting any UNAVAILABLE verdict.
+.venv/bin/python - <<'EOF'
+from ipo_screening.issue_terms import _default_http_fetch
+body = _default_http_fetch("https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P", 30)
+print("egress OK, bytes:", len(body))
+EOF
+#    Expect: "egress OK, bytes: <n>".  Any URLError here means the host is still
+#    blocked and nothing below can be interpreted.
+
+# 2. Name the exchange's closed-issue archive (the only configuration needed).
+export IPO_OFFICIAL_HISTORICAL_LISTINGS="https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P"
+
+# 3. Resolve through the real runtime, with the filing's own issue window.
+.venv/bin/python - <<'EOF'
+from ipo_screening.issue_terms import build_resolver_from_env
+outcome = build_resolver_from_env().resolve(
+    company_name="PARAS HEALTHCARE LIMITED",
+    ipo_id="PARAS-HEALTHCARE-LIMITED",
+    missing_fields=["price_band_low", "price_band_high", "lot_size"],
+    issue_context={"open_date": "2026-10-21", "close_date": "2026-10-23"})
+print(outcome.status, outcome.resolved_fields, outcome.unresolved_fields)
+for f in ("price_band_low", "price_band_high", "lot_size"):
+    c = outcome.field_diagnostics[f]["candidates"]
+    print(f, c[0]["value"], c[0]["uri"], c[0]["verification"])
+EOF
+```
+
+**Success criteria — all of them, or it did not succeed:**
+
+| # | Observable | Expected |
+|---|---|---|
+| 1 | step 1 | prints `egress OK, bytes: <n>` |
+| 2 | `outcome.status` | `RESOLVED` |
+| 3 | `resolved_fields` | `['price_band_low', 'price_band_high', 'lot_size']` |
+| 4 | values | `660.0`, `693.0`, `21.0` |
+| 5 | `uri` per field | the BSE issue page or its linked advertisement, never a third-party host |
+| 6 | `verification` | `VERIFIED` for each |
+| 7 | `outcome.conflicts` | empty |
+| 8 | `outcome.provider_reports[].sources` | one attempt with `classification="historical"`, and a note naming the bound issue number `8048` |
+| 9 | optional, ingestion | a normal `ingest_document(..., mode="final")` of the retained RHP proceeds past `AWAITING_ISSUE_TERMS` — **that step would create an evaluation and is NOT authorised here** |
+
+**Failure signatures, and what each means** — so a failure is never misread as absence:
+
+| Symptom | Meaning | Action |
+|---|---|---|
+| `[TRANSPORT]` in the note | the host was never reached | fix egress; nothing is concluded about publication |
+| `IDENTITY_UNBOUND` | no expected window reached the resolver | check the filing's own `issue.open_date`/`issue.close_date` |
+| `STALE_OR_DIFFERENT_ISSUE` | the archive row is a different offering | correct the expected window or the archive URL |
+| `IDENTITY_CONFLICT` / `IDENTITY_INCOMPLETE` | the row contradicts itself or lacks `IPONo` | a data problem at the exchange; report, do not force |
+| `UNPUBLISHED` | a **live** listing was genuinely read and carried no issuer document | nothing else to do; the terms are not published |
+
+### 18.5 Validation on the final code
+
+| Scope | Result |
+|---|---|
+| New wiring/integration module (`tests/test_historical_listing_wiring.py`) | **14 passed** |
+| Identity + wiring + issue-page/closed-archive modules | **74 passed** |
+| **Full backend suite** (production code changed this pass) | **1846 collected — 1846 passed / 0 failed / 0 skipped**, exit 0 |
+
+### 18.6 Status, unchanged where it must be
+
+Frozen-core pin: **VERIFIED — READY FOR RAMKI RATIFICATION** (not revisited, not ratified). Official evidence retrieval: **blocked at transport** in this environment. `price_band_low` / `price_band_high` / `lot_size`: **UNRESOLVED**. Required-term gate: **CLOSED**, verified end to end. Evaluation: **NOT RUN**, none created, updated or persisted. Evaluation readiness: **NOT ESTABLISHED**.

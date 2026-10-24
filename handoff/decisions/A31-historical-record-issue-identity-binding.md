@@ -45,6 +45,17 @@ The model lives in `engine/ipo_screening/issue_identity.py` and is issuer-indepe
 - It does **not** resolve any term for any issuer. No value from the retained capture entered any configuration, canonical record, snapshot or evaluation.
 - It does **not** create, update or authorize an evaluation.
 
+## 4a. Runtime wiring (added 2026-10-24)
+
+The rule is only useful if the application actually reaches it, so the chain is asserted end to end in `tests/test_historical_listing_wiring.py`:
+
+* `create_app()` → `PresentationService` → `build_resolver_from_env()` → `OfficialDiscoveryProvider(historical_listing_urls=…)` is the real construction path (`presentation/service.py:161-166`), and the test builds the service the same way.
+* The resolver forwards the canonical `issue` mapping to providers that declare it, so the expected window reaches the archive search. Proven by ingesting the retained RHP through `ingest_document` and recording what the resolver received: `2026-10-21`..`2026-10-23`, exactly the three pricing fields missing, then `AWAITING_ISSUE_TERMS` with no evaluation written.
+* Misconfiguration now surfaces as a configuration-diagnostic provider (variable, entry position, reason — never the value) rather than as a per-ingestion note that looks identical to a network outage.
+* The archive search itself remains opt-in and off by default: an unconfigured deployment behaves exactly as it did before this record.
+
+Operational runbook for a host with official-source egress: report §18.4 (commands, success criteria, failure signatures).
+
 ## 5. Open item submitted to RAMKI (not decided here)
 
 **Source allow-list for operator-configured notice URLs.** The BSE price-band advertisement for this issue lives on `listing.bseindia.com`, which is in `DISCOVERY_HOSTS` but not in `OFFICIAL_HOSTS`. A configured `IPO_PRICE_BAND_NOTICE_URLS` entry pointing at that document is therefore **REJECTED** before retrieval ("host is not an HTTPS official source host"). This was found by tracing the configured-URL path end to end, not by inference.

@@ -151,6 +151,17 @@ See report §17 and decision record **A31**.
 * **Not done, deliberately:** allowing `listing.bseindia.com` as an operator-configured notice URL. That reverses a documented scoping with its own test; the change was made, found to contradict that test, and fully reverted. It is recorded for RAMKI in A31 §5.
 * **Gate unchanged.** Controlled non-production ingestion re-run on the real filing (disposable store on `/tmp`, artifact hash-checked): `AWAITING_ISSUE_TERMS` on exactly the three pricing terms, `evaluation_run: False`, `persisted: False`, no evaluation store. With the historical listing configured the archive search is genuinely attempted and recorded as `[TRANSPORT]`; the outcome does not change.
 
+### 5.9 Configuration-to-runtime wiring, verified (2026-10-24)
+
+Report §18; decision record A31.
+
+* **The chain was traced, not assumed.** `create_app()` builds `PresentationService` with no injected resolver, so the service constructs `build_resolver_from_env()`; that reads `IPO_OFFICIAL_HISTORICAL_LISTINGS` and hands the URLs to `OfficialDiscoveryProvider`. A new integration test constructs the service exactly that way and asserts the provider carries the configured archive.
+* **The input identity binding depends on is really delivered.** Running the retained 651-page RHP through `ingest_document` with a recording resolver shows the service passing `issue_context` `{open_date: 2026-10-21, close_date: 2026-10-23}` — the filing's own window — with exactly the three missing fields, and then failing closed as `AWAITING_ISSUE_TERMS` with no evaluation written.
+* **Configuration errors are now diagnosable.** A plain-HTTP entry, a non-official host or an IP literal in `IPO_OFFICIAL_HISTORICAL_LISTINGS` registers a configuration-diagnostic provider naming the variable, position and reason (value never echoed) instead of silently producing the same "unavailable" verdict as a network outage. Usable entries still reach the provider.
+* **Transport re-checked and still blocked**: three `curl` attempts and the engine transport all fail at TLS; the agent proxy returns HTTP 500 on the price-band advertisement (fourth attempt across two passes). Recorded as `[TRANSPORT]`, never as absence.
+* **Validation:** new wiring/integration module 14 passed; identity + wiring + issue-page modules 74 passed; **full backend suite 1846 collected / 1846 passed / 0 failed / 0 skipped**, exit 0 (21 m 04 s).
+* **Operational handoff** (report §18.4) gives the exact commands, the nine success criteria and a failure-signature table, so an egress-capable host cannot mistake a transport failure for non-publication.
+
 **Still not run, and not claimed:** the full backend suite (`PYTHONPATH=engine python -m pytest -q tests/`, ≈ 3 h); any evaluation; any production ingestion. **Parser-level green is not ingestion-level green** — §12.5 of the investigation report says exactly where the two part company.
 
 ## 6. Residual risks and open items

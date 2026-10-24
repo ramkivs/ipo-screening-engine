@@ -294,7 +294,11 @@ class ListingAttempt:
     the listing was genuinely read.
     """
     url: str
-    classification: str  # ok | empty | homepage | shell | failed
+    # ok | empty | homepage | shell | failed
+    # ``historical`` marks a closed-issue archive: it can confirm an
+    # offering that has already closed, so it is never counted as a
+    # searched listing for a NOT_FOUND/UNPUBLISHED conclusion.
+    classification: str
     searched: bool = False
     issue_entries: int = 0
     detail: str = ""
@@ -1491,6 +1495,43 @@ def _url_map_from_env(var_name: str) -> tuple[Dict[str, str], Optional[str]]:
     return mapping, None
 
 
+def _historical_listing_urls_from_env() -> tuple[List[str], List[str]]:
+    """Read ``IPO_OFFICIAL_HISTORICAL_LISTINGS``; return (usable, problems).
+
+    An entry is usable only when it is an HTTPS URL on an official host the
+    discovery pathway is already allowed to read.  Anything else is
+    reported as a configuration problem instead of being handed to the
+    provider, where it would surface only as a per-ingestion note -- the
+    operator would see "unavailable" on every run without learning that
+    the value itself is wrong.
+
+    The problem text never echoes the configured value: it names the
+    variable, the entry's position and the reason.
+    """
+    raw = os.getenv("IPO_OFFICIAL_HISTORICAL_LISTINGS", "").strip()
+    if not raw:
+        return [], []
+    usable: List[str] = []
+    problems: List[str] = []
+    for position, entry in enumerate(raw.split(","), start=1):
+        url = entry.strip()
+        if not url:
+            continue
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        if parsed.scheme != "https":
+            problems.append(
+                f"IPO_OFFICIAL_HISTORICAL_LISTINGS entry {position} is not an HTTPS URL; "
+                "closed-issue listings must be retrieved over HTTPS")
+        elif host not in DISCOVERY_HOSTS:
+            problems.append(
+                f"IPO_OFFICIAL_HISTORICAL_LISTINGS entry {position} names host {host or '?'}, "
+                "which is not an allowed official source host")
+        else:
+            usable.append(url)
+    return usable, problems
+
+
 def build_resolver_from_env() -> IssueTermsResolver:
     """Default runtime resolver wired from environment configuration.
 
@@ -1530,9 +1571,10 @@ def build_resolver_from_env() -> IssueTermsResolver:
         # archives to search (comma-separated, allow-listed hosts only).
         # Unset means none, which is the behaviour every existing
         # deployment already has.
-        historical = [u.strip() for u in
-                      os.getenv("IPO_OFFICIAL_HISTORICAL_LISTINGS", "").split(",") if u.strip()]
+        historical, historical_problems = _historical_listing_urls_from_env()
         providers.append(OfficialDiscoveryProvider(historical_listing_urls=historical))
+        for problem in historical_problems:
+            providers.append(ConfigurationDiagnosticProvider("official-historical-listing", problem))
     from .issue_platforms import PublicPlatformProvider, PLATFORM_LISTINGS
     enabled = {x.strip().lower() for x in os.getenv("IPO_TERM_PLATFORM_PROVIDERS", "").split(",") if x.strip()}
     for name in sorted(enabled):
