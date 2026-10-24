@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import copy
+import inspect
 import math
 import http.cookiejar
 import json
@@ -593,6 +594,28 @@ class HttpProspectusProvider:
         )
 
 
+def _failure_class(exc: BaseException) -> str:
+    """Distinguish a transport failure from a content/parsing one.
+
+    The distinction is operational: a transport failure means the source
+    was not read at all and nothing may be concluded from its silence,
+    while a content failure means the source was read and refused.  Both
+    are reported as UNAVAILABLE by the provider -- neither is NOT_FOUND --
+    but an operator repairing the network needs to see which is which.
+    """
+    import socket
+    import ssl
+    from urllib.error import HTTPError, URLError
+
+    # HTTPError is a URLError *and* an OSError, so it is checked first: the
+    # server did answer, just not with the document.
+    if isinstance(exc, HTTPError):
+        return "HTTP"
+    if isinstance(exc, (URLError, ssl.SSLError, socket.timeout, TimeoutError, OSError)):
+        return "TRANSPORT"
+    return "CONTENT"
+
+
 class OfficialDiscoveryProvider:
     """Discovers official issue-term documents without per-issuer config.
 
@@ -780,10 +803,16 @@ class OfficialDiscoveryProvider:
         listing_urls: Optional[Sequence[str]] = None,
         max_candidates: int = 6,
         timeout_seconds: float = 60.0,
+        historical_listing_urls: Optional[Sequence[str]] = None,
     ):
         self.allowed_hosts = allowed_hosts if allowed_hosts is not None else set(DISCOVERY_HOSTS)
         self._requires_https = allowed_hosts is None
         self.listing_urls = list(listing_urls) if listing_urls is not None else list(self.LISTING_URLS)
+        # Closed-issue listings are OFF by default.  They are searched only
+        # when an operator configures them, and even then a record is
+        # admitted only when its own identity is bound to this offering
+        # (see ``_search_historical_listing`` and ``issue_identity``).
+        self.historical_listing_urls = list(historical_listing_urls or ())
         self.max_candidates = max_candidates
         self.timeout_seconds = timeout_seconds
         self._fetcher = fetcher
@@ -858,7 +887,8 @@ class OfficialDiscoveryProvider:
         try:
             raw = self._fetch(url, referer=referer)
         except Exception as exc:
-            return None, f"{url}: issue-page retrieval failed ({type(exc).__name__}: {exc})"
+            return None, (f"{url}: issue-page retrieval failed [{_failure_class(exc)}] "
+                          f"({type(exc).__name__}: {exc})")
         try:
             if urlparse(url).path == '/api/ipo-detail':
                 from .official_issue_sources import parse_nse_detail
@@ -899,8 +929,17 @@ class OfficialDiscoveryProvider:
             if (parsed.hostname not in self.allowed_hosts or
                     (self._requires_https and parsed.scheme != "https")):
                 continue
+            # The exchange publishes its own documents under short archival
+            # names: BSE's price-band advertisement is ``PBA_<yyyymmdd….pdf>``,
+            # which no "price band" phrase in the served anchor text is
+            # guaranteed to echo (the rendered link text is often just
+            # "Click Here").  Recognising the exchange's own document-name
+            # stem is a naming rule, not a widened source list: the URL must
+            # still be on an allow-listed official host and the document is
+            # still issuer-matched and class-verified after retrieval.
             if (parsed.path.lower().endswith((".pdf", ".zip")) and
-                    re.search(r"price.?band|prospectus|rhp|drhp|gid|offer.document|ratios|basis.of.issue.price", label + " " + url, re.I)):
+                    re.search(r"price.?band|prospectus|rhp|drhp|gid|offer.document|ratios|"
+                              r"basis.of.issue.price|(?:^|[/_-])pba[/_-]?\d", label + " " + url, re.I)):
                 if url not in eligible:
                     eligible.append(url)
         for url in eligible[:self.max_candidates]:
@@ -948,6 +987,70 @@ class OfficialDiscoveryProvider:
                 reasons.append(f"{url}: official attachment retrieval/decoding failed ({type(exc).__name__}: {exc})")
         return found, reasons
 
+    def _search_historical_listing(
+        self,
+        listing_url: str,
+        company_name: str,
+        ipo_id: str,
+        issue_context: Optional[Mapping[str, Any]],
+    ) -> tuple[List[NoticeCandidate], int, List[str]]:
+        """Search one configured closed-issue listing for an identity-bound record.
+
+        Returns (candidates, matched_record_count, notes).
+
+        The listing is read with the same transport, allow-list and
+        retrieval-time rules as any other official source, but a record is
+        admitted only when ``bse_historical_issue_records`` binds it to the
+        expected offering (exact issuer, exact bid window, exchange issue
+        number, internally consistent identifiers).  Without an expected
+        window from the filing every record is withheld as
+        IDENTITY_UNBOUND: a closed record is never usable on a name match.
+
+        Silence here is not evidence of absence.  An issue that is still
+        forthcoming cannot appear in a closed-issue archive, so this source
+        never contributes a NOT_FOUND/UNPUBLISHED conclusion.
+        """
+        from .issue_identity import IssueIdentity
+        from .official_issue_sources import bse_historical_issue_records
+
+        notes: List[str] = []
+        host = (urlparse(listing_url).hostname or "").lower()
+        if host not in self.allowed_hosts or (self._requires_https and urlparse(listing_url).scheme != "https"):
+            return [], 0, [f"{listing_url}: host is not an HTTPS official source host"]
+        try:
+            raw = self._fetch(listing_url)
+        except Exception as exc:
+            return [], 0, [f"{listing_url}: closed-issue listing retrieval failed "
+                           f"[{_failure_class(exc)}] ({type(exc).__name__}: {exc})"]
+        if not raw.lstrip().startswith(b"<"):
+            return [], 0, [f"{listing_url}: closed-issue listing returned a non-HTML response"]
+
+        expected = IssueIdentity.from_issue_context(issue_context)
+        try:
+            records, rejections = bse_historical_issue_records(raw, company_name, expected)
+        except Exception as exc:
+            return [], 0, [f"{listing_url}: closed-issue listing could not be read "
+                           f"({type(exc).__name__}: {exc})"]
+        notes.extend(rejections)
+
+        candidates: List[NoticeCandidate] = []
+        for page_url, result in records[: self.max_candidates]:
+            candidates.append(NoticeCandidate(
+                result, self.name, page_url,
+                _utcnow().isoformat().replace("+00:00", "Z"), raw_bytes=raw, verified=True))
+            page_candidate, reason = self._from_issue_page(page_url, company_name,
+                                                           referer=listing_url)
+            if page_candidate is not None:
+                candidates.append(page_candidate)
+                attachments, reasons = self._issue_attachments(page_candidate, company_name, ipo_id)
+                candidates.extend(attachments)
+                notes.extend(reasons)
+            else:
+                notes.append(reason)
+        if records:
+            notes.append(f"{listing_url}: {len(records)} closed-issue record(s) bound to this offering")
+        return candidates, len(records), notes
+
     @staticmethod
     def _merge_candidates(candidates: List[NoticeCandidate]) -> NoticeCandidate:
         """Fill missing pricing fields of the primary candidate from
@@ -964,7 +1067,8 @@ class OfficialDiscoveryProvider:
                     setattr(primary.result, name, getattr(other.result, name, None))
         return primary
 
-    def find(self, company_name: str, ipo_id: str) -> tuple[Optional[NoticeCandidate], ProviderReport]:
+    def find(self, company_name: str, ipo_id: str,
+             issue_context: Optional[Mapping[str, Any]] = None) -> tuple[Optional[NoticeCandidate], ProviderReport]:
         reached = False
         notes: List[str] = []
         attempts: List[ListingAttempt] = []
@@ -979,7 +1083,8 @@ class OfficialDiscoveryProvider:
                 from .official_issue_sources import BSE_LISTING, BSE_PUBLIC_LISTING
                 raw = self._fetch(listing_url, referer=BSE_PUBLIC_LISTING if listing_url == BSE_LISTING else None)
             except Exception as exc:
-                detail = f"listing retrieval failed ({type(exc).__name__}: {exc})"
+                detail = (f"listing retrieval failed [{_failure_class(exc)}] "
+                          f"({type(exc).__name__}: {exc})")
                 note(f"{listing_url}: {detail}")
                 attempts.append(ListingAttempt(listing_url, "failed", False, 0, detail))
                 continue
@@ -1101,6 +1206,17 @@ class OfficialDiscoveryProvider:
                 all_candidates.extend(collected)
             else:
                 attempt.detail += "; no issuer-matched official document found in it"
+        for historical_url in self.historical_listing_urls:
+            historical, matched, historical_notes = self._search_historical_listing(
+                historical_url, company_name, ipo_id, issue_context)
+            for text in historical_notes:
+                note(text)
+            attempts.append(ListingAttempt(
+                historical_url, "historical", False, matched,
+                "closed-issue listing read; it can only confirm an offering that has already "
+                "closed, so it is never evidence of non-publication"))
+            all_candidates.extend(historical)
+
         if all_candidates:
             merged = self._merge_candidates(all_candidates)
             return merged, ProviderReport(self.name, "FOUND", "examined all configured listings; issuer-matched documents found",
@@ -1234,6 +1350,28 @@ class NoticeSnapshotCache:
         )
 
 
+def _provider_find(provider, company_name: str, ipo_id: str,
+                   issue_context: Optional[Mapping[str, Any]]):
+    """Call a provider's ``find``, passing the issue context when it accepts it.
+
+    Providers are independent and most need only the issuer name.  The
+    resolver does not require every provider to grow a parameter: it
+    inspects the signature once and passes ``issue_context`` only where the
+    provider declares it.  A provider that has not opted in keeps exactly
+    the behaviour it had.
+    """
+    find = provider.find
+    try:
+        parameters = inspect.signature(find).parameters
+    except (TypeError, ValueError):
+        return find(company_name, ipo_id)
+    accepts = "issue_context" in parameters or any(
+        p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters.values())
+    if accepts:
+        return find(company_name, ipo_id, issue_context=issue_context)
+    return find(company_name, ipo_id)
+
+
 class IssueTermsResolver:
     """Coordinates providers, caching, identity and conflict checks."""
 
@@ -1268,7 +1406,7 @@ class IssueTermsResolver:
         # A cache is evidence, not permission to skip remaining configured sources.
         for provider in self.providers:
             try:
-                candidate, report = provider.find(company_name, ipo_id)
+                candidate, report = _provider_find(provider, company_name, ipo_id, issue_context)
             except Exception as exc:
                 candidate = None
                 report = ProviderReport(getattr(provider, "name", type(provider).__name__),
@@ -1366,6 +1504,10 @@ def build_resolver_from_env() -> IssueTermsResolver:
     - ``IPO_PRICE_BAND_NOTICE_DIR``: operator-retained notice directories
       (os.pathsep-separated). Retained copies are searched and reported,
       but classified UNVERIFIED and never used to resolve terms.
+    - ``IPO_OFFICIAL_HISTORICAL_LISTINGS``: comma-separated closed-issue
+      listing URLs (allow-listed official hosts).  Off unless configured,
+      and even then a closed record is admitted only when its own issue
+      identity is bound to the offering under examination.
     - ``IPO_ISSUE_TERMS_CACHE_DIR`` / ``IPO_ISSUE_TERMS_CACHE_TTL_HOURS``.
 
     No notice document is shipped with the application as production
@@ -1384,7 +1526,13 @@ def build_resolver_from_env() -> IssueTermsResolver:
     elif prospectus_urls:
         providers.append(HttpProspectusProvider(prospectus_urls))
     if os.getenv("IPO_OFFICIAL_DISCOVERY", "1").strip().lower() not in ("0", "false", "no"):
-        providers.append(OfficialDiscoveryProvider())
+        # Closed-issue listings are opt-in: an operator names the exchange
+        # archives to search (comma-separated, allow-listed hosts only).
+        # Unset means none, which is the behaviour every existing
+        # deployment already has.
+        historical = [u.strip() for u in
+                      os.getenv("IPO_OFFICIAL_HISTORICAL_LISTINGS", "").split(",") if u.strip()]
+        providers.append(OfficialDiscoveryProvider(historical_listing_urls=historical))
     from .issue_platforms import PublicPlatformProvider, PLATFORM_LISTINGS
     enabled = {x.strip().lower() for x in os.getenv("IPO_TERM_PLATFORM_PROVIDERS", "").split(",") if x.strip()}
     for name in sorted(enabled):

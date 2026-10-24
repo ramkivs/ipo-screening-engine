@@ -1555,3 +1555,36 @@ Two separate workstreams this pass. **No evaluation created, updated or scored; 
 - **Record:** report §16; A30 §5.7.
 
 - **Disposition: PIN VERIFIED AND AWAITING RAMKI'S RATIFICATION; OFFICIAL PRICE BAND AND LOT EVIDENCE LOCATED AND RETAINED BUT NOT ADMISSIBLE AND NOT RETRIEVED THROUGH THE ENGINE; NO TERM RESOLVED; GATE CLOSED; NO EVALUATION; FULL SUITE LAST GREEN 1772/1772 AT `14a0047` AND NOT RE-RUN (NO PRODUCTION CODE CHANGED THIS PASS).**
+
+## Paras — official retrieval trace + closed-issue identity binding — 2026-10-24 (revision 10)
+
+**No evaluation created, updated, scored or persisted; no durable record written; PR #7 open; `main` untouched at `01ba66c`.**
+
+### Retrieval trace — why UNAVAILABLE
+- Traced end to end (DNS → TLS → session → endpoint → parser → matching), not inferred. **Only TLS egress fails**: every official host (`www.bseindia.com`, `www.nseindia.com`, `www.sebi.gov.in`, `api.bseindia.com`) connects at TCP then closes the TLS handshake; the engine's `urllib` transport and `curl` fail identically, and DNS resolves everywhere.
+- The six configured listings therefore report `classification=failed, searched=False` and the provider returns **UNAVAILABLE** — never `NOT_FOUND`, because no report names a listing it actually read. The endpoint set, the cookie-jar/session warm-up, the issue-page parser and the issuer matching are all working; each was checked separately.
+- **Diagnostics improved:** every retrieval failure now carries `[TRANSPORT]` / `[HTTP]` / `[CONTENT]`, so "never reached" and "reached and refused" are distinguishable without reading exception types (`HTTPError` classified before `URLError`/`OSError`, since it is both).
+
+### Closed-issue evidence — narrow, identity-bound admission (A31)
+- The live BSE listing no longer carries the Paras row (the issue closed on 23 Oct 2026); the historical listing does, linking the issue page that states the pricing terms. That is a **coverage** gap, not a parser defect.
+- The live-only default was **not** removed. A closed record is now admissible only when bound to the exact offering: exact issuer **and** the filing's own bid window **and** the exchange issue number (`IPONo`) with a well-formed scrip id **and** internally consistent identifiers (link `startdt` vs row date, IPO record type). No expected window ⇒ **no admission**; conflicts and ambiguity ⇒ **withhold with a reason**; an older offering by the same issuer is rejected on the window before any value is read. The closed-issue listing is **off unless configured** (`IPO_OFFICIAL_HISTORICAL_LISTINGS`) and never substantiates `NOT_FOUND`/`UNPUBLISHED`, because a forthcoming issue cannot appear in a closed archive.
+- Implemented in `engine/ipo_screening/issue_identity.py` + `bse_historical_issue_records` + `OfficialDiscoveryProvider._search_historical_listing`; `IssueTermsResolver` forwards the canonical `issue` context to providers that declare it. Issuer-independent; nothing names an issuer, symbol or issue number.
+- **Recorded finding:** the exchange publishes its price-band advertisement as `PBA_<yyyymmdd…>.pdf` with anchor text "Click Here", which the attachment filter did not recognise. Recognised now — a naming rule inside the existing allow-list, still issuer-matched and class-verified after retrieval.
+- **Decision boundary, not crossed:** admitting `listing.bseindia.com` as an operator-configured notice URL would reverse `test_archive_hosts_are_scoped_to_issuer_matched_discovery_not_direct_prospectus_urls`. The change was made, found to contradict that safeguard, and **fully reverted**; it is RAMKI's call under A31 §5.
+
+### Tests and controlled validation
+- New `tests/test_historical_issue_identity.py` — **35 passed** (bound / unbound / incomplete / stale / conflicted; previous offering; same-window different issue number; two issue numbers claiming one window; same issue listed twice; link/row date contradiction; non-IPO record; foreign and similar names; unreadable price cell; transport failure; source isolation; cross-issuer leakage; conflict withholding; cap-without-floor; lot vs maximum bid quantity; gate).
+- `tests/test_paras_official_issue_page_terms.py` — **25 passed** (issue-page terms, closed-archive binding from the retained capture, advertisement-followed discovery, configured-URL rejection preserved, agreement across two document classes, gate).
+- **Full backend suite re-run on final code** (this pass changed shared engine code, so the re-run was required): **1832 collected — 1832 passed / 0 failed / 0 skipped**, exit 0, 20 m 11 s (1772 previous + 60 new cases).
+- Focused sweeps on final code: **451 passed** (22 issue-term/discovery/identity/upload-path/cache/integrity modules) and **141 passed** (provenance, manual terms, ui7, enrichment, worker lifecycle). **0 failed, 0 skipped.** No assertion weakened or removed; the one existing safeguard test this work initially broke was **not** edited — the code change was reverted instead.
+- **Controlled non-production ingestion** (disposable `store_root` on `/tmp`, artifact hash-checked before/after, `mode=final`): **`AWAITING_ISSUE_TERMS`** on exactly `price_band_low`, `price_band_high`, `lot_size`; `evaluation_run: False`, `persisted: False`, `evaluation_id: None`, no evaluation store. Re-run with the historical listing configured: the archive search is genuinely attempted, recorded as `[TRANSPORT]`, outcome unchanged. Evidence PDF byte-identical (`E0A3187F…570E74`).
+
+### Status, stated separately
+- Frozen-core pin: **VERIFIED — READY FOR RAMKI RATIFICATION** (unchanged; not revisited).
+- Official evidence retrieval: **PARTIAL** (issue page, historical listing, BSE notice, SEBI filing retrieved; the advertisement itself unreachable from here).
+- Evidence admissibility: **identity-bound path implemented and tested**; live route transport-blocked here.
+- `price_band_low` / `price_band_high` / `lot_size`: **UNRESOLVED** — no official bytes reached the engine in this environment; no value entered any configuration, canonical record or store.
+- Required-term gate: **CLOSED** (verified). Evaluation readiness: **NOT ESTABLISHED**. Evaluation execution: **NOT RUN**.
+- **Capability needed to finish live:** egress to `*.bseindia.com` / `nseindia.com` / `sebi.gov.in`, then `IPO_OFFICIAL_HISTORICAL_LISTINGS="https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P"` — the filing supplies the window, the archive row binds by issue number 8048, and the issue page supplies 660.00 / 693.00 / lot 21. No code change required.
+
+- **Disposition: TRANSPORT BLOCKED AND PROVEN; CLOSED-ISSUE EVIDENCE NOW ADMISSIBLE ONLY BY IDENTITY BINDING (A31); ALLOW-LIST WIDENING REVERTED AND REFERRED TO RAMKI; 589 FOCUSED TESTS GREEN; GATE CLOSED; NO EVALUATION.**

@@ -141,6 +141,16 @@ This decision withholds `price_band_low`, `price_band_high` and `lot_size` becau
 * **The extraction layer is not the blocker.** Against a transcription of the real page's labelled rows, the unmodified `ExchangeIssuePageParser` returns `660.0` / `693.0` / lot `21` / both dates / the issuer, and the general discovery provider returns `FOUND`. 17 new cases in `tests/test_paras_official_issue_page_terms.py`; no production code changed.
 * **Nothing was resolved.** The three values exist in this repository only as investigation evidence and test input — not in any configuration, canonical record, snapshot or evaluation. The gate stays closed and evaluation remains NOT RUN.
 
+### 5.8 Retrieval trace and the closed-issue identity path (2026-10-24)
+
+See report §17 and decision record **A31**.
+
+* **Why the engine reports UNAVAILABLE:** TLS egress from the execution environment fails for every official host before any bytes are read (`URLError: TLS/SSL connection has been closed (EOF)`; `curl (35) SSL_ERROR_SYSCALL`). It is not a parser, endpoint, cookie or issuer-matching failure, and it is never a `NOT_FOUND`. Retrieval failures now carry a `[TRANSPORT]` / `[HTTP]` / `[CONTENT]` class so the two can no longer be confused in diagnostics.
+* **The closed-issue gap, closed narrowly:** a record from the exchange's historical listing is admissible only when its own identity is bound to this offering — exact issuer, the filing's own bid window, the exchange issue number, internally consistent identifiers — with no expected window meaning no admission, and conflicts withholding rather than arbitrating. The live search, its status filter and every allow-list are unchanged, and the historical listing stays off unless an operator configures it (A31).
+* **The exchange's own advertisement name is now recognised** (`PBA_<yyyymmdd…>.pdf`), so an issuer-matched issue page that links its price-band advertisement can resolve the terms through the unmodified notice parser. A naming rule, not a widened source list.
+* **Not done, deliberately:** allowing `listing.bseindia.com` as an operator-configured notice URL. That reverses a documented scoping with its own test; the change was made, found to contradict that test, and fully reverted. It is recorded for RAMKI in A31 §5.
+* **Gate unchanged.** Controlled non-production ingestion re-run on the real filing (disposable store on `/tmp`, artifact hash-checked): `AWAITING_ISSUE_TERMS` on exactly the three pricing terms, `evaluation_run: False`, `persisted: False`, no evaluation store. With the historical listing configured the archive search is genuinely attempted and recorded as `[TRANSPORT]`; the outcome does not change.
+
 **Still not run, and not claimed:** the full backend suite (`PYTHONPATH=engine python -m pytest -q tests/`, ≈ 3 h); any evaluation; any production ingestion. **Parser-level green is not ingestion-level green** — §12.5 of the investigation report says exactly where the two part company.
 
 ## 6. Residual risks and open items

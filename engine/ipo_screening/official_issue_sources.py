@@ -218,3 +218,229 @@ def bse_issue_records(raw, company_name):
         result.metadata['page_kind'] = 'bse_public_issue_record_json'
         found.append((page, result))
     return found
+
+
+# The exchange's own archive of closed issues.  This listing is NOT one of
+# the default discovery sources: the engine searches the live listing, and
+# a closed record is admitted only through the identity-bound path below.
+BSE_HISTORICAL_LISTING = 'https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P'
+
+_DATE_CELL = re.compile(r'^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$')
+_BAND_CELL = re.compile(r'(\d[\d,]*(?:\.\d+)?)\s*(?:-|–|—|to)\s*(\d[\d,]*(?:\.\d+)?)')
+
+
+def _row_cells(row_html):
+    """Visible text of each table cell in one row, in document order."""
+    from html import unescape
+    cells = []
+    for cell in re.findall(r'<t[dh]\b[^>]*>(.*?)</t[dh]>', row_html, re.DOTALL | re.IGNORECASE):
+        text = unescape(re.sub(r'<[^>]+>', ' ', cell))
+        cells.append(' '.join(text.split()))
+    return cells
+
+
+def _cell_date(text):
+    from datetime import date
+    match = _DATE_CELL.match(text.strip())
+    if not match:
+        return None
+    day, month, year = (int(part) for part in match.groups())
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def _query_identity(url):
+    """The identity an exchange issue link carries, plus parse problems."""
+    from urllib.parse import parse_qs
+    query = parse_qs(urlparse(url).query)
+    def one(name):
+        values = query.get(name) or []
+        return values[0].strip() if len(values) == 1 else None
+    return {
+        'scrip': one('id'),
+        'issue_number': one('IPONo'),
+        'symbol': one('symbol'),
+        'status': one('status'),
+        'type': one('type'),
+        'startdt': one('startdt'),
+    }
+
+
+def bse_historical_issue_records(raw, company_name, expected=None):
+    """Closed-issue BSE listing records, admitted only when identity is bound.
+
+    Returns ``(records, rejections)``.
+
+    ``records`` are ``(page_url, result)`` pairs in the same shape the live
+    record adapter yields, so the caller follows the issue-information page
+    for the remaining labelled terms exactly as it does for a live issue.
+    ``rejections`` name every issuer-matched row that was withheld and why,
+    so a name match never disappears silently and never becomes a term.
+
+    Eligibility (all required, see ``issue_identity``):
+
+    1. the served row names this issuer exactly;
+    2. the row states both issue dates, and they equal the expected
+       offering's window established by the filing;
+    3. the row carries the exchange's own issue number (``IPONo``) and a
+       well-formed scrip id, so the record identifies an *issue*, not just
+       a company;
+    4. the row's own identifiers agree with each other -- a link whose
+       ``startdt`` contradicts the row's start date is a conflict;
+    5. no other eligible row for the same issuer contradicts it.
+
+    An older offering by the same issuer therefore cannot answer for the
+    current one: it has a different window, and it is rejected on the
+    window before any of its values are read.
+    """
+    from datetime import date, datetime
+    from dataclasses import replace
+    from html import unescape
+    from .issue_identity import (IDENTITY_INCOMPLETE, IssueIdentity,
+                                 check_issue_identity)
+    from .issue_terms import _norm_name
+    from .extraction.exchange_issue_page import ExchangeIssuePageParser
+    from .extraction.price_band_notice import PriceBandField
+
+    text = raw.decode('utf-8', errors='ignore') if isinstance(raw, (bytes, bytearray)) else str(raw)
+    text = unescape(text)
+    digest = hashlib.sha256(raw.encode('utf-8') if isinstance(raw, str) else raw).hexdigest()
+    found, rejections = [], []
+    seen_issues = {}
+    bound_rows = []
+
+    for row in re.findall(r'<tr\b.*?</tr>', text, re.DOTALL | re.IGNORECASE):
+        anchors = re.findall(r'<a\b[^>]*href\s*=\s*"([^"]*)"[^>]*>(.*?)</a>',
+                             row, re.DOTALL | re.IGNORECASE)
+        page_url, link_text = None, ''
+        for href, anchor_text in anchors:
+            # Any issue-information link makes this a record; whether it is an
+            # IPO is checked (and reported) rather than silently skipped.
+            if 'displayipo' in href.lower():
+                page_url = urljoin(BSE_HISTORICAL_LISTING, href.strip())
+                link_text = ' '.join(unescape(re.sub(r'<[^>]+>', ' ', anchor_text)).split())
+                break
+        if page_url is None:
+            continue  # not an issue record
+        cells = _row_cells(row)
+        name = link_text or (cells[0] if cells else '')
+        if _norm_name(name) != _norm_name(company_name):
+            continue  # never another issuer's row, however similar the name
+
+        dates = [(index, _cell_date(cell)) for index, cell in enumerate(cells)]
+        dates = [(index, value) for index, value in dates if value is not None]
+        # The band cell is a price range and nothing else: a date cell also
+        # contains digits and a dash, so a prefix search would read the issue
+        # dates as a price band.
+        band = None
+        for cell in cells:
+            candidate = re.sub(r'^(?:rs\.?|inr|\u20b9)\s*', '', cell.strip(), flags=re.IGNORECASE)
+            if _cell_date(cell) is None and _BAND_CELL.fullmatch(candidate):
+                band = cell
+                break
+        identifiers = _query_identity(page_url)
+
+        observed = IssueIdentity(
+            open_date=dates[0][1].isoformat() if len(dates) >= 1 else None,
+            close_date=dates[1][1].isoformat() if len(dates) >= 2 else None,
+            issue_number=identifiers['issue_number'],
+            symbol=identifiers['symbol'],
+            uri=page_url,
+        )
+        conflicts = []
+        link_start = identifiers['startdt']
+        if link_start:
+            # BSE writes this parameter as DD/MM/YYYY; a dashed form carries the
+            # same day, so both are read, and anything else is a conflict.
+            parsed_start = _cell_date(link_start) if _cell_date(link_start) else None
+            if parsed_start is None and re.fullmatch(r'\d{1,2}/\d{1,2}/\d{4}', link_start):
+                day, month, year = (int(part) for part in link_start.split('/'))
+                try:
+                    parsed_start = date(year, month, day)
+                except ValueError:
+                    parsed_start = None
+            if parsed_start is None:
+                conflicts.append(f'{page_url}: issue link start date {link_start!r} is not a date')
+            if parsed_start and observed.open_date and parsed_start.isoformat() != observed.open_date:
+                conflicts.append(
+                    f'{page_url}: issue link start date {parsed_start.isoformat()} contradicts the '
+                    f'listing row start date {observed.open_date}')
+        if not identifiers['scrip'] or not re.fullmatch(r'[A-Za-z0-9_-]{1,40}', identifiers['scrip'] or ''):
+            conflicts.append(f'{page_url}: the issue link carries no well-formed scrip id')
+        if identifiers['type'] and identifiers['type'].upper() != 'IPO':
+            conflicts.append(f'{page_url}: the issue link is not an initial public offering record')
+
+        verdict = check_issue_identity(observed, expected, conflicts=conflicts)
+        if verdict.eligible and not observed.issue_number:
+            # A closed record must identify the issue, not only the company.
+            verdict.eligible = False
+            verdict.state = IDENTITY_INCOMPLETE
+            verdict.reasons = ['the closed-issue record carries no exchange issue number (IPONo), '
+                               'so it identifies a company but not one offering']
+        if not verdict.eligible:
+            rejections.append(
+                f'{name} ({page_url}): closed-issue record withheld -- {verdict.state}: '
+                + '; '.join(verdict.reasons))
+            continue
+
+        key = (observed.issue_number, observed.open_date, observed.close_date)
+        seen_issues.setdefault(key, []).append(page_url)
+        if len(seen_issues[key]) > 1:
+            continue  # the same issue listed twice is one issue, not a second opinion
+        bound_rows.append((name, page_url, observed, band, cells, identifiers, verdict))
+
+    # Two different issue numbers claiming one bid window is an ambiguity, not
+    # two confirmations: a listing that cannot say which offering it describes
+    # supplies nothing.  Both rows are withheld with that reason.
+    by_window = {}
+    for row in bound_rows:
+        by_window.setdefault((row[2].open_date, row[2].close_date), set()).add(row[2].issue_number)
+    ambiguous = {window for window, numbers in by_window.items() if len(numbers) > 1}
+    if ambiguous:
+        still_bound = []
+        for row in bound_rows:
+            window = (row[2].open_date, row[2].close_date)
+            if window in ambiguous:
+                rejections.append(
+                    f'{row[0]} ({row[1]}): closed-issue record withheld -- IDENTITY_CONFLICT: '
+                    f'issue numbers {sorted(by_window[window])} claim the same bid window '
+                    f'{window[0]}..{window[1]}, so the listing does not identify one offering')
+            else:
+                still_bound.append(row)
+        bound_rows = still_bound
+
+    for name, page_url, observed, band, cells, identifiers, verdict in bound_rows:
+        open_iso, close_iso = observed.open_date, observed.close_date
+        html = ('<h1>' + escape(name) + '</h1>'
+                + ('<p>Price Band ' + escape(band) + '</p>' if band else '')
+                + f'<p>Issue Period {open_iso} to {close_iso}</p>')
+        result = ExchangeIssuePageParser().parse(html.encode(), url=page_url)
+        sid = 'SRC-EXCHANGE-' + digest[:8].upper()
+        result.source = replace(result.source, source_id=sid, content_hash=digest)
+        result.source_ref = replace(result.source_ref, source_id=sid, content_hash=digest)
+        result.company_name = name
+        if band:
+            for field in ('price_band_low', 'price_band_high'):
+                obj = getattr(result, field)
+                if obj is not None:
+                    setattr(result, field, replace(obj, quote=band,
+                        locator='BSE historical public-issue listing - Offer Price'))
+        for field, value in (('open_date', open_iso), ('close_date', close_iso)):
+            raw_text = next((cell for cell in cells
+                             if _cell_date(cell) is not None
+                             and _cell_date(cell) == date.fromisoformat(value)), value)
+            setattr(result, field, PriceBandField(name=field, value=value, raw_text=raw_text,
+                quote=raw_text, locator='BSE historical public-issue listing - Issue dates',
+                extraction_method='EXCHANGE_DATA', confidence=.95))
+        if band and result.price_band_low is None:
+            rejections.append(
+                f'{name} ({page_url}): closed-issue record withheld -- the listing states an offer '
+                f'price {band!r} that could not be read as a two-sided price band')
+            continue
+        result.metadata['page_kind'] = 'bse_historical_public_issue_listing'
+        result.metadata['issue_status'] = identifiers['status'] or 'unknown'
+        result.metadata['issue_identity'] = verdict.as_dict()
+        found.append((page_url, result))
+    return found, rejections
