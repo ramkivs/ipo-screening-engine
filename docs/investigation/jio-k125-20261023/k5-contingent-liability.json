@@ -1,0 +1,131 @@
+{
+ "investigation_date": "2026-10-23",
+ "branch": "arena/07f3439f-ipo-screening-engine",
+ "branch_tip_at_start": "d894ba53f242987fdd89220032bd5c331760bb08",
+ "evaluation": "JIO-PLATFORMS-LIMITED-20261023-085751Z-final-29d9a601",
+ "retained_source": {
+  "path": "evidence/non-authoritative/jio/U72900GJ2019PLC110816_JIO.pdf",
+  "sha256": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+  "pages": 591,
+  "type": "NON-AUTHORITATIVE retained filing copy (RHP), issuer-matched to Jio Platforms Limited (CIN U72900GJ2019PLC110816)"
+ },
+ "method": "Read-only. Existing artifacts and the retained PDF were inspected; the engine's own extractor and regexes were applied to page text in a probe script (no ingestion, no evaluation, no regression suite, no code change).",
+ "criterion": "K5 / contingent_liab_unquantified (+ the contingent_liab_pct_networth leaf)",
+ "engine_disposition": {
+  "K5": "UNVERIFIED (missing: contingent_liab_unquantified)",
+  "ratio_leaf": {
+   "state": "VALUE",
+   "value": 0.4470843084747791,
+   "detail": "contingent_liab_pct_networth = 0.44708... > 50 -> FALSE"
+  },
+  "flag": {
+   "state": "UNKNOWN",
+   "reason": "the supplied input does not establish whether any material contingent liability is unquantified"
+  }
+ },
+ "governing_rule": {
+  "config": "K5 required [contingent_liab_pct_networth, contingent_liab_unquantified]; when any(ratio > 50, flag contingent_liab_unquantified). derived_metrics.contingent_liab_pct_networth formula 'contingent liabilities / net worth x 100', inputs [financials.contingent_liabilities, financials.periods].",
+  "decision": "handoff/decisions/A20-k5-contingent-liability-numerator.md (RAMKI-APPROVED 2026-10-20, decision D-2). Rule 3: latest fiscal-year (31 March) column, never an interim column. Rule 6: commitments excluded. Rule 7: an unquantified exposure with no disclosed total leaves the AMOUNT unknown. Rule 8: the unquantified flag is set True only on a positive unquantified statement in the same section; negated language leaves it None; it is never coerced to False. Rule 9: threshold and structure unchanged.",
+  "code": "engine/ipo_screening/extraction/financial_tables.py::_extract_contingent_liabilities (positive-only in-section unquantified test) -> builder -> derived._contingent_liab_unquantified (unknown when the canonical field is absent) -> knockouts K5"
+ },
+ "numerator_verified": {
+  "value": 15021.0,
+  "unit": "INR millions",
+  "page": 405,
+  "note": "Note 37 (I) Contingent Liabilities, 'Claims / disputed liabilities against the Group not acknowledged as debts*', 31 March 2026 column. Commitments (II) 26,198 excluded per A20 rule 6. This is the only contingent-liability row, so there is no total-plus-constituents double count."
+ },
+ "denominator_verified": {
+  "value": 3359769.0,
+  "unit": "INR millions",
+  "page": 406,
+  "note": "'Total Equity (As per Restated Consolidated Statement of Assets and Liabilities) (B) 3,359,769' at 31 March 2026 \u2014 the canonical periods[].net_worth for FY2026, which is what derived.ctx.p('net_worth') returns (latest full FY)."
+ },
+ "arithmetic": [
+  {
+   "basis": "engine",
+   "numerator": 15021,
+   "denominator": 3359769,
+   "pct": 0.4470843085,
+   "matches_record": true
+  },
+  {
+   "basis": "ICDR Net Worth denominator (p487, equity share capital + other equity excluding OCI)",
+   "numerator": 15021,
+   "denominator": 3340134,
+   "pct": 0.4497124966,
+   "matches_record": "no record uses this; documented as the C3 alternative"
+  },
+  {
+   "basis": "interim 30 June 2026 claims / FY2026 equity (NOT permitted by A20 rule 3)",
+   "numerator": 14688,
+   "denominator": 3359769,
+   "pct": 0.4371729128,
+   "matches_record": false
+  }
+ ],
+ "threshold": {
+  "rule": "> 50 %",
+  "value": 50.0,
+  "distance": "0.4471 % is 111.8x below the threshold; the ratio would need contingent liabilities of INR 1,679,884.5 million (50 % of net worth) to fire",
+  "if_commitments_were_added_against_A20": "0.7798 % \u2014 still 64x below the threshold; adding the excluded commitments would not change the outcome"
+ },
+ "why_unknown": "K5 is an OR of two limbs over Kleene logic: the ratio limb is decisively FALSE, so the knockout's result is decided entirely by the second limb, which is UNKNOWN because the canonical field financials.contingent_liabilities_unquantified is absent. The absence is policy-driven (A20 rule 8: positive-in-section only, never False), not a parsing failure.",
+ "evidence_found": [
+  {
+   "page": 405,
+   "quote": "37 Contingent Liabilities and Commitments ... (I) Contingent Liabilities \u2014 Claims / disputed liabilities against the Group not acknowledged as debts* \u2014 14,688 / 14,151 / 15,021 / 30,183 / 27,924 (30 June 2026, 30 June 2025, 31 March 2026, 31 March 2025, 31 March 2024). The claims/disputed liabilities are not likely to have any material effect on financial position of the Group. * The Group has been advised that the demand is likely to be either deleted or substantially reduced and accordingly no provision is considered necessary. (II) Commitments \u2014 Estimated amount of contracts remaining to be executed on Capital account not provided for \u2014 90,389 / 65,624 / 26,198 / 51,272 / 58,284.",
+   "what_it_establishes": "A fully quantified note with a materiality assessment and a provision rationale; no unquantified exposure, no completeness caveat, no 'unquantifiable' wording."
+  },
+  {
+   "page": 472,
+   "quote": "As the arbitration is under way, any claim cannot be determined until quantification is done by the Tribunal in the final award.",
+   "what_it_establishes": "The only unquantifiability language in the filing \u2014 and it concerns a Promoter arbitration in the litigation section, outside note 37's defined section, so A20 rule 8 does not admit it."
+  }
+ ],
+ "evidence_not_found": [
+  "'unquantified' / 'not quantifiable' / 'cannot be quantified' / 'unascertained' \u2014 0 occurrences in the 591 pages (only the p472 paraphrase above)",
+  "any explicit statement that the note is complete or that no unquantified exposures exist",
+  "an amount for the p472 promoter arbitration claim"
+ ],
+ "technical_findings": {
+  "extraction_scan_ran": true,
+  "note_located": true,
+  "value_correct": true,
+  "flag_candidate_lost": false,
+  "evidence_quality_defect": {
+   "field": "financials.contingent_liabilities",
+   "issue": "the emitted quote is the row label only \u2014 'Claims / disputed liabilities against the Group not acknowledged as debts*' \u2014 and does not contain the extracted amount 15,021. A reader of the evidence panel cannot verify the number from the citation, although the number is correct on p405.",
+   "severity": "provenance/display only; no value error",
+   "smallest_fix_documented": "extend the quote to the amount row (label + the five amount cells, or at least the 31 March 2026 cell) when the extracted value comes from that row"
+  },
+  "assessment": "No numerator, denominator, unit, period or rounding error was found. The engine's ratio reproduces exactly (0.4470843084747791)."
+ },
+ "classification": "SEMANTIC / GOVERNANCE (the unquantified limb has a positive-only rule and no negative-confirmation standard). The factual position is established; there is no missing-evidence gap in the note, and no denominator defect (the net-worth basis is a separate, documented question).",
+ "is_unknown_justified": true,
+ "justification": "A20 rule 8 requires exactly this treatment, and the K5 OR cannot resolve on one FALSE limb. Treating silence as False would be a new rule and would clear a knockout on the absence of evidence.",
+ "minimum_evidence_to_resolve_factually": [
+  "none for the ratio: both inputs are disclosed and verified",
+  "for the flag: either a positive unquantified statement inside note 37 (there is none), or a governance rule that permits a negative"
+ ],
+ "governance_question": {
+  "exists": false,
+  "note": "A20 rule 8 already answers it for the defined note. The only open variant is a scope extension \u2014 whether a material unquantified exposure disclosed OUTSIDE note 37 (here, the promoter arbitration at p472) may set the flag. That is a scope decision, not a defect; it is listed as optional, with no recommendation to adopt it now."
+ },
+ "optional_scope_question": {
+  "question": "Should the unquantified limb look beyond the issuer's contingent-liability note to material unquantified exposures disclosed elsewhere in the filing?",
+  "alternatives": [
+   {
+    "id": "K5-A",
+    "rule": "Status quo: the defined note only (A20 rule 8).",
+    "consequence": "Jio K5 stays UNVERIFIED."
+   },
+   {
+    "id": "K5-B",
+    "rule": "Extend to material unquantified exposures disclosed in the litigation section, with a materiality threshold.",
+    "consequence": "Jio would need an assessment of the p472 promoter arbitration (not the issuer's own liability) and of the Rs 67,955 million tax-claim aggregate at p474; a scope and materiality rule would have to be defined first."
+   }
+  ],
+  "recommendation": "No change. A20's scope is coherent and the extension would import promoter-level exposure into an issuer-level ratio."
+ },
+ "dependency_note": "K5's denominator is the net-worth basis question recorded separately in docs/investigation/jio-validation-20261023/c3-net-worth-basis.json. No authoritative decision on that basis exists on this branch. Both bases give 0.4471 % / 0.4497 %, so K5's outcome does not depend on the choice; the dependency is recorded, not resolved."
+}

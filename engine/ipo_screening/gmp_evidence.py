@@ -1,4 +1,4 @@
-"""Approved GMP source-policy decisions D1-D3 and §7 evidence linkage.
+"""Approved GMP source-policy decisions D1-D3, §7 linkage and A28 trend extension.
 
 Decision record: ``docs/investigation/A9-GMP-SOURCE-POLICY-SELECTION-2026-10-15.md`` §§6-7.
 
@@ -244,6 +244,10 @@ def _load_rendered_capture_from_manifest(
         # Two declarations would let one reference resolve to either file.
         raise GmpEvidenceError(f"artifact {artifact_id!r} is declared more than once in {path.name}")
     entry = entries[0]
+    # A recorded acquisition failure is not missing GMP, displayed zero or a
+    # publisher withdrawal. Unknown legacy status is not upgraded to success.
+    if entry.get("toolResultStatus") not in (None, "success"):
+        raise GmpEvidenceError("capture failed: retrieval tool did not report success")
 
     file_name = entry.get("file")
     declared = entry.get("sha256")
@@ -285,6 +289,11 @@ def _load_rendered_capture_from_manifest(
             text = data.decode("utf-8")
         except UnicodeDecodeError:
             text = None
+    # The documented PD response is a successful TOOL rendering of an error
+    # page, not a GMP observation. This is deliberately not an HTML/DOM parser
+    # or a claim that arbitrary error pages can be recognized heuristically.
+    if text is not None and text.lstrip().startswith("# Temporarily unavailable"):
+        raise GmpEvidenceError("capture failed: temporary-unavailability page")
 
     window = entry.get("retrievalWindowUtc")
     window = window if isinstance(window, Mapping) else {}
@@ -441,6 +450,13 @@ GMP_LINK_EVIDENCE_FIELDS = (
     ("market.gmp.pct", "EV-market.gmp.pct"),
     ("market.gmp.as_of", "EV-market.gmp.as_of"),
 )
+GMP_LINK_OPTIONAL_EVIDENCE_FIELDS = (("market.gmp.trend", "EV-market.gmp.trend"),)
+
+
+def _link_fields(trend):
+    return GMP_LINK_EVIDENCE_FIELDS + (GMP_LINK_OPTIONAL_EVIDENCE_FIELDS if trend is not None else ())
+
+
 _LINK_LOCATOR = re.compile(r"^line ([1-9][0-9]*)$")
 # Locate whole signed percentage tokens only. Adjoining alphanumerics, decimal
 # punctuation, percent signs, and sign-like characters block subtoken matches.
@@ -488,6 +504,7 @@ class GmpEvidenceLinkVerification:
     expected_company_name: Optional[str] = field(default=None, repr=False, compare=False)
     expected_pct: Any = field(default=None, repr=False, compare=False)
     expected_as_of: Any = field(default=None, repr=False, compare=False)
+    expected_trend: Any = field(default=None, repr=False, compare=False)
     capture: Optional[RenderedGmpCapture] = field(default=None, repr=False, compare=False)
 
     @property
@@ -571,6 +588,7 @@ def _link_result(
     expected_company_name: Optional[str] = None,
     expected_pct: Any = None,
     expected_as_of: Any = None,
+    expected_trend: Any = None,
     capture: Optional[RenderedGmpCapture] = None,
     status: str = "FAILED",
 ) -> GmpEvidenceLinkVerification:
@@ -594,6 +612,7 @@ def _link_result(
         expected_company_name=expected_company_name,
         expected_pct=expected_pct,
         expected_as_of=expected_as_of,
+        expected_trend=expected_trend,
         capture=capture,
     )
 
@@ -836,6 +855,7 @@ def verify_gmp_evidence_link(
     root = Path(repo_root).resolve()
     market_gmp = context.get("market_gmp")
     market_gmp = market_gmp if isinstance(market_gmp, Mapping) else {}
+    link_fields = _link_fields(market_gmp.get("trend"))
     source_id_value = market_gmp.get("source_id")
     source_id = source_id_value if isinstance(source_id_value, str) and source_id_value else None
     evidence_map = context.get("evidence")
@@ -843,7 +863,7 @@ def verify_gmp_evidence_link(
     registered = _registered_evidence(record)
     available_refs = tuple(
         evidence_id
-        for _path, evidence_id in GMP_LINK_EVIDENCE_FIELDS
+        for _path, evidence_id in link_fields
         if evidence_id in registered
     )
 
@@ -927,8 +947,8 @@ def verify_gmp_evidence_link(
         _issue_url, displayed_issue_name = _publisher_url_identity(manifest, artifact_id)
 
         evidence_details: dict[str, Tuple[int, str]] = {}
-        required_paths = {path for path, _evidence_id in GMP_LINK_EVIDENCE_FIELDS}
-        required_ids = {evidence_id for _path, evidence_id in GMP_LINK_EVIDENCE_FIELDS}
+        required_paths = {path for path, _evidence_id in link_fields}
+        required_ids = {evidence_id for _path, evidence_id in link_fields}
         for path, spec in evidence_map.items():
             if (
                 path not in required_paths
@@ -936,8 +956,12 @@ def verify_gmp_evidence_link(
                 and spec.get("evidence_id") in required_ids
             ):
                 raise GmpEvidenceError("a canonical GMP evidence id is reused for a different input field")
+        if market_gmp.get("trend") is None and "market.gmp.trend" in evidence_map:
+            raise GmpEvidenceError("absent market.gmp.trend cannot hide asserted trend evidence")
         lines = capture.text.splitlines()
-        for field_path, evidence_id in GMP_LINK_EVIDENCE_FIELDS:
+        if market_gmp.get("trend") is None and any(line.startswith("Trend: ") for line in lines):
+            raise GmpEvidenceError("absent market.gmp.trend cannot hide a displayed publisher label")
+        for field_path, evidence_id in link_fields:
             line_text, quote = _exact_quote(
                 evidence_map.get(field_path),
                 path=field_path,
@@ -965,8 +989,8 @@ def verify_gmp_evidence_link(
                 or registered_item.get("extraction_method") != "MANUAL_ENTRY"
             ):
                 raise GmpEvidenceError(f"registered evidence for {field_path!r} differs from the link input")
-        if set(available_refs) != {evidence_id for _path, evidence_id in GMP_LINK_EVIDENCE_FIELDS}:
-            raise GmpEvidenceError("all three canonical GMP linkage evidence objects must be registered")
+        if set(available_refs) != {evidence_id for _path, evidence_id in link_fields}:
+            raise GmpEvidenceError("all required canonical GMP linkage evidence objects must be registered")
 
         company_name = context.get("company_name")
         if not isinstance(company_name, str) or not company_name:
@@ -1041,7 +1065,17 @@ def verify_gmp_evidence_link(
         ):
             raise GmpEvidenceError("assembled market snapshot changed the linked GMP source or values")
         if market_gmp.get("trend") is not None:
-            raise GmpEvidenceError("market.gmp.trend has no linked evidence and cannot be tied by this contract")
+            # A28 extends A18 only for explicit publisher labels, never deltas.
+            from .connectors.adapters import _map_gmp_trend_label
+            trend_line_number, trend_quote = evidence_details["market.gmp.trend"]
+            trend_lines = [line for line in lines if line.startswith("Trend: ")]
+            if (
+                len(trend_lines) != 1
+                or lines[trend_line_number - 1] != f"Trend: {trend_quote}"
+                or _map_gmp_trend_label(trend_quote) != market_gmp.get("trend")
+                or snapshot_values.get("trend") != market_gmp.get("trend")
+            ):
+                raise GmpEvidenceError("market.gmp.trend lacks one matching publisher-supplied label")
 
         evaluation_instant = evaluation_at if isinstance(evaluation_at, datetime) else explicit_offset_instant(evaluation_at)
         if (
@@ -1067,6 +1101,7 @@ def verify_gmp_evidence_link(
                 expected_company_name=company_name,
                 expected_pct=market_gmp.get("pct"),
                 expected_as_of=market_gmp.get("as_of"),
+                expected_trend=market_gmp.get("trend"),
                 capture=capture,
                 status="NOT_AVAILABLE_BY_CUTOFF",
             )
@@ -1089,6 +1124,7 @@ def verify_gmp_evidence_link(
                 expected_company_name=company_name,
                 expected_pct=market_gmp.get("pct"),
                 expected_as_of=market_gmp.get("as_of"),
+                expected_trend=market_gmp.get("trend"),
                 capture=capture,
                 status="NOT_AVAILABLE_BY_CUTOFF",
             )
@@ -1110,6 +1146,7 @@ def verify_gmp_evidence_link(
             expected_company_name=company_name,
             expected_pct=market_gmp.get("pct"),
             expected_as_of=market_gmp.get("as_of"),
+            expected_trend=market_gmp.get("trend"),
             capture=capture,
             status="VERIFIED",
         )
@@ -1145,6 +1182,7 @@ def verify_gmp_linkage_projection(
     manifest. It runs after the entire A15 object (including diagnostics, digest
     references, and timestamp facts) has been assembled and before persistence.
     """
+    link_fields = _link_fields(verification.expected_trend)
     sources = document.get("sources", [])
     evidence = document.get("evidence", [])
     integrity = document.get("integrity", {})
@@ -1195,12 +1233,12 @@ def verify_gmp_linkage_projection(
         ):
             raise GmpEvidenceError("assembled A15 record company_name differs from the linked issue")
         expected_ids = set(verification.evidence_refs)
-        if expected_ids != {evidence_id for _path, evidence_id in GMP_LINK_EVIDENCE_FIELDS}:
-            raise GmpEvidenceError("verified GMP link lacks all three canonical evidence references")
+        if expected_ids != {evidence_id for _path, evidence_id in link_fields}:
+            raise GmpEvidenceError("verified GMP link lacks required canonical evidence references")
         by_evidence_id = {
             item.get("evidence_id"): item for item in evidence if isinstance(item, Mapping)
         }
-        for _path, evidence_id in GMP_LINK_EVIDENCE_FIELDS:
+        for _path, evidence_id in link_fields:
             item = by_evidence_id.get(evidence_id)
             if (
                 not isinstance(item, Mapping)
@@ -1218,6 +1256,8 @@ def verify_gmp_linkage_projection(
             ("/input/market/gmp/pct", "EV-market.gmp.pct", verification.expected_pct),
             ("/input/market/gmp/as_of", "EV-market.gmp.as_of", verification.expected_as_of),
         )
+        if verification.expected_trend is not None:
+            expected_fields += (("/input/market/gmp/trend", "EV-market.gmp.trend", verification.expected_trend),)
         for field_path, evidence_id, expected_value in expected_fields:
             field_value = by_field_path.get(field_path)
             if not isinstance(field_value, Mapping) or evidence_id not in field_value.get("evidence_refs", []):

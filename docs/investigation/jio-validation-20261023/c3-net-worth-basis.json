@@ -1,0 +1,43 @@
+{
+  "scope": "Competing denominators and their printed support; no basis was selected.",
+  "engine_value": {
+    "field": "financials.periods[2].net_worth",
+    "value": 3359769.0,
+    "unit": "INR_MILLIONS",
+    "label_used": "total equity attributable to owners (includes OCI)",
+    "source_pages": [
+      329,
+      406
+    ]
+  },
+  "icdr_value": {
+    "value": 3340134.0,
+    "unit": "INR_MILLIONS",
+    "printed_on_page_451": "Equity Share Capital (H) 89,390 + Other Equity excluding Other Comprehensive Income (I) 3,250,744 = Net Worth**** (J = H+I) 3,340,134",
+    "definition_on_page_487": "Net Worth has been calculated as the aggregate of equity share capital and other equity excluding other comprehensive income.",
+    "basis": "SEBI ICDR definition, i.e. the denominator the issuer uses for its own capitalisation statement"
+  },
+  "difference": {
+    "amount": 19635.0,
+    "cause": "other comprehensive income, included in owners' equity and excluded from ICDR Net Worth"
+  },
+  "impacts": {
+    "K5_ratio": {
+      "using_engine_value_pct": 0.4470843,
+      "using_icdr_value_pct": 0.4496628,
+      "gate_effect": "none; both far below the 50% threshold"
+    },
+    "K1_net_worth_negative_leaf": {
+      "effect": "none; positive on either basis"
+    },
+    "other_consumers": "net worth feeds leverage/ROCE-style derived metrics; any change would move those values slightly and must be a deliberate, tested change"
+  },
+  "existing_authority": "No decision record defines the engine's net-worth basis. Searches over handoff/decisions/, config and docs found no net-worth basis ruling; A10/A11 mention denominators only for subscription data.",
+  "unresolved_question": "Should financials.periods[].net_worth use the issuer's ICDR Net Worth (equity share capital + other equity excluding OCI) where printed, instead of total owners' equity including OCI?",
+  "options": [
+    "A. Keep total owners' equity (status quo): simplest, consistent with the balance-sheet total, but not the issuer's stated ICDR net worth.",
+    "B. Adopt ICDR Net Worth where the filing prints both, with a documented fallback: matches the issuer's capitalisation statement and the statutory definition, changes stored values for this and similar filings.",
+    "C. Store both (net_worth = ICDR, net_worth_owners_equity = balance sheet) and let criteria declare which they use: largest schema/consumer change."
+  ],
+  "recommendation": "B or C; A is defensible only if the engine documents that its net worth is owners' equity. This is a governance choice, not an extraction fix."
+}

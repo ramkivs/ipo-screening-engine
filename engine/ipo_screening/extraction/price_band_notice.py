@@ -279,6 +279,82 @@ _NOTICE_SEMANTIC_TOKENS: Sequence[str] = (
     "equity shares",
 )
 
+#: Document titles that establish a *prospectus*, not a Price Band Notice.
+#: A prospectus contains every "price band" / "bid lot" / "floor price" /
+#: "cap price" token a notice does, so token counting alone classified a
+#: 496-page RHP as a notice and then applied the notice's conflict rules to
+#: it -- rejecting the whole filing because a historical sentence in its
+#: history section mentioned a different "closing date".
+_PROSPECTUS_TITLE = re.compile(
+    r"\bDraft\s+Red\s+Herring\s+Prospectus\b"
+    r"|\bRed\s+Herring\s+Prospectus\b"
+    r"|\bProspectus\s*\n?\s*(?:Dated|Date)\s*:",
+    re.IGNORECASE,
+)
+#: The first pages of a document carry its title; a prospectus mention deep
+#: inside a notice is a reference, not the document's class.
+_TITLE_WINDOW_PAGES = 3
+
+#: A notice is a short, single-purpose announcement.  Beyond this length the
+#: document is some other filing that happens to use the same vocabulary, and
+#: the notice's "one band, one lot, one window" contract does not apply to it.
+_NOTICE_MAX_PAGES = 25
+
+#: Pages that state the *current* issue's terms.  A term-page restriction is
+#: what stops a historical date or an example table on page 400 from becoming
+#: the current issue's opening/closing date.
+_ISSUE_TERM_PAGE = re.compile(
+    r"issue\s+opens|issue\s+closes|bid/offer\s+opens|bid/offer\s+closes"
+    r"|offer\s+opens|offer\s+closes|bid\s+opens|bid\s+closes"
+    r"|issue\s+opening\s+date|issue\s+closing\s+date|bid\s+opening\s+date"
+    r"|bid\s+closing\s+date|price\s+band|floor\s+price|cap\s+price|bid\s+lot"
+    r"|market\s+lot|issue\s+programme|offer\s+programme|issue\s+details"
+    r"|issue\s+structure|terms\s+of\s+the\s+(?:issue|offer)",
+    re.IGNORECASE,
+)
+_ISSUE_TERM_PAGE_COUNT = 5
+
+#: A cover date.  Used to separate a *current* issue date from a historical
+#: one without guessing: an issue cannot close years before the document that
+#: announces it, and a document does not announce an issue decades ahead.
+#:
+#: Two forms occur in real filings and both must be read:
+#:   ``Dated: July 10, 2017``        (notice, US-style)
+#:   ``Dated October 14, 2026``      (RHP cover; no colon -- a dated colon-only
+#:                                    pattern silently produced no document
+#:                                    date at all for such a filing)
+#:
+#: The anchor is the *start of a line*, because a cover date stands alone on
+#: its own line.  Scanning mid-sentence would read the first "dated December
+#: 21, 1987" (a certificate of incorporation) as the document's own date and
+#: then treat the genuine issue window as implausible.
+_DOCUMENT_DATE = re.compile(
+    r"(?m)^[ \t]*(?:(?:Draft\s+)?(?:Red\s+Herring\s+)?Prospectus|Price\s+Band\s+Notice)?"
+    r"[ \t]*(?:Dated|Date)\s*[:\-]?\s*([^\n\r]{4,40})",
+    re.IGNORECASE,
+)
+_DATE_WINDOW_DAYS_BEFORE = 60
+_DATE_WINDOW_DAYS_AFTER = 400
+
+#: A defined-term entry is a definition, not a statement about this issue.
+#: Articles/definitions sections commonly carry entries such as
+#: ``"Closing Date" shall mean 14 July 2017``; the date belongs to the term
+#: being defined and can never be the current issue's window.
+_DEFINITION_FRAME = re.compile(
+    r"[\"\u201c\u201d\u2018\u2019'][^\"\u201c\u201d\u2018\u2019']{2,80}"
+    r"[\"\u201c\u201d\u2018\u2019']\s*(?:shall\s+mean|means|has\s+the\s+meaning)\b",
+    re.IGNORECASE,
+)
+
+#: Wording that frames a date as historical: a previous offer, an earlier
+#: filing, the listing that already happened.
+_HISTORICAL_FRAME = re.compile(
+    r"\b(?:previous|previously|earlier|erstwhile|prior|historically|former|originally)\b"
+    r"|\binitial\s+public\s+(?:offering|offer)\s+(?:in|during|of\s+the\s+year)\b"
+    r"|\b(?:has|have)\s+been\s+listed\b|\bsince\s+(?:our\s+)?listing\b",
+    re.IGNORECASE,
+)
+
 
 # --------------------------------------------------------------------------
 # Price Band Notice Parser
@@ -366,7 +442,7 @@ class PriceBandNoticeParser:
         findings: List[Finding] = []
 
         # 1. Document Classification
-        is_notice, class_reason = self._classify_document(full_text)
+        is_notice, class_reason = self._classify_document(full_text, pages)
         if not is_notice:
             raise PriceBandNoticeClassificationError(
                 f"Document does not match Price Band Notice criteria: {class_reason}"
@@ -435,16 +511,65 @@ class PriceBandNoticeParser:
             collar_spread_pct=spread_pct,
             collar_valid=collar_valid,
             findings=findings,
-            metadata={"full_text_length": len(full_text)},
+            metadata={
+                "full_text_length": len(full_text),
+                # Field-level withholding reasons, so a partial parse is
+                # distinguishable from a field the document never stated.
+                "issue_term_errors": self._issue_term_errors(findings),
+                "historical_dates_excluded": list(getattr(self, "_last_excluded_dates", [])),
+            },
         )
+
+    @staticmethod
+    def _issue_term_errors(findings: Sequence[Finding]) -> Dict[str, str]:
+        """Map withheld-field findings to their field, for the resolver."""
+        mapping = {
+            "CONFLICTING_CLOSE_DATES": "close_date",
+            "CONFLICTING_OPEN_DATES": "open_date",
+            "CONFLICTING_PRICE_BANDS": "price_band",
+            "CONFLICTING_LOT_SIZES": "lot_size",
+            "INVALID_ISSUE_DATE_ORDER": "open_date,close_date",
+        }
+        errors: Dict[str, str] = {}
+        for finding in findings:
+            field = mapping.get(finding.code)
+            if field:
+                errors[field] = finding.message
+        return errors
 
     # ----------------------------------------------------------------------
     # Classification Logic
     # ----------------------------------------------------------------------
 
-    def _classify_document(self, text: str) -> Tuple[bool, str]:
-        """Verify whether document contains authoritative Price Band Notice indicators."""
+    def _classify_document(
+        self, text: str, pages: Optional[Sequence[Tuple[int, str]]] = None
+    ) -> Tuple[bool, str]:
+        """Verify whether document contains authoritative Price Band Notice indicators.
+
+        A prospectus is excluded explicitly, not by token arithmetic.  Every
+        RHP and final Prospectus contains the notice's five semantic tokens, so
+        the token test alone accepted one and then applied notice-only rules --
+        "the *Notice* announces one price band" -- to a 500-page filing whose
+        other pages legitimately mention other price bands and other dates.
+        A notice is a short, single-purpose announcement; when the document's
+        own title pages say it is a prospectus, it is not a notice, and its
+        terms are read by the prospectus/RHP extractors instead.
+        """
         clean_text = text.lower()
+
+        title_scope = (
+            "\n".join(t for page, t in pages if page <= _TITLE_WINDOW_PAGES)
+            if pages
+            else text[:6000]
+        )
+        prospectus_title = _PROSPECTUS_TITLE.search(title_scope)
+        if prospectus_title:
+            return (
+                False,
+                "document title establishes a prospectus ("
+                + (prospectus_title.group(0) or "").replace("\n", " ").strip()
+                + "), not a Price Band Notice",
+            )
 
         # Check for title / header markers
         has_title = any(pattern.search(text) for pattern in _NOTICE_TITLE_PATTERNS)
@@ -454,6 +579,12 @@ class PriceBandNoticeParser:
 
         if has_title and token_count >= 2:
             return True, "Authoritative title and semantic price tokens matched"
+        if pages and len(pages) > _NOTICE_MAX_PAGES:
+            return (
+                False,
+                f"{len(pages)}-page document without a notice title is not a Price "
+                "Band Notice (tokens found: " + str(token_count) + ")",
+            )
         if token_count >= 4:
             return True, "Strong semantic price band token match"
 
@@ -493,8 +624,19 @@ class PriceBandNoticeParser:
             r"floor\s+price\s+(?:is\s+)?(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*]).*?cap\s+price\s+(?:is\s+)?(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*])",
             re.IGNORECASE | re.DOTALL,
         )
+        # A price band is stated in several shapes in official material:
+        #   "Price band of Rs 100 to Rs 110"   (classic notice wording)
+        #   "Price Band: Rs. 100 to Rs. 110"   (colon form; the label separator
+        #                                       was the missing token, so this
+        #                                       form yielded no band at all)
+        #   "Price Band: ₹100 – ₹110"          (en dash, rupee glyph)
+        # The label, both amounts and a range separator are still required, so
+        # an unrelated numeric range elsewhere in a document cannot match; a
+        # trailing "-NN" (a date written 2026-10-23) is refused.
         pat_range = re.compile(
-            r"price\s+band\s+(?:is\s+)?(?:of\s+)?(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*])\s*to\s*(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*])",
+            r"price\s+band\s*(?:is|of|[:\-–—])?\s*(?:rs\.?|inr|₹)?\s*"
+            r"([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*])\s*(?:to|\-|–|—)\s*"
+            r"(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]+)?)(?![A-Za-z0-9?@#*])(?!\s*[\-/]\s*\d)",
             re.IGNORECASE,
         )
         pat_lu = re.compile(
@@ -510,11 +652,14 @@ class PriceBandNoticeParser:
             re.IGNORECASE,
         )
 
-        # Scan each page
+        # Scan each page.  *Every* explicit declaration on the page is a
+        # candidate, not just the first one: a page that states two different
+        # bands is a conflict, and taking the first would silently pick a
+        # winner.  Identical repeats (running headers, restated table cells)
+        # collapse later because candidates are compared as a set of pairs.
         for page_num, text in pages:
             # Pattern A: Explicit Floor and Cap sentences
-            m_fc = pat_fc.search(text)
-            if m_fc:
+            for m_fc in pat_fc.finditer(text):
                 f_val = parse_indian_number(m_fc.group(1))
                 c_val = parse_indian_number(m_fc.group(2))
                 if f_val and c_val:
@@ -522,8 +667,7 @@ class PriceBandNoticeParser:
                     candidates.append((f_val, c_val, page_num, quote, "Explicit Floor and Cap phrase"))
 
             # Pattern B: Range phrase: "Price Band of Rs. X to Rs. Y"
-            m_range = pat_range.search(text)
-            if m_range:
+            for m_range in pat_range.finditer(text):
                 f_val = parse_indian_number(m_range.group(1))
                 c_val = parse_indian_number(m_range.group(2))
                 if f_val and c_val:
@@ -531,8 +675,7 @@ class PriceBandNoticeParser:
                     candidates.append((f_val, c_val, page_num, quote, "Price Band range phrase"))
 
             # Pattern C: Lower end and Upper end
-            m_lu = pat_lu.search(text)
-            if m_lu:
+            for m_lu in pat_lu.finditer(text):
                 f_val = parse_indian_number(m_lu.group(1))
                 c_val = parse_indian_number(m_lu.group(2))
                 if f_val and c_val:
@@ -595,9 +738,10 @@ class PriceBandNoticeParser:
                     location="price_band",
                 )
             )
-            raise PriceBandNoticeParseError(
-                f"Multiple conflicting price band pairs found in notice: {list(unique_pairs)}"
-            )
+            # One field cannot take the document down with it: withhold the
+            # band (both ends, so no half-verified collar is published) and let
+            # the lot size and issue window be read on their own evidence.
+            return None, None, findings
 
         # Single authoritative pair
         floor_val, cap_val, page_num, quote, pattern_desc = candidates[0]
@@ -684,9 +828,7 @@ class PriceBandNoticeParser:
                     location="price_band.lot_size",
                 )
             )
-            raise PriceBandNoticeParseError(
-                f"Multiple conflicting lot sizes found in notice: {list(unique_lots)}"
-            )
+            return None, findings
 
         lot_val, page_num, quote = candidates[0]
         lot_field = PriceBandField(
@@ -705,12 +847,94 @@ class PriceBandNoticeParser:
     # Date Extraction (Open & Close)
     # ----------------------------------------------------------------------
 
+    #: Pages that carry the *current* issue window.  The first pages of any
+    #: official document hold the cover/programme block; a notice's terms are
+    #: there.  Deeper pages may restate terms in a summary section, which
+    #: ``_ISSUE_TERM_PAGE`` recognises.
+    @staticmethod
+    def _is_term_page(page_num: int, text: str) -> bool:
+        return page_num <= _ISSUE_TERM_PAGE_COUNT or bool(_ISSUE_TERM_PAGE.search(text))
+
+    def _document_date(self, pages: Sequence[Tuple[int, str]]) -> Optional[str]:
+        """The document's own date from its first pages, if stated.
+
+        Used only to judge whether an issue-window candidate is plausible for
+        *this* document.  A notice or prospectus cannot announce an issue that
+        closed years before it was written, and it does not announce one
+        decades ahead; a candidate outside the window is a historical or
+        example date, not the current issue's.
+        """
+        for page_num, text in pages:
+            if page_num > _TITLE_WINDOW_PAGES:
+                break
+            for match in _DOCUMENT_DATE.finditer(text):
+                value = self._normalize_date_string(match.group(1))
+                if value:
+                    return value
+        return None
+
+    @staticmethod
+    def _days_between(a: str, b: str) -> int:
+        from datetime import date as _date
+
+        ya, ma, da = (int(part) for part in a.split("-"))
+        yb, mb, db = (int(part) for part in b.split("-"))
+        return (_date(ya, ma, da) - _date(yb, mb, db)).days
+
+    def _historical_reason(
+        self, line: str, value: str, document_date: Optional[str]
+    ) -> Optional[str]:
+        """Why a matched date belongs to the document's history, or None.
+
+        Four independent signals, any one of which is enough, each reported
+        separately so the exclusion is auditable rather than a bare "skipped":
+
+        * the enclosing line is a **defined-term entry** ("Closing Date" shall
+          mean 14 July 2017) -- a definition of a word, not a statement about
+          this issue;
+        * the enclosing line is framed as past (a previous/earlier offer, the
+          listing that already happened);
+        * the line states the date in the past tense with a year
+          ("the Issue Closing Date **was** July 14, 2017");
+        * the date falls outside a plausible window around the document's own
+          date, which is what catches a historical or example date whose
+          sentence carries no other cue.
+        """
+        if _DEFINITION_FRAME.search(line):
+            return "defined-term entry, not a statement about this issue"
+        if _HISTORICAL_FRAME.search(line):
+            return "wording frames the date as a previous/earlier offer"
+        if re.search(r"\b(?:was|were|had\s+been)\b", line, re.IGNORECASE) and re.search(
+            r"\b(?:19|20)\d{2}\b", line
+        ):
+            return "past-tense statement"
+        if document_date:
+            offset = self._days_between(value, document_date)
+            if offset < -_DATE_WINDOW_DAYS_BEFORE or offset > _DATE_WINDOW_DAYS_AFTER:
+                return (
+                    "outside the document's own date window ("
+                    + f"{value} vs document date {document_date}, {offset} days)"
+                )
+        return None
+
     def _extract_dates(
         self, pages: Sequence[Tuple[int, str]]
     ) -> Tuple[Optional[PriceBandField], Optional[PriceBandField], List[Finding]]:
+        """The current issue window, from term pages, with no document-wide abort.
+
+        A single field cannot take the whole document down with it: when two
+        credible *current-issue* candidates disagree the field is withheld and
+        the disagreement is reported, so the other fields the document does
+        establish remain available.  Candidates are read only from term pages
+        and only from lines that are not historical.
+        """
         findings: List[Finding] = []
-        open_candidates: List[Tuple[str, int, str]] = []
-        close_candidates: List[Tuple[str, int, str]] = []
+        open_candidates: List[Tuple[str, int, str, str]] = []
+        close_candidates: List[Tuple[str, int, str, str]] = []
+        excluded: List[Dict[str, Any]] = []
+        excluded_keys: set = set()
+        self._last_excluded_dates = excluded
+        document_date = self._document_date(pages)
 
         open_patterns: Sequence[re.Pattern[str]] = (
             re.compile(
@@ -743,90 +967,117 @@ class PriceBandNoticeParser:
         )
 
         for page_num, text in pages:
-            # Scan open dates
-            for pat in open_patterns:
-                for match in pat.finditer(text):
-                    date_str = self._normalize_date_string(match.group(1))
-                    if date_str:
-                        open_candidates.append((date_str, page_num, match.group(0)))
+            if not text or not self._is_term_page(page_num, text):
+                continue
+            for bucket, patterns, label in (
+                (open_candidates, open_patterns, "open_date"),
+                (close_candidates, close_patterns, "close_date"),
+            ):
+                for pat in patterns:
+                    for match in pat.finditer(text):
+                        date_str = self._normalize_date_string(match.group(1))
+                        if not date_str:
+                            continue
+                        line_start = text.rfind("\n", 0, match.start()) + 1
+                        line_end = text.find("\n", match.end())
+                        line = text[line_start: line_end if line_end != -1 else len(text)]
+                        reason = self._historical_reason(line, date_str, document_date)
+                        if reason:
+                            # One sentence often matches two label patterns
+                            # ("Closing Date" and "closes on"); report it once.
+                            key = (label, date_str, page_num)
+                            if key not in excluded_keys:
+                                excluded_keys.add(key)
+                                excluded.append(
+                                    {
+                                        "field": label,
+                                        "value": date_str,
+                                        "page": page_num,
+                                        "reason": reason,
+                                        "line": " ".join(line.split())[:200],
+                                    }
+                                )
+                            continue
+                        bucket.append((date_str, page_num, match.group(0), " ".join(line.split())[:200]))
 
-            # Scan close dates
-            for pat in close_patterns:
-                for match in pat.finditer(text):
-                    date_str = self._normalize_date_string(match.group(1))
-                    if date_str:
-                        close_candidates.append((date_str, page_num, match.group(0)))
-
-        open_field: Optional[PriceBandField] = None
-        close_field: Optional[PriceBandField] = None
-
-        if open_candidates:
-            unique_opens = set(c[0] for c in open_candidates)
-            if len(unique_opens) > 1:
-                findings.append(
-                    Finding(
-                        code="CONFLICTING_OPEN_DATES",
-                        message=f"Multiple conflicting issue open dates: {list(unique_opens)}",
-                        severity=SEVERITY_ERROR,
-                        scope="price_band_notice",
-                        location="price_band.open_date",
-                    )
+        if excluded:
+            findings.append(
+                Finding(
+                    code="HISTORICAL_DATES_EXCLUDED",
+                    message=(
+                        "Historical/example issue dates were not treated as the current issue "
+                        f"window: {[(item['field'], item['value'], item['page']) for item in excluded]}"
+                    ),
+                    severity=SEVERITY_WARNING,
+                    scope="price_band_notice",
+                    location="price_band.open_date",
                 )
-                raise PriceBandNoticeParseError(f"Conflicting open dates: {list(unique_opens)}")
-            val, pg, q = open_candidates[0]
-            open_field = PriceBandField(
-                name="open_date",
-                value=val,
-                raw_text=val,
-                page=pg,
-                locator=f"Page {pg}, 'Bid Opening Date'",
-                quote=q,
-                extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
-                verification=Verification.VERIFIED.value,
             )
 
-        if close_candidates:
-            unique_closes = set(c[0] for c in close_candidates)
-            if len(unique_closes) > 1:
-                findings.append(
-                    Finding(
-                        code="CONFLICTING_CLOSE_DATES",
-                        message=f"Multiple conflicting issue close dates: {list(unique_closes)}",
-                        severity=SEVERITY_ERROR,
-                        scope="price_band_notice",
-                        location="price_band.close_date",
-                    )
+        open_field = self._window_field(
+            "open_date", open_candidates, findings, "CONFLICTING_OPEN_DATES", "'Bid Opening Date'"
+        )
+        close_field = self._window_field(
+            "close_date", close_candidates, findings, "CONFLICTING_CLOSE_DATES", "'Bid Closing Date'"
+        )
+
+        # Validate open_date <= close_date.  An inverted pair is not a reason to
+        # throw away the rest of the document: both window fields are withheld.
+        if open_field and close_field and open_field.value > close_field.value:
+            findings.append(
+                Finding(
+                    code="INVALID_ISSUE_DATE_ORDER",
+                    message=(
+                        f"Issue open date ({open_field.value}) is after close date "
+                        f"({close_field.value}); both dates withheld"
+                    ),
+                    severity=SEVERITY_ERROR,
+                    scope="price_band_notice",
+                    location="price_band",
                 )
-                raise PriceBandNoticeParseError(f"Conflicting close dates: {list(unique_closes)}")
-            val, pg, q = close_candidates[0]
-            close_field = PriceBandField(
-                name="close_date",
-                value=val,
-                raw_text=val,
-                page=pg,
-                locator=f"Page {pg}, 'Bid Closing Date'",
-                quote=q,
-                extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
-                verification=Verification.VERIFIED.value,
             )
+            return None, None, findings
 
-        # Validate open_date <= close_date
-        if open_field and close_field:
-            if open_field.value > close_field.value:
-                findings.append(
-                    Finding(
-                        code="INVALID_ISSUE_DATE_ORDER",
-                        message=f"Issue open date ({open_field.value}) is after close date ({close_field.value})",
-                        severity=SEVERITY_ERROR,
-                        scope="price_band_notice",
-                        location="price_band",
-                    )
-                )
-                raise PriceBandNoticeParseError(
-                    f"Open date {open_field.value} is after close date {close_field.value}"
-                )
-
+        self._last_excluded_dates = excluded
         return open_field, close_field, findings
+
+    def _window_field(
+        self,
+        name: str,
+        candidates: Sequence[Tuple[str, int, str, str]],
+        findings: List[Finding],
+        conflict_code: str,
+        locator_label: str,
+    ) -> Optional[PriceBandField]:
+        """One issue-window field, withheld on a genuine current-issue conflict."""
+        if not candidates:
+            return None
+        unique = sorted({candidate[0] for candidate in candidates})
+        if len(unique) > 1:
+            findings.append(
+                Finding(
+                    code=conflict_code,
+                    message=(
+                        f"Multiple conflicting issue {name.replace('_', ' ')} candidates: {unique} "
+                        "(field withheld; other fields unaffected)"
+                    ),
+                    severity=SEVERITY_ERROR,
+                    scope="price_band_notice",
+                    location=f"price_band.{name}",
+                )
+            )
+            return None
+        val, page_num, quote, _line = candidates[0]
+        return PriceBandField(
+            name=name,
+            value=val,
+            raw_text=val,
+            page=page_num,
+            locator=f"Page {page_num}, {locator_label}",
+            quote=quote,
+            extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+            verification=Verification.VERIFIED.value,
+        )
 
     def _normalize_date_string(self, raw_str: str) -> Optional[str]:
         """Convert varied Indian notice date formulations into standard YYYY-MM-DD."""

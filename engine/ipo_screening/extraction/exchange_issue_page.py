@@ -10,13 +10,14 @@ mislabels the source, while the field contract (``PriceBandField``)
 matches the notice pathway.
 
 Deterministic and fail-closed: only explicitly labelled values are
-extracted; "Market Lot" is the lot size (never minimum bid quantity
+extracted; "Market Lot" / "Bid Lot" identify lot size (never minimum bid quantity
 or minimum investment); an unparseable page yields no fields.
 """
 
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 import html as html_module
 import re
 from datetime import datetime
@@ -26,7 +27,7 @@ from ..canonical import ExtractionMethod, SourceRef, SourceType, Verification
 from .interfaces import SourceDocument
 from .price_band_notice import PriceBandField, PriceBandNoticeResult
 
-_MONTHS = "%d %B %Y|%d %b %Y".split("|")
+_MONTHS = "%d %B %Y|%d %b %Y|%d-%B-%Y|%d-%b-%Y".split("|")
 
 
 def _strip_html(raw: bytes) -> str:
@@ -39,6 +40,8 @@ def _strip_html(raw: bytes) -> str:
 
 
 def _number(token: str) -> float:
+    if not re.fullmatch(r"[+-]?(?:\d+|\d{1,3}(?:,\d{3})+|\d{1,2}(?:,\d{2})*,\d{3})(?:\.\d+)?", token):
+        return float("nan")  # field validation rejects malformed grouping
     return float(token.replace(",", ""))
 
 
@@ -50,6 +53,31 @@ def _parse_date(token: str) -> Optional[str]:
         except ValueError:
             continue
     return None
+
+
+@dataclass
+class ExchangeIssueTermsResult(PriceBandNoticeResult):
+    """Extended exchange/page terms; the frozen notice parser remains unchanged."""
+
+    fresh_issue_amount: Optional[PriceBandField] = None
+    fresh_issue_amount_unit: Optional[str] = None
+    ofs_amount: Optional[PriceBandField] = None
+    ofs_amount_unit: Optional[str] = None
+
+    def to_enrichment_dict(self, ipo_id=None):
+        payload = super().to_enrichment_dict(ipo_id=ipo_id)
+        payload["as_of"] = self.source_ref.source_timestamp or self.source_ref.retrieval_timestamp
+        payload["sources"][0]["note"] = getattr(self, "document_class", "EXCHANGE_ISSUE_PAGE")
+        for name in ("fresh_issue", "ofs"):
+            obj = getattr(self, name + "_amount")
+            if obj is not None:
+                payload[name + "_amount"] = {
+                    "value": obj.value, "unit": getattr(self, name + "_amount_unit"),
+                    "source_id": self.source_ref.source_id, "verification": obj.verification,
+                    "quote": obj.quote, "locator": obj.locator, "page": obj.page,
+                    "extraction_method": obj.extraction_method,
+                }
+        return payload
 
 
 class ExchangeIssuePageParser:
@@ -71,7 +99,7 @@ class ExchangeIssuePageParser:
             content_hash=content_hash,
         )
         text = _strip_html(raw)
-        result = PriceBandNoticeResult(
+        result = ExchangeIssueTermsResult(
             source=source,
             source_ref=source_ref,
             is_classified_notice=False,
@@ -80,11 +108,11 @@ class ExchangeIssuePageParser:
         result.document_class = "EXCHANGE_ISSUE_PAGE"  # resolver-level class
 
         band = re.search(
-            r"price\s*band\D{0,30}?([\d,]+\.?\d*)\s*(?:-|–|—|to)\s*([\d,]+\.?\d*)",
+            r"price\s*(?:band|range)\D{0,30}?([+-]?[\d,]+\.?\d*)\s*(?:-|–|—|to)\s*(?:(?:Rs\.?|INR|₹)\s*)?([+-]?[\d,]+\.?\d*)",
             text,
             re.IGNORECASE,
         ) or re.search(
-            r"offer\s*price\D{0,20}?([\d,]+\.?\d*)\s*(?:-|–|—)\s*([\d,]+\.?\d*)",
+            r"offer\s*price\D{0,20}?([+-]?[\d,]+\.?\d*)\s*(?:-|–|—)\s*([+-]?[\d,]+\.?\d*)",
             text,
             re.IGNORECASE,
         )
@@ -107,17 +135,17 @@ class ExchangeIssuePageParser:
                 result.collar_spread_pct = round((high - low) / low * 100, 4) if low else None
                 result.collar_valid = True
 
-        lot = re.search(r"market\s*lot\D{0,20}?(\d[\d,]*)", text, re.IGNORECASE)
+        lot = re.search(r"(?:market\s*lot|lot\s*size|bid\s*lot)\D{0,20}?([+-]?\d[\d,]*(?:\.[\d]+)?)", text, re.IGNORECASE)
         if lot:
             result.lot_size = PriceBandField(
-                name="lot_size", value=int(_number(lot.group(1))), raw_text=lot.group(1),
+                name="lot_size", value=_number(lot.group(1)), raw_text=lot.group(1),
                 locator="Exchange issue information - Market Lot", quote=lot.group(0),
                 extraction_method=ExtractionMethod.EXCHANGE_DATA.value,
                 verification=Verification.VERIFIED.value, confidence=0.95,
             )
 
         period = re.search(
-            r"issue\s*period\D{0,20}?(\d{1,2}\s+[A-Za-z]{3,9},?\s+20\d{2})\s*(?:to|-)\s*(\d{1,2}\s+[A-Za-z]{3,9},?\s+20\d{2})",
+            r"issue\s*period\D{0,20}?(\d{1,2}(?:\s+|-)[A-Za-z]{3,9},?(?:\s+|-)20\d{2})\s*(?:to|-)\s*(\d{1,2}(?:\s+|-)[A-Za-z]{3,9},?(?:\s+|-)20\d{2})",
             text,
             re.IGNORECASE,
         )
@@ -137,6 +165,32 @@ class ExchangeIssuePageParser:
                     extraction_method=ExtractionMethod.EXCHANGE_DATA.value,
                     verification=Verification.VERIFIED.value, confidence=0.95,
                 )
+
+        # Explicit monetary component amounts only, never share counts or issue size.
+        for name, label in (("fresh_issue", r"fresh\s+(?:issue|offer)"),
+                            ("ofs", r"(?:offer\s+for\s+sale|ofs)")):
+            pattern = (label + r"\s*(?:size|amount)?\s*[:|]?\s*(?:₹|rs\.?|inr)\s*"
+                       r"([+-]?[0-9,]+(?:\.[0-9]+)?)\s*(crores?|cr\b|lakhs?|millions?)")
+            matches = list(re.finditer(pattern, text, re.IGNORECASE))
+            amounts = {(_number(m.group(1)), m.group(2).lower()) for m in matches}
+            if len(amounts) != 1:
+                continue
+            value, word = next(iter(amounts))
+            unit = "INR_CRORES" if word.startswith("cr") else "INR_LAKHS" if word.startswith("lakh") else "INR_MILLIONS"
+            setattr(result, name + "_amount", PriceBandField(
+                name=name + "_amount", value=value, raw_text=matches[0].group(0),
+                quote=matches[0].group(0), locator="Issue page — explicit " + name + " amount",
+                extraction_method=ExtractionMethod.EXCHANGE_DATA.value))
+            setattr(result, name + "_amount_unit", unit)
+
+        # Repeated contradictory labels in one response are not first-wins.
+        for match, names, count in ((band, ('price_band_low', 'price_band_high'), 2),
+                                    (lot, ('lot_size',), 1)):
+            if match and len({tuple(_number(m.group(i)) for i in range(1, count + 1))
+                              for m in match.re.finditer(text)}) > 1:
+                for name in names:
+                    setattr(result, name, None)
+                    result.metadata.setdefault('issue_term_errors', {})[name] = 'Conflicting labelled values in one issue page'
 
         # Issuer identity: the shortest name-like LIMITED line preceding
         # the terms (exchange pages head the issue table with it).

@@ -127,10 +127,21 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     # contains no establishable opinion language, so the opinion is honestly
     # unknown -- the previous "unqualified" value was an unsupported default.
     assert canonical["governance"]["auditor_opinion"] is None
-    assert canonical["governance"]["auditor_changed_3y"] is False
+    # Tenure/change is emitted only on a positive three-year tenure statement;
+    # this filing carries none, so the field is unknown (it used to be a
+    # constant False).  The auditor criterion was already UNKNOWN because the
+    # opinion is unknown, so the score is unchanged.
+    assert canonical["governance"]["auditor_changed_3y"] is None
     assert canonical["governance"]["auditor_reputed"] is False
-    assert canonical["governance"]["litigation_bucket"] == "clean"
-    assert canonical["governance"]["sebi_ed_action_active"] is False
+    # D-5: RK's filing has no "Outstanding Litigation" section reachable by the
+    # table-of-contents router (its litigation disclosure sits outside the
+    # default pp. 430-500 scan range), so the scan read nothing.  "clean" and
+    # ``sebi_ed_action_active = False`` were defaults, not findings, and both
+    # fields are now absent -- UNKNOWN.
+    assert canonical["governance"]["litigation_bucket"] is None
+    assert canonical["governance"]["sebi_ed_action_active"] is None
+    assert "governance.litigation_bucket" not in canonical["_evidence"]
+    assert "governance.sebi_ed_action_active" not in canonical["_evidence"]
     assert canonical["governance"]["rpt_pct_revenue"] == 10.79
 
     # 5. Module E: Business & Industry
@@ -149,13 +160,16 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     outcome = evaluate(canonical, config, mode="final", evaluation_datetime=eval_at)
 
     assert outcome.record.validation["ok"] is True
-    assert outcome.record.score["final_score"] == 49.0  # 55.0 - 2 (supplier) - 2 (cagr) - 1 (cfo) - 1 (auditor opinion unknown, B(i))
-    assert outcome.record.score["base_score"] == 52.0
+    # 55.0 - 2 (supplier) - 2 (cagr) - 1 (cfo) - 1 (auditor opinion unknown, B(i))
+    # - 4 (litigation unknown, D-5: the "clean" that earned these 4 points was a
+    # default, and availability drops by the same 4 points, 73 -> 69).
+    assert outcome.record.score["final_score"] == 44.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
+    assert outcome.record.score["base_score"] == 47.0  # -1: kmp default removed
     assert outcome.record.score["penalties_total"] == -3.0
     assert outcome.record.confidence["level"] == "Low"
-    assert outcome.record.confidence["completeness_pct"] == 73.0
-    assert outcome.record.score["lower_bound"] == 36.0
-    assert outcome.record.score["upper_bound"] == 76.0
+    assert outcome.record.confidence["completeness_pct"] == 67.0  # -2: board_kmp leaves availability
+    assert outcome.record.score["lower_bound"] == 31.0
+    assert outcome.record.score["upper_bound"] == 77.0
     assert outcome.record.verdict["verdict"] == "INSUFFICIENT_DATA"
 
     # Module assertions
@@ -185,9 +199,18 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     assert prom_ofs_crit["state"] == "SCORED"
     assert prom_ofs_crit["score"] == 2.0
 
-    # Module D: 10 / 15, auditor criterion (2 pts) unknown (opinion not established, B(i))
-    assert modules["D"]["score"] == 10.0
-    assert modules["D"]["unknown_points"] == 2.0
+    # Module D: 6 / 15.  The auditor criterion (2 pts) is unknown (opinion not
+    # established, B(i)) and, after D-5, so is litigation (4 pts): its 4 points
+    # used to be awarded for reading nothing.
+    assert modules["D"]["score"] == 5.0  # -1: board_kmp UNKNOWN
+    assert modules["D"]["unknown_points"] == 8.0  # +2: board_kmp criterion now unknown
+    lit_crit = next(c for c in modules["D"]["criteria"] if c["criterion_id"] == "litigation")
+    assert lit_crit["state"] == "UNKNOWN"
+    assert lit_crit.get("score") is None
+    # K2 used to be cleared by the defaulted flag; it is now honestly unverified.
+    k2 = next(k for k in outcome.record.knockouts["results"] if k["rule_id"] == "K2")
+    assert k2["state"] == "UNVERIFIED"
+    assert k2["missing"] == ["sebi_ed_action_active"]
     prom_post_crit = next(c for c in modules["D"]["criteria"] if c["criterion_id"] == "promoter_post_holding")
     assert prom_post_crit["state"] == "SCORED"
     assert prom_post_crit["score"] == 4.0

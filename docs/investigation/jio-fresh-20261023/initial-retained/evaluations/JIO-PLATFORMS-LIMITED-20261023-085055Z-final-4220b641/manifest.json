@@ -1,0 +1,25 @@
+{
+  "artifact_hash_algorithm": "SHA-256",
+  "artifact_hash_profile": "ipo-engine-canonical-json/1.5.0",
+  "artifact_hash_subject": "parsed JSON object",
+  "artifacts": {
+    "evaluation-record.v1.json": "0da872584dc7312f81cdb7169aad628e4b78ce0693291fb4b0484f0b6d9127ea",
+    "evaluation.json": "3656da5fbb50059d0b19d21ec41829b80996bde59decda0a6a37aecf996d55ac",
+    "evidence.json": "97046354c3638aca2bb2ed80f68455638215885a98d3889720a5b2c1435bc7cb",
+    "input.json": "a8083ddce1e40f5373a69ee3604b1c7b75e6cf8740921e4eb4cd57c68b721e71",
+    "market.json": "bac4758e1d265f474d0969c560ba6dfb855709c6676781cfb3a7d8a6a245936d",
+    "peers.json": "eaa57c3852802a74370c361f6e4c9891e031270c994c19720a074927e49d70be",
+    "result.json": "6cc5a12bd3b4c8382205a8df21d7b4a6a2a211cf3e54f67d1e034bbbb0728b48"
+  },
+  "config_hash": "4a5d92e867aea681127352c628522f9a9c5841b89ea7a47736bf55e617526d2b",
+  "config_version": "1.5.0",
+  "engine_version": "1.5.0",
+  "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-085055Z-final-4220b641",
+  "evaluation_timestamp": "2026-10-23T08:50:55Z",
+  "input_snapshot_hash": "7fd3a0cd72d52529dd637465e0e278f990738be8d437e6163d15555d095c649a",
+  "market_snapshot_hash": "cb2cf135481c7af8264e29105cd4ec5b2997455853decf470eff810bf21933ec",
+  "peer_snapshot_hash": "61f5c9132e97baf987f2693568ab5b4b5ec748136b05453f0e2d155b842edb9b",
+  "result_hash": "4220b641d224c8be382aeca7ab1317da21dbcd800c6fdd6a8a2ed588851e3d93",
+  "source_manifest_hash": "5563cf1dbfb58d48e16eb42bcf2d2ca618af14bf2145da89a3144df4f169f928",
+  "spec_version": "1.5"
+}

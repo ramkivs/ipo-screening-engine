@@ -162,11 +162,26 @@ def test_adversarial_c_invalid_collar_fails_closed():
 
 
 def test_adversarial_d_conflicting_price_sources(unpriced_raw):
-    """Case D: Conflicting authoritative notice files reject evaluation."""
+    """Case D: Conflicting authoritative notice files reject evaluation.
+
+    Changed 2026-10-23 (A30): a field-level conflict no longer discards the
+    document at parse time -- the band is withheld and the other fields
+    survive.  The adversarial property this case guards is unchanged: a
+    conflicting band must not reach an evaluation, and it still fails closed
+    at the final-mode gate because the band was withheld, never guessed.
+    """
     pbn_conflicting = REPO_ROOT / "fixtures" / "notices" / "conflicting_notice.txt"
     parser = PriceBandNoticeParser()
-    with pytest.raises(Exception):
-        parser.parse_from_file(pbn_conflicting)
+    pbn_res = parser.parse_from_file(pbn_conflicting)
+    # The conflict is still reported and the band is still withheld (both
+    # ends), so no contradictory value can be published.
+    assert pbn_res.price_band_low is None and pbn_res.price_band_high is None
+    assert "CONFLICTING_PRICE_BANDS" in {finding.code for finding in pbn_res.findings}
+    assert "price_band" in pbn_res.metadata["issue_term_errors"]
+
+    with pytest.raises(EnrichmentValidationError) as exc:
+        EnrichmentEngine.assemble(base_input=unpriced_raw, price_band_notice=pbn_res, mode="final")
+    assert "price band" in str(exc.value).lower()
 
 
 # --------------------------------------------------------------------------

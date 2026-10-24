@@ -1,0 +1,64 @@
+..............FF.......                                                  [100%]
+=================================== FAILURES ===================================
+________ test_jio_without_official_source_fails_closed_on_pricing_only _________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-2/test_jio_without_official_sour0')
+jio_canonical = {'ipo_id': 'JIO-PLATFORMS-LIMITED', 'company_name': 'JIO PLATFORMS LIMITED', 'board': 'mainboard', 'icdr_route': '6(1)', ...}
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f2a43b30590>
+
+    def test_jio_without_official_source_fails_closed_on_pricing_only(tmp_path, jio_canonical, monkeypatch):
+        monkeypatch.setattr(
+            DocumentExtractor,
+            "extract_from_pdf",
+            lambda self, pdf_path=None, allow_fixture_fallbacks=False: (jio_canonical, {}),
+        )
+        cfg = PresentationConfig(
+            store_root=tmp_path / "evaluations",
+            config_dir=REPO_ROOT / "config",
+            issue_terms_resolver=IssueTermsResolver(providers=[]),
+        )
+        service = PresentationService(cfg)
+        with pytest.raises(IngestionAwaitingIssueTermsError) as excinfo:
+            service.ingest_document(file_bytes=b"%PDF-1.4 test", filename="jio.pdf", mode="final")
+        # OFS is filing-established (fresh-only); only pricing remains open.
+>       assert excinfo.value.missing_fields == ["price_band_low", "price_band_high", "lot_size"]
+E       AssertionError: assert ['price_band_...'fresh_issue'] == ['price_band_...', 'lot_size']
+E         
+E         Left contains one more item: 'fresh_issue'
+E         Use -v to get more diff
+
+tests/test_jio_rhp_issue_terms.py:142: AssertionError
+______________ test_jio_completes_via_verified_prospectus_pathway ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-2/test_jio_completes_via_verifie0')
+
+    def test_jio_completes_via_verified_prospectus_pathway(tmp_path):
+        from ipo_screening.issue_terms import HttpProspectusProvider
+    
+        provider = HttpProspectusProvider(
+            {"JIO-PLATFORMS-LIMITED": "https://www.sebi.gov.in/sebi_data/attachdocs/jio-prospectus.pdf"},
+            fetcher=lambda u: PROSPECTUS_TEXT.encode(),
+        )
+        cfg = PresentationConfig(
+            store_root=tmp_path / "evaluations",
+            config_dir=REPO_ROOT / "config",
+            issue_terms_resolver=IssueTermsResolver(providers=[provider]),
+        )
+        service = PresentationService(cfg)
+        resp = service.ingest_document(
+            file_bytes=JIO_PDF.read_bytes(), filename=JIO_PDF.name, mode="final"
+        )
+        assert resp.ipo_id == "JIO-PLATFORMS-LIMITED"
+        record = service.eval_store.read(resp.evaluation_id)
+        issue = record["input_snapshot"]["input"]["issue"]
+        assert (issue["price_band_low"], issue["price_band_high"], issue["lot_size"]) == (500.0, 550.0, 25)
+        assert issue["ofs"] == 0.0  # filing-established: no Offer for Sale
+        # Stated Rs.148,500 million converted to canonical INR lakhs.
+>       assert issue["fresh_issue"] == 1485000.0
+E       assert 148500.0 == 1485000.0
+
+tests/test_jio_rhp_issue_terms.py:167: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_jio_rhp_issue_terms.py::test_jio_without_official_source_fails_closed_on_pricing_only
+FAILED tests/test_jio_rhp_issue_terms.py::test_jio_completes_via_verified_prospectus_pathway
+2 failed, 21 passed in 52.26s

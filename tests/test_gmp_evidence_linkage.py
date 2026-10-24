@@ -464,7 +464,7 @@ def test_cutoff_inside_window_is_nonterminal_and_preserves_only_unknown_window(
         ("weekday-mismatch", "not an explicit supported instant"),
         ("wrong-locator", "is outside the artifact"),
         ("publisher-host-mismatch", "publisher-host or issue-URL identity"),
-        ("untied-trend", "trend has no linked evidence"),
+        ("untied-trend", "evidence entry 'market.gmp.trend' is missing"),
     ],
 )
 def test_link_failures_are_diagnostics_not_input_rejections(
@@ -666,3 +666,188 @@ def test_failed_or_unlinked_legacy_inputs_keep_the_existing_a15_mapping(
     a15 = _a15_document(outcome)
     assert not any(item["code"] == GMP_LINK_DIAGNOSTIC_CODE for item in a15["result"]["diagnostics"])
     assert not any(item.get("subject_kind") == "RAW_ARTIFACT_BYTES" for item in a15["integrity"]["digests"])
+
+
+@pytest.mark.parametrize("issuer", ["Acme Corp", "Example Instruments"])
+@pytest.mark.parametrize("hour", [14, 15])
+def test_unqualified_linkage_replay_is_not_issuer_or_evaluation_specific(
+    tmp_path, monkeypatch, golden_input, config, issuer, hour
+):
+    """Component-positive linkage is NOT a qualified positive A9 fixture."""
+    slug = issuer.lower().replace(" ", "-")
+    url = f"https://publisher.example/ipo/{slug}"
+
+    def identity(manifest):
+        manifest["publisherIssuePage"]["url"] = url
+        manifest["publisherIssuePage"]["displayedIssueName"] = issuer
+        manifest["artifacts"][0]["url"] = url
+
+    text = CAPTURE_TEXT.replace("Acme Corp", issuer)
+    repo, _hash, source = _make_capture_repo(
+        tmp_path, manifest_mutator=identity, artifact_text=text
+    )
+    _use_test_repo(monkeypatch, repo)
+    document = _linked_input(golden_input, source)
+    document["company_name"] = issuer
+    document["_evidence"]["company_name"]["quote"] = f"# {issuer}IPO GMP Today"
+    store = EvaluationStore(tmp_path / "evaluations")
+    at = EVALUATED_AT.replace(hour=hour)
+    outcome = evaluate(document, config, evaluation_datetime=at, store=store)
+    original = _a15_document(outcome)
+    restored = _a15_document(replay(store, outcome.record.evaluation_id, config))
+    assert "result=VERIFIED" in _link_diagnostic(original)["message"]
+    assert restored["result"]["outcome_resolution"] == original["result"]["outcome_resolution"]
+    assert original["result"]["outcome_resolution"]["reason"]["code"] == "SOURCE_UNQUALIFIED"
+    assert "final_outcome" not in original["result"]
+    assert store.verify_hashes(outcome.record.evaluation_id)["artifact_mismatches"] == []
+    preliminary = _a15_document(evaluate(
+        document, config, mode="preliminary", evaluation_datetime=at
+    ))
+    assert "A9_GMP_FINAL_WITHHELD" not in {
+        item["code"] for item in preliminary["result"]["diagnostics"]
+    }
+
+
+@pytest.mark.parametrize("trend", ["strong", "flat", "falling"])
+def test_a28_unlinked_trend_rejection_is_not_hidden_by_blanket_a9_veto(
+    tmp_path, monkeypatch, golden_input, config, trend
+):
+    """Exercise the linkage reason itself, not merely Final withholding."""
+    repo, _hash, source = _make_capture_repo(tmp_path)
+    _use_test_repo(monkeypatch, repo)
+    document = _linked_input(golden_input, source)
+    baseline = _a15_document(evaluate(document, config, evaluation_datetime=EVALUATED_AT))
+    assert "result=VERIFIED" in _link_diagnostic(baseline)["message"]
+    document["market"]["gmp"]["trend"] = trend
+    changed = _a15_document(evaluate(document, config, evaluation_datetime=EVALUATED_AT))
+    diagnostic = _link_diagnostic(changed)["message"]
+    assert "result=VERIFIED" not in diagnostic
+    assert "evidence entry 'market.gmp.trend' is missing" in diagnostic
+    assert changed["result"]["outcome_resolution"]["reason"]["code"] == "SOURCE_UNQUALIFIED"
+
+
+def test_retained_marketlive_package_integrity_is_not_qualification():
+    """D1 permits rendered bytes; these eight digests certify no publisher."""
+    package = (
+        Path(__file__).resolve().parents[1]
+        / "evidence/gmp-observations/marketliveipogmp-tonbo-20261015"
+    )
+    manifest = json.loads((package / "capture-manifest.json").read_text(encoding="utf-8"))
+    assert len(manifest["artifacts"]) == 8
+    for artifact in manifest["artifacts"]:
+        data = (package / artifact["file"]).read_bytes()
+        assert len(data) == artifact["bytes"], artifact["id"]
+        assert hashlib.sha256(data).hexdigest().lower() == artifact["sha256"].lower(), artifact["id"]
+
+
+@pytest.mark.parametrize(
+    ("target", "reason"),
+    [("artifact", "byte count or SHA-256 does not match"),
+     ("manifest", "manifest SHA-256 does not match")],
+)
+def test_replay_rechecks_external_bytes_without_rewriting_stored_evidence(
+    tmp_path, monkeypatch, golden_input, config, target, reason
+):
+    """A persisted verified link is not a cached approval of future bytes."""
+    repo, _hash, source = _make_capture_repo(tmp_path)
+    _use_test_repo(monkeypatch, repo)
+    store = EvaluationStore(tmp_path / "evaluations")
+    outcome = evaluate(_linked_input(golden_input, source), config,
+                       evaluation_datetime=EVALUATED_AT, store=store)
+    original = store.read_artifact(outcome.record.evaluation_id, "evaluation-record.v1")
+    assert "result=VERIFIED" in _link_diagnostic(original)["message"]
+    path = repo / MANIFEST_URI_PATH
+    if target == "artifact":
+        path = path.parent / "source-captures/page.md"
+        path.write_bytes(path.read_bytes().replace(b"+71.4%", b"+72.4%"))
+    else:
+        path.write_bytes(path.read_bytes() + b" ")
+    replayed = _a15_document(replay(store, outcome.record.evaluation_id, config))
+    message = _link_diagnostic(replayed)["message"]
+    assert "result=FAILED:" in message
+    assert reason in message
+    assert replayed["result"]["outcome_resolution"]["reason"]["code"] == "SOURCE_UNQUALIFIED"
+    assert "final_outcome" not in replayed["result"]
+    assert store.read_artifact(outcome.record.evaluation_id, "evaluation-record.v1") == original
+    # The store's own hash verification is not an external-evidence recheck.
+    assert store.verify_hashes(outcome.record.evaluation_id)["artifact_mismatches"] == []
+
+
+@pytest.mark.parametrize("early_first", [True, False])
+def test_capture_availability_never_leaks_across_evaluation_cutoffs(
+    tmp_path, monkeypatch, golden_input, config, early_first
+):
+    """Reuse identical input in both orders; assert component timing, not A9 alone."""
+    repo, _hash, source = _make_capture_repo(tmp_path)
+    _use_test_repo(monkeypatch, repo)
+    document = _linked_input(golden_input, source)
+    early = EVALUATED_AT.replace(hour=13, minute=16)
+    instants = [early, EVALUATED_AT] if early_first else [EVALUATED_AT, early]
+    store = EvaluationStore(tmp_path / "evaluations")
+    ids = []
+    for instant in instants:
+        outcome = evaluate(document, config, evaluation_datetime=instant, store=store)
+        ids.append(outcome.record.evaluation_id)
+        expected = "NOT_AVAILABLE_BY_CUTOFF" if instant == early else "VERIFIED"
+        original = _a15_document(outcome)
+        assert f"result={expected}" in _link_diagnostic(original)["message"]
+        restored = _a15_document(replay(store, outcome.record.evaluation_id, config))
+        assert _link_diagnostic(restored)["message"] == _link_diagnostic(original)["message"]
+        assert restored["result"]["outcome_resolution"] == original["result"]["outcome_resolution"]
+        assert "final_outcome" not in restored["result"]
+    assert ids[0] != ids[1]
+
+
+@pytest.mark.parametrize(('label', 'mapped'), [('rising', 'strong'), ('neutral', 'flat'), ('down', 'falling')])
+def test_a28_explicit_trend_links_and_replays_without_qualifying_source(
+    tmp_path, monkeypatch, golden_input, config, label, mapped
+):
+    text = CAPTURE_TEXT + f'\nTrend: {label}'
+    repo, _hash, source = _make_capture_repo(tmp_path, artifact_text=text)
+    _use_test_repo(monkeypatch, repo)
+    document = _linked_input(golden_input, source)
+    document['market']['gmp']['trend'] = mapped
+    document['_evidence']['market.gmp.trend'] = {
+        'evidence_id': 'EV-market.gmp.trend', 'source_id': LINK_SOURCE_ID,
+        'locator': 'line 5', 'quote': label, 'extraction_method': 'MANUAL_ENTRY',
+    }
+    store = EvaluationStore(tmp_path / 'evaluations')
+    outcome = evaluate(document, config, evaluation_datetime=EVALUATED_AT, store=store)
+    original = _a15_document(outcome)
+    assert 'result=VERIFIED' in _link_diagnostic(original)['message']
+    assert 'EV-market.gmp.trend' in _link_diagnostic(original)['evidence_refs']
+    assert original['result']['outcome_resolution']['reason']['code'] == 'SOURCE_UNQUALIFIED'
+    restored = _a15_document(replay(store, outcome.record.evaluation_id, config))
+    assert _link_diagnostic(restored) == _link_diagnostic(original)
+    assert 'final_outcome' not in restored['result']
+
+
+@pytest.mark.parametrize('case', ['delta', 'unsupported', 'conflicting', 'mismatch', 'hidden'])
+def test_a28_trend_requires_actual_unambiguous_publisher_label(
+    tmp_path, monkeypatch, golden_input, config, case
+):
+    label = 'sideways' if case == 'unsupported' else 'rising'
+    text = CAPTURE_TEXT + ('\nMovement: rising' if case == 'delta' else f'\nTrend: {label}')
+    if case == 'conflicting':
+        text += '\nTrend: down'
+    repo, _hash, source = _make_capture_repo(tmp_path, artifact_text=text)
+    _use_test_repo(monkeypatch, repo)
+    document = _linked_input(golden_input, source)
+    document['market']['gmp']['trend'] = None if case == 'hidden' else ('flat' if case == 'mismatch' else 'strong')
+    document['_evidence']['market.gmp.trend'] = {
+        'evidence_id': 'EV-market.gmp.trend', 'source_id': LINK_SOURCE_ID,
+        'locator': 'line 5', 'quote': label, 'extraction_method': 'MANUAL_ENTRY',
+    }
+    a15 = _a15_document(evaluate(document, config, evaluation_datetime=EVALUATED_AT))
+    assert 'result=FAILED:' in _link_diagnostic(a15)['message']
+    assert 'final_outcome' not in a15['result']
+
+
+def test_a28_null_input_cannot_discard_a_displayed_publisher_label(
+    tmp_path, monkeypatch, golden_input, config
+):
+    repo, _hash, source = _make_capture_repo(tmp_path, artifact_text=CAPTURE_TEXT+'\nTrend: rising')
+    _use_test_repo(monkeypatch, repo)
+    a15 = _a15_document(evaluate(_linked_input(golden_input, source), config, evaluation_datetime=EVALUATED_AT))
+    assert 'cannot hide a displayed publisher label' in _link_diagnostic(a15)['message']
+    assert 'final_outcome' not in a15['result']

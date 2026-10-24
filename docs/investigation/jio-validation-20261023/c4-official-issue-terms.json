@@ -1,0 +1,31 @@
+{
+  "engine_workflow_run": {
+    "when_utc": "2026-10-23T11:14:52Z",
+    "resolver": "build_resolver_from_env() -> OfficialDiscoveryProvider",
+    "status": "UNAVAILABLE",
+    "detail": "every configured endpoint failed at the transport layer: URLError TLS/SSL connection has been closed (EOF) for https://www.nseindia.com/market-data/all-upcoming-issues-ipo and https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P (and the remaining endpoints)",
+    "classification": "sandbox egress restriction (the environment permits only an allowlist of hosts); NOT evidence that the record is unpublished"
+  },
+  "independent_publication_check": {
+    "method": "functions.fetch_page retrieval of the public BSE pages (a rendering client, NOT the engine's fetcher and NOT an official-source capture under the engine's evidence contract)",
+    "listing_url": "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
+    "listing_row": "Jio Platforms Limited | MainBoard | 21-10-2026 to 23-10-2026 | 1065.00 - 1119.00 | face value 10.00 | IPO | Live",
+    "detail_url": "https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4894&type=IPO&idtype=1&status=L&IPONo=8047&startdt=21/10/2026",
+    "detail_fields": {
+      "price_band": "1065.00-1119.00 (employee discount Rs 54 for eligible employees)",
+      "market_lot": 12,
+      "minimum_bid_quantity": 12,
+      "issue_size_no_of_shares": "19,75,25,934",
+      "issue_period": "21 Oct 2026 to 23 Oct 2026",
+      "symbol": "JPL"
+    },
+    "exchange_notice_listed": "Public issue of Jio Platforms Limited - Allocation to Anchor Investor (2026-10-19, https://www.bseindia.com/downloads/UploadDocs/Notices/20261019-46/20261019-46.pdf)"
+  },
+  "findings": [
+    "The official issue terms ARE published: the exchange page carries the price band and the market lot.",
+    "The engine could not retrieve them because of this sandbox's egress restriction, not because they do not exist.",
+    "The engine's issue-term values remain the PA-authorized third-party ones, tagged UNVERIFIED; nothing from this independent check was written into any official field.",
+    "A discrepancy needing authoritative resolution: BSE's 'Issue Size - No. of Shares' (19,75,25,934) does not equal the 27,00,00,000 fresh shares used by the retained aggregator and the filing's cover. Neither figure was changed; the reconciliation needs the Prospectus/notice, not a guess.",
+    "An anchor-allocation notice exists on the exchange, which is relevant to the anchor market block; anchor quality still requires the separately authorized assessment contract and is not inferred here."
+  ]
+}

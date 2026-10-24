@@ -1,0 +1,108 @@
+{
+  "scope": "Governing requirements read from config/ipo-config.v1.5.0.json and engine/ipo_screening/knockouts.py; evidence read from the committed RHP. No rule was changed.",
+  "K1": {
+    "rule": "any(auditor_opinion in [qualified, adverse, disclaimer], going_concern_uncertainty flag, net_worth_latest < 0)",
+    "leaves": {
+      "auditor_opinion": {
+        "value": "unqualified",
+        "page": 324,
+        "state": "FALSE leaf (not triggered)",
+        "note": "unmodified/unqualified conclusion in the examination report"
+      },
+      "net_worth_latest": {
+        "value": 3359769.0,
+        "unit": "INR_MILLIONS",
+        "state": "FALSE leaf"
+      },
+      "going_concern_uncertainty": {
+        "value": null,
+        "state": "UNKNOWN"
+      }
+    },
+    "document_search": {
+      "phrase_going_concern_pages": [
+        253
+      ],
+      "finding": "The only 'going concern' occurrence in the whole 591-page document is page 253, describing the accounting basis of a 2019 scheme of arrangement ('at their carrying values, on a going concern basis'). It is not an uncertainty statement.",
+      "no_material_uncertainty_phrase_present": false,
+      "phrases_absent": [
+        "no material uncertainty",
+        "unquantified",
+        "unascertained",
+        "cannot be quantified"
+      ]
+    },
+    "conclusion": "The filing is silent on going-concern uncertainty. Silence is neither a positive finding (trigger) nor an explicit negative (clearance).",
+    "required_policy_decision": "Whether an unqualified/unmodified SEBI-format examination report with no going-concern paragraph, no Emphasis of Matter and no Key Audit Matter reference may be recorded as going_concern_uncertainty = False. That would be a new negative-confirmation rule (A19 extension); it is not implemented."
+  },
+  "K2": {
+    "rule": "any(promoter_pledge_pct > 25, sebi_ed_action_active flag)",
+    "leaves": {
+      "promoter_pledge_pct": {
+        "value": 0.0,
+        "state": "FALSE leaf",
+        "evidence": "page 104/109 pledge statements"
+      },
+      "sebi_ed_action_active": {
+        "value": null,
+        "state": "UNKNOWN",
+        "note": "the integrated extractor does not emit the flag; the branch extractor emitted an unsupported False and is superseded"
+      }
+    },
+    "document_evidence": [
+      {
+        "page": 470,
+        "quote": "SEBI had filed a complaint on July 16, 2020 ... The Special Court, Mumbai, vide order dated September 30, 2020, dismissed SEBI's complaint as barred by limitation. Against the said order ... SEBI has filed a revision application before the Hon'ble High Court of Bombay and the same is currently pending.",
+        "relevance": "live SEBI proceeding involving the Promoter, not the Company"
+      },
+      {
+        "page": 470,
+        "quote": "By an order dated March 24, 2017, the Whole time Member found RIL acted in a fraudulent manner ...",
+        "relevance": "historical penalty matter (reported set aside on appeal in 2026); see 471/472"
+      },
+      {
+        "page": 472,
+        "quote": "V. Disciplinary actions including penalties imposed by SEBI or stock exchanges against RIL, the Promoter in the last five financial years ...",
+        "relevance": "disclosed penalties"
+      },
+      {
+        "page": 487,
+        "quote": "neither the Company nor the Directors or Promoter or members of the Promoter Group, are debarred from accessing the capital markets by SEBI",
+        "relevance": "a DEBARMENT denial, not a denial of pending proceedings"
+      },
+      {
+        "page": 463,
+        "quote": "except as disclosed in this section, there are no outstanding litigation as of the date of this RHP ...",
+        "relevance": "scoped negative limited to undisclosed matters"
+      }
+    ],
+    "conclusion": "Neither a verified positive nor a verified negative for the flag: there is a disclosed pending regulatory proceeding against the Promoter, while the only affirmative denial covers debarment.",
+    "required_policy_decision": "Scope of 'active SEBI/ED action' for K2: (a) entity — Company only, or Promoter included; (b) nature — criminal complaint/revision, penalty proceedings, and debarment treated differently; (c) status — pending revision after a dismissal counts as active. Also whether ED coverage may be treated as satisfied when the filing does not mention ED at all."
+  },
+  "K5": {
+    "rule": "any(contingent_liab_pct_networth > 50, contingent_liab_unquantified flag)",
+    "leaves": {
+      "contingent_liab_pct_networth": {
+        "numerator": 15021.0,
+        "denominator_engine": 3359769.0,
+        "ratio_pct": 0.4470843,
+        "state": "FALSE leaf",
+        "note": "denominator basis is the C3 open question; the alternative basis gives 0.4497%, also far below 50%"
+      },
+      "contingent_liab_unquantified": {
+        "value": null,
+        "state": "UNKNOWN",
+        "note": "defined-note scope, no positive unquantified disclosure"
+      }
+    },
+    "document_evidence": {
+      "page": 405,
+      "note_heading": "37 Contingent Liabilities and Commitments",
+      "printed": "Claims / disputed liabilities against the Group not acknowledged as debts* 14,688 14,151 15,021 30,183 27,924",
+      "footnote": "The claims/disputed liabilities are not likely to have any material effect on financial position of the Group.",
+      "commitments_excluded": "Estimated amount of contracts remaining to be executed on Capital account not provided for 90,389 65,624 26,198 51,272 58,284 (a commitment, not a contingent liability)"
+    },
+    "conclusion": "All five periods are quantified in the defined note; no unquantified/unascertained language exists anywhere in the document. That does not by itself establish 'fully quantified' as a rule-level False.",
+    "required_policy_decision": "Whether a complete, quantified contingent-liability note with no unquantified language supports contingent_liab_unquantified = False (A20 scope extension), or whether the flag stays UNKNOWN unless a positive unquantified disclosure exists (current behaviour)."
+  }
+}

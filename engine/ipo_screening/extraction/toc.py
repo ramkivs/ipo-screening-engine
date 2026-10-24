@@ -26,13 +26,15 @@ class TOCEntry:
 _SECTION_PATTERNS = (
     ("the_offer", re.compile(r"\bTHE\s+OFFER\b", re.IGNORECASE)),
     ("capital_structure", re.compile(r"\bCAPITAL\s+STRUCTURE\b", re.IGNORECASE)),
-    ("objects_of_the_offer", re.compile(r"\bOBJECTS\s+OF\s+(?:THE\s+)?OFFER\b", re.IGNORECASE)),
-    ("basis_for_offer_price", re.compile(r"\bBASIS\s+(?:FOR|OF)\s+(?:THE\s+)?OFFER\s+PRICE\b", re.IGNORECASE)),
+    ("objects_of_the_offer", re.compile(r"\bOBJECTS\s+OF\s+(?:THE\s+)?(?:OFFER|ISSUE)\b", re.IGNORECASE)),
+    # SEBI's current heading is "BASIS FOR ISSUE PRICE"; older filings use
+    # "BASIS FOR OFFER PRICE".  Both route to the same section.
+    ("basis_for_offer_price", re.compile(r"\bBASIS\s+(?:FOR|OF)\s+(?:THE\s+)?(?:OFFER|ISSUE)\s+PRICE\b", re.IGNORECASE)),
     ("industry_overview", re.compile(r"\bINDUSTRY\s+OVERVIEW\b", re.IGNORECASE)),
     ("our_business", re.compile(r"\bOUR\s+BUSINESS\b", re.IGNORECASE)),
-    ("our_management", re.compile(r"\bOUR\s+MANAGEMENT\b", re.IGNORECASE)),
+    ("our_management", re.compile(r"\b(?:OUR|THE)\s+MANAGEMENT\b", re.IGNORECASE)),
     ("promoters", re.compile(r"\bOUR\s+PROMOTER(?:S|\s+AND\s+PROMOTER\s+GROUP)?\b", re.IGNORECASE)),
-    ("restated_financials", re.compile(r"\b(?:RESTATED\s+)?FINANCIAL\s+STATEMENTS\b", re.IGNORECASE)),
+    ("restated_financials", re.compile(r"\b(?:RESTATED\s+(?:CONSOLIDATED\s+)?FINANCIAL\s+INFORMATION|(?:RESTATED\s+)?(?:CONSOLIDATED\s+)?FINANCIAL\s+STATEMENTS)\b", re.IGNORECASE)),
     ("financial_indebtedness", re.compile(r"\b(?:FINANCIAL\s+INDEBTEDNESS|CAPITALISATION\s+STATEMENT)\b", re.IGNORECASE)),
     ("litigation", re.compile(r"\bOUTSTANDING\s+LITIGATION\b", re.IGNORECASE)),
     ("contingent_liabilities", re.compile(r"\bSUMMARY\s+OF\s+CONTINGENT\s+LIABILITIES\b", re.IGNORECASE)),

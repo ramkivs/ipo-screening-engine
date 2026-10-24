@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import logging
 from datetime import datetime, timezone
 import shutil
 import tempfile
@@ -128,6 +130,9 @@ class IngestionIssueTermConflictError(IngestionError):
         self.conflicts = list(conflicts)
 
 
+from ..aggregator_issue_terms import authority_warnings
+
+
 class PresentationConfig:
     """Configuration paths for PresentationService."""
 
@@ -139,6 +144,7 @@ class PresentationConfig:
         analytics_path: Optional[str | Path] = "build/analytics/analytics.json",
         proposal_path: Optional[str | Path] = "config/calibration-proposal.v1.6.0.json",
         issue_terms_resolver: Optional[Any] = None,
+        aggregator_issue_terms_resolver: Optional[Any] = None,
     ) -> None:
         self.store_root = Path(store_root)
         self.config_dir = Path(config_dir)
@@ -146,6 +152,7 @@ class PresentationConfig:
         self.analytics_path = Path(analytics_path) if analytics_path else None
         self.proposal_path = Path(proposal_path) if proposal_path else None
         self.issue_terms_resolver = issue_terms_resolver
+        self.aggregator_issue_terms_resolver = aggregator_issue_terms_resolver
 
 
 class PresentationService:
@@ -157,6 +164,9 @@ class PresentationService:
             from ..issue_terms import build_resolver_from_env
 
             self.config.issue_terms_resolver = build_resolver_from_env()
+        if self.config.aggregator_issue_terms_resolver is None:
+            from ..aggregator_issue_terms import build_from_env
+            self.config.aggregator_issue_terms_resolver = build_from_env()
         self.eval_store = EvaluationStore(self.config.store_root)
         self.lifecycle_mgr = LifecycleManager(self.config.store_root, active_config_hash=ACTIVE_RATIFIED_CONFIG_HASH)
         # Ingestion diagnostics live beside (never inside) the immutable
@@ -490,6 +500,7 @@ class PresentationService:
                     points=float(p.get("points", 0.0)),
                     state=p.get("state", "SCORED"),
                     trigger=p.get("trigger"),
+                    reason=p.get("reason"),
                 )
             )
 
@@ -541,6 +552,7 @@ class PresentationService:
         ]
 
         return EvaluationDetail(
+            authority_warnings=authority_warnings(rec),
             evaluation_id=eval_id,
             ipo_id=rec.get("ipo_id", ""),
             company_name=rec.get("company_name", ""),
@@ -603,7 +615,11 @@ class PresentationService:
         # floor/cap (or any pair sharing one quote) cannot be swapped.
         snapshot = rec.get("input_snapshot") or {}
         canonical_input = snapshot.get("input") if isinstance(snapshot.get("input"), dict) else snapshot
-        reporting_unit = snapshot.get("reporting_unit") or canonical_input.get("reporting_unit")
+        reporting_unit = (
+            snapshot.get("reporting_unit")
+            or canonical_input.get("reporting_unit")
+            or (canonical_input.get("financials") or {}).get("reporting_unit")
+        )
 
         def _resolve_path(path: str):
             """Resolve a canonical path, including list indices written
@@ -665,7 +681,13 @@ class PresentationService:
             if leaf == "lot_size":
                 return "equity shares"
             if leaf in ("ofs", "fresh_issue", "issue_size") and reporting_unit:
-                return f"INR {reporting_unit}"
+                # Canonical monetary fields are stated in the document's
+                # reporting unit (v1.5: financials.reporting_unit).
+                pretty = {
+                    "INR_LAKHS": "INR lakh",
+                    "INR_CRORES": "INR crore",
+                }.get(str(reporting_unit), f"INR {reporting_unit}")
+                return pretty
             if leaf in (
                 "fresh_shares",
                 "post_issue_shares",
@@ -745,7 +767,9 @@ class PresentationService:
                 host = uri.split("://", 1)[1].split("/", 1)[0].lower()
             from ..issue_terms import OFFICIAL_HOSTS
 
-            if item.get("extraction_method") == "DERIVED" or source_type == "DERIVED":
+            if str(source_id or "").startswith("SRC-AGG-"):
+                verification = "THIRD_PARTY_AGGREGATOR_OVERRIDE"
+            elif item.get("extraction_method") == "DERIVED" or source_type == "DERIVED":
                 verification = "DERIVED"
             elif not source_entry:
                 verification = "UNVERIFIED"
@@ -1072,7 +1096,25 @@ class PresentationService:
 
     MAX_INGEST_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB bound
 
-    MANUAL_ISSUE_TERM_FIELDS = ("price_band_low", "price_band_high", "lot_size")
+    # The required issue terms that the filing may leave undisclosed, all
+    # manually enterable (Step 4 Area C bounded entry, 2026-10-17; four-field
+    # scope directed 2026-10-18 so initial screening never waits for
+    # official-source retrieval; issue.fresh_issue added 2026-10-19 to close
+    # the Jio manual-entry dead end -- the canonical input contract v1.5
+    # requires it for every evaluation and the broker's IPO page states it).
+    # issue.ofs is the Offer-for-Sale MONETARY amount in the filing's
+    # financials.reporting_unit (v1.5 input contract: number, minimum 0,
+    # "in reporting_unit") -- never a share count and never assumed zero.
+    # issue.fresh_issue is the fresh-issue MONETARY amount in the same
+    # reporting unit (v1.5 input contract: number, minimum 0): explicit 0 is
+    # an operator statement of a pure-OFS offer, never a default.
+    MANUAL_ISSUE_TERM_FIELDS = (
+        "price_band_low",
+        "price_band_high",
+        "lot_size",
+        "ofs",
+        "fresh_issue",
+    )
     MANUAL_ENTRY_SOURCE_ID = "SRC-MANUAL-ENTRY"
 
     def ingest_document(
@@ -1178,27 +1220,75 @@ class PresentationService:
         filename: str = "filing.pdf",
         mode: str = "final",
     ) -> IngestionRecorder:
-        """Start ingestion on a background thread with a live trace.
+        """Dispatch a traced worker; never assume inner terminal recording ran.
 
-        Returns the recorder immediately; the UI polls the activity
-        endpoints for events while processing continues.  The terminal
-        outcome is recorded by ``ingest_document`` itself, so a thread
-        failure can never leave a trace stuck at RUNNING without the
-        wrapper's terminal recording having run.
+        A live but blocked thread cannot safely be killed or labelled failed:
+        it may later persist an evaluation. This boundary handles dispatch and
+        exited workers, not an unsafe wall-clock cancellation of live work.
         """
         import threading as _threading
+        from .ingestion_activity import TERMINAL_STATUSES
 
+        logger = logging.getLogger(__name__)
         recorder = self.activity_store.new_recorder(filename=filename, mode=mode)
+
+        def _failed(code: str, message: str) -> None:
+            snapshot = recorder.snapshot()
+            if snapshot["status"] in TERMINAL_STATUSES:
+                # Memory is not proof of durability: finish mutates the record
+                # before its atomic filesystem write, which can itself fail.
+                try:
+                    saved = self.activity_store.get(recorder.ingestion_id)
+                except (OSError, ValueError):
+                    logger.exception("Ingestion %s terminal activity could not be read",
+                                     recorder.ingestion_id)
+                    saved = None  # retry the trusted worker snapshot below
+                if saved != snapshot:
+                    try:
+                        self.activity_store.save(snapshot)
+                    except Exception:
+                        logger.exception("Ingestion %s existing terminal activity write failed",
+                                         recorder.ingestion_id)
+                return  # preserve specific BLOCKED/FAILED or genuine success
+            try:
+                recorder.finish("FAILED", error_code=code, error_message=message)
+            except Exception:
+                logger.exception("Ingestion %s terminal activity write failed", recorder.ingestion_id)
+                # finish updated the in-memory terminal record/event before
+                # writing it. Retry that exact snapshot once (no duplicate event).
+                try:
+                    self.activity_store.save(recorder.snapshot())
+                except Exception:
+                    logger.exception("Ingestion %s terminal activity retry failed; storage unavailable",
+                                     recorder.ingestion_id)
 
         def _run() -> None:
             try:
+                recorder.emit("background_execution", "started", "RUNNING",
+                              "Background ingestion worker entered processing.")
                 self.ingest_document(
                     file_bytes=file_bytes, filename=filename, mode=mode, recorder=recorder
                 )
-            except Exception:
-                pass  # terminal outcome already recorded by ingest_document
+            except BaseException as exc:
+                # SystemExit in a daemon thread is not process termination;
+                # Exception-only handlers otherwise leave a durable RUNNING row.
+                if recorder.snapshot()["status"] not in TERMINAL_STATUSES:
+                    logger.exception("Ingestion %s worker exited (%s)",
+                                     recorder.ingestion_id, type(exc).__name__)
+                    _failed("INGESTION_WORKER_FAILED",
+                            f"Background ingestion worker failed ({type(exc).__name__}); see server logs.")
+            finally:
+                _failed("INGESTION_WORKER_INCOMPLETE",
+                        "Background ingestion worker returned without a terminal processing result.")
 
-        _threading.Thread(target=_run, daemon=True, name=f"ingest-{recorder.ingestion_id}").start()
+        try:
+            _threading.Thread(target=_run, daemon=True,
+                              name=f"ingest-{recorder.ingestion_id}").start()
+        except Exception as exc:
+            logger.exception("Ingestion %s dispatch failed (%s)",
+                             recorder.ingestion_id, type(exc).__name__)
+            _failed("INGESTION_DISPATCH_FAILED",
+                    f"Could not start ingestion worker ({type(exc).__name__}); see server logs.")
         return recorder
 
     def _ingest_document_impl(
@@ -1228,6 +1318,40 @@ class PresentationService:
             if act is not None:
                 act.emit(stage, event_type, status, message, **kw)
 
+        def _emit_term_evidence(field, origin, state, index, candidate):
+            # Preserve selected field evidence even when another field blocks
+            # evaluation. Flat events respect the existing depth/item limits.
+            # Long quotations are lossless numbered parts, never a silently
+            # truncated assertion. These are diagnostics, not new authority.
+            evidence_key = f"{origin}:issue.{field}:{index}"
+            keys = ("value", "unit", "source_id", "document_class", "uri",
+                    "content_hash", "page", "locator", "extraction_method",
+                    "confidence", "verification", "quote", "retrieved_at")
+            details = {"field": "issue." + field, "origin": origin,
+                       "state": state, "evidence_key": evidence_key}
+            long_values = {}
+            for key in keys:
+                value = candidate.get(key)
+                if isinstance(value, str) and len(value) > 500:
+                    long_values[key] = value
+                else:
+                    details[key] = value
+            evidence_status = ("SUCCEEDED" if origin in ("filing", "THIRD_PARTY_AGGREGATOR_OVERRIDE") or
+                               (state == "VERIFIED" and candidate.get("verification") == "VERIFIED")
+                               else "BLOCKED")
+            _emit("term_resolution", "field_evidence", evidence_status,
+                  f"Recorded evidence candidate for issue.{field}; field state: {state}.",
+                  details=details)
+            for key, value in long_values.items():
+                count = (len(value) + 499) // 500
+                digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+                for part in range(count):
+                    _emit("term_resolution", "field_evidence_part", evidence_status,
+                          f"Evidence {key} part {part + 1}/{count} for issue.{field}.",
+                          details={"evidence_key": evidence_key, "key": key,
+                                   "part": part, "parts": count, "sha256": digest,
+                                   "text": value[part * 500:(part + 1) * 500]})
+
         _emit("upload", "received", "SUCCEEDED",
               "File received by the ingestion service.",
               details={"filename": filename, "size_bytes": len(file_bytes) if file_bytes else 0, "mode": mode})
@@ -1251,41 +1375,83 @@ class PresentationService:
                 f"Invalid evaluation mode '{mode}'. Allowed modes are 'final' and 'preliminary'."
             )
 
-        # Step 5 (Step 4 Area C, approved 2026-10-17): bounded manual entry
-        # for price_band_low / price_band_high / lot_size only. Manual values
-        # are provenance-labelled MANUAL_ENTRY and are never source-verified.
+        # Step 5 (Step 4 Area C, approved 2026-10-17; four-field scope
+        # directed 2026-10-18): manual entry for the four required issue
+        # terms price_band_low / price_band_high / lot_size / ofs. Manual
+        # values are provenance-labelled MANUAL_ENTRY and are never
+        # source-verified. issue.ofs is the Offer-for-Sale monetary amount
+        # in the filing's financials.reporting_unit (v1.5 contract:
+        # number, minimum 0): an explicit 0 is an operator statement of
+        # "no offer for sale", never a default for an unknown value.
         manual_clean: Dict[str, Any] = {}
         if manual_terms:
-            unknown_keys = sorted(set(manual_terms) - set(self.MANUAL_ISSUE_TERM_FIELDS))
-            if unknown_keys:
-                raise IngestionValidationError(
-                    "Manual issue-term entry is limited to price_band_low, "
-                    f"price_band_high and lot_size; unsupported field(s): {unknown_keys}."
-                )
-            manual_clean = {k: v for k, v in manual_terms.items() if v is not None}
-            if manual_clean:
-                if not (manual_explanation or "").strip():
+            submitted_fields = sorted(str(k) for k in manual_terms.keys())
+            submitted_values = {k: v for k, v in manual_terms.items() if v is not None}
+            # Audit receipt: the submission itself is an auditable act,
+            # recorded before validation so a rejected submission still
+            # shows exactly what was submitted (values are operator
+            # issue-term figures, sanitized/bounded like all details).
+            _emit("term_resolution", "manual_submission", "SUCCEEDED",
+                  "Manual issue-term submission received (MANUAL_ENTRY; not source-verified).",
+                  details={"fields": submitted_fields,
+                           "values": submitted_values,
+                           "explanation_supplied": bool((manual_explanation or "").strip())})
+            try:
+                unknown_keys = sorted(set(manual_terms) - set(self.MANUAL_ISSUE_TERM_FIELDS))
+                if unknown_keys:
                     raise IngestionValidationError(
-                        "An explanation is required for manually entered issue terms."
+                        "Manual issue-term entry is limited to price_band_low, "
+                        "price_band_high, lot_size, ofs and fresh_issue; "
+                        f"unsupported field(s): {unknown_keys}."
                     )
-                for field_name, value in manual_clean.items():
-                    if isinstance(value, bool) or not isinstance(value, (int, float)):
+                manual_clean = {k: v for k, v in manual_terms.items() if v is not None}
+                if manual_clean:
+                    if not (manual_explanation or "").strip():
                         raise IngestionValidationError(
-                            f"Manually entered issue.{field_name} must be a number."
+                            "An explanation is required for manually entered issue terms."
                         )
-                    if value <= 0:
-                        raise IngestionValidationError(
-                            f"Manually entered issue.{field_name} must be positive."
-                        )
-                    if field_name == "lot_size" and float(value) != int(value):
-                        raise IngestionValidationError(
-                            "Manually entered issue.lot_size must be a whole number of shares."
-                        )
-                if "price_band_low" in manual_clean and "price_band_high" in manual_clean:
-                    if float(manual_clean["price_band_low"]) > float(manual_clean["price_band_high"]):
-                        raise IngestionValidationError(
-                            "Manually entered price_band_low must not exceed price_band_high."
-                        )
+                    for field_name, value in manual_clean.items():
+                        if isinstance(value, bool) or not isinstance(value, (int, float)):
+                            raise IngestionValidationError(
+                                f"Manually entered issue.{field_name} must be a number."
+                            )
+                        if not math.isfinite(float(value)):
+                            raise IngestionValidationError(
+                                f"Manually entered issue.{field_name} must be a finite number."
+                            )
+                        if field_name in ("ofs", "fresh_issue"):
+                            # Monetary amounts in the filing's reporting
+                            # unit: explicit 0 is an operator statement
+                            # (no OFS / pure-OFS offer), never a default.
+                            if float(value) < 0:
+                                raise IngestionValidationError(
+                                    f"Manually entered issue.{field_name} must be zero or a "
+                                    "positive amount in the filing's reporting unit."
+                                )
+                        elif field_name == "lot_size":
+                            if float(value) != int(value) or int(value) <= 0:
+                                raise IngestionValidationError(
+                                    "Manually entered issue.lot_size must be a whole number of shares."
+                                )
+                        else:
+                            if value <= 0:
+                                raise IngestionValidationError(
+                                    f"Manually entered issue.{field_name} must be positive."
+                                )
+                    if "price_band_low" in manual_clean and "price_band_high" in manual_clean:
+                        if float(manual_clean["price_band_low"]) > float(manual_clean["price_band_high"]):
+                            raise IngestionValidationError(
+                                "Manually entered price_band_low must not exceed price_band_high."
+                            )
+            except IngestionValidationError as exc:
+                # The rejection is an auditable outcome in its own right;
+                # nothing proceeds and no value is silently replaced.
+                _emit("term_resolution", "manual_validation", "FAILED",
+                      f"Manual issue-term submission rejected: {exc}",
+                      details={"fields": submitted_fields,
+                               "values": submitted_values},
+                      error_code="VALIDATION_ERROR")
+                raise
 
         _emit("document_validation", "passed", "SUCCEEDED",
               "Document passed format, size and mode validation.",
@@ -1332,13 +1498,54 @@ class PresentationService:
               details={"company_name": str(canonical_dict.get("company_name", "")),
                        "ipo_id": str(canonical_dict.get("ipo_id", ""))})
         _filing_issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
-        for _f in ("price_band_low", "price_band_high", "lot_size", "ofs", "fresh_issue"):
+        for _f in ("price_band_low", "price_band_high", "lot_size", "ofs", "fresh_issue",
+                   "open_date", "close_date", "fresh_shares"):
             _emit("term_resolution", "term_status",
                   "SUCCEEDED" if _filing_issue.get(_f) is not None else "BLOCKED",
-                  f"issue.{_f}: " + ("disclosed by the filing." if _filing_issue.get(_f) is not None else "not disclosed by the filing."),
+                  f"issue.{_f}: " + ("disclosed by the filing." if _filing_issue.get(_f) is not None else "not established by filing extraction."),
                   details={"field": f"issue.{_f}",
                            "state": "extracted" if _filing_issue.get(_f) is not None else "missing",
                            "origin": "filing"})
+
+            if _filing_issue.get(_f) is not None:
+                spec = (canonical_dict.get("_evidence") or {}).get("issue." + _f) or {}
+                source = next((src for src in canonical_dict.get("_sources", [])
+                               if src.get("source_id") == spec.get("source_id")), {})
+                _emit_term_evidence(_f, "filing", "extracted", 0, {
+                    **spec, "value": _filing_issue[_f],
+                    "unit": (canonical_dict.get("financials") or {}).get("reporting_unit")
+                            if _f in ("ofs", "fresh_issue") else None,
+                    "uri": source.get("uri"), "content_hash": source.get("content_hash"),
+                    "confidence": spec.get("extraction_confidence"),
+                    "document_class": source.get("source_type"),
+                })
+
+        # Peer rows enter the canonical input here and are schema-bound
+        # (roe_pct and the sibling percentage fields share the contract's
+        # pct bounds). The full document gate runs at evaluation time;
+        # validating the peers array at ingestion time rejects
+        # out-of-contract peer data EARLY with a diagnostic naming the
+        # peer and field, instead of the anonymous evaluation-time
+        # SCHEMA_VIOLATION wall (audit trace ing-81fd285e5b8248c6:
+        # peers/0/roe_pct 26957.28, peers/1/roe_pct 21700.34). Raw values
+        # are never clamped, substituted or silently dropped.
+        from ..schema_validation import validate_peer_records
+
+        peer_findings = validate_peer_records(
+            (canonical_dict.get("peers") if isinstance(canonical_dict, dict) else None) or []
+        )
+        if peer_findings:
+            detail = "; ".join(f"{f.location}: {f.message}" for f in peer_findings)
+            _emit("validation", "peer_contract", "FAILED",
+                  "Peer data violates the canonical input contract.",
+                  details={"findings": [f.to_dict() for f in peer_findings[:5]]},
+                  error_code="SCHEMA_VIOLATION")
+            raise IngestionValidationError(
+                "Peer data in the filing violates the canonical input contract: "
+                + detail
+                + ". Raw values are never clamped or substituted; correct the "
+                "peer source data and re-upload the filing."
+            )
 
         # Automatically resolve required issue terms the filing does not
         # disclose ([●] placeholders pending the Price Band Notice) from
@@ -1347,11 +1554,12 @@ class PresentationService:
         # official evidence is available: no value is invented, substituted
         # or borrowed, and nothing is evaluated or persisted.
         issue_terms_report: Optional[Dict[str, Any]] = None
+        resolution_dict: Optional[Dict[str, Any]] = None
         pending_awaiting: Optional[Tuple[list, dict, str]] = None
         issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
         missing_issue_fields = [
             field
-            for field in ("price_band_low", "price_band_high", "lot_size", "ofs")
+            for field in ("price_band_low", "price_band_high", "lot_size", "ofs", "fresh_issue", "open_date", "close_date")
             if issue.get(field) is None
         ]
         if missing_issue_fields:
@@ -1366,8 +1574,13 @@ class PresentationService:
                 company_name=str(canonical_dict.get("company_name", "")),
                 ipo_id=str(canonical_dict.get("ipo_id", "")),
                 missing_fields=missing_issue_fields,
+                issue_context=issue,
             )
             resolution_dict = outcome.to_dict()
+            for field, diagnostic in resolution_dict.get("fields", {}).items():
+                for index, candidate in enumerate(diagnostic.get("candidates", [])):
+                    _emit_term_evidence(field, "official_discovery", diagnostic.get("state"),
+                                        index, candidate)
             for _rep in outcome.provider_reports:
                 _emit("official_discovery", "source_attempt",
                       "SUCCEEDED" if _rep.outcome == "FOUND" else ("BLOCKED" if _rep.outcome in ("NOT_FOUND",) else "FAILED"),
@@ -1429,8 +1642,8 @@ class PresentationService:
                     # URL + retrieval timestamp) into the canonical source
                     # manifest so the persisted record identifies the
                     # actual disclosure document, not a local filename.
-                    notice_payload = outcome.notice.to_enrichment_dict()
-                    if notice_payload.get("sources"):
+                    notice_payload = outcome.enrichment_payload or outcome.notice.to_enrichment_dict()
+                    if outcome.enrichment_payload is None and notice_payload.get("sources"):
                         source_ref = dict(notice_payload["sources"][0])
                         if outcome.source_uri:
                             source_ref["uri"] = outcome.source_uri
@@ -1441,6 +1654,7 @@ class PresentationService:
                         base_input=canonical_dict,
                         price_band_notice=notice_payload,
                         mode=mode_clean,
+                        partial_issue_terms=True,  # retain partial facts; readiness gate below remains mandatory
                     )
                     canonical_dict = assembled.canonical_input
                 except Exception as exc:
@@ -1480,12 +1694,15 @@ class PresentationService:
                                "origin": "official_discovery"},
                       source_reference=outcome.source_uri)
             if not still_missing and issue_after.get("fresh_issue") is None:
-                # The four issue terms resolved, but the stated
-                # fresh-issue amount (a canonical requirement) is only
-                # established by the final Prospectus; fail closed with
-                # that precise field rather than a schema failure.
+                # The pricing terms resolved, but the stated fresh-issue
+                # amount (a canonical input requirement, schema
+                # issue.required) is only established by the filing, the
+                # final Prospectus or the bounded manual entry; fail closed
+                # with that precise field rather than a schema failure.
                 still_missing = ["fresh_issue"]
-            if outcome.notice is not None and not still_missing:
+            resolution_dict["remaining_required_fields"] = ["issue." + f for f in still_missing]
+            resolution_dict["ready"] = not still_missing
+            if not still_missing:
                 issue_terms_report = resolution_dict
             else:
                 unresolved = still_missing or list(missing_issue_fields)
@@ -1517,6 +1734,45 @@ class PresentationService:
                 # terms the deferred raise fires unchanged before evaluation.
                 pending_awaiting = (unresolved, resolution_dict, reason)
 
+        # PA-authorized third-party fallback is a separate authority path,
+        # never passed through the official enrichment verification gate.
+        fallback = self.config.aggregator_issue_terms_resolver
+        if (fallback is not None and pending_awaiting is not None
+                and not (resolution_dict or {}).get("conflicts")
+                and (resolution_dict or {}).get("status") != "CONFLICT"
+                and not (resolution_dict or {}).get("assembly_error")):
+            from ..aggregator_issue_terms import apply_override, TAG
+            _emit("aggregator_fallback", "started", "RUNNING",
+                  "Official discovery incomplete; checking PA-authorized third-party issue data.")
+            try:
+                override = fallback.resolve(company_name=str(canonical_dict.get("company_name", "")),
+                    ipo_id=str(canonical_dict.get("ipo_id", "")), issue_context=canonical_dict.get("issue", {}),
+                    missing_fields=pending_awaiting[0])
+                canonical_dict = apply_override(canonical_dict, override, pending_awaiting[0])
+            except Exception as exc:
+                override = {"authority": TAG, "verified": False, "applied_fields": [],
+                            "error": f"{type(exc).__name__}: {exc}"}
+            for attempt in override.get("attempts", []):
+                _emit("aggregator_fallback", "source_attempt", "SUCCEEDED" if attempt.get("content_hash") else "FAILED",
+                      "Third-party fallback source: " + attempt.get("outcome", "UNKNOWN"),
+                      details=attempt, source_reference=attempt.get("uri"))
+            for field in override.get("applied_fields", []):
+                sid = canonical_dict["_evidence"]["issue." + field]["source_id"]
+                item = next(item for item in override["fields"][field] if item["source_id"] == sid)
+                _emit_term_evidence(field, TAG, TAG, 0, {**item, "value": canonical_dict["issue"][field],
+                    "unit": ((canonical_dict.get("financials") or {}).get("reporting_unit") if field in ("fresh_issue", "ofs") else item["unit"]),
+                    "document_class": "THIRD_PARTY_IPO_TABLE"})
+            _emit("aggregator_fallback", "completed", "SUCCEEDED" if override.get("applied_fields") else "BLOCKED",
+                  "PA-authorized aggregator fallback processed; never official verification.",
+                  details={"authority": TAG, "verified": False, "fields": override.get("applied_fields", []),
+                           "conflicts": override.get("conflicts", []), "error": override.get("error")})
+            issue_terms_report = dict(resolution_dict or {})
+            issue_terms_report["aggregator_override"] = override
+            remaining = [f for f in pending_awaiting[0] if canonical_dict.get("issue", {}).get(f) is None]
+            issue_terms_report["remaining_required_fields"] = ["issue." + f for f in remaining]
+            issue_terms_report["ready"] = not remaining
+            pending_awaiting = (remaining, issue_terms_report, pending_awaiting[2]) if remaining else None
+
         # --- Step 5: bounded manual issue-term entry ---------------------
         # Runs after verified-official resolution. Manual values never
         # upgrade provenance: they are recorded as MANUAL_ENTRY against a
@@ -1546,6 +1802,17 @@ class PresentationService:
                         }
                     )
             if conflicts and not confirm_conflicts:
+                # The conflict and its requirement for explicit
+                # confirmation are auditable outcomes of the submission;
+                # nothing was evaluated or persisted.
+                _emit("term_resolution", "conflict", "BLOCKED",
+                     "Manual issue terms conflict with existing values; "
+                     "explicit confirmation is required before proceeding. "
+                     "Nothing was evaluated or persisted.",
+                     details={"conflicts": conflicts,
+                              "fields": [c["field"] for c in conflicts],
+                              "confirmation_required": True},
+                     error_code="ISSUE_TERM_CONFLICT")
                 raise IngestionIssueTermConflictError(
                     "Manually entered issue terms conflict with existing "
                     "values; explicit confirmation is required before "
@@ -1609,7 +1876,15 @@ class PresentationService:
                 )
 
             if issue_terms_report is None:
-                issue_terms_report = {}
+                # Preserve the official-discovery outcome alongside the
+                # manual completion: a manual term set is a separate input
+                # source and never evidence that an official source
+                # published or verified anything (stays UNAVAILABLE etc.).
+                issue_terms_report = dict(resolution_dict) if resolution_dict else {}
+            reporting_unit = str(
+                (canonical_dict.get("financials") or {}).get("reporting_unit")
+                or "INR_LAKHS"
+            )
             issue_terms_report["manual_entry"] = {
                 "fields": manual_applied,
                 "values": {f: manual_clean[f] for f in manual_applied},
@@ -1617,12 +1892,19 @@ class PresentationService:
                 "provenance": "MANUAL_ENTRY",
                 "verified": False,
                 "overridden_by_verified": overridden_by_verified,
+                "reporting_unit": reporting_unit,
             }
             _emit("term_resolution", "manual_entry", "SUCCEEDED",
                   "Operator manual issue-term entry applied (MANUAL_ENTRY; not source-verified).",
                   details={"fields": [f"issue.{f}" for f in manual_applied],
+                           "values": {f: manual_clean[f] for f in manual_applied},
+                           "explanation": (manual_explanation or "").strip(),
                            "overridden_by_verified": overridden_by_verified,
-                           "provenance": "MANUAL_ENTRY"})
+                           "provenance": "MANUAL_ENTRY",
+                           "verified": False,
+                           "conflicts_confirmed": bool(confirm_conflicts),
+                           "ipo_id": str(canonical_dict.get("ipo_id", "")),
+                           "reporting_unit": reporting_unit})
             if pending_awaiting is not None:
                 remaining = [f for f in pending_awaiting[0] if issue_now.get(f) is None]
                 if remaining:
@@ -1631,6 +1913,23 @@ class PresentationService:
                     pending_awaiting = (remaining, augmented, pending_awaiting[2])
                 else:
                     pending_awaiting = None
+
+        if pending_awaiting is None:
+            # The manually enterable issue terms are complete, but the
+            # canonical input contract v1.5 also requires the stated
+            # fresh-issue amount (schema issue.required; it is never
+            # invented or defaulted). It may come from the filing, the
+            # final Prospectus, or the bounded manual entry above; fail
+            # closed with that precise field rather than a schema failure.
+            issue_gate = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+            if issue_gate.get("fresh_issue") is None:
+                pending_awaiting = (
+                    ["fresh_issue"],
+                    dict(issue_terms_report) if issue_terms_report else {},
+                    "the stated fresh-issue amount is established by the filing, the "
+                    "final Prospectus, or the bounded manual issue-term entry, and "
+                    "remains undisclosed",
+                )
 
         if pending_awaiting is not None:
             unresolved, resolution_dict, reason = pending_awaiting
@@ -1643,14 +1942,28 @@ class PresentationService:
                   "Evaluation was not run; nothing was persisted.")
             _emit("persistence", "not_attempted", "SKIPPED",
                   "No evaluation artifact was persisted.")
+            resolution_payload = dict(resolution_dict or {})
+            # Carry the canonical monetary unit so a manual entry for
+            # issue.ofs can be labelled and validated against the unit the
+            # engine will actually evaluate (v1.5: "in reporting_unit").
+            resolution_payload.setdefault(
+                "reporting_unit",
+                str(
+                    (canonical_dict.get("financials") or {}).get("reporting_unit")
+                    or "INR_LAKHS"
+                ),
+            )
             raise IngestionAwaitingIssueTermsError(
                 "AWAITING_ISSUE_TERMS: required issue terms are unavailable: "
                 + ", ".join(f"issue.{field}" for field in unresolved)
                 + f". The uploaded filing does not disclose them and {reason}. "
                 "No evaluation was produced, no values were assumed, and nothing was persisted. "
-                "Retry after the official Price Band Notice is published, or upload a filing that discloses these terms.",
+                "Retry automatic official discovery or upload an applicable authoritative filing "
+                "that establishes the unresolved fields. A retrieved price band alone does not "
+                "establish a missing fresh-issue monetary amount; missing evidence is not proof "
+                "that a notice has not been published.",
                 missing_fields=unresolved,
-                resolution=resolution_dict,
+                resolution=resolution_payload,
             )
 
         _emit("evaluation_eligibility", "passed", "SUCCEEDED",
@@ -1775,7 +2088,9 @@ class PresentationService:
             verdict=str(verdict_str),
             confidence=str(outcome.score.confidence),
             is_duplicate=False,
-            message="Filing successfully ingested, extracted, and evaluated.",
+            message=("Filing evaluated using THIRD_PARTY_AGGREGATOR_OVERRIDE; third-party terms are NOT official disclosures."
+                     if (issue_terms_report or {}).get("aggregator_override", {}).get("applied_fields") else
+                     "Filing successfully ingested, extracted, and evaluated."),
             evaluation_url=f"/#evaluations/{eval_id_to_return}",
             evaluation=eval_detail,
             issue_terms=issue_terms_report,
@@ -1800,6 +2115,7 @@ class PresentationService:
         supersedes = lc.supersedes if lc else None
 
         return EvaluationSummary(
+            authority_warnings=authority_warnings(rec),
             evaluation_id=eval_id,
             ipo_id=rec.get("ipo_id", ""),
             company_name=rec.get("company_name", ""),

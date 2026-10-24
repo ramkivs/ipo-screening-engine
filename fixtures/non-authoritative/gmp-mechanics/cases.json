@@ -1,0 +1,30 @@
+{
+  "label": "SYNTHETIC — NOT QUALIFICATION EVIDENCE",
+  "purpose": "Test-only mechanics vectors; never a publisher disposition, R7/R8 evidence or production input",
+  "cases": [
+    {
+      "key": "alpha-offer1",
+      "issuer_id": "SYNTHETIC-ALPHA",
+      "issue_id": "OFFER-1",
+      "pct": "12.5",
+      "trend": null,
+      "label": "SYNTHETIC — NOT QUALIFICATION EVIDENCE"
+    },
+    {
+      "key": "alpha-offer2",
+      "issuer_id": "SYNTHETIC-ALPHA",
+      "issue_id": "OFFER-2",
+      "pct": "15",
+      "trend": "strong",
+      "label": "SYNTHETIC — NOT QUALIFICATION EVIDENCE"
+    },
+    {
+      "key": "beta-offer1",
+      "issuer_id": "SYNTHETIC-BETA",
+      "issue_id": "OFFER-1",
+      "pct": "21",
+      "trend": null,
+      "label": "SYNTHETIC — NOT QUALIFICATION EVIDENCE"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+[
+  {
+    "url": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+    "started_at": "2026-10-23T08:50:22.242229+00:00",
+    "transport": "LIVE_HTTP_ATTEMPT",
+    "error": "URLError(SSLZeroReturnError(6, 'TLS/SSL connection has been closed (EOF) (_ssl.c:992)'))",
+    "finished_at": "2026-10-23T08:50:22.273250+00:00"
+  },
+  {
+    "url": "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
+    "started_at": "2026-10-23T08:50:22.274198+00:00",
+    "transport": "LIVE_HTTP_ATTEMPT",
+    "error": "URLError(SSLZeroReturnError(6, 'TLS/SSL connection has been closed (EOF) (_ssl.c:992)'))",
+    "finished_at": "2026-10-23T08:50:22.304006+00:00"
+  },
+  {
+    "url": "https://www.bseindia.com/publicissue.html",
+    "started_at": "2026-10-23T08:50:22.304894+00:00",
+    "transport": "LIVE_HTTP_ATTEMPT",
+    "error": "URLError(SSLZeroReturnError(6, 'TLS/SSL connection has been closed (EOF) (_ssl.c:992)'))",
+    "finished_at": "2026-10-23T08:50:22.334754+00:00"
+  },
+  {
+    "url": "https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue_par_updated/w?flag=1",
+    "started_at": "2026-10-23T08:50:22.335631+00:00",
+    "transport": "LIVE_HTTP_ATTEMPT",
+    "error": "URLError(SSLZeroReturnError(6, 'TLS/SSL connection has been closed (EOF) (_ssl.c:992)'))",
+    "finished_at": "2026-10-23T08:50:22.364331+00:00"
+  },
+  {
+    "url": "https://www.nseindia.com/api/all-upcoming-issues?category=ipo",
+    "started_at": "2026-10-23T08:50:22.365182+00:00",
+    "transport": "LIVE_HTTP_ATTEMPT",
+    "error": "URLError(SSLZeroReturnError(6, 'TLS/SSL connection has been closed (EOF) (_ssl.c:992)'))",
+    "finished_at": "2026-10-23T08:50:22.397023+00:00"
+  },
+  {
+    "url": "https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0",
+    "started_at": "2026-10-23T08:50:22.397925+00:00",
+    "transport": "LIVE_HTTP_ATTEMPT",
+    "error": "URLError(SSLZeroReturnError(6, 'TLS/SSL connection has been closed (EOF) (_ssl.c:992)'))",
+    "finished_at": "2026-10-23T08:50:22.639491+00:00"
+  },
+  {
+    "url": "https://www.chittorgarh.com/ipo/ipo_dashboard.asp",
+    "started_at": "2026-10-23T08:50:22.650902+00:00",
+    "transport": "LIVE_HTTP_ATTEMPT",
+    "error": "URLError(SSLZeroReturnError(6, 'TLS/SSL connection has been closed (EOF) (_ssl.c:992)'))",
+    "finished_at": "2026-10-23T08:50:22.683735+00:00"
+  },
+  {
+    "url": "https://www.investorgain.com/report/live-ipo-gmp/331/",
+    "started_at": "2026-10-23T08:50:22.684591+00:00",
+    "transport": "LIVE_HTTP_ATTEMPT",
+    "error": "URLError(SSLZeroReturnError(6, 'TLS/SSL connection has been closed (EOF) (_ssl.c:992)'))",
+    "finished_at": "2026-10-23T08:50:22.717980+00:00"
+  }
+]

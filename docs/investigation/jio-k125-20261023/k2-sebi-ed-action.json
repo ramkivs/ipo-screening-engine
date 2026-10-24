@@ -1,0 +1,245 @@
+{
+ "investigation_date": "2026-10-23",
+ "branch": "arena/07f3439f-ipo-screening-engine",
+ "branch_tip_at_start": "d894ba53f242987fdd89220032bd5c331760bb08",
+ "evaluation": "JIO-PLATFORMS-LIMITED-20261023-085751Z-final-29d9a601",
+ "retained_source": {
+  "path": "evidence/non-authoritative/jio/U72900GJ2019PLC110816_JIO.pdf",
+  "sha256": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+  "pages": 591,
+  "type": "NON-AUTHORITATIVE retained filing copy (RHP), issuer-matched to Jio Platforms Limited (CIN U72900GJ2019PLC110816)"
+ },
+ "method": "Read-only. Existing artifacts and the retained PDF were inspected; the engine's own extractor and regexes were applied to page text in a probe script (no ingestion, no evaluation, no regression suite, no code change).",
+ "criterion": "K2 / sebi_ed_action_active",
+ "engine_disposition": {
+  "K2": "UNVERIFIED (missing: sebi_ed_action_active)",
+  "metric": {
+   "state": "UNKNOWN",
+   "reason": "the supplied input does not establish whether an active SEBI/ED action exists"
+  },
+  "sibling_leaf": {
+   "promoter_pledge_pct": "0.0 > 25 -> FALSE"
+  }
+ },
+ "governing_rule": {
+  "config": "config/ipo-config.v1.5.0.json K2 required [promoter_pledge_pct, sebi_ed_action_active]; when any(promoter_pledge_pct > 25, flag sebi_ed_action_active). sebi_ed_action_active is also one of config.critical_data.items.",
+  "decisions": [
+   "A23-litigation-regulatory-evidence-defaults.md \u2014 rule 6: True requires SEBI or ED as actor + a finite act (initiated/issued/passed/imposed/conducted/attached/registered/taken/served/filed/raised/recorded/framed, or 'pending before SEBI') + a party, with registration/disclaimer boilerplate excluded; rule 8: False requires an explicit denial naming BOTH SEBI and ED (A23 was corrected in 41f2f86 under A25 D1/D2).",
+   "A24-litigation-party-coverage-standard.md \u2014 APPROVED 2026-10-20 (D1-D3, implemented): population = company, promoters, directors; KMP/Senior Management NOT adopted.",
+   "A25-sebi-ed-absence-source-coverage-standard.md \u2014 D1/D2 approved 2026-10-20: a False means 'the filing denies it on the pages searched', never verified absence; the True path is unaffected by coverage gates.",
+   "A7-knockout-verdict-precedence.md \u2014 a verified TRIGGERED knockout produces final outcome AVOID and takes precedence over the score; config verdict.knockout_verdict = 'AVOID'."
+  ],
+  "code": "engine/ipo_screening/extraction/sections.py::_sebi_ed_action_finding (+ _REG_ACTION, _REG_BOILERPLATE, _LIT_PARTY, _LIT_NEGATION, _lit_span, 600-character span cap) -> builder._pick_gov -> derived._sebi_ed_action_active (passthrough) -> knockouts K2",
+  "authoritative_source_note": "A23/A24/A25 are authoritative; the files are absent from this branch's handoff/decisions (see provenance_gap in k1)."
+ },
+ "factual_evidence_found": [
+  {
+   "page": 468,
+   "section": "III. Outstanding litigation involving the Directors \u2014 a) Criminal proceedings against the Directors \u2014 Mr. Mukesh Dhirubhai Ambani",
+   "quote": "In this matter, SEBI had filed a complaint on July 16, 2020, before the Special Court, Mumbai, (i) inter alia against Mr. Mukesh Dhirubhai Ambani (in his capacity as a director of RIL), for taking cognizance of alleged offences under Regulations 3, 5 and 6 of [the PFUTP Regulations], 1995 and Sections 77(2) and 77A of Companies Act, 1956; and (ii) inter alia against Mr. Mukesh Dhirubhai Ambani (being part of the promoter and promoter group of RIL) for taking cognizance of alleged offence under Regulation 11(1) of SEBI (Substantial Acquisition of Shares and Takeovers) Regulations, 1997. The Special Court, Mumbai, vide order dated September 30, 2020, dismissed SEBI's complaint as barred by limitation. Against the said order of the Special Court, SEBI filed a revision application before the Hon'ble High Court of Bombay and the same is currently pending.",
+   "what_it_establishes": "A SEBI-initiated criminal complaint against a Director of the issuer (and a promoter-group person), dismissed on limitation, with SEBI's revision application pending before the Bombay High Court as at the RHP date.",
+   "covered_person_status": "Director (Mr. Mukesh Dhirubhai Ambani) \u2014 in the A24 population. The sentence that names him is a different sentence from the sentence that describes the pending revision."
+  },
+  {
+   "page": 470,
+   "section": "IV. Outstanding litigation involving RIL, the Promoter \u2014 c) Actions by statutory/ regulatory authorities against RIL",
+   "quote": "(iii) RIL had issued debentures with convertible warrants in the year 1994 and allotted equity shares against the warrants in the year 2000. In this matter, SEBI had filed a complaint on July 16, 2020, inter alia against RIL before the Special Court, Mumbai, for taking cognizance of alleged offences under Regulations 3, 5 and 6 of [the PFUTP Regulations], 1995 and Sections 77(2) and 77A of Companies Act, 1956. The Special Court, Mumbai, vide order dated September 30, 2020, dismissed SEBI's complaint as barred by limitation. Against the said order of the Special Court, SEBI has filed a revision application before the Hon'ble High Court of Bombay and the same is currently pending.",
+   "what_it_establishes": "The same SEBI action against the Promoter (RIL), with the revision application currently pending.",
+   "covered_person_status": "Promoter \u2014 in the A23/A24 population."
+  },
+  {
+   "page": "470-471",
+   "section": "IV(c)(i)",
+   "quote": "(i) On December 16, 2010, SEBI issued a show cause notice, inter alia to RIL ... By an order dated March 24, 2017, the Whole time Member found RIL acted in a fraudulent manner ... and passed the following directions ... The Hon'ble Supreme Court of India, on May 29, 2026 disposed off the two appeals: (a) holding that 'fraud' under the PFUTP Regulations is not made out against RIL ... (d) holding that RIL has only violated the disclosure requirements under 2001 SEBI Circular ... and is liable to be penalized ... and concurred with the observations of the SAT as regards the penalty levied on RIL for the same.",
+   "what_it_establishes": "A concluded SEBI proceeding against the Promoter: the fraud finding was set aside by the Supreme Court in May 2026, while the disclosure-violation penalty was left in place.",
+   "covered_person_status": "Promoter."
+  },
+  {
+   "page": "472-473",
+   "section": "V. Disciplinary actions including penalties imposed by SEBI or stock exchanges against RIL, the Promoter in the last five financial years ... including outstanding actions",
+   "quote": "(i) On December 22, 2021, SEBI issued a show cause notice inter alia to RIL ... The Adjudicating Officer of SEBI passed an order on June 20, 2022, imposing a penalty of Rs 3 million. The SAT on May 2, 2025, dismissed RIL's appeal ... RIL's appeal against the SAT Order before the Hon'ble Supreme Court of India was dismissed on December 2, 2025. (ii) SEBI, on August 8, 2014, had passed an adjudication order ... imposing monetary penalty of Rs 130 million ... SAT set aside SEBI's order and remanded the matter ... SEBI issued a fresh show cause notice dated April 5, 2016 ... The AO, vide his order dated September 20, 2021, disposed of the show cause notice without levy of any penalty.",
+   "what_it_establishes": "Two further SEBI matters against the Promoter in the last five financial years: one concluded with a Rs 3 million penalty upheld through the Supreme Court (Dec 2025); one concluded with no penalty (Sept 2021).",
+   "covered_person_status": "Promoter."
+  },
+  {
+   "page": 463,
+   "section": "SECTION VI \u2014 OUTSTANDING LITIGATION AND OTHER MATERIAL DEVELOPMENTS (opening scope statement)",
+   "quote": "Except as disclosed in this section there are no outstanding litigation as of the date of this RHP, pertaining to ... (ii) actions taken by statutory and/ or regulatory authorities against the Relevant Parties ... Further, this section also provides the details of all disciplinary actions initiated or taken and penalties imposed by SEBI or the Stock Exchanges against the Promoter in the last five financial years including outstanding actions other than matters already covered in (ii) above.",
+   "what_it_establishes": "The filing frames the section as OUTSTANDING (i.e. live) matters and expressly includes regulatory actions and SEBI penalties against the Promoter. The p468/p470 disclosures are therefore presented as live, not historical footnotes."
+  }
+ ],
+ "evidence_not_found": [
+  "any subsequent SEBI order, withdrawal, closure or stay of the p470/p468 revision application \u2014 no post-RHP regulator record exists in the retained corpus, and a regulator docket could not be consulted (sandbox egress blocked; see the C4 finding of the 2026-10-23 validation report)",
+  "any Enforcement Directorate / PMLA reference anywhere in the 591 pages (0 occurrences)",
+  "any denial of SEBI/ED action that names BOTH regulators (so no False is available either)",
+  "any SEBI action against the Company itself: p464 'c) Actions by statutory and regulatory authorities against the Company \u2014 Nil'; the Directors' Nil at p469 and the KMP/Senior Management Nils at p473 are scoped subset nils and cannot clear the flag under A23 rule 8 / A25 C3-C4"
+ ],
+ "technical_findings": {
+  "extraction_scan_ran": true,
+  "window": "litigation section located via the filing TOC, pages 463-478; every page READ (no extraction failure), so A25 C1/C2 are satisfied",
+  "candidate_lost": true,
+  "measured": {
+   "spans_with_SEBI_or_ED_actor": 12,
+   "spans_over_the_600_character_cap": 12,
+   "spans_passing_every_other_test": 0
+  },
+  "dominant_mechanism": "The 600-character span cap is applied to a LINE span (text joined until a line ends with a period), not to a sentence. In this filing every SEBI-actor span is 715-1804 characters, so all twelve are discarded before the party/negation/boilerplate tests can matter.",
+  "additional_mechanisms": [
+   {
+    "id": "E1",
+    "mechanism": "Span cap 600 chars",
+    "reproduction": "p470 span '(iii) RIL had issued debentures ... SEBI has filed a revision application ... currently pending' -> len=801 > 600 -> skipped",
+    "effect": "discards every SEBI-actor span in this filing"
+   },
+   {
+    "id": "E2",
+    "mechanism": "_REG_ACTION uses [^.\\n], so a hard line break breaks the match",
+    "reproduction": "p468 raw: 'SEBI \\nfiled a revision application' -> _REG_ACTION.search(raw) is False; after joining the wrap -> True (matched 'order of the Special Court, SEBI filed')",
+    "effect": "the Director-scoped pending-revision sentence is never even a candidate"
+   },
+   {
+    "id": "E3",
+    "mechanism": "_LIT_PARTY does not know the issuer's own defined short name ('RIL'), and the party test runs on the matched span only",
+    "reproduction": "_LIT_PARTY.search('SEBI has filed a revision application against RIL') -> False; ... against RIL, the Promoter -> True",
+    "effect": "p470/p472 sentences name only 'RIL', so even a correctly sized span fails the party test"
+   },
+   {
+    "id": "E4",
+    "mechanism": "_REG_BOILERPLATE matches any sentence citing a regulation number ('Regulations, 2003'), and vetoes a genuine action sentence",
+    "reproduction": "boilerplate on 'By an order dated March 24, 2017 ... violated Section 12A of the SEBI Act read with ... Regulations, 2003' -> True",
+    "effect": "p470 (c)(i) and p472 (i) spans are vetoed even when party and length would pass"
+   },
+   {
+    "id": "E5",
+    "mechanism": "The regulator-first alternation lists initiated|issued|passed|imposed|conducted|attached|registered|served but not 'filed'",
+    "reproduction": "'SEBI filed a revision application' does not match that branch",
+    "effect": "a regulator that files/appeals is not recognised as acting in that word order"
+   }
+  ],
+  "sentence_level_counterfactual": [
+   {
+    "page": 468,
+    "sentence": "Against the said order of the Special Court, SEBI filed a revision application before the Hon'ble High Court of Bombay and the same is currently pending.",
+    "act": true,
+    "party": false,
+    "boilerplate": false,
+    "length": 153,
+    "blockers_after_e2": [
+     "party (E3)"
+    ]
+   },
+   {
+    "page": 470,
+    "sentence": "Against the said order of the Special Court, SEBI has filed a revision application before the Hon'ble High Court of Bombay and the same is currently pending.",
+    "act": true,
+    "party": "True when the enclosing span includes 'the Promoter'",
+    "length": "879 as spanned; ~154 as a sentence",
+    "blockers_after_e1": [
+     "none on the sentence itself"
+    ]
+   },
+   {
+    "page": 472,
+    "sentence": "The Adjudicating Officer of Securities and Exchange Board of India passed an order on June 20, 2022, imposing a penalty of Rs 3 million.",
+    "act": true,
+    "party": false,
+    "boilerplate": false,
+    "length": 135,
+    "blockers_after_e1": [
+     "party (E3)"
+    ]
+   }
+  ],
+  "direction_of_error": "fail-closed: every mechanism can only turn a disclosed action into an absent flag, never a false True; negation and boilerplate guards are not bypassed by any of them"
+ },
+ "assessment": "The UNKNOWN is the correct output of the current rule, but it is not a correct description of the filing: the filing discloses a pending SEBI proceeding against the Promoter and a Director, plus concluded SEBI penalties against the Promoter, inside a TOC-located, fully-readable litigation window.",
+ "classification": "TECHNICAL (positive extraction route incomplete) + SEMANTIC (what 'active' covers). Not a missing-evidence case.",
+ "is_unknown_justified": "Partly \u2014 justified as the current rule's fail-closed output; not justified as a statement that the filing discloses no active SEBI action.",
+ "minimum_evidence_to_resolve_factually": [
+  "A regulator record (SEBI order/docket or Bombay High Court cause list) establishing the current status of the revision application \u2014 external, blocked by sandbox egress; the filing already establishes that it was pending at the RHP date",
+  "no further document is needed to establish that a SEBI proceeding was pending at the RHP date"
+ ],
+ "governance_question": {
+  "exists": true,
+  "question": "For K2's 'active SEBI/ED action' limb, does a proceeding count as ACTIVE when (i) SEBI's complaint was dismissed and SEBI's own revision/appeal against that dismissal is pending, and/or (ii) the proceeding is concluded with a penalty that has become final?",
+  "already_settled": "Party scope for adverse evidence is settled (A23 rule 6 + A24 population: company, promoters, directors). The False path is settled (A23 rule 8, A25 D1/D2). What is not settled is the temporal/status meaning of 'active' for a positive finding.",
+  "alternatives": [
+   {
+    "id": "K2-A",
+    "rule": "Active = a proceeding pending at the evaluation cutoff (regulator appeal/revision counts; concluded penalties do not).",
+    "consequence_on_Jio": "flag True on the p468/p470 revision application -> K2 TRIGGERED -> final outcome AVOID (config verdict.knockout_verdict + A7). Score and all other criteria unchanged."
+   },
+   {
+    "id": "K2-B",
+    "rule": "Active = any SEBI/ED action with a live adverse consequence at the cutoff (pending proceeding OR a penalty still in force), i.e. narrower than K2-A for pending appeals but broader for final penalties.",
+    "consequence_on_Jio": "flag True on the Rs 250 million / Rs 3 million penalties that survived appeal -> K2 TRIGGERED -> AVOID."
+   },
+   {
+    "id": "K2-C",
+    "rule": "Active = an enforcement action against the issuer itself only; promoter/director matters feed litigation_bucket but never this flag (this is what A23's 'Proceeding involving a Director, not the issuer' row literally says; it would also exclude promoter matters).",
+    "consequence_on_Jio": "flag stays absent (the Company's own regulatory Nil at p464) -> K2 remains UNVERIFIED -> INSUFFICIENT_DATA. Contradicts A23 rule 6's promoter-permitting party test and the K2 label's promoter framing; would need A23 to be amended."
+   },
+   {
+    "id": "K2-D",
+    "rule": "Status quo: the flag is set only when the extractor can see the sentence; no policy statement about 'active'.",
+    "consequence_on_Jio": "UNKNOWN persists for mechanical reasons that are invisible to the reader of the record \u2014 not recommended as a durable answer."
+   }
+  ],
+  "decision_needed": "K2-A vs K2-B vs K2-C. The extraction fix (P1-P5 below) should not be implemented until the status meaning is chosen, because the fix's outcome (AVOID) is material."
+ },
+ "smallest_documented_correction_not_implemented": {
+  "status": "documented only; no code changed in this pass",
+  "fixes": [
+   {
+    "id": "P1",
+    "change": "Apply the 600-character cap to a SENTENCE inside the line span (split at sentence-ending periods that are followed by a capital letter, quote or '(i)'-style marker), not to the joined line span.",
+    "fixes": [
+     "E1"
+    ],
+    "risk": "low; the quote stays a verbatim slice"
+   },
+   {
+    "id": "P2",
+    "change": "Treat a hard line wrap as whitespace inside _REG_ACTION (match on a newline-normalised copy, then map offsets back to the original), or replace [^.\\n] with [^.] bounded by a 90-character window.",
+    "fixes": [
+     "E2"
+    ],
+    "risk": "medium; must keep sentence-boundary discipline so a match cannot span two sentences"
+   },
+   {
+    "id": "P3",
+    "change": "Party attribution: when the matched sentence names no party but the enclosing filing heading names one (the filing's own headings read '...against RIL, the Promoter'), attribute the heading's party and include the heading line in the quote. Alternative (larger): read the filing's own Definitions section for defined short names, which introduces an alias mechanism A23 does not currently authorise.",
+    "fixes": [
+     "E3"
+    ],
+    "risk": "medium-high; mis-attribution would create a false True, the one direction A23 guards hardest"
+   },
+   {
+    "id": "P4",
+    "change": "Narrow _REG_BOILERPLATE: it should veto only sentences that name an agency but describe no act (e.g. 'not been recommended or approved by SEBI'), not every sentence that cites a regulation number.",
+    "fixes": [
+     "E4"
+    ],
+    "risk": "medium; needs negative cases for regulation-citing circulars and registration language"
+   },
+   {
+    "id": "P5",
+    "change": "Add 'filed|preferred|moved|referred' to the regulator-first verb alternation.",
+    "fixes": [
+     "E5"
+    ],
+    "risk": "low"
+   }
+  ],
+  "required_regression_cases_when_implemented": [
+   "newline-wrapped 'SEBI filed ...' is found; the same words spanning two sentences are not",
+   "a 900-character paragraph is matched via its constituent sentence, and the emitted quote is that sentence",
+   "a promoter-named heading plus a sentence naming only the defined short name resolves the party; a sentence with no party anywhere in heading or sentence does not",
+   "'SEBI has issued a circular under ... Regulations, 2018' is still rejected as boilerplate",
+   "the existing both-regulator-denial, closed-period, subset-nil and negation pins are unchanged (A23/A25 behaviour must not move)",
+   "no False may be produced by any of these changes"
+  ]
+ },
+ "recommended_next_action": "Ramki decides K2-A / K2-B / K2-C. If K2-A or K2-B, authorise P1, P2, P4 (+P5) first and treat P3 as a separate, narrower authorisation with its own negative tests. Until then the recorded UNKNOWN stands.",
+ "provenance_gap": "handoff/decisions/A23, A24 and A25 are implemented in code but absent from this branch's handoff/decisions directory; they exist at commit ebb8a6c6b0d12e54228ec6b523bda025e927fb0b. Recorded, not fixed."
+}

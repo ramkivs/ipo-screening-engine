@@ -74,6 +74,9 @@ from ipo_screening.version import (  # noqa: E402
 )
 from ipo_screening.pipeline import evaluate  # noqa: E402
 
+#: The pricing terms the required-term gate actually blocks on.
+PRICING_TERMS_ORDER = ("price_band_low", "price_band_high", "lot_size")
+
 EXIT_OK = 0
 EXIT_REFUSED = 1
 EXIT_USAGE = 2
@@ -1183,6 +1186,89 @@ def cmd_post_listing_shadow_evaluate(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------
 
 
+def cmd_issue_terms(args: argparse.Namespace) -> int:
+    """Resolve issue terms through the real configured providers, read-only.
+
+    This is the operator's diagnostic for "why are the pricing terms still
+    unresolved?".  It runs the same resolver the ingestion path builds, so
+    what it prints is what an ingestion would have seen -- but it evaluates
+    nothing, writes nothing and creates no evaluation.
+
+    Every retrieval outcome is kept distinct: a source that could not be
+    reached ([TRANSPORT]) is never reported as an absence, and a listing
+    that was genuinely searched without an issuer match is never reported
+    as unreachable.
+    """
+    from ipo_screening.issue_terms import (DISCOVERABLE_TERMS,
+                                           build_resolver_from_env)
+
+    fields = args.fields or list(PRICING_TERMS_ORDER)
+    unknown = [f for f in fields if f not in DISCOVERABLE_TERMS]
+    if unknown:
+        print(f"error: unknown issue term(s): {', '.join(unknown)}", file=sys.stderr)
+        print(f"  known terms: {', '.join(DISCOVERABLE_TERMS)}", file=sys.stderr)
+        return EXIT_USAGE
+
+    issue_context = {}
+    if args.open:
+        issue_context["open_date"] = args.open
+    if args.close:
+        issue_context["close_date"] = args.close
+
+    resolver = build_resolver_from_env()
+    outcome = resolver.resolve(
+        company_name=args.issuer,
+        ipo_id=args.ipo_id or args.issuer.upper().replace(" ", "-"),
+        missing_fields=list(fields),
+        issue_context=issue_context or None,
+    )
+
+    if args.json:
+        print(json.dumps(outcome.to_dict(), indent=2, default=str))
+        return EXIT_OK if outcome.status == "RESOLVED" else EXIT_REFUSED
+
+    print(f"issuer             {args.issuer}")
+    print(f"expected window    {issue_context.get('open_date') or '-'} .. "
+          f"{issue_context.get('close_date') or '-'}"
+          + ("" if issue_context.get("open_date") and issue_context.get("close_date")
+             else "   (no window: a closed-issue record cannot be bound)"))
+    print(f"requested terms    {', '.join(fields)}")
+    print(f"status             {outcome.status}")
+    print(f"resolved           {', '.join(outcome.resolved_fields) or '-'}")
+    print(f"unresolved         {', '.join(outcome.unresolved_fields) or '-'}")
+    if outcome.conflicts:
+        print(f"conflicts          {'; '.join(outcome.conflicts)}")
+    print()
+    print("providers")
+    for report in outcome.provider_reports:
+        print(f"  {report.provider:<28} {report.outcome}")
+        if report.detail:
+            print(f"    {report.detail}")
+        for source in report.sources:
+            marker = "searched" if source.searched else source.classification
+            print(f"    - [{marker}] {source.url}")
+            if source.detail:
+                print(f"      {source.detail}")
+        for note in report.notes:
+            print(f"    ! {note}")
+    print()
+    print("terms")
+    for name in fields:
+        diagnostic = outcome.field_diagnostics.get(name) or {}
+        state = diagnostic.get("state", "NOT_EVALUATED")
+        print(f"  {name:<18} {state}")
+        for candidate in diagnostic.get("candidates", []):
+            print(f"    value {candidate.get('value')}  {candidate.get('verification')}"
+                  f"  {candidate.get('uri')}")
+            if candidate.get("quote"):
+                print(f"      quote: {candidate.get('quote')}")
+            if candidate.get("locator"):
+                print(f"      at:    {candidate.get('locator')}")
+        for reason in diagnostic.get("why_unresolved", []) or []:
+            print(f"    why: {reason}")
+    return EXIT_OK if outcome.status == "RESOLVED" else EXIT_REFUSED
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ipo_screen",
@@ -1374,6 +1460,18 @@ def build_parser() -> argparse.ArgumentParser:
     cfg_diff.add_argument("--output", "-o", default=None, help="optional path to output diff report JSON")
     cfg_diff.add_argument("--verbose", "-v", action="store_true", help="show verbose details")
     cfg_diff.set_defaults(func=cmd_config_diff)
+
+    terms = sub.add_parser(
+        "issue-terms",
+        help="resolve issue terms through the configured official sources (read-only)")
+    terms.add_argument("--issuer", required=True, help="issuer legal name as filed")
+    terms.add_argument("--ipo-id", default=None, help="IPO id (defaults to the issuer name, upper-cased)")
+    terms.add_argument("--open", default=None, help="the filing's bid opening date (YYYY-MM-DD)")
+    terms.add_argument("--close", default=None, help="the filing's bid closing date (YYYY-MM-DD)")
+    terms.add_argument("--fields", nargs="+", default=None,
+                       help="terms to resolve (default: price_band_low price_band_high lot_size)")
+    terms.add_argument("--json", action="store_true", help="print the full resolution report as JSON")
+    terms.set_defaults(func=cmd_issue_terms)
 
     return parser
 

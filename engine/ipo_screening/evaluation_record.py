@@ -798,7 +798,9 @@ def _input_field_rows(
         legacy_path = _legacy_path(tokens)
         local_evidence_id = _input_evidence_id(pointer)
         evidence_refs = [local_evidence_id]
-        fallback_id = f"EV-{legacy_path}"
+        field_map = (getattr(record, "evidence", {}) or {}).get("field_map", {})
+        mapped_id = field_map.get(legacy_path) if isinstance(field_map, Mapping) else None
+        fallback_id = mapped_id or f"EV-{legacy_path}"
         if fallback_id in legacy_evidence_by_id:
             evidence_refs.append(fallback_id)
         evidence_refs = sorted(set(evidence_refs))
@@ -1020,9 +1022,9 @@ def _a9_final_gmp_gate(
 ) -> Optional[Dict[str, Any]]:
     """Return A9's nonterminal reason for Final under the current GMP contract.
 
-    The A9 contract still defines no qualifying GMP source or qualification
-    signal and does not define the required A9 GMP hash subject. The separate §7
-    local-byte linkage is recorded for evidence reproducibility only; it does
+    A28 defines the qualification-binding sidecar, but no publisher is qualified
+    and no evidence-backed admission verifier consumes that sidecar here. The
+    separate A18/A28 local-byte linkage records reproducibility only; it does
     not grant A9 qualification and is not consumed here. A generic market
     digest, an opaque legacy SourceRef.content_hash, or a verified local link is
     never substituted for A9 approval. Missing values remain distinct from
@@ -1362,7 +1364,7 @@ def _project_evaluation_record(record: Any) -> Dict[str, Any]:
     # Record the limited, known evidence mapping without treating the
     # evidence registry as a complete field-path map.
     has_external_evidence = bool(legacy_evidence)
-    if has_external_evidence:
+    if has_external_evidence and not (getattr(record, "evidence", {}) or {}).get("field_map"):
         _append_finding(
             findings,
             "LEGACY_FIELD_EVIDENCE_MAPPING_INCOMPLETE",

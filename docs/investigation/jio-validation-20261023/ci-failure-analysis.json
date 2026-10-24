@@ -1,0 +1,48 @@
+{
+ "scope": "CI result on the exact published commits and root-cause analysis of the single failing test.",
+ "runs": [
+  {
+   "run": 39942804962,
+   "commit": "e612702ea22acf221758c44a2f3f98eca85f4d51",
+   "conclusion": "failure",
+   "job_id": 120378105750,
+   "backend": "1670 tests, failures=1, errors=0, time=1589.298s",
+   "other_steps": "frontend success; schema/integrity success; compileall success; git diff --exit-code success"
+  },
+  {
+   "run": 39942848045,
+   "commit": "589e468e06b49c8066bbdb2e3f0729c4d09cd929",
+   "conclusion": "failure",
+   "job_id": 120378250252,
+   "backend": "1670 tests, failures=1, errors=0, time=1822.159s",
+   "other_steps": "frontend success; schema/integrity success; compileall success; git diff --exit-code success"
+  }
+ ],
+ "failing_test": "tests/test_automatic_official_issue_discovery.py::test_image_only_official_notice_uses_real_offline_ocr_and_preserves_original_pdf_hash",
+ "ci_assertion": "retrieved notice names a different issuer: None; OCR header: 'PRICEBANDADVERTISEMENT / INITIAL PUBLICOFFERINGOFACMEFORGELIMITED / NOTICE TO INVESTORS ...'",
+ "local_result": "1670 passed, 25 warnings, 1206.58s, exit 0 on a git archive of 589e468",
+ "local_single_test": {
+  "result": "1 passed in 5.81s",
+  "company_name": "ACMEFORGE LIMITED",
+  "ocr_header": "PRICEBANDADVERTISEMENT / INITIAL PUBLICOFFERINGOF ACME FORGE LIMITED / NOTICE TO INVESTORS ..."
+ },
+ "pinned_packages": {
+  "rapidocr": "3.10.0",
+  "onnxruntime": "1.24.4",
+  "pypdfium2": "5.14.0",
+  "pillow": "13.0.0",
+  "pytest": "9.1.1"
+ },
+ "font": "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf at 28pt",
+ "diagnosis": [
+  "The issuer guard compares normalised names; _norm_name() strips non-alphanumerics, so spacing is irrelevant to matching.",
+  "The failure came from company_name being None: the frozen parser's broad name fallback cannot isolate a legal name from a heading line with no word separators, and _primary_issuer_header requires an identity block (CIN/registered office/'to be listed on') that this synthetic notice omits.",
+  "Same code, same pinned OCR packages, same font and same input file produced correctly separated text locally, so the difference is the OCR engine's segmentation on the runner, not a code or data difference.",
+  "The mode is fail-closed: ambiguous OCR rejects the document; it never accepts an unverified issuer."
+ ],
+ "not_done": "No test, engine, config or fixture file was changed to make the run green.",
+ "open_decision": [
+  "Option A: make the synthetic fixture realistic by adding a CIN/registered-office block so the intended _primary_issuer_header path is exercised; test-only change, leaves the broad-fallback fragility untested.",
+  "Option B: add space-tolerant heading normalisation in the OCR pre-pass outside the frozen parser; touches a verification-adjacent path and needs review, and must not repair digits or weights."
+ ]
+}

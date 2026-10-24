@@ -1,0 +1,15 @@
+{
+  "scope": "RETAINED_PUBLISHER_BYTES_NOT_LIVE_FETCH",
+  "reference_commit": "ebb8a6c6b0d12e54228ec6b523bda025e927fb0b",
+  "container": "docs/investigation/aggregator-fallback-2026-10-22/native-accepted.json",
+  "source": {
+    "content_hash": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+    "retrieval_timestamp": "2026-10-21T20:19:43.817744Z",
+    "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+    "source_type": "MARKET_DATA",
+    "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/"
+  },
+  "raw_sha256": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+  "consumed_at": "2026-10-23T08:53:46.431262+00:00",
+  "qualification": "UNVERIFIED / PA opt-in issue terms only; not GMP qualification"
+}

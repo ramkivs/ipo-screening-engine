@@ -304,6 +304,18 @@ class ProspectusTermsParser:
                 "document is a Red Herring Prospectus / DRHP, not a final Prospectus"
             )
         if not _PROSPECTUS_DATED.search(full_text):
+            # Name the document's actual class.  An RHP is not a final
+            # Prospectus and is never promoted to one to pass this check; it is
+            # read by the RHP extractor, which has its own field authority.  The
+            # previous wording ("no 'Prospectus Dated:' marker") described the
+            # missing test rather than the document, so an operator reading it
+            # could not tell an RHP from an unreadable file.
+            if re.search(r"\b(?:Draft\s+)?Red\s+Herring\s+Prospectus\b", cover_text, re.IGNORECASE):
+                raise ProspectusClassificationError(
+                    "document is a Red Herring Prospectus, not a final Prospectus: it "
+                    "establishes RHP-authorized terms (price band, bid lot, disclosed "
+                    "offer components) and cannot establish final-Prospectus terms"
+                )
             raise ProspectusClassificationError(
                 "no 'Prospectus Dated:' title marker found"
             )

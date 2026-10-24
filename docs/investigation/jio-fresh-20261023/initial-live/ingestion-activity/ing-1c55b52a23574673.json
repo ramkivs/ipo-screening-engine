@@ -1,0 +1,902 @@
+{
+  "contract_version": 1,
+  "ingestion_id": "ing-1c55b52a23574673",
+  "correlation_id": "ing-1c55b52a23574673",
+  "filename": "U72900GJ2019PLC110816_JIO.pdf",
+  "mode": "final",
+  "status": "BLOCKED",
+  "started_at": "2026-10-23T08:50:00.523150Z",
+  "finished_at": "2026-10-23T08:50:22.724271Z",
+  "evaluation_id": null,
+  "evaluation_run": false,
+  "persisted": false,
+  "is_duplicate": false,
+  "error_code": "AWAITING_ISSUE_TERMS",
+  "error_message": "AWAITING_ISSUE_TERMS: required issue terms are unavailable: issue.price_band_low, issue.price_band_high, issue.lot_size, issue.fresh_issue. The uploaded filing does not disclose them and no usable official listing was searched: official sources could not be retrieved, or returned unusable content (this is not evidence that the terms are unpublished). No evaluation was produced, no values were assumed, and nothing was persisted. Retry automatic official discovery or upload an applicable authoritative filing that establishes the unresolved fields. A retrieved price band alone does not establish ",
+  "missing_fields": [
+    "issue.price_band_low",
+    "issue.price_band_high",
+    "issue.lot_size",
+    "issue.fresh_issue"
+  ],
+  "result": null,
+  "events": [
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 1,
+      "timestamp": "2026-10-23T08:50:00.523172Z",
+      "stage": "upload",
+      "event_type": "received",
+      "status": "RUNNING",
+      "message": "Upload received; ingestion started.",
+      "details": {
+        "filename": "U72900GJ2019PLC110816_JIO.pdf",
+        "mode": "final"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 2,
+      "timestamp": "2026-10-23T08:50:00.523450Z",
+      "stage": "upload",
+      "event_type": "received",
+      "status": "SUCCEEDED",
+      "message": "File received by the ingestion service.",
+      "details": {
+        "filename": "U72900GJ2019PLC110816_JIO.pdf",
+        "size_bytes": 11630670,
+        "mode": "final"
+      },
+      "duration_ms": 0.3,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 3,
+      "timestamp": "2026-10-23T08:50:00.523722Z",
+      "stage": "document_validation",
+      "event_type": "passed",
+      "status": "SUCCEEDED",
+      "message": "Document passed format, size and mode validation.",
+      "details": {
+        "filename": "U72900GJ2019PLC110816_JIO.pdf",
+        "mode": "final"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 4,
+      "timestamp": "2026-10-23T08:50:00.538327Z",
+      "stage": "filing_extraction",
+      "event_type": "started",
+      "status": "RUNNING",
+      "message": "Extracting the filing (tables, sections, canonical input).",
+      "details": {},
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 5,
+      "timestamp": "2026-10-23T08:50:22.233162Z",
+      "stage": "filing_extraction",
+      "event_type": "completed",
+      "status": "SUCCEEDED",
+      "message": "Filing extraction completed.",
+      "details": {
+        "company_name": "JIO PLATFORMS LIMITED",
+        "ipo_id": "JIO-PLATFORMS-LIMITED"
+      },
+      "duration_ms": 21694.8,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 6,
+      "timestamp": "2026-10-23T08:50:22.233556Z",
+      "stage": "issuer_identification",
+      "event_type": "identified",
+      "status": "SUCCEEDED",
+      "message": "Issuer identified from the filing.",
+      "details": {
+        "company_name": "JIO PLATFORMS LIMITED",
+        "ipo_id": "JIO-PLATFORMS-LIMITED"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 7,
+      "timestamp": "2026-10-23T08:50:22.233967Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "BLOCKED",
+      "message": "issue.price_band_low: not established by filing extraction.",
+      "details": {
+        "field": "issue.price_band_low",
+        "state": "missing",
+        "origin": "filing"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 8,
+      "timestamp": "2026-10-23T08:50:22.234286Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "BLOCKED",
+      "message": "issue.price_band_high: not established by filing extraction.",
+      "details": {
+        "field": "issue.price_band_high",
+        "state": "missing",
+        "origin": "filing"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 9,
+      "timestamp": "2026-10-23T08:50:22.234612Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "BLOCKED",
+      "message": "issue.lot_size: not established by filing extraction.",
+      "details": {
+        "field": "issue.lot_size",
+        "state": "missing",
+        "origin": "filing"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 10,
+      "timestamp": "2026-10-23T08:50:22.234962Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "SUCCEEDED",
+      "message": "issue.ofs: disclosed by the filing.",
+      "details": {
+        "field": "issue.ofs",
+        "state": "extracted",
+        "origin": "filing"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 11,
+      "timestamp": "2026-10-23T08:50:22.235370Z",
+      "stage": "term_resolution",
+      "event_type": "field_evidence",
+      "status": "SUCCEEDED",
+      "message": "Recorded evidence candidate for issue.ofs; field state: extracted.",
+      "details": {
+        "field": "issue.ofs",
+        "origin": "filing",
+        "state": "extracted",
+        "evidence_key": "filing:issue.ofs:0",
+        "value": 0.0,
+        "unit": "INR_MILLIONS",
+        "source_id": "RHP-FILING-72480c2e",
+        "document_class": "RHP",
+        "uri": "/tmp/ipo_ingest/72480c2e249eb8da/filing.pdf",
+        "content_hash": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+        "page": 1,
+        "locator": "Cover page, Offer for Sale Size",
+        "extraction_method": "DETERMINISTIC_PDF",
+        "confidence": 1.0,
+        "verification": null,
+        "quote": "OFFER FOR SALE SIZE TOTAL ISSUE SIZE ELIGIBILITY AND SHARE RESERVATION \nFresh Issue Up to  \n270,000,000 \nEquity Shares of \nface value of \u20b910 \neach for cash at a \nprice of \u20b9[\u25cf] each \n(including a \nsecurities \npremium of \u20b9[\u25cf] \nper Equity Share) \naggregating up to \n\u20b9[\u25cf] million \nNot applicable",
+        "retrieved_at": null
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 12,
+      "timestamp": "2026-10-23T08:50:22.235792Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "BLOCKED",
+      "message": "issue.fresh_issue: not established by filing extraction.",
+      "details": {
+        "field": "issue.fresh_issue",
+        "state": "missing",
+        "origin": "filing"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 13,
+      "timestamp": "2026-10-23T08:50:22.236158Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "SUCCEEDED",
+      "message": "issue.open_date: disclosed by the filing.",
+      "details": {
+        "field": "issue.open_date",
+        "state": "extracted",
+        "origin": "filing"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 14,
+      "timestamp": "2026-10-23T08:50:22.236544Z",
+      "stage": "term_resolution",
+      "event_type": "field_evidence",
+      "status": "SUCCEEDED",
+      "message": "Recorded evidence candidate for issue.open_date; field state: extracted.",
+      "details": {
+        "field": "issue.open_date",
+        "origin": "filing",
+        "state": "extracted",
+        "evidence_key": "filing:issue.open_date:0",
+        "value": "2026-10-21",
+        "unit": null,
+        "source_id": "RHP-FILING-72480c2e",
+        "document_class": "RHP",
+        "uri": "/tmp/ipo_ingest/72480c2e249eb8da/filing.pdf",
+        "content_hash": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+        "page": 1,
+        "locator": "Cover page, Issue Opening Date",
+        "extraction_method": "DETERMINISTIC_PDF",
+        "confidence": 0.98,
+        "verification": null,
+        "quote": "ISSUE OPENS \nON \nWEDNESDAY, \nOCTOBER 21, 2026",
+        "retrieved_at": null
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 15,
+      "timestamp": "2026-10-23T08:50:22.237051Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "SUCCEEDED",
+      "message": "issue.close_date: disclosed by the filing.",
+      "details": {
+        "field": "issue.close_date",
+        "state": "extracted",
+        "origin": "filing"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 16,
+      "timestamp": "2026-10-23T08:50:22.237454Z",
+      "stage": "term_resolution",
+      "event_type": "field_evidence",
+      "status": "SUCCEEDED",
+      "message": "Recorded evidence candidate for issue.close_date; field state: extracted.",
+      "details": {
+        "field": "issue.close_date",
+        "origin": "filing",
+        "state": "extracted",
+        "evidence_key": "filing:issue.close_date:0",
+        "value": "2026-10-23",
+        "unit": null,
+        "source_id": "RHP-FILING-72480c2e",
+        "document_class": "RHP",
+        "uri": "/tmp/ipo_ingest/72480c2e249eb8da/filing.pdf",
+        "content_hash": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+        "page": 1,
+        "locator": "Cover page, Issue Closing Date",
+        "extraction_method": "DETERMINISTIC_PDF",
+        "confidence": 0.98,
+        "verification": null,
+        "quote": "ISSUE CLOSES \nON(1) \nFRIDAY, \nOCTOBER 23, 2026",
+        "retrieved_at": null
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 17,
+      "timestamp": "2026-10-23T08:50:22.237900Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "SUCCEEDED",
+      "message": "issue.fresh_shares: disclosed by the filing.",
+      "details": {
+        "field": "issue.fresh_shares",
+        "state": "extracted",
+        "origin": "filing"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 18,
+      "timestamp": "2026-10-23T08:50:22.238315Z",
+      "stage": "term_resolution",
+      "event_type": "field_evidence",
+      "status": "SUCCEEDED",
+      "message": "Recorded evidence candidate for issue.fresh_shares; field state: extracted.",
+      "details": {
+        "field": "issue.fresh_shares",
+        "origin": "filing",
+        "state": "extracted",
+        "evidence_key": "filing:issue.fresh_shares:0",
+        "value": 270000000,
+        "unit": null,
+        "source_id": "RHP-FILING-72480c2e",
+        "document_class": "RHP",
+        "uri": "/tmp/ipo_ingest/72480c2e249eb8da/filing.pdf",
+        "content_hash": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+        "page": 1,
+        "locator": "Cover page, Fresh Issue Shares",
+        "extraction_method": "DETERMINISTIC_PDF",
+        "confidence": 0.98,
+        "verification": null,
+        "quote": "Fresh Issue Up to  \n270,000,000 \nEquity Shares",
+        "retrieved_at": null
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 19,
+      "timestamp": "2026-10-23T08:50:22.239428Z",
+      "stage": "official_discovery",
+      "event_type": "started",
+      "status": "RUNNING",
+      "message": "Searching official sources for the missing issue terms.",
+      "details": {
+        "missing_fields": [
+          "issue.price_band_low",
+          "issue.price_band_high",
+          "issue.lot_size",
+          "issue.fresh_issue"
+        ]
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 20,
+      "timestamp": "2026-10-23T08:50:22.641256Z",
+      "stage": "official_discovery",
+      "event_type": "source_attempt",
+      "status": "FAILED",
+      "message": "official-discovery: UNAVAILABLE -- no valid official listing could be retrieved: https://www.nseindia.com/market-data/all-upcoming-issues-ipo: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>); https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>); https://www.bseindia.com/publicissue.html: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>); https://api.bseindia.",
+      "details": {
+        "provider": "official-discovery",
+        "outcome": "UNAVAILABLE",
+        "detail": "no valid official listing could be retrieved: https://www.nseindia.com/market-data/all-upcoming-issues-ipo: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>); https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>); https://www.bseindia.com/publicissue.html: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>); https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue_\u2026",
+        "listing_searched": false,
+        "searched_listings": [],
+        "notes": [
+          "https://www.nseindia.com/market-data/all-upcoming-issues-ipo: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)",
+          "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)",
+          "https://www.bseindia.com/publicissue.html: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)",
+          "https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue_par_updated/w?flag=1: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)",
+          "https://www.nseindia.com/api/all-upcoming-issues?category=ipo: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)",
+          "https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)"
+        ],
+        "sources": [
+          {
+            "url": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+            "classification": "failed",
+            "searched": false,
+            "issue_entries": 0,
+            "detail": "listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)"
+          },
+          {
+            "url": "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
+            "classification": "failed",
+            "searched": false,
+            "issue_entries": 0,
+            "detail": "listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)"
+          },
+          {
+            "url": "https://www.bseindia.com/publicissue.html",
+            "classification": "failed",
+            "searched": false,
+            "issue_entries": 0,
+            "detail": "listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)"
+          },
+          {
+            "url": "https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue_par_updated/w?flag=1",
+            "classification": "failed",
+            "searched": false,
+            "issue_entries": 0,
+            "detail": "listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)"
+          },
+          {
+            "url": "https://www.nseindia.com/api/all-upcoming-issues?category=ipo",
+            "classification": "failed",
+            "searched": false,
+            "issue_entries": 0,
+            "detail": "listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)"
+          },
+          {
+            "url": "https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0",
+            "classification": "failed",
+            "searched": false,
+            "issue_entries": 0,
+            "detail": "listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)"
+          }
+        ]
+      },
+      "duration_ms": 401.8,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 21,
+      "timestamp": "2026-10-23T08:50:22.642210Z",
+      "stage": "official_discovery",
+      "event_type": "source_attempt",
+      "status": "FAILED",
+      "message": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)",
+      "details": {
+        "provider": "official-discovery",
+        "outcome": "UNAVAILABLE",
+        "url": "https://www.nseindia.com/market-data/all-upcoming-issues-ipo",
+        "classification": "failed",
+        "searched": false,
+        "issue_entries": 0,
+        "source_unusable": true
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 22,
+      "timestamp": "2026-10-23T08:50:22.642749Z",
+      "stage": "official_discovery",
+      "event_type": "source_attempt",
+      "status": "FAILED",
+      "message": "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)",
+      "details": {
+        "provider": "official-discovery",
+        "outcome": "UNAVAILABLE",
+        "url": "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
+        "classification": "failed",
+        "searched": false,
+        "issue_entries": 0,
+        "source_unusable": true
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 23,
+      "timestamp": "2026-10-23T08:50:22.643345Z",
+      "stage": "official_discovery",
+      "event_type": "source_attempt",
+      "status": "FAILED",
+      "message": "https://www.bseindia.com/publicissue.html: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)",
+      "details": {
+        "provider": "official-discovery",
+        "outcome": "UNAVAILABLE",
+        "url": "https://www.bseindia.com/publicissue.html",
+        "classification": "failed",
+        "searched": false,
+        "issue_entries": 0,
+        "source_unusable": true
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 24,
+      "timestamp": "2026-10-23T08:50:22.644033Z",
+      "stage": "official_discovery",
+      "event_type": "source_attempt",
+      "status": "FAILED",
+      "message": "https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue_par_updated/w?flag=1: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)",
+      "details": {
+        "provider": "official-discovery",
+        "outcome": "UNAVAILABLE",
+        "url": "https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue_par_updated/w?flag=1",
+        "classification": "failed",
+        "searched": false,
+        "issue_entries": 0,
+        "source_unusable": true
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 25,
+      "timestamp": "2026-10-23T08:50:22.644663Z",
+      "stage": "official_discovery",
+      "event_type": "source_attempt",
+      "status": "FAILED",
+      "message": "https://www.nseindia.com/api/all-upcoming-issues?category=ipo: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)",
+      "details": {
+        "provider": "official-discovery",
+        "outcome": "UNAVAILABLE",
+        "url": "https://www.nseindia.com/api/all-upcoming-issues?category=ipo",
+        "classification": "failed",
+        "searched": false,
+        "issue_entries": 0,
+        "source_unusable": true
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 26,
+      "timestamp": "2026-10-23T08:50:22.645504Z",
+      "stage": "official_discovery",
+      "event_type": "source_attempt",
+      "status": "FAILED",
+      "message": "https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0: listing retrieval failed (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)",
+      "details": {
+        "provider": "official-discovery",
+        "outcome": "UNAVAILABLE",
+        "url": "https://www.sebi.gov.in/sebiweb/home/handleAction?doListing=yes&sid=1&ssid=7&smid=0",
+        "classification": "failed",
+        "searched": false,
+        "issue_entries": 0,
+        "source_unusable": true
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 27,
+      "timestamp": "2026-10-23T08:50:22.646194Z",
+      "stage": "official_discovery",
+      "event_type": "completed",
+      "status": "BLOCKED",
+      "message": "Official discovery outcome: UNAVAILABLE.",
+      "details": {
+        "status": "UNAVAILABLE",
+        "resolved_fields": [],
+        "unresolved_fields": [
+          "price_band_low",
+          "price_band_high",
+          "lot_size",
+          "fresh_issue"
+        ],
+        "conflicts": []
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 28,
+      "timestamp": "2026-10-23T08:50:22.647302Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "BLOCKED",
+      "message": "issue.price_band_low: still missing after official discovery.",
+      "details": {
+        "field": "issue.price_band_low",
+        "state": "unavailable",
+        "origin": "official_discovery"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 29,
+      "timestamp": "2026-10-23T08:50:22.648064Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "BLOCKED",
+      "message": "issue.price_band_high: still missing after official discovery.",
+      "details": {
+        "field": "issue.price_band_high",
+        "state": "unavailable",
+        "origin": "official_discovery"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 30,
+      "timestamp": "2026-10-23T08:50:22.648736Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "BLOCKED",
+      "message": "issue.lot_size: still missing after official discovery.",
+      "details": {
+        "field": "issue.lot_size",
+        "state": "unavailable",
+        "origin": "official_discovery"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 31,
+      "timestamp": "2026-10-23T08:50:22.649414Z",
+      "stage": "term_resolution",
+      "event_type": "term_status",
+      "status": "BLOCKED",
+      "message": "issue.fresh_issue: still missing after official discovery.",
+      "details": {
+        "field": "issue.fresh_issue",
+        "state": "unavailable",
+        "origin": "official_discovery"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 32,
+      "timestamp": "2026-10-23T08:50:22.650203Z",
+      "stage": "aggregator_fallback",
+      "event_type": "started",
+      "status": "RUNNING",
+      "message": "Official discovery incomplete; checking PA-authorized third-party issue data.",
+      "details": {},
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 33,
+      "timestamp": "2026-10-23T08:50:22.719265Z",
+      "stage": "aggregator_fallback",
+      "event_type": "source_attempt",
+      "status": "FAILED",
+      "message": "Third-party fallback source: UNAVAILABLE",
+      "details": {
+        "uri": "https://www.chittorgarh.com/ipo/ipo_dashboard.asp",
+        "outcome": "UNAVAILABLE",
+        "detail": "URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+      },
+      "duration_ms": 69.1,
+      "source_reference": "https://www.chittorgarh.com/ipo/ipo_dashboard.asp",
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 34,
+      "timestamp": "2026-10-23T08:50:22.720194Z",
+      "stage": "aggregator_fallback",
+      "event_type": "source_attempt",
+      "status": "FAILED",
+      "message": "Third-party fallback source: UNAVAILABLE",
+      "details": {
+        "uri": "https://www.investorgain.com/report/live-ipo-gmp/331/",
+        "outcome": "UNAVAILABLE",
+        "detail": "URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>"
+      },
+      "duration_ms": null,
+      "source_reference": "https://www.investorgain.com/report/live-ipo-gmp/331/",
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 35,
+      "timestamp": "2026-10-23T08:50:22.720988Z",
+      "stage": "aggregator_fallback",
+      "event_type": "completed",
+      "status": "BLOCKED",
+      "message": "PA-authorized aggregator fallback processed; never official verification.",
+      "details": {
+        "authority": "THIRD_PARTY_AGGREGATOR_OVERRIDE",
+        "verified": false,
+        "fields": [],
+        "conflicts": [],
+        "error": null
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 36,
+      "timestamp": "2026-10-23T08:50:22.721825Z",
+      "stage": "evaluation_eligibility",
+      "event_type": "blocked",
+      "status": "BLOCKED",
+      "message": "Evaluation blocked: required issue terms remain unresolved.",
+      "details": {
+        "missing_fields": [
+          "issue.price_band_low",
+          "issue.price_band_high",
+          "issue.lot_size",
+          "issue.fresh_issue"
+        ],
+        "reason": "no usable official listing was searched: official sources could not be retrieved, or returned unusable content (this is not evidence that the terms are unpublished)"
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": "AWAITING_ISSUE_TERMS",
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 37,
+      "timestamp": "2026-10-23T08:50:22.722567Z",
+      "stage": "evaluation",
+      "event_type": "not_run",
+      "status": "SKIPPED",
+      "message": "Evaluation was not run; nothing was persisted.",
+      "details": {},
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 38,
+      "timestamp": "2026-10-23T08:50:22.723333Z",
+      "stage": "persistence",
+      "event_type": "not_attempted",
+      "status": "SKIPPED",
+      "message": "No evaluation artifact was persisted.",
+      "details": {},
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": null,
+      "retryable": null
+    },
+    {
+      "ingestion_id": "ing-1c55b52a23574673",
+      "correlation_id": "ing-1c55b52a23574673",
+      "sequence": 39,
+      "timestamp": "2026-10-23T08:50:22.724299Z",
+      "stage": "finalization",
+      "event_type": "terminated",
+      "status": "BLOCKED",
+      "message": "Ingestion blocked: AWAITING_ISSUE_TERMS: required issue terms are unavailable: issue.price_band_low, issue.price_band_high, issue.lot_size, issue.fresh_issue. The uploaded filing does not disclose them and no usable official listing was searched: official sources could not be retrieved, or returned unusable content (this is not evidence that the terms are unpublished). No evaluation was produced, no values were assumed, and nothing was persisted. Retry automatic official discovery or upload an applicable authoritative filing that establishes the unresolved fields. A retrieved price band alone ",
+      "details": {
+        "evaluation_run": false,
+        "persisted": false,
+        "evaluation_id": null,
+        "missing_fields": [
+          "issue.price_band_low",
+          "issue.price_band_high",
+          "issue.lot_size",
+          "issue.fresh_issue"
+        ],
+        "duration_ms": 22201.1
+      },
+      "duration_ms": null,
+      "source_reference": null,
+      "error_code": "AWAITING_ISSUE_TERMS",
+      "retryable": false
+    }
+  ]
+}

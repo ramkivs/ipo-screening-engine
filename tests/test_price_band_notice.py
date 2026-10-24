@@ -227,12 +227,25 @@ def test_non_notice_document_rejected(parser):
 # --------------------------------------------------------------------------
 
 
-def test_conflicting_price_bands_rejected(parser):
-    """Notice with conflicting candidate price bands raises PriceBandNoticeParseError."""
+def test_conflicting_price_bands_withhold_the_band_not_the_document(parser):
+    """A conflicting band withholds the band; the other fields survive.
+
+    Changed 2026-10-23 (A30 / Paras investigation): a field-level conflict used
+    to raise ``PriceBandNoticeParseError`` and discard the whole document --
+    including a lot size and issue window that nothing disputed.  The conflict
+    is still reported, the band is still withheld (both ends, so no
+    half-verified collar is published) and the value is still never guessed.
+    """
     fixture_path = FIXTURES_DIR / "conflicting_notice.txt"
-    with pytest.raises(PriceBandNoticeParseError) as excinfo:
-        parser.parse_from_file(fixture_path)
-    assert "Multiple conflicting price band" in str(excinfo.value)
+    result = parser.parse_from_file(fixture_path)
+    assert result.price_band_low is None
+    assert result.price_band_high is None
+    assert result.has_full_price_band is False
+    assert "CONFLICTING_PRICE_BANDS" in {finding.code for finding in result.findings}
+    assert "price_band" in result.metadata["issue_term_errors"]
+    # Independently supported fields are still extracted.
+    assert result.lot_size is not None and result.lot_size.value == 100
+    assert result.open_date is not None and result.close_date is not None
 
 
 # --------------------------------------------------------------------------
@@ -305,8 +318,13 @@ def test_ambiguous_ocr_symbols_fail_closed(parser):
 # --------------------------------------------------------------------------
 
 
-def test_inverted_date_order_rejected(parser):
-    """Open date after close date raises PriceBandNoticeParseError."""
+def test_inverted_date_order_withholds_both_dates(parser):
+    """An inverted window withholds both dates instead of discarding the notice.
+
+    Changed 2026-10-23 (A30): the pair is contradictory, so neither date is
+    published, but the price band and lot size the document does state are
+    still available.
+    """
     text = """
     PRICE BAND NOTICE
     INITIAL PUBLIC OFFERING OF INVERTED DATE LIMITED
@@ -315,10 +333,14 @@ def test_inverted_date_order_rejected(parser):
     Issue Opens On: 2026-10-15
     Issue Closes On: 2026-10-10
     """
-    with pytest.raises(PriceBandNoticeParseError) as excinfo:
-        parser.parse_from_text(text)
-    assert "Open date" in str(excinfo.value)
-    assert "is after close date" in str(excinfo.value)
+    result = parser.parse_from_text(text)
+    assert result.open_date is None
+    assert result.close_date is None
+    codes = {finding.code for finding in result.findings}
+    assert "INVALID_ISSUE_DATE_ORDER" in codes
+    assert "open_date,close_date" in result.metadata["issue_term_errors"]
+    assert result.price_band_low.value == 100.0
+    assert result.lot_size.value == 50
 
 
 # --------------------------------------------------------------------------

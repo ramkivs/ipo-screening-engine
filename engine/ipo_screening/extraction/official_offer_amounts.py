@@ -1,0 +1,409 @@
+"""Explicit monetary offer components from issuer-matched official attachments.
+
+No total-issue substitution, reservation subtotal, shares-times-price inference,
+or absent-OFS-to-zero default. Existing OFS NIL binding is reused unchanged.
+RHP terms remain a distinct document class, never relabelled final Prospectus.
+"""
+from dataclasses import fields
+import hashlib
+import io
+import math
+import re
+from typing import Optional
+
+from ..canonical import SourceRef, SourceType
+from .exchange_issue_page import ExchangeIssueTermsResult
+from .interfaces import SourceDocument
+from .price_band_notice import PriceBandField, PriceBandNoticeResult
+from .prospectus_terms import ProspectusTermsParser
+from .sections import _find_ofs_nil
+
+
+_SOURCE_PLACEHOLDER = re.compile(r'\[\s*(?:[●•.\-]+)?\s*\]|\bTBD\b', re.I)
+
+#: A placeholder that occupies the **money slot** -- ``Rs. [●]``, ``₹ [•]``,
+#: ``[●] million``, ``aggregating up to [ ]``.  Only this makes the amount
+#: unknown.  A placeholder in a *share-count* slot ("Up to [●] Equity Shares
+#: of face value of ₹1 each aggregating up to ₹ 9,500.00 million") leaves the
+#: money amount explicitly stated, and treating it as unknown discarded a
+#: disclosed Offer for Sale amount.
+#: A *source* marker that makes the amount itself unknown: the document prints
+#: the money slot as a placeholder, or as ``TBD``.  ``[UNREADABLE_OCR_LINE]`` is
+#: deliberately **not** here: that marker is produced by this pipeline when OCR
+#: confidence is low, so reporting it as ``SOURCE_PLACEHOLDER`` attributes a
+#: reading failure to the issuer's document.  An unreadable run still withholds
+#: the amount (see the intervening-text guard below) -- it just is not called a
+#: placeholder.
+_AMOUNT_UNKNOWN_MARKER = re.compile(
+    r'(?:₹|Rs\.?|INR)\s*[\[\(][^\]\)]{0,6}[\]\)]'
+    r'|[\[\(][^\]\)]{0,6}[\]\)]\s*(?:lakhs?|millions?|crores?)\b'
+    r'|aggregating\s+(?:up\s+)?to\s*[\[\(][^\]\)]{0,6}[\]\)]'
+    r'|\bTBD\b',
+    re.I,
+)
+
+_AMOUNT_SLOT_PLACEHOLDER = re.compile(
+    r'(?:₹|Rs\.?|INR)\s*[\[\(][^\]\)]{0,6}[\]\)]'
+    r'|[\[\(][^\]\)]{0,6}[\]\)]\s*(?:lakhs?|millions?|crores?)\b'
+    r'|aggregating\s+(?:up\s+)?to\s*[\[\(][^\]\)]{0,6}[\]\)]',
+    re.I,
+)
+
+#: A component label that is immediately preceded by another component label
+#: (or by a header cell naming several) says nothing about which column the
+#: following numbers belong to: "TYPE FRESH ISSUE SIZE  OFFER FOR SALE SIZE
+#: TOTAL OFFER SIZE", or a merged cell "Fresh Issue and Offer for Sale".
+#: Reading the next amount in text order would bind the *fresh-issue* amount
+#: to the Offer for Sale.  Refuse to guess instead.
+_COMPONENT_MERGED_PREFIX = re.compile(
+    r'(?:fresh\s+(?:issue|offer)(?:\s+size)?|offer\s+for\s+sale(?:\s+size)?'
+    r'|total\s+(?:issue|offer)(?:\s+size)?)\s*(?:and|&|/|\+|,)?\s*$',
+    re.I,
+)
+
+def explicit_amounts(result, pages, table_columns=()):
+    if not isinstance(result, ExchangeIssueTermsResult):
+        result = ExchangeIssueTermsResult(**{f.name: getattr(result, f.name)
+                                             for f in fields(PriceBandNoticeResult)})
+        result.document_class = 'PRICE_BAND_NOTICE'
+    diagnostics = result.metadata.setdefault('issue_term_diagnostics', [])
+    table_pages = {column['page'] for column in table_columns}
+    units = {'lakh': 'INR_LAKHS', 'million': 'INR_MILLIONS', 'crore': 'INR_CRORES'}
+    for name, label in (('fresh_issue', r'fresh\s+(?:issue|offer)'),
+                        ('ofs', r'offer\s+for\s+sale')):
+        found = []
+        inputs = [(page, text, None) for page, text in pages if page not in table_pages]
+        for column in table_columns:
+            if column['component'] == name:
+                for cell in column['cells']:
+                    # Reject category/face-value/subtotal runs, even in an
+                    # apparently aligned cell. Never merge adjacent runs.
+                    if re.search(r'reservation|employee|shareholder|anchor|face\s+value|total\s+(?:issue|offer)', cell['text'], re.I):
+                        continue
+                    label_text = 'Fresh Issue' if name == 'fresh_issue' else 'Offer for Sale'
+                    inputs.append((column['page'], label_text + '\n' + cell['text'], cell))
+        for page, text, cell in inputs:
+            for m in re.finditer(label + r'\b', text, re.I):
+                segment = text[m.end():m.end() + 300]
+                amount = re.search(r'aggregating\s+(?:up\s+to\s+|to\s+)?(?:₹|Rs\.?|INR)\s*'
+                                   r'(\d[\d,]*(?:\.\d+)?)\s*(lakhs?|millions?|crores?)', segment, re.I)
+                assertion = re.split(r'fresh\s+(?:issue|offer)|offer\s+for\s+sale|total\s+(?:issue|offer)|reservation|employee|shareholder|anchor', segment, maxsplit=1, flags=re.I)[0]
+                # Report SOURCE_PLACEHOLDER only when the *amount* is unknown:
+                # a placeholder in the money slot, TBD, or an unreadable run.
+                # A placeholder share count with a stated money amount is not
+                # an unknown amount, and reporting it as one contradicted the
+                # value the parser had just extracted.
+                if _AMOUNT_UNKNOWN_MARKER.search(assertion):
+                    diagnostics.append({'code': 'SOURCE_PLACEHOLDER', 'field': name,
+                        'page': page, 'quote': cell['text'] if cell else text[m.start():m.end()+len(assertion)],
+                        'method': 'NATIVE_TABLE' if cell else ('OCR' if ('ocr' in result.metadata or 'ocr_header_excerpt' in result.metadata) else 'NATIVE_TEXT'),
+                        'coordinates': {'x': cell['x'], 'y': cell['y']} if cell else None})
+                if not amount:
+                    continue
+                # A merged/header cell ("TYPE FRESH ISSUE SIZE  OFFER FOR SALE
+                # SIZE  TOTAL OFFER SIZE", or "Fresh Issue and Offer for Sale")
+                # does not say which column the following amounts belong to.
+                # Reading the next amount in text order would bind the
+                # fresh-issue amount to the Offer for Sale, so refuse to guess.
+                # The placeholder diagnostic above is still reported: it names
+                # the field the document leaves open, not a value.
+                if _COMPONENT_MERGED_PREFIX.search(text[max(0, m.start() - 60):m.start()]):
+                    continue
+                before = segment[:amount.start()]
+                if re.search(r'offer\s+for\s+sale|fresh\s+(?:issue|offer)|reservation|employee|shareholder|anchor|total\s+(?:issue|offer)|UNREADABLE_OCR_LINE|\bTBD\b|\[\s*\]', before, re.I) or _AMOUNT_SLOT_PLACEHOLDER.search(before):
+                    # Another component, a reservation/subtotal, unreadable OCR,
+                    # or a placeholder *in the money slot* intervened. A
+                    # placeholder share count does not disqualify a stated
+                    # amount (see _AMOUNT_SLOT_PLACEHOLDER).
+                    continue
+                from .exchange_issue_page import _number
+                value = _number(amount.group(1))
+                if not math.isfinite(value):
+                    continue
+                word = amount.group(2).lower()
+                unit = next(u for k, u in units.items() if word.startswith(k))
+                quote = text[m.start():m.end() + amount.end()]
+                found.append((value, unit, page, cell['text'] if cell else quote, cell))
+        unique = {(v, u) for v, u, _, _, _ in found}
+        if len(unique) > 1:
+            result.metadata.setdefault('issue_term_errors', {})[name] = 'Conflicting explicit monetary amounts in one document'
+        if len(unique) == 1:
+            value, unit, page, quote, cell = found[0]
+            setattr(result, name + '_amount', PriceBandField(name=name + '_amount',
+                value=value, raw_text=quote, quote=quote, page=page,
+                locator=('Native offer-table column ' + name + '; original text run x=' + str(cell['x']) + ', y=' + str(cell['y']) if cell else 'Official offer document — explicit ' + name + ' aggregating amount')))
+            setattr(result, name + '_amount_unit', unit)
+    # Explicit no-OFS wording only, using the already-governed binding guard.
+    nil_inputs = [(page, text, None) for page, text in pages if page not in table_pages]
+    for column in table_columns:
+        if column['component'] == 'ofs':
+            nil_inputs.extend((column['page'], 'Offer for Sale\n' + cell['text'], cell) for cell in column['cells'])
+    nil = next(((page, cell['text'] if cell else quote, cell) for page, text, cell in nil_inputs if (quote := _find_ofs_nil(text))), None)
+    if nil and (result.ofs_amount is not None and result.ofs_amount.value > 0 or
+                'ofs' in result.metadata.get('issue_term_errors', {})):
+        result.ofs_amount = None
+        result.ofs_amount_unit = None
+        result.metadata.setdefault('issue_term_errors', {})['ofs'] = 'Explicit OFS NIL conflicts with monetary amounts'
+    elif nil and result.ofs_amount is None:
+        result.ofs_amount = PriceBandField(name='ofs_amount', value=0.0, page=nil[0],
+            raw_text=nil[1], quote=nil[1], locator=('Native offer-table column ofs; original text run x=' + str(nil[2]['x']) + ', y=' + str(nil[2]['y']) if nil[2] else 'Official offer document — explicit OFS NIL'))
+        result.ofs_amount_unit = 'INR_LAKHS'
+    return result
+
+
+
+def _rhp_issue_terms(result, pages):
+    """Attach the terms an RHP itself establishes, field by field.
+
+    The cover / offer summary is the only place an RHP states its *current*
+    price band and bid lot; reading them from the whole document would pick up
+    historical issues and worked examples.  A field the document does not state
+    stays None and a field whose current-issue candidates conflict is withheld
+    by the extractor; either way the other fields survive.  A failure inside
+    this block is recorded as "term not established for this field" and never
+    discards a document whose identity and offer amounts are already good.
+    """
+    from .price_band_notice import PriceBandNoticeParser
+
+    parser = PriceBandNoticeParser()
+    try:
+        cover_pages = [(number, text) for number, text in pages if number <= 5]
+        band_low, band_high, band_findings = parser._extract_price_band(cover_pages)
+        lot_field, lot_findings = parser._extract_lot_size(cover_pages)
+        # The issue window may also be restated in a dated issue-summary
+        # section; ``_extract_dates`` applies the term-page and document-date
+        # rules itself.
+        term_pages = [
+            (number, text) for number, text in pages if parser._is_term_page(number, text)
+        ]
+        open_field, close_field, date_findings = parser._extract_dates(term_pages)
+    except Exception as exc:  # a term-level failure is not a document failure
+        result.metadata.setdefault('issue_term_errors', {})['rhp_terms'] = (
+            f"{type(exc).__name__}: {exc}"
+        )
+        return result
+    for field_name, field_obj in (
+        ('price_band_low', band_low),
+        ('price_band_high', band_high),
+        ('lot_size', lot_field),
+        ('open_date', open_field),
+        ('close_date', close_field),
+    ):
+        if field_obj is not None:
+            setattr(result, field_name, field_obj)
+    # The term pages, not only the cover: an RHP states "Price Band"/"Bid
+    # Lot" as defined terms in its abbreviations/definitions pages, which is
+    # where a placeholder is visible as a placeholder.
+    _record_pricing_placeholders(
+        result,
+        term_pages,
+        [
+            name
+            for name, field_obj in (
+                ("price_band_low", band_low),
+                ("price_band_high", band_high),
+                ("lot_size", lot_field),
+            )
+            if field_obj is None
+        ],
+    )
+    findings = list(band_findings) + list(lot_findings) + list(date_findings)
+    result.metadata['issue_term_findings'] = [
+        {'code': f.code, 'message': f.message, 'location': getattr(f, 'location', None)}
+        for f in findings
+    ]
+    result.metadata['historical_dates_excluded'] = list(
+        getattr(parser, '_last_excluded_dates', [])
+    )
+    result.metadata.setdefault('issue_term_errors', {}).update(
+        parser._issue_term_errors(findings)
+    )
+    return result
+
+
+def document_pages(raw, max_pages=5, diagnostics=None):
+    if raw.startswith(b'%PDF-'):
+        from pypdf import PdfReader
+        with io.BytesIO(raw) as stream:
+            reader = PdfReader(stream)
+            pages = []
+            limit = min(max_pages, len(reader.pages))
+            if diagnostics is not None:
+                diagnostics.update(total_pages=len(reader.pages), page_limit=max_pages,
+                                   pages_examined=limit, complete_document=limit == len(reader.pages),
+                                   page_read_errors=[])
+            for i in range(limit):
+                try:
+                    pages.append((i + 1, reader.pages[i].extract_text() or ''))
+                except Exception as exc:
+                    if diagnostics is None:
+                        raise
+                    diagnostics['page_read_errors'].append({'page': i+1, 'error': str(exc)})
+                    diagnostics['complete_document'] = False
+            return pages
+    return [(1, raw.decode('utf-8', errors='replace'))]
+
+
+#: Titles that name a notice outright.  Deliberately narrower than the notice
+#: parser's full title list: an RHP cover legitimately contains phrases like
+#: "the Floor Price and the Cap Price", which are notice *vocabulary*, not a
+#: notice *title*.
+_EXPLICIT_NOTICE_TITLES = (
+    re.compile(r"price\s+band\s+(?:notice|advertisement|announcement)", re.I),
+    re.compile(r"pre-bid\s+advertisement", re.I),
+    re.compile(r"notice\s+to\s+investors", re.I),
+)
+
+
+def _rhp_role(cover: str) -> Optional[str]:
+    """Why this document is a current-issue RHP, or None.
+
+    A final-Prospectus marker is deliberately NOT required: an RHP is not a
+    final prospectus, and requiring one rejected genuine RHP archive members.
+    What IS required is a current-issue role -- a dated "Red Herring
+    Prospectus" title, the issuer responsibility statement, or a complete
+    offer-table header -- and the document must not be a Draft RHP (whose
+    terms are placeholders by construction) or a General Information
+    Document (a format guide, never issuer terms).
+    """
+    if re.search(r'\bDraft\s+Red\s+Herring\s+Prospectus\b', cover, re.I):
+        return None
+    if re.search(r'GENERAL\s+INFORMATION\s+DOCUMENT', cover[:1500], re.I):
+        return None
+    # A notice is its own class: a notice that happens to quote the RHP's title
+    # must not be re-read as the RHP itself.
+    if any(pattern.search(cover) for pattern in _EXPLICIT_NOTICE_TITLES):
+        return None
+    # Title form, not a mention: the phrase starts a line (how a title is set),
+    # or is directly followed by the "Dated:" field.  A sentence such as "the
+    # Red Herring Prospectus dated ... has been filed" is a reference.
+    if re.search(r'(?m)^[ \t]*(?:Red\s+Herring\s+Prospectus)\b', cover) or \
+            re.search(r'Red\s+Herring\s+Prospectus\s*(?:Dated|Date)\s*:', cover, re.I):
+        return 'RHP title'
+    if re.search(r'this\s+Red\s+Herring\s+Prospectus\s+c\s*ontains\s+all\s+information', cover, re.I):
+        return 'issuer responsibility statement'
+    if re.search(r'FRESH\s+ISSUE\s+SIZE\s+OFFER\s+FOR\s+SALE\s+SIZE\s+TOTAL\s+ISSUE\s+SIZE', cover, re.I):
+        return 'offer-table header'
+    return None
+
+
+
+#: The label each unresolved pricing term is disclosed under.
+_PRICING_PLACEHOLDER_LABEL = {
+    "price_band_low": r"price\s+band",
+    "price_band_high": r"price\s+band",
+    "lot_size": r"(?:bid|market)\s+lot",
+}
+_PLACEHOLDER_TOKEN = re.compile(r"\[\s*(?:[●•.\-]+)?\s*\]")
+
+
+def _record_pricing_placeholders(result, pages, missing):
+    """Say that the document *states* a pricing term as a placeholder.
+
+    An RHP published before the price band is fixed states the band and the
+    bid lot as ``[●]``.  Without this, the field is indistinguishable from a
+    parsing failure, and the operator's diagnostic says only that the document
+    "does not state" it.  Recording the placeholder does not create, infer or
+    default any value: the field stays ``None``.
+    """
+    if not missing:
+        return
+    diagnostics = result.metadata.setdefault("issue_term_diagnostics", [])
+    for name in missing:
+        label = _PRICING_PLACEHOLDER_LABEL[name]
+        for page, text in pages:
+            found = None
+            for match in re.finditer(label, text, re.IGNORECASE):
+                window = text[match.end(): match.end() + 160]
+                if _PLACEHOLDER_TOKEN.search(window):
+                    found = (page, " ".join(text[match.start(): match.end() + 160].split())[:200])
+                    break
+            if found:
+                diagnostics.append(
+                    {
+                        "code": "SOURCE_PLACEHOLDER",
+                        "field": name,
+                        "page": found[0],
+                        "quote": found[1],
+                        "method": "NATIVE_TEXT",
+                        "coordinates": None,
+                    }
+                )
+                break
+
+
+def parse_official_rhp(raw, url):
+    """Issue terms an official RHP itself establishes, field by field.
+
+    An RHP is its own document class (never relabelled a final Prospectus and
+    never a Price Band Notice).  Its field authority is the cover / offer
+    summary block: price band, bid lot and the issue window when the document
+    states them, plus the fresh-issue and OFS amounts when the offer table or
+    offer summary states them.  A field the document does not state stays
+    None; a field whose current-issue candidates conflict is withheld.  The
+    remaining fields are still returned, so one bad field cannot discard the
+    document.
+    """
+    read_scope = {}
+    pages = document_pages(raw, max_pages=30, diagnostics=read_scope)
+    cover = '\n'.join(t for page, t in pages if page <= 2)
+    identity_scope = '\n'.join(t for page, t in pages if page <= 5)
+    role = _rhp_role(cover) or _rhp_role(identity_scope)
+    if role is None:
+        # A Draft RHP is refused by class, and says so: its terms are
+        # placeholders by construction, which is a different operator problem
+        # from "this attachment is not an RHP at all".
+        if re.search(r'\bDraft\s+Red\s+Herring\s+Prospectus\b', cover + '\n' + identity_scope, re.I):
+            raise ValueError(
+                'Draft Red Herring Prospectus cannot be promoted to current RHP terms'
+            )
+        raise ValueError(
+            'RHP title or issuer responsibility/offer-table role not established'
+        )
+    # Identity is read from the title pages, not only from the first two: a
+    # graphical cover can push the CIN/name block onto page 3-5.  The issuer
+    # match itself is unchanged -- the caller still compares the extracted
+    # name against the filing's, and a mismatch rejects the candidate.
+    cin = re.search(r'\b[LU]\d{5}[A-Z]{2}\d{4}PLC\d{6}\b', identity_scope) or re.search(
+        r'\b[LU]\d{5}[A-Z]{2}\d{4}PLC\d{6}\b', '\n'.join(t for _, t in pages)
+    )
+    name = ProspectusTermsParser._extract_company_name(cover) or \
+        ProspectusTermsParser._extract_company_name(identity_scope)
+    if not cin or not name:
+        raise ValueError('RHP issuer name/CIN not established')
+    digest = hashlib.sha256(raw).hexdigest()
+    sid = 'SRC-OFFICIAL-RHP-' + digest[:8].upper()
+    result = ExchangeIssueTermsResult(source=SourceDocument(source_id=sid,
+        source_type=SourceType.RHP.value, uri=url, content_hash=digest),
+        source_ref=SourceRef(source_id=sid, source_type=SourceType.RHP.value,
+                             uri=url, content_hash=digest),
+        company_name=name, is_classified_notice=False,
+        metadata={'document_class': 'OFFICIAL_RHP_TERMS'})
+    result.cin = cin.group()
+    result.document_class = 'OFFICIAL_RHP_TERMS'
+    columns = []
+    if raw.startswith(b'%PDF-'):
+        from pypdf import PdfReader
+        from .offer_table import component_columns
+        with io.BytesIO(raw) as stream:
+            reader = PdfReader(stream)
+            for number, _ in pages:
+                try:
+                    columns.extend(component_columns(reader.pages[number-1], number))
+                except Exception as exc:
+                    read_scope.setdefault('layout_read_errors', []).append({'page': number, 'error': str(exc)})
+    table_pages = {column['page'] for column in columns}
+    # Beyond the original cover window, only explicit offer-summary sections
+    # or established component tables may supply terms. A historical/example
+    # mention elsewhere in the first 30 pages is not an issue summary.
+    summary = re.compile(r'^\s*(?:THE\s+(?:ISSUE|OFFER)|DETAILS\s+OF\s+THE\s+(?:ISSUE|OFFER)\s+TO\s+THE\s+PUBLIC|ISSUE\s+(?:DETAILS|STRUCTURE))\s*$', re.I | re.M)
+    eligible_pages = [(number, text) for number, text in pages
+                      if number <= 5 or number in table_pages or summary.search(text)]
+    read_scope['amount_pages_considered'] = [number for number, _ in eligible_pages]
+    result.metadata['native_read_scope'] = read_scope
+    result.metadata['offer_table_columns'] = columns
+    result.metadata['linear_text_excluded_table_pages'] = sorted({column['page'] for column in columns})
+    result.metadata['document_role_basis'] = role
+
+    _rhp_issue_terms(result, pages)
+    return explicit_amounts(result, eligible_pages, columns)

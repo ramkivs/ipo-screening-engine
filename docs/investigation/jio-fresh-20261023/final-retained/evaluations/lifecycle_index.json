@@ -1,0 +1,32 @@
+{
+  "issuers": {
+    "JIO-PLATFORMS-LIMITED": {
+      "active_final_id": "JIO-PLATFORMS-LIMITED-20261023-085751Z-final-29d9a601",
+      "active_preliminary_id": null,
+      "company_name": "JIO PLATFORMS LIMITED",
+      "evaluations": {
+        "JIO-PLATFORMS-LIMITED-20261023-085751Z-final-29d9a601": {
+          "actor": "system_ingest",
+          "created_at": "2026-10-23T08:57:51Z",
+          "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-085751Z-final-29d9a601",
+          "ipo_id": "JIO-PLATFORMS-LIMITED",
+          "lifecycle_state": "ACTIVE",
+          "lifecycle_version": "1.0.0",
+          "mode": "final",
+          "operational_status": "ACTIVE",
+          "superseded_by": null,
+          "supersedes": null,
+          "transition_reason": "statutory_filing_ingest",
+          "transition_timestamp": "2026-10-23T08:57:51Z",
+          "updated_at": "2026-10-23T08:57:51Z",
+          "visibility_state": "VISIBLE"
+        }
+      },
+      "ipo_id": "JIO-PLATFORMS-LIMITED",
+      "last_updated": "2026-10-23T08:57:51Z",
+      "status": "ACTIVE_OFFERING"
+    }
+  },
+  "updated_at": "2026-10-23T08:57:51Z",
+  "version": "1.0.0"
+}

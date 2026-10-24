@@ -125,3 +125,92 @@ test('App - Fail-Closed Invariant: missing/null values never default to zero', (
   assert.notEqual(app.renderMetricValue(undefined, 'UNKNOWN'), '<code>0.00</code>');
   assert.ok(app.renderMetricValue(null, 'UNKNOWN').includes('UNKNOWN'));
 });
+
+test('Penalty rendering distinguishes an unevaluated penalty from a cleared one', () => {
+  const app = new App();
+  const html = app.renderPenaltyItems([
+    {
+      id: 'auditor_cfo_exit',
+      label: 'Auditor/CFO resignation in last 2 years',
+      points: 0,
+      state: 'UNKNOWN',
+      reason: 'the trigger could not be evaluated; the penalty is neither applied nor ignored, and is carried in the lower bound',
+    },
+    {
+      id: 'receivable_days_up',
+      label: 'Receivable days up >30% YoY',
+      points: 0,
+      state: 'SCORED',
+      reason: 'not triggered',
+    },
+    {
+      id: 'margin_spike',
+      label: 'Margin up >500 bps YoY in either of the last two FYs',
+      points: -3,
+      state: 'SCORED',
+      reason: 'triggered',
+    },
+  ]);
+
+  // The zero-point UNKNOWN is explicitly "carried in range", never "cleared".
+  assert.ok(html.includes('UNKNOWN \u2014 carried in range'));
+  assert.ok(html.includes('carried in the lower bound'));
+  assert.ok(html.includes('Not triggered'));
+  assert.ok(html.includes('Applied'));
+  assert.ok(html.includes('-3.0 pts'));
+  // The reason text is escaped, not injected as HTML.
+  assert.ok(!html.includes('<script>'));
+  const escaped = app.renderPenaltyItems([
+    { id: 'x', label: '<script>alert(1)</script>', points: 0, state: 'SCORED', reason: '<b>no</b>' },
+  ]);
+  assert.ok(escaped.includes('&lt;script&gt;'));
+  assert.ok(!escaped.includes('<b>no</b>'));
+});
+
+test('Penalty rendering handles an empty list', () => {
+  const app = new App();
+  assert.ok(app.renderPenaltyItems([]).includes('Zero penalties triggered'));
+  assert.ok(app.renderPenaltyItems(undefined).includes('Zero penalties triggered'));
+});
+
+test('Governance metric rendering keeps UNKNOWN distinct from a verified absence', () => {
+  // A23-C: the presentation layer must never turn a missing governance input
+  // into a favourable statement.  `sebi_ed_action_active` and
+  // `litigation_bucket` are the two fields where an extraction defect used to
+  // read as "no adverse action", so the three display states are pinned here:
+  //   adverse evidence      -> the value itself, SCORED
+  //   verified absence      -> the value itself (False / "clean"), SCORED
+  //   no evidence supplied   -> UNKNOWN, and no favourable wording at all
+  const app = new App();
+
+  const adverse = app.renderMetricValue('criminal_or_regulatory', 'SCORED');
+  assert.ok(adverse.includes('criminal_or_regulatory'));
+  assert.ok(!adverse.includes('badge-unknown'));
+
+  const verifiedAbsent = app.renderMetricValue(false, 'SCORED');
+  assert.equal(verifiedAbsent, '<code>False</code>');
+
+  // Missing / null / UNKNOWN -- each must render the unknown badge, and none of
+  // them may produce text that reads as an all-clear.
+  for (const [value, state] of [
+    [null, 'UNKNOWN'],
+    [undefined, 'UNKNOWN'],
+    [false, 'UNKNOWN'],
+    ['clean', 'UNKNOWN'],
+    [null, 'SCORED'],
+  ]) {
+    const html = app.renderMetricValue(value, state);
+    assert.ok(html.includes('badge-unknown'), `expected UNKNOWN badge for ${value}/${state}`);
+    assert.ok(!/no active|not triggered|clear|no adverse/i.test(html), html);
+  }
+
+  // The state badge keeps the same three-way distinction.
+  assert.ok(app.renderSemanticStateBadge('UNKNOWN').includes('UNKNOWN'));
+  assert.ok(!app.renderSemanticStateBadge('UNKNOWN').includes('SCORED'));
+  assert.ok(app.renderSemanticStateBadge('SCORED').includes('SCORED'));
+  assert.ok(app.renderSemanticStateBadge('NOT_APPLICABLE').includes('NOT APPLICABLE'));
+
+  // A missing verdict is UNKNOWN, never a pass.
+  assert.ok(app.renderVerdictBadge(null).includes('UNKNOWN'));
+  assert.ok(app.renderVerdictBadge(undefined).includes('UNKNOWN'));
+});

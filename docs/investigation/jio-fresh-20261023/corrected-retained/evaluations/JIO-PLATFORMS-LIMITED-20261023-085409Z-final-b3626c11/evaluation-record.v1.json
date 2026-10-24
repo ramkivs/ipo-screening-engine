@@ -1,0 +1,5758 @@
+{
+  "adjudications": [],
+  "evaluation": {
+    "evaluated_at": "2026-10-23T08:54:09Z",
+    "evaluation_cutoff": {
+      "evidence_refs": [],
+      "reason": {
+        "code": "UNAVAILABLE",
+        "message": "No single global cutoff is stored in the legacy record; do not substitute evaluation or retrieval time."
+      },
+      "state": "UNKNOWN"
+    },
+    "mode": "FINAL",
+    "processing_status": "COMPLETED",
+    "validation": {
+      "findings": [
+        {
+          "code": "A9_GMP_FINAL_WITHHELD",
+          "evidence_refs": [
+            "A15-RESULT-09767a568834916577e8"
+          ],
+          "field_path": "/result/outcome_resolution",
+          "message": "A9 requires a qualifying GMP snapshot and its required hash for FINAL, but the projected GMP block has no non-null pct or trend observation. The generic market-snapshot digest is a local digest over all market blocks, not a GMP qualification hash. FINAL is withheld.",
+          "severity": "WARNING"
+        },
+        {
+          "code": "GCP_UNDISCLOSED",
+          "evidence_refs": [],
+          "field_path": "use_of_proceeds.gcp",
+          "message": "the general corporate purposes amount is undisclosed in the RHP; the 25% ICDR ceiling is recorded separately as a limit and is not treated as the amount",
+          "severity": "WARNING"
+        },
+        {
+          "code": "LEGACY_NONSCALAR_FIELD_PRESERVED_BY_REFERENCE",
+          "evidence_refs": [
+            "A15-INPUT-90b6ba498c6bf5b6fd72"
+          ],
+          "field_path": "/input/capital_structure/pre_ipo_placements",
+          "message": "This empty JSON container cannot be represented by the v1 scalar field-value shape; its exact value remains in input.json.",
+          "severity": "WARNING"
+        },
+        {
+          "code": "LEGACY_NONSCALAR_FIELD_PRESERVED_BY_REFERENCE",
+          "evidence_refs": [
+            "A15-INPUT-1c62543ee80297874e2b"
+          ],
+          "field_path": "/input/issue/ofs_sellers",
+          "message": "This empty JSON container cannot be represented by the v1 scalar field-value shape; its exact value remains in input.json.",
+          "severity": "WARNING"
+        },
+        {
+          "code": "MARKET_BLOCK_UNUSABLE",
+          "evidence_refs": [],
+          "field_path": "market.anchor",
+          "message": "market block 'anchor' is MISSING: block not supplied",
+          "severity": "WARNING"
+        },
+        {
+          "code": "MARKET_BLOCK_UNUSABLE",
+          "evidence_refs": [],
+          "field_path": "market.gmp",
+          "message": "market block 'gmp' is MISSING: block not supplied",
+          "severity": "WARNING"
+        },
+        {
+          "code": "MARKET_BLOCK_UNUSABLE",
+          "evidence_refs": [],
+          "field_path": "market.regime",
+          "message": "market block 'regime' is MISSING: block not supplied",
+          "severity": "WARNING"
+        },
+        {
+          "code": "MARKET_BLOCK_UNUSABLE",
+          "evidence_refs": [],
+          "field_path": "market.subscription",
+          "message": "market block 'subscription' is MISSING: block not supplied",
+          "severity": "WARNING"
+        },
+        {
+          "code": "OVERLAY_TRIGGER_UNKNOWN",
+          "evidence_refs": [],
+          "field_path": "structure_overlays.retail_heavy",
+          "message": "structure overlay 'retail_heavy' could not be evaluated because the metric that triggers it is UNKNOWN; the overlay is treated as not applied",
+          "severity": "WARNING"
+        },
+        {
+          "code": "PROVENANCE_MISSING_FOR_FIELDS",
+          "evidence_refs": [],
+          "field_path": "_evidence",
+          "message": "78 material input field(s) carry no evidence reference, for example ['issue.post_issue_shares', 'issue.post_issue_eps', 'financials.periods[0].fy', 'financials.periods[0].revenue', 'financials.periods[0].pat', 'financials.periods[0].net_worth', 'financials.periods[0].total_debt', 'financials.periods[0].cfo']. Each scored input should identify its source, as-of date, document/page and extraction method (spec s3.4).",
+          "severity": "WARNING"
+        }
+      ],
+      "schema_status": "PASSED",
+      "semantic_status": "PASSED"
+    }
+  },
+  "evidence": [
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-01b7b85e28c6f81b1006",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/fy",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-024ae5a907b9a31ca351",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/1/business_match",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-02edfcf95cfb34279a77",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/fresh_shares",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-042fbbcbbb2839207de9",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/1/as_of",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-0898cc14c82a925e0a7a",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/use_of_proceeds/0/amount",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-0907af4852a0bd78aa22",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/open_date",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-0bf551e3429de391f858",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/contingent_liabilities",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-125fbd777fa20abab965",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/total_debt",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-134a12f631aeca6e0843",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/total_debt",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-147bf8961d48bf80c966",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/use_of_proceeds/0/category",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-1637b622e105978cb8a2",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/cash_and_equivalents",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-16c1597252c5a1142344",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/pat",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-1758993280abd511b43e",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/1/pe",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-194069a09fde0592d497",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/repeated_eom",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-1a6d001f0b0db066c2d6",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/auditor_changed_3y",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-1c5a059c45b904aec37e",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/ebitda",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-1c62543ee80297874e2b",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/ofs_sellers",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-1d5ce0c7cbbfcb28375e",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/receivable_days",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-1fdfd58416610f7d11cb",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/reporting_unit",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-28893676a4db1f66c67c",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/company_name",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-29163f5f509903af3e8e",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/disclosed_roce_pct",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-2a27a90e8c6009bd5b4d",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/0/source_id",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-2adcba6c100ea9446e66",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/1/name",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-2b78603a627e6117edf7",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/cash_and_equivalents",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-3114e6b5a701a5934d33",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/revenue",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-31a4fc3d1b65a9e7952e",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/1/listed_years",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-347c08f28e0162ba8e1c",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/1/roe_pct",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-382562c69c68ee38fd09",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/contingent_liabilities_unquantified",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-3a846e2973d1a06fd9c2",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/0/name",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-3cdf1409379f513eb2bd",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/interest_expense",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-525b46a5cb69eea09996",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/post_issue_eps",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-528b4541f8f830e2b598",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/net_worth",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-52e0361c217e0821a8b7",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/ebit",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-54553e7b46fbb42b34a1",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/price_band_high",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-5697008ecb1070cab941",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/1/source_id",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-579684577fada9b11f6a",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/ipo_id",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-57d16606c5a4db6b457a",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/going_concern_uncertainty",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-5ddb01ef3c487dcfbf21",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/auditor_opinion",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-624ed4834fa5854fde3b",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/close_date",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-682519bf0647df425745",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/ebit",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-6b5b9b7d0b3b8ebf8766",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/sector",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-6d29448e85c8cc4323ff",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/0/pb",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-6df7a2db6a6ee8fd9c16",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/fy",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-75b84a45702a46cced7e",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/fy",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-7b5d753d71cf8d1a11e4",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/cfo",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-7ba588732fdf946c92a9",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/0/pe",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-7d4a1a07e76dca4cdc4a",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/auditor_reputed",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-8045766ad1278e6d13aa",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/pat",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-835e23255e1bb295a2cd",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/cfo",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-83ac8a4ebf70c5b2bb56",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/disclosed_roce_pct",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-87a9bee44c5931f0f878",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/revenue",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-894608e6aab2c6939f7e",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/business/visibility_rating",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-8b20daaa3e07c07a7399",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/sector_profile",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-8eec89c78076d04ed1c3",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/litigation_bucket",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-90b6ba498c6bf5b6fd72",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/capital_structure/pre_ipo_placements",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-9195000577cdcd3119a9",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/disclosed_roce_pct",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-925e04a92ab028e6085b",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/pre_issue_shares",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-9a544fafe36bc8edf648",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/business/top5_supplier_pct",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-a132c6f83b127890a27c",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/receivable_days",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-a63f7ed0f13e57d0e095",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/1/pb",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-ab91479f3db9fff35f4b",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/ebitda",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-ac213e45133f54ff91a6",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/capital_structure/promoter_pledge_pct",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-b132887b3c54125068a8",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/0/roe_pct",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-b6df437405d0e585a506",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/board",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-b777dec6c6ac7c75f2d8",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/interest_expense",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-b9f21b4a68a5d6cebf34",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/net_worth",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-bca8966a6345a2026304",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/business/industry_cagr_pct",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-bcec53768313b760f595",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/eom_materiality",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-bd8a41f25841c2610077",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/net_worth",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-be97a14b7664411bbadf",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/rpt_pct_revenue",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-bead970df1e84daeccb0",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/sebi_ed_action_active",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-c143d174acf4662f2454",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/ebit",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-c3b0c0b74b3208d798aa",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/business/industry_forecast_period",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-c4c93b5ab0b8389e828b",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/ofs",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-ca396a3fd92b2b325c7a",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/post_issue_shares",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-cb586c0cee23b92275b5",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/ebitda",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-cef9ac773bc244b535a3",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/business/industry_scope",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-cfd5b5ff59f80146f6ac",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/board_independent_majority",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-d096b3be610f96b919fc",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/2/cfo",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-d471036792125c41dc17",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/cash_and_equivalents",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-d52ba3bc9235790331be",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/0/as_of",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-d57726b0c3195ae13640",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/price_band_low",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-d873caffab552d2f59cb",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/interest_expense",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-d95d3db57b42a673f1dd",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/business/regulatory_dependence",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-db353a98e295b98a317a",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/capital_structure/promoter_post_pct",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-db43a5ab1f86c4b6799a",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/use_of_proceeds/1/amount",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-dc78d78e4e73c137041a",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/capital_structure/discounted_allotments_18m_before_drhp",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-dcbb18ce6109dc598cdf",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/capital_structure/large_holders_unlocked_early",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-df7fd217e433e7d4fad4",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/0/listed_years",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-e0bff349016e4565c8a2",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/fresh_issue",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-e1aac2d51b233f47b190",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/business/industry_source",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-e1ffc7f671218e63f0ca",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/business/top5_customer_pct",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-e33b6b43b0182b2bfc68",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/icdr_route",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-e400c40859e9af9e8631",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/peers/0/business_match",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-e6fd1aabb8600a918dd1",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/revenue",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-e7a20ae02e8f157130b2",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/capital_structure/promoter_pre_pct",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-e923de09ad65cd8b089f",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/rpt_pct_of_revenue_growth",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-ea89f45c1e8f87bf5cb6",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/governance/kmp_exits_2y",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-f25ea4fe0bf4b02f8ed4",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/capital_structure/promoter_lockin_in_place",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-f35fb73d0118df7f1f9e",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/pat",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-f502633e59eb36d5e2b5",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/0/receivable_days",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-f837cb231de4a02cd79a",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/issue/lot_size",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-f8d887b379a849a1b71a",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/use_of_proceeds/1/category",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-fb60f3d824664e31efbd",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/business/moat_rating",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-fd39cb3175531f66ca10",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/use_of_proceeds/1/undisclosed_marker",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "input.json",
+      "evidence_id": "A15-INPUT-feeabc31ff1f34098018",
+      "extraction_method": "STRUCTURED_INPUT",
+      "locator": "input.json#/snapshot/input/financials/periods/1/total_debt",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "market.json",
+      "evidence_id": "A15-RESULT-09767a568834916577e8",
+      "extraction_method": "DERIVED",
+      "locator": "market.json#/snapshot/blocks/2",
+      "source_id": "A15-LOCAL-RESULT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "result.json",
+      "evidence_id": "A15-RESULT-337efd1b37f684bb3ff4",
+      "extraction_method": "DERIVED",
+      "locator": "result.json#/knockouts/results/3",
+      "source_id": "A15-LOCAL-RESULT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "result.json",
+      "evidence_id": "A15-RESULT-3cfc2f86cc2ad9eb0f1e",
+      "extraction_method": "DERIVED",
+      "locator": "result.json#/knockouts/results/1",
+      "source_id": "A15-LOCAL-RESULT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "result.json",
+      "evidence_id": "A15-RESULT-4d2e6ca918ae8b707e5e",
+      "extraction_method": "DERIVED",
+      "locator": "result.json#/knockouts/results/0",
+      "source_id": "A15-LOCAL-RESULT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "result.json",
+      "evidence_id": "A15-RESULT-763b8ece13cb81ead18b",
+      "extraction_method": "DERIVED",
+      "locator": "result.json#/knockouts/results/2",
+      "source_id": "A15-LOCAL-RESULT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "result.json",
+      "evidence_id": "A15-RESULT-8992b0e1f5c77288b1d0",
+      "extraction_method": "DERIVED",
+      "locator": "result.json#/missing_unverified/25",
+      "source_id": "A15-LOCAL-RESULT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "result.json",
+      "evidence_id": "A15-RESULT-cb1bd163db399748e773",
+      "extraction_method": "DERIVED",
+      "locator": "result.json#/knockouts/results/5",
+      "source_id": "A15-LOCAL-RESULT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "result.json",
+      "evidence_id": "A15-RESULT-ce8f87c51186b50d25c5",
+      "extraction_method": "DERIVED",
+      "locator": "result.json#/knockouts/results/4",
+      "source_id": "A15-LOCAL-RESULT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "result.json",
+      "evidence_id": "A15-RESULT-e3a8c28aa5710e56d890",
+      "extraction_method": "DERIVED",
+      "locator": "result.json#/missing_unverified/26",
+      "source_id": "A15-LOCAL-RESULT",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/0",
+      "confidence": 0.98,
+      "evidence_id": "EV-capital_structure-promoter_pre_pct",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Shareholding of our Promoters and Promoter Group",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/1",
+      "confidence": 1.0,
+      "evidence_id": "EV-company_name",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Cover page header",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/2",
+      "confidence": 0.95,
+      "evidence_id": "EV-financials-contingent_liabilities",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Contingent Liabilities and Commitments (claims not acknowledged as debts, latest fiscal year)",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/3",
+      "confidence": 0.95,
+      "evidence_id": "EV-financials-periods",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "P&L, Balance Sheet, Cash Flow Annexures",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/4",
+      "confidence": 1.0,
+      "evidence_id": "EV-financials-reporting_unit",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Restated Statement Header",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/5",
+      "confidence": 0.95,
+      "evidence_id": "EV-governance-auditor_changed_3y",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Auditor Tenure and Examination Report",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/6",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-auditor_opinion",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Auditor Examination Report — Opinion",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/7",
+      "confidence": 0.95,
+      "evidence_id": "EV-governance-auditor_reputed",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Auditor Standing",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/8",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-board_independent_majority",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Board of Directors Composition",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/9",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-litigation_bucket",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Outstanding Litigation and Material Developments",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/10",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_0",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — purchase of property, plant and equipment — and Other Intangible Assets Parent — FY2026",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/11",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_1",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — purchase of property, plant and equipment — and Other Intangible Assets Parent — FY2025",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/12",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_10",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — sale of property, plant and equipment — Fellow Subsidiaries - - — FY2024",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/13",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_11",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Parent — FY2026",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/14",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_12",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Parent — FY2025",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/15",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_13",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Parent — FY2024",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/16",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_14",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Fellow Subsidiaries — FY2026",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/17",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_15",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Fellow Subsidiaries — FY2025",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/18",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_16",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Fellow Subsidiaries — FY2024",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/19",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_17",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Associate/JV and Associate/ JV of the Parent — FY2026",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/20",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_18",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Associate/JV and Associate/ JV of the Parent — FY2025",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/21",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_19",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Associate/JV and Associate/ JV of the Parent — FY2024",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/22",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_2",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — purchase of property, plant and equipment — and Other Intangible Assets Parent — FY2024",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/23",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_20",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Others — FY2026",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/24",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_21",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Others — FY2025",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/25",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_22",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — revenue from operations — Others — FY2024",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/26",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_3",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — purchase of property, plant and equipment — Fellow Subsidiaries — FY2026",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/27",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_4",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — purchase of property, plant and equipment — Fellow Subsidiaries — FY2025",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/28",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_5",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — purchase of property, plant and equipment — Fellow Subsidiaries — FY2024",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/29",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_6",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — purchase of property, plant and equipment — Associate/JV and Associate/ JV of the Parent — FY2026",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/30",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_7",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — purchase of property, plant and equipment — Associate/JV and Associate/ JV of the Parent — FY2025",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/31",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_8",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — purchase of property, plant and equipment — Associate/JV and Associate/ JV of the Parent — FY2024",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/32",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-related_party_transactions_9",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Related Party Transactions — sale of property, plant and equipment — and Other Intangible Assets Parent 1 - — FY2026",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/33",
+      "confidence": 0.9,
+      "evidence_id": "EV-governance-repeated_eom",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Auditor Opinion Notes",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/34",
+      "confidence": 0.98,
+      "evidence_id": "EV-issue-close_date",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Cover page, Issue Closing Date",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/35",
+      "confidence": 0.98,
+      "evidence_id": "EV-issue-fresh_shares",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Cover page, Fresh Issue Shares",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/36",
+      "confidence": 1.0,
+      "evidence_id": "EV-issue-ofs",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Cover page, Offer for Sale Size",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/37",
+      "confidence": 1.0,
+      "evidence_id": "EV-issue-ofs_sellers",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Cover page, Offer for Sale Size",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/38",
+      "confidence": 0.98,
+      "evidence_id": "EV-issue-open_date",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Cover page, Issue Opening Date",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/39",
+      "confidence": 0.95,
+      "evidence_id": "EV-issue-pre_issue_shares",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Pre-issue Share Capital",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/40",
+      "evidence_id": "EV-issue.fresh_issue",
+      "extraction_method": "TABLE_EXTRACTION",
+      "locator": "HTML table row 11, Fresh Issue",
+      "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/41",
+      "evidence_id": "EV-issue.lot_size",
+      "extraction_method": "TABLE_EXTRACTION",
+      "locator": "HTML table row 5, Lot Size",
+      "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/42",
+      "evidence_id": "EV-issue.price_band_high",
+      "extraction_method": "TABLE_EXTRACTION",
+      "locator": "HTML table row 4, Price Band",
+      "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/43",
+      "evidence_id": "EV-issue.price_band_low",
+      "extraction_method": "TABLE_EXTRACTION",
+      "locator": "HTML table row 4, Price Band",
+      "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/44",
+      "confidence": 0.95,
+      "evidence_id": "EV-peers",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Comparison of Accounting Ratios with Listed Industry Peers",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/45",
+      "confidence": 0.98,
+      "evidence_id": "EV-use_of_proceeds",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "Schedule of Implementation and Deployment",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/46",
+      "confidence": 0.98,
+      "evidence_id": "EV-use_of_proceeds_0-amount",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "debt_repayment allocation row",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    },
+    {
+      "artifact_ref": "evidence.json#/evidence/evidence/47",
+      "confidence": 0.98,
+      "evidence_id": "EV-use_of_proceeds_1-amount",
+      "extraction_method": "DETERMINISTIC_PDF",
+      "locator": "gcp allocation row",
+      "source_id": "RHP-FILING-72480c2e",
+      "timestamps": []
+    }
+  ],
+  "field_values": [
+    {
+      "evidence_refs": [
+        "A15-INPUT-b6df437405d0e585a506"
+      ],
+      "field_path": "/input/board",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "mainboard",
+      "qualification_status": "PENDING",
+      "raw_value": "mainboard",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-b6df437405d0e585a506"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-b6df437405d0e585a506"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-bca8966a6345a2026304"
+      ],
+      "field_path": "/input/business/industry_cagr_pct",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-bca8966a6345a2026304"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-bca8966a6345a2026304"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-c3b0c0b74b3208d798aa"
+      ],
+      "field_path": "/input/business/industry_forecast_period",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-c3b0c0b74b3208d798aa"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-c3b0c0b74b3208d798aa"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-cef9ac773bc244b535a3"
+      ],
+      "field_path": "/input/business/industry_scope",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-cef9ac773bc244b535a3"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-cef9ac773bc244b535a3"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e1aac2d51b233f47b190"
+      ],
+      "field_path": "/input/business/industry_source",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-e1aac2d51b233f47b190"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-e1aac2d51b233f47b190"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-fb60f3d824664e31efbd"
+      ],
+      "field_path": "/input/business/moat_rating",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-fb60f3d824664e31efbd"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-fb60f3d824664e31efbd"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d95d3db57b42a673f1dd"
+      ],
+      "field_path": "/input/business/regulatory_dependence",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-d95d3db57b42a673f1dd"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-d95d3db57b42a673f1dd"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e1ffc7f671218e63f0ca"
+      ],
+      "field_path": "/input/business/top5_customer_pct",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-e1ffc7f671218e63f0ca"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-e1ffc7f671218e63f0ca"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-9a544fafe36bc8edf648"
+      ],
+      "field_path": "/input/business/top5_supplier_pct",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-9a544fafe36bc8edf648"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-9a544fafe36bc8edf648"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-894608e6aab2c6939f7e"
+      ],
+      "field_path": "/input/business/visibility_rating",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-894608e6aab2c6939f7e"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-894608e6aab2c6939f7e"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-dc78d78e4e73c137041a"
+      ],
+      "field_path": "/input/capital_structure/discounted_allotments_18m_before_drhp",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": false,
+      "qualification_status": "PENDING",
+      "raw_value": false,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-dc78d78e4e73c137041a"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-dc78d78e4e73c137041a"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-dcbb18ce6109dc598cdf"
+      ],
+      "field_path": "/input/capital_structure/large_holders_unlocked_early",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": false,
+      "qualification_status": "PENDING",
+      "raw_value": false,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-dcbb18ce6109dc598cdf"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-dcbb18ce6109dc598cdf"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-f25ea4fe0bf4b02f8ed4"
+      ],
+      "field_path": "/input/capital_structure/promoter_lockin_in_place",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": true,
+      "qualification_status": "PENDING",
+      "raw_value": true,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-f25ea4fe0bf4b02f8ed4"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-f25ea4fe0bf4b02f8ed4"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-ac213e45133f54ff91a6"
+      ],
+      "field_path": "/input/capital_structure/promoter_pledge_pct",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 0.0,
+      "qualification_status": "PENDING",
+      "raw_value": 0.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-ac213e45133f54ff91a6"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-ac213e45133f54ff91a6"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-db353a98e295b98a317a"
+      ],
+      "field_path": "/input/capital_structure/promoter_post_pct",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-db353a98e295b98a317a"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-db353a98e295b98a317a"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e7a20ae02e8f157130b2",
+        "EV-capital_structure-promoter_pre_pct"
+      ],
+      "field_path": "/input/capital_structure/promoter_pre_pct",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 66.43,
+      "qualification_status": "PENDING",
+      "raw_value": 66.43,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-e7a20ae02e8f157130b2",
+          "EV-capital_structure-promoter_pre_pct"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-e7a20ae02e8f157130b2"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-28893676a4db1f66c67c",
+        "EV-company_name"
+      ],
+      "field_path": "/input/company_name",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "JIO PLATFORMS LIMITED",
+      "qualification_status": "PENDING",
+      "raw_value": "JIO PLATFORMS LIMITED",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-28893676a4db1f66c67c",
+          "EV-company_name"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-28893676a4db1f66c67c"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-0bf551e3429de391f858",
+        "EV-financials-contingent_liabilities"
+      ],
+      "field_path": "/input/financials/contingent_liabilities",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/contingent_liabilities"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 1502.1000000000001,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 15021.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-0bf551e3429de391f858",
+          "EV-financials-contingent_liabilities"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-0bf551e3429de391f858"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-382562c69c68ee38fd09"
+      ],
+      "field_path": "/input/financials/contingent_liabilities_unquantified",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-382562c69c68ee38fd09"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-382562c69c68ee38fd09"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d471036792125c41dc17"
+      ],
+      "field_path": "/input/financials/periods/0/cash_and_equivalents",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/0/cash_and_equivalents"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 2488.9,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 24889.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-d471036792125c41dc17"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-d471036792125c41dc17"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-835e23255e1bb295a2cd"
+      ],
+      "field_path": "/input/financials/periods/0/cfo",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/0/cfo"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 57661.600000000006,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 576616.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-835e23255e1bb295a2cd"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-835e23255e1bb295a2cd"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-9195000577cdcd3119a9"
+      ],
+      "field_path": "/input/financials/periods/0/disclosed_roce_pct",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 12.83,
+      "qualification_status": "PENDING",
+      "raw_value": 12.83,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-9195000577cdcd3119a9"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-9195000577cdcd3119a9"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-682519bf0647df425745"
+      ],
+      "field_path": "/input/financials/periods/0/ebit",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/0/ebit"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 32238.300000000003,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 322383.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-682519bf0647df425745"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-682519bf0647df425745"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1c5a059c45b904aec37e"
+      ],
+      "field_path": "/input/financials/periods/0/ebitda",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/0/ebitda"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 54341.4,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 543414.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-1c5a059c45b904aec37e"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-1c5a059c45b904aec37e"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-6df7a2db6a6ee8fd9c16"
+      ],
+      "field_path": "/input/financials/periods/0/fy",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "FY2024",
+      "qualification_status": "PENDING",
+      "raw_value": "FY2024",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-6df7a2db6a6ee8fd9c16"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-6df7a2db6a6ee8fd9c16"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-3cdf1409379f513eb2bd"
+      ],
+      "field_path": "/input/financials/periods/0/interest_expense",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/0/interest_expense"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 4047.6000000000004,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 40476.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-3cdf1409379f513eb2bd"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-3cdf1409379f513eb2bd"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-bd8a41f25841c2610077"
+      ],
+      "field_path": "/input/financials/periods/0/net_worth",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/0/net_worth"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 278286.4,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 2782864.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-bd8a41f25841c2610077"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-bd8a41f25841c2610077"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-f35fb73d0118df7f1f9e"
+      ],
+      "field_path": "/input/financials/periods/0/pat",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/0/pat"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 21434.0,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 214340.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-f35fb73d0118df7f1f9e"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-f35fb73d0118df7f1f9e"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-f502633e59eb36d5e2b5"
+      ],
+      "field_path": "/input/financials/periods/0/receivable_days",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 9.5,
+      "qualification_status": "PENDING",
+      "raw_value": 9.5,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-f502633e59eb36d5e2b5"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-f502633e59eb36d5e2b5"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e6fd1aabb8600a918dd1"
+      ],
+      "field_path": "/input/financials/periods/0/revenue",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/0/revenue"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 109558.1,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 1095581.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-e6fd1aabb8600a918dd1"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-e6fd1aabb8600a918dd1"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-134a12f631aeca6e0843"
+      ],
+      "field_path": "/input/financials/periods/0/total_debt",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/0/total_debt"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 54348.9,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 543489.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-134a12f631aeca6e0843"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-134a12f631aeca6e0843"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-2b78603a627e6117edf7"
+      ],
+      "field_path": "/input/financials/periods/1/cash_and_equivalents",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/1/cash_and_equivalents"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 8011.5,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 80115.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-2b78603a627e6117edf7"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-2b78603a627e6117edf7"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-7b5d753d71cf8d1a11e4"
+      ],
+      "field_path": "/input/financials/periods/1/cfo",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/1/cfo"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 68155.7,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 681557.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-7b5d753d71cf8d1a11e4"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-7b5d753d71cf8d1a11e4"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-83ac8a4ebf70c5b2bb56"
+      ],
+      "field_path": "/input/financials/periods/1/disclosed_roce_pct",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 12.5,
+      "qualification_status": "PENDING",
+      "raw_value": 12.5,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-83ac8a4ebf70c5b2bb56"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-83ac8a4ebf70c5b2bb56"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-52e0361c217e0821a8b7"
+      ],
+      "field_path": "/input/financials/periods/1/ebit",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/1/ebit"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 38917.8,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 389178.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-52e0361c217e0821a8b7"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-52e0361c217e0821a8b7"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-cb586c0cee23b92275b5"
+      ],
+      "field_path": "/input/financials/periods/1/ebitda",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/1/ebitda"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 63055.4,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 630554.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-cb586c0cee23b92275b5"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-cb586c0cee23b92275b5"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-01b7b85e28c6f81b1006"
+      ],
+      "field_path": "/input/financials/periods/1/fy",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "FY2025",
+      "qualification_status": "PENDING",
+      "raw_value": "FY2025",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-01b7b85e28c6f81b1006"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-01b7b85e28c6f81b1006"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d873caffab552d2f59cb"
+      ],
+      "field_path": "/input/financials/periods/1/interest_expense",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/1/interest_expense"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 4905.1,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 49051.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-d873caffab552d2f59cb"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-d873caffab552d2f59cb"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-b9f21b4a68a5d6cebf34"
+      ],
+      "field_path": "/input/financials/periods/1/net_worth",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/1/net_worth"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 305047.4,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 3050474.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-b9f21b4a68a5d6cebf34"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-b9f21b4a68a5d6cebf34"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-8045766ad1278e6d13aa"
+      ],
+      "field_path": "/input/financials/periods/1/pat",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/1/pat"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 26120.300000000003,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 261203.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-8045766ad1278e6d13aa"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-8045766ad1278e6d13aa"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-a132c6f83b127890a27c"
+      ],
+      "field_path": "/input/financials/periods/1/receivable_days",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 7.0,
+      "qualification_status": "PENDING",
+      "raw_value": 7.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-a132c6f83b127890a27c"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-a132c6f83b127890a27c"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-87a9bee44c5931f0f878"
+      ],
+      "field_path": "/input/financials/periods/1/revenue",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/1/revenue"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 128218.40000000001,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 1282184.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-87a9bee44c5931f0f878"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-87a9bee44c5931f0f878"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-feeabc31ff1f34098018"
+      ],
+      "field_path": "/input/financials/periods/1/total_debt",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/1/total_debt"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 73060.3,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 730603.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-feeabc31ff1f34098018"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-feeabc31ff1f34098018"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1637b622e105978cb8a2"
+      ],
+      "field_path": "/input/financials/periods/2/cash_and_equivalents",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/2/cash_and_equivalents"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 16557.0,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 165570.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-1637b622e105978cb8a2"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-1637b622e105978cb8a2"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d096b3be610f96b919fc"
+      ],
+      "field_path": "/input/financials/periods/2/cfo",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/2/cfo"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 77556.3,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 775563.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-d096b3be610f96b919fc"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-d096b3be610f96b919fc"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-29163f5f509903af3e8e"
+      ],
+      "field_path": "/input/financials/periods/2/disclosed_roce_pct",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 10.76,
+      "qualification_status": "PENDING",
+      "raw_value": 10.76,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-29163f5f509903af3e8e"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-29163f5f509903af3e8e"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-c143d174acf4662f2454"
+      ],
+      "field_path": "/input/financials/periods/2/ebit",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/2/ebit"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 46132.700000000004,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 461327.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-c143d174acf4662f2454"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-c143d174acf4662f2454"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-ab91479f3db9fff35f4b"
+      ],
+      "field_path": "/input/financials/periods/2/ebitda",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/2/ebitda"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 73381.6,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 733816.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-ab91479f3db9fff35f4b"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-ab91479f3db9fff35f4b"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-75b84a45702a46cced7e"
+      ],
+      "field_path": "/input/financials/periods/2/fy",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "FY2026",
+      "qualification_status": "PENDING",
+      "raw_value": "FY2026",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-75b84a45702a46cced7e"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-75b84a45702a46cced7e"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-b777dec6c6ac7c75f2d8"
+      ],
+      "field_path": "/input/financials/periods/2/interest_expense",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/2/interest_expense"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 8653.4,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 86534.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-b777dec6c6ac7c75f2d8"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-b777dec6c6ac7c75f2d8"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-528b4541f8f830e2b598"
+      ],
+      "field_path": "/input/financials/periods/2/net_worth",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/2/net_worth"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 335976.9,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 3359769.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-528b4541f8f830e2b598"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-528b4541f8f830e2b598"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-16c1597252c5a1142344"
+      ],
+      "field_path": "/input/financials/periods/2/pat",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/2/pat"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 30052.7,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 300527.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-16c1597252c5a1142344"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-16c1597252c5a1142344"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1d5ce0c7cbbfcb28375e"
+      ],
+      "field_path": "/input/financials/periods/2/receivable_days",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 6.3,
+      "qualification_status": "PENDING",
+      "raw_value": 6.3,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-1d5ce0c7cbbfcb28375e"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-1d5ce0c7cbbfcb28375e"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-3114e6b5a701a5934d33"
+      ],
+      "field_path": "/input/financials/periods/2/revenue",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/2/revenue"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 146885.30000000002,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 1468853.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-3114e6b5a701a5934d33"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-3114e6b5a701a5934d33"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-125fbd777fa20abab965"
+      ],
+      "field_path": "/input/financials/periods/2/total_debt",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/financials/periods/2/total_debt"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 70781.0,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 707810.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-125fbd777fa20abab965"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-125fbd777fa20abab965"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1fdfd58416610f7d11cb",
+        "EV-financials-reporting_unit"
+      ],
+      "field_path": "/input/financials/reporting_unit",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "INR_MILLIONS",
+      "qualification_status": "PENDING",
+      "raw_value": "INR_MILLIONS",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-1fdfd58416610f7d11cb",
+          "EV-financials-reporting_unit"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-1fdfd58416610f7d11cb"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1a6d001f0b0db066c2d6",
+        "EV-governance-auditor_changed_3y"
+      ],
+      "field_path": "/input/governance/auditor_changed_3y",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": false,
+      "qualification_status": "PENDING",
+      "raw_value": false,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-1a6d001f0b0db066c2d6",
+          "EV-governance-auditor_changed_3y"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-1a6d001f0b0db066c2d6"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-5ddb01ef3c487dcfbf21",
+        "EV-governance-auditor_opinion"
+      ],
+      "field_path": "/input/governance/auditor_opinion",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "unqualified",
+      "qualification_status": "PENDING",
+      "raw_value": "unqualified",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-5ddb01ef3c487dcfbf21",
+          "EV-governance-auditor_opinion"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-5ddb01ef3c487dcfbf21"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-7d4a1a07e76dca4cdc4a",
+        "EV-governance-auditor_reputed"
+      ],
+      "field_path": "/input/governance/auditor_reputed",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": true,
+      "qualification_status": "PENDING",
+      "raw_value": true,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-7d4a1a07e76dca4cdc4a",
+          "EV-governance-auditor_reputed"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-7d4a1a07e76dca4cdc4a"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-cfd5b5ff59f80146f6ac",
+        "EV-governance-board_independent_majority"
+      ],
+      "field_path": "/input/governance/board_independent_majority",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": false,
+      "qualification_status": "PENDING",
+      "raw_value": false,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-cfd5b5ff59f80146f6ac",
+          "EV-governance-board_independent_majority"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-cfd5b5ff59f80146f6ac"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-bcec53768313b760f595"
+      ],
+      "field_path": "/input/governance/eom_materiality",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-bcec53768313b760f595"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-bcec53768313b760f595"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-57d16606c5a4db6b457a"
+      ],
+      "field_path": "/input/governance/going_concern_uncertainty",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-57d16606c5a4db6b457a"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-57d16606c5a4db6b457a"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-ea89f45c1e8f87bf5cb6"
+      ],
+      "field_path": "/input/governance/kmp_exits_2y",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-ea89f45c1e8f87bf5cb6"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-ea89f45c1e8f87bf5cb6"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-8eec89c78076d04ed1c3",
+        "EV-governance-litigation_bucket"
+      ],
+      "field_path": "/input/governance/litigation_bucket",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "criminal_or_regulatory",
+      "qualification_status": "PENDING",
+      "raw_value": "criminal_or_regulatory",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-8eec89c78076d04ed1c3",
+          "EV-governance-litigation_bucket"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-8eec89c78076d04ed1c3"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-194069a09fde0592d497",
+        "EV-governance-repeated_eom"
+      ],
+      "field_path": "/input/governance/repeated_eom",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": false,
+      "qualification_status": "PENDING",
+      "raw_value": false,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-194069a09fde0592d497",
+          "EV-governance-repeated_eom"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-194069a09fde0592d497"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e923de09ad65cd8b089f"
+      ],
+      "field_path": "/input/governance/rpt_pct_of_revenue_growth",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": -0.1141,
+      "qualification_status": "PENDING",
+      "raw_value": -0.1141,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-e923de09ad65cd8b089f"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-e923de09ad65cd8b089f"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-be97a14b7664411bbadf"
+      ],
+      "field_path": "/input/governance/rpt_pct_revenue",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 4.3094,
+      "qualification_status": "PENDING",
+      "raw_value": 4.3094,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-be97a14b7664411bbadf"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-be97a14b7664411bbadf"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-bead970df1e84daeccb0"
+      ],
+      "field_path": "/input/governance/sebi_ed_action_active",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-bead970df1e84daeccb0"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-bead970df1e84daeccb0"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e33b6b43b0182b2bfc68"
+      ],
+      "field_path": "/input/icdr_route",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "6(1)",
+      "qualification_status": "PENDING",
+      "raw_value": "6(1)",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-e33b6b43b0182b2bfc68"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-e33b6b43b0182b2bfc68"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-579684577fada9b11f6a"
+      ],
+      "field_path": "/input/ipo_id",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "JIO-PLATFORMS-LIMITED",
+      "qualification_status": "PENDING",
+      "raw_value": "JIO-PLATFORMS-LIMITED",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-579684577fada9b11f6a"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-579684577fada9b11f6a"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-624ed4834fa5854fde3b",
+        "EV-issue-close_date"
+      ],
+      "field_path": "/input/issue/close_date",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "2026-10-23",
+      "qualification_status": "PENDING",
+      "raw_value": "2026-10-23",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-624ed4834fa5854fde3b",
+          "EV-issue-close_date"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-624ed4834fa5854fde3b"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e0bff349016e4565c8a2",
+        "EV-issue.fresh_issue"
+      ],
+      "field_path": "/input/issue/fresh_issue",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/issue/fresh_issue"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 30213.0,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 302130.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-e0bff349016e4565c8a2",
+          "EV-issue.fresh_issue"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-e0bff349016e4565c8a2"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-02edfcf95cfb34279a77",
+        "EV-issue-fresh_shares"
+      ],
+      "field_path": "/input/issue/fresh_shares",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 270000000,
+      "qualification_status": "PENDING",
+      "raw_value": 270000000,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-02edfcf95cfb34279a77",
+          "EV-issue-fresh_shares"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-02edfcf95cfb34279a77"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-f837cb231de4a02cd79a",
+        "EV-issue.lot_size"
+      ],
+      "field_path": "/input/issue/lot_size",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 12,
+      "qualification_status": "PENDING",
+      "raw_value": 12,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-f837cb231de4a02cd79a",
+          "EV-issue.lot_size"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-f837cb231de4a02cd79a"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-c4c93b5ab0b8389e828b",
+        "EV-issue-ofs"
+      ],
+      "field_path": "/input/issue/ofs",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/issue/ofs"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 0.0,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 0.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-c4c93b5ab0b8389e828b",
+          "EV-issue-ofs"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-c4c93b5ab0b8389e828b"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-0907af4852a0bd78aa22",
+        "EV-issue-open_date"
+      ],
+      "field_path": "/input/issue/open_date",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "2026-10-21",
+      "qualification_status": "PENDING",
+      "raw_value": "2026-10-21",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-0907af4852a0bd78aa22",
+          "EV-issue-open_date"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-0907af4852a0bd78aa22"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-525b46a5cb69eea09996"
+      ],
+      "field_path": "/input/issue/post_issue_eps",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 32.63,
+      "qualification_status": "PENDING",
+      "raw_value": 32.63,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-525b46a5cb69eea09996"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-525b46a5cb69eea09996"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-ca396a3fd92b2b325c7a"
+      ],
+      "field_path": "/input/issue/post_issue_shares",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 9209030830,
+      "qualification_status": "PENDING",
+      "raw_value": 9209030830,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-ca396a3fd92b2b325c7a"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-ca396a3fd92b2b325c7a"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-925e04a92ab028e6085b",
+        "EV-issue-pre_issue_shares"
+      ],
+      "field_path": "/input/issue/pre_issue_shares",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 8939030830,
+      "qualification_status": "PENDING",
+      "raw_value": 8939030830,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-925e04a92ab028e6085b",
+          "EV-issue-pre_issue_shares"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-925e04a92ab028e6085b"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-54553e7b46fbb42b34a1",
+        "EV-issue.price_band_high"
+      ],
+      "field_path": "/input/issue/price_band_high",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 1119.0,
+      "qualification_status": "PENDING",
+      "raw_value": 1119.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-54553e7b46fbb42b34a1",
+          "EV-issue.price_band_high"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-54553e7b46fbb42b34a1"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d57726b0c3195ae13640",
+        "EV-issue.price_band_low"
+      ],
+      "field_path": "/input/issue/price_band_low",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 1065.0,
+      "qualification_status": "PENDING",
+      "raw_value": 1065.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-d57726b0c3195ae13640",
+          "EV-issue.price_band_low"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-d57726b0c3195ae13640"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d52ba3bc9235790331be"
+      ],
+      "field_path": "/input/peers/0/as_of",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "2026-10-13",
+      "qualification_status": "PENDING",
+      "raw_value": "2026-10-13",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-d52ba3bc9235790331be"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-d52ba3bc9235790331be"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e400c40859e9af9e8631"
+      ],
+      "field_path": "/input/peers/0/business_match",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "partial",
+      "qualification_status": "PENDING",
+      "raw_value": "partial",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-e400c40859e9af9e8631"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-e400c40859e9af9e8631"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-df7fd217e433e7d4fad4"
+      ],
+      "field_path": "/input/peers/0/listed_years",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-df7fd217e433e7d4fad4"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-df7fd217e433e7d4fad4"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-3a846e2973d1a06fd9c2"
+      ],
+      "field_path": "/input/peers/0/name",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "Bharti Airtel Limited",
+      "qualification_status": "PENDING",
+      "raw_value": "Bharti Airtel Limited",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-3a846e2973d1a06fd9c2"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-3a846e2973d1a06fd9c2"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-6d29448e85c8cc4323ff"
+      ],
+      "field_path": "/input/peers/0/pb",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-6d29448e85c8cc4323ff"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-6d29448e85c8cc4323ff"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-7ba588732fdf946c92a9"
+      ],
+      "field_path": "/input/peers/0/pe",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 40.71,
+      "qualification_status": "PENDING",
+      "raw_value": 40.71,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-7ba588732fdf946c92a9"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-7ba588732fdf946c92a9"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-b132887b3c54125068a8"
+      ],
+      "field_path": "/input/peers/0/roe_pct",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 20.32,
+      "qualification_status": "PENDING",
+      "raw_value": 20.32,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-b132887b3c54125068a8"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-b132887b3c54125068a8"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-2a27a90e8c6009bd5b4d"
+      ],
+      "field_path": "/input/peers/0/source_id",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "RHP-FILING-72480c2e",
+      "qualification_status": "PENDING",
+      "raw_value": "RHP-FILING-72480c2e",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-2a27a90e8c6009bd5b4d"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-2a27a90e8c6009bd5b4d"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-042fbbcbbb2839207de9"
+      ],
+      "field_path": "/input/peers/1/as_of",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "2026-10-13",
+      "qualification_status": "PENDING",
+      "raw_value": "2026-10-13",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-042fbbcbbb2839207de9"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-042fbbcbbb2839207de9"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-024ae5a907b9a31ca351"
+      ],
+      "field_path": "/input/peers/1/business_match",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "partial",
+      "qualification_status": "PENDING",
+      "raw_value": "partial",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-024ae5a907b9a31ca351"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-024ae5a907b9a31ca351"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-31a4fc3d1b65a9e7952e"
+      ],
+      "field_path": "/input/peers/1/listed_years",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-31a4fc3d1b65a9e7952e"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-31a4fc3d1b65a9e7952e"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-2adcba6c100ea9446e66"
+      ],
+      "field_path": "/input/peers/1/name",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "Vodafone Idea Limited",
+      "qualification_status": "PENDING",
+      "raw_value": "Vodafone Idea Limited",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-2adcba6c100ea9446e66"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-2adcba6c100ea9446e66"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-a63f7ed0f13e57d0e095"
+      ],
+      "field_path": "/input/peers/1/pb",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-a63f7ed0f13e57d0e095"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-a63f7ed0f13e57d0e095"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1758993280abd511b43e"
+      ],
+      "field_path": "/input/peers/1/pe",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": 3.99,
+      "qualification_status": "PENDING",
+      "raw_value": 3.99,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-1758993280abd511b43e"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-1758993280abd511b43e"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-347c08f28e0162ba8e1c"
+      ],
+      "field_path": "/input/peers/1/roe_pct",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-347c08f28e0162ba8e1c"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-347c08f28e0162ba8e1c"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-5697008ecb1070cab941"
+      ],
+      "field_path": "/input/peers/1/source_id",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "RHP-FILING-72480c2e",
+      "qualification_status": "PENDING",
+      "raw_value": "RHP-FILING-72480c2e",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-5697008ecb1070cab941"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-5697008ecb1070cab941"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-6b5b9b7d0b3b8ebf8766"
+      ],
+      "field_path": "/input/sector",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "Diversified / General",
+      "qualification_status": "PENDING",
+      "raw_value": "Diversified / General",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-6b5b9b7d0b3b8ebf8766"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-6b5b9b7d0b3b8ebf8766"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-8b20daaa3e07c07a7399"
+      ],
+      "field_path": "/input/sector_profile",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "standard",
+      "qualification_status": "PENDING",
+      "raw_value": "standard",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-8b20daaa3e07c07a7399"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-8b20daaa3e07c07a7399"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-0898cc14c82a925e0a7a",
+        "EV-use_of_proceeds_0-amount"
+      ],
+      "field_path": "/input/use_of_proceeds/0/amount",
+      "normalization": {
+        "formula_id": "UNIT_TO_CRORE",
+        "formula_version": "1.5",
+        "input_field_refs": [
+          "/input/use_of_proceeds/0/amount"
+        ],
+        "kind": "NORMALIZED"
+      },
+      "normalized_unit": "INR_CRORES",
+      "normalized_value": 27500.0,
+      "qualification_status": "PENDING",
+      "raw_unit": "INR_MILLIONS",
+      "raw_value": 275000.0,
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-0898cc14c82a925e0a7a",
+          "EV-use_of_proceeds_0-amount"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-0898cc14c82a925e0a7a"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-147bf8961d48bf80c966"
+      ],
+      "field_path": "/input/use_of_proceeds/0/category",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "debt_repayment",
+      "qualification_status": "PENDING",
+      "raw_value": "debt_repayment",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-147bf8961d48bf80c966"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-147bf8961d48bf80c966"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-db43a5ab1f86c4b6799a",
+        "EV-use_of_proceeds_1-amount"
+      ],
+      "field_path": "/input/use_of_proceeds/1/amount",
+      "qualification_status": "PENDING",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-db43a5ab1f86c4b6799a",
+          "EV-use_of_proceeds_1-amount"
+        ],
+        "message": "The frozen input value is null; the canonical value remains UNKNOWN."
+      },
+      "source_observation_ids": [
+        "A15-OBS-db43a5ab1f86c4b6799a"
+      ],
+      "value_state": "UNKNOWN",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-f8d887b379a849a1b71a"
+      ],
+      "field_path": "/input/use_of_proceeds/1/category",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "gcp",
+      "qualification_status": "PENDING",
+      "raw_value": "gcp",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-f8d887b379a849a1b71a"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-f8d887b379a849a1b71a"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-fd39cb3175531f66ca10"
+      ],
+      "field_path": "/input/use_of_proceeds/1/undisclosed_marker",
+      "normalization": {
+        "kind": "IDENTITY"
+      },
+      "normalized_value": "[●]",
+      "qualification_status": "PENDING",
+      "raw_value": "[●]",
+      "reason": {
+        "code": "UNVERIFIED",
+        "evidence_refs": [
+          "A15-INPUT-fd39cb3175531f66ca10"
+        ],
+        "message": "The legacy EvaluationRecord does not retain field-level verification or source-qualification status; this value remains UNVERIFIED and PENDING."
+      },
+      "source_observation_ids": [
+        "A15-OBS-fd39cb3175531f66ca10"
+      ],
+      "value_origin": "SOURCE",
+      "value_state": "VALUE",
+      "verification_status": "UNVERIFIED"
+    }
+  ],
+  "integrity": {
+    "digests": [
+      {
+        "algorithm": "SHA-256",
+        "canonicalization_id": "ipo-engine-canonical-json/1.5.0",
+        "digest_id": "input-snapshot",
+        "digest_value": "ba27fc4b99e3ac6ad28ec065e788d7beb57cfb8b9f1fc71e09b3839b93a8f04f",
+        "evidence_refs": [],
+        "origin": "LOCAL_COMPUTED",
+        "subject_kind": "CANONICAL_JSON_OBJECT",
+        "subject_ref": "input.json#snapshot"
+      },
+      {
+        "algorithm": "SHA-256",
+        "canonicalization_id": "ipo-engine-canonical-json/1.5.0",
+        "digest_id": "market-snapshot",
+        "digest_value": "c595db55360d53c902ed30deb8aab6ba01dfd6c42294ae47585121227d7e5f53",
+        "evidence_refs": [],
+        "origin": "LOCAL_COMPUTED",
+        "subject_kind": "CANONICAL_JSON_OBJECT",
+        "subject_ref": "market.json#snapshot.hash_payload"
+      },
+      {
+        "algorithm": "SHA-256",
+        "canonicalization_id": "ipo-engine-canonical-json/1.5.0",
+        "digest_id": "peer-snapshot",
+        "digest_value": "61f5c9132e97baf987f2693568ab5b4b5ec748136b05453f0e2d155b842edb9b",
+        "evidence_refs": [],
+        "origin": "LOCAL_COMPUTED",
+        "subject_kind": "CANONICAL_JSON_OBJECT",
+        "subject_ref": "peers.json#snapshot.hash_payload"
+      },
+      {
+        "algorithm": "UNKNOWN",
+        "digest_id": "source-content-hash-42169e64bfafa0070e3a",
+        "digest_value": "47293a7fa3a645e55f474c6d0b243912126ec6e7f1ba5bd9affa4d44d73f25fe",
+        "evidence_refs": [],
+        "origin": "LEGACY_UNRESOLVED",
+        "reason": {
+          "code": "LEGACY_UNRESOLVED",
+          "evidence_refs": [],
+          "message": "The legacy SourceRef.content_hash is preserved verbatim, but its algorithm, subject, and provenance are not established by the record."
+        },
+        "subject_kind": "LEGACY_UNSPECIFIED",
+        "subject_ref": "UNKNOWN"
+      },
+      {
+        "algorithm": "UNKNOWN",
+        "digest_id": "source-content-hash-5e00286c948e20dc4f3f",
+        "digest_value": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+        "evidence_refs": [],
+        "origin": "LEGACY_UNRESOLVED",
+        "reason": {
+          "code": "LEGACY_UNRESOLVED",
+          "evidence_refs": [],
+          "message": "The legacy SourceRef.content_hash is preserved verbatim, but its algorithm, subject, and provenance are not established by the record."
+        },
+        "subject_kind": "LEGACY_UNSPECIFIED",
+        "subject_ref": "UNKNOWN"
+      },
+      {
+        "algorithm": "SHA-256",
+        "canonicalization_id": "ipo-engine-canonical-json/1.5.0",
+        "digest_id": "source-manifest",
+        "digest_value": "74fb2529579904b20d71bc4002e6dc96359ed41ad741180a78fdd0fc45299f16",
+        "evidence_refs": [],
+        "origin": "LOCAL_COMPUTED",
+        "subject_kind": "CANONICAL_JSON_OBJECT",
+        "subject_ref": "evidence.json#sources+evidence"
+      },
+      {
+        "algorithm": "SHA-256",
+        "canonicalization_id": "ipo-engine-canonical-json/1.5.0",
+        "digest_id": "v1.5-result",
+        "digest_value": "b3626c11214cb5978fea955cb4ad141519f944a94c4163668c01784782c752cb",
+        "evidence_refs": [],
+        "origin": "LOCAL_COMPUTED",
+        "subject_kind": "V1_5_RESULT_PAYLOAD",
+        "subject_ref": "result_payload.v1.5"
+      }
+    ]
+  },
+  "observations": [
+    {
+      "evidence_refs": [
+        "A15-INPUT-b6df437405d0e585a506"
+      ],
+      "field_path": "/input/board",
+      "observation_id": "A15-OBS-b6df437405d0e585a506",
+      "raw_value": "mainboard",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-bca8966a6345a2026304"
+      ],
+      "field_path": "/input/business/industry_cagr_pct",
+      "observation_id": "A15-OBS-bca8966a6345a2026304",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-bca8966a6345a2026304"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-c3b0c0b74b3208d798aa"
+      ],
+      "field_path": "/input/business/industry_forecast_period",
+      "observation_id": "A15-OBS-c3b0c0b74b3208d798aa",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-c3b0c0b74b3208d798aa"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-cef9ac773bc244b535a3"
+      ],
+      "field_path": "/input/business/industry_scope",
+      "observation_id": "A15-OBS-cef9ac773bc244b535a3",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-cef9ac773bc244b535a3"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e1aac2d51b233f47b190"
+      ],
+      "field_path": "/input/business/industry_source",
+      "observation_id": "A15-OBS-e1aac2d51b233f47b190",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-e1aac2d51b233f47b190"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-fb60f3d824664e31efbd"
+      ],
+      "field_path": "/input/business/moat_rating",
+      "observation_id": "A15-OBS-fb60f3d824664e31efbd",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-fb60f3d824664e31efbd"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d95d3db57b42a673f1dd"
+      ],
+      "field_path": "/input/business/regulatory_dependence",
+      "observation_id": "A15-OBS-d95d3db57b42a673f1dd",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-d95d3db57b42a673f1dd"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e1ffc7f671218e63f0ca"
+      ],
+      "field_path": "/input/business/top5_customer_pct",
+      "observation_id": "A15-OBS-e1ffc7f671218e63f0ca",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-e1ffc7f671218e63f0ca"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-9a544fafe36bc8edf648"
+      ],
+      "field_path": "/input/business/top5_supplier_pct",
+      "observation_id": "A15-OBS-9a544fafe36bc8edf648",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-9a544fafe36bc8edf648"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-894608e6aab2c6939f7e"
+      ],
+      "field_path": "/input/business/visibility_rating",
+      "observation_id": "A15-OBS-894608e6aab2c6939f7e",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-894608e6aab2c6939f7e"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-dc78d78e4e73c137041a"
+      ],
+      "field_path": "/input/capital_structure/discounted_allotments_18m_before_drhp",
+      "observation_id": "A15-OBS-dc78d78e4e73c137041a",
+      "raw_value": false,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-dcbb18ce6109dc598cdf"
+      ],
+      "field_path": "/input/capital_structure/large_holders_unlocked_early",
+      "observation_id": "A15-OBS-dcbb18ce6109dc598cdf",
+      "raw_value": false,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-f25ea4fe0bf4b02f8ed4"
+      ],
+      "field_path": "/input/capital_structure/promoter_lockin_in_place",
+      "observation_id": "A15-OBS-f25ea4fe0bf4b02f8ed4",
+      "raw_value": true,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-ac213e45133f54ff91a6"
+      ],
+      "field_path": "/input/capital_structure/promoter_pledge_pct",
+      "observation_id": "A15-OBS-ac213e45133f54ff91a6",
+      "raw_value": 0.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-db353a98e295b98a317a"
+      ],
+      "field_path": "/input/capital_structure/promoter_post_pct",
+      "observation_id": "A15-OBS-db353a98e295b98a317a",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-db353a98e295b98a317a"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e7a20ae02e8f157130b2",
+        "EV-capital_structure-promoter_pre_pct"
+      ],
+      "field_path": "/input/capital_structure/promoter_pre_pct",
+      "observation_id": "A15-OBS-e7a20ae02e8f157130b2",
+      "raw_value": 66.43,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-28893676a4db1f66c67c",
+        "EV-company_name"
+      ],
+      "field_path": "/input/company_name",
+      "observation_id": "A15-OBS-28893676a4db1f66c67c",
+      "raw_value": "JIO PLATFORMS LIMITED",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-0bf551e3429de391f858",
+        "EV-financials-contingent_liabilities"
+      ],
+      "field_path": "/input/financials/contingent_liabilities",
+      "observation_id": "A15-OBS-0bf551e3429de391f858",
+      "raw_value": 15021.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-382562c69c68ee38fd09"
+      ],
+      "field_path": "/input/financials/contingent_liabilities_unquantified",
+      "observation_id": "A15-OBS-382562c69c68ee38fd09",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-382562c69c68ee38fd09"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d471036792125c41dc17"
+      ],
+      "field_path": "/input/financials/periods/0/cash_and_equivalents",
+      "observation_id": "A15-OBS-d471036792125c41dc17",
+      "raw_value": 24889.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-835e23255e1bb295a2cd"
+      ],
+      "field_path": "/input/financials/periods/0/cfo",
+      "observation_id": "A15-OBS-835e23255e1bb295a2cd",
+      "raw_value": 576616.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-9195000577cdcd3119a9"
+      ],
+      "field_path": "/input/financials/periods/0/disclosed_roce_pct",
+      "observation_id": "A15-OBS-9195000577cdcd3119a9",
+      "raw_value": 12.83,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-682519bf0647df425745"
+      ],
+      "field_path": "/input/financials/periods/0/ebit",
+      "observation_id": "A15-OBS-682519bf0647df425745",
+      "raw_value": 322383.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1c5a059c45b904aec37e"
+      ],
+      "field_path": "/input/financials/periods/0/ebitda",
+      "observation_id": "A15-OBS-1c5a059c45b904aec37e",
+      "raw_value": 543414.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-6df7a2db6a6ee8fd9c16"
+      ],
+      "field_path": "/input/financials/periods/0/fy",
+      "observation_id": "A15-OBS-6df7a2db6a6ee8fd9c16",
+      "raw_value": "FY2024",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-3cdf1409379f513eb2bd"
+      ],
+      "field_path": "/input/financials/periods/0/interest_expense",
+      "observation_id": "A15-OBS-3cdf1409379f513eb2bd",
+      "raw_value": 40476.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-bd8a41f25841c2610077"
+      ],
+      "field_path": "/input/financials/periods/0/net_worth",
+      "observation_id": "A15-OBS-bd8a41f25841c2610077",
+      "raw_value": 2782864.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-f35fb73d0118df7f1f9e"
+      ],
+      "field_path": "/input/financials/periods/0/pat",
+      "observation_id": "A15-OBS-f35fb73d0118df7f1f9e",
+      "raw_value": 214340.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-f502633e59eb36d5e2b5"
+      ],
+      "field_path": "/input/financials/periods/0/receivable_days",
+      "observation_id": "A15-OBS-f502633e59eb36d5e2b5",
+      "raw_value": 9.5,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e6fd1aabb8600a918dd1"
+      ],
+      "field_path": "/input/financials/periods/0/revenue",
+      "observation_id": "A15-OBS-e6fd1aabb8600a918dd1",
+      "raw_value": 1095581.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-134a12f631aeca6e0843"
+      ],
+      "field_path": "/input/financials/periods/0/total_debt",
+      "observation_id": "A15-OBS-134a12f631aeca6e0843",
+      "raw_value": 543489.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-2b78603a627e6117edf7"
+      ],
+      "field_path": "/input/financials/periods/1/cash_and_equivalents",
+      "observation_id": "A15-OBS-2b78603a627e6117edf7",
+      "raw_value": 80115.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-7b5d753d71cf8d1a11e4"
+      ],
+      "field_path": "/input/financials/periods/1/cfo",
+      "observation_id": "A15-OBS-7b5d753d71cf8d1a11e4",
+      "raw_value": 681557.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-83ac8a4ebf70c5b2bb56"
+      ],
+      "field_path": "/input/financials/periods/1/disclosed_roce_pct",
+      "observation_id": "A15-OBS-83ac8a4ebf70c5b2bb56",
+      "raw_value": 12.5,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-52e0361c217e0821a8b7"
+      ],
+      "field_path": "/input/financials/periods/1/ebit",
+      "observation_id": "A15-OBS-52e0361c217e0821a8b7",
+      "raw_value": 389178.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-cb586c0cee23b92275b5"
+      ],
+      "field_path": "/input/financials/periods/1/ebitda",
+      "observation_id": "A15-OBS-cb586c0cee23b92275b5",
+      "raw_value": 630554.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-01b7b85e28c6f81b1006"
+      ],
+      "field_path": "/input/financials/periods/1/fy",
+      "observation_id": "A15-OBS-01b7b85e28c6f81b1006",
+      "raw_value": "FY2025",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d873caffab552d2f59cb"
+      ],
+      "field_path": "/input/financials/periods/1/interest_expense",
+      "observation_id": "A15-OBS-d873caffab552d2f59cb",
+      "raw_value": 49051.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-b9f21b4a68a5d6cebf34"
+      ],
+      "field_path": "/input/financials/periods/1/net_worth",
+      "observation_id": "A15-OBS-b9f21b4a68a5d6cebf34",
+      "raw_value": 3050474.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-8045766ad1278e6d13aa"
+      ],
+      "field_path": "/input/financials/periods/1/pat",
+      "observation_id": "A15-OBS-8045766ad1278e6d13aa",
+      "raw_value": 261203.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-a132c6f83b127890a27c"
+      ],
+      "field_path": "/input/financials/periods/1/receivable_days",
+      "observation_id": "A15-OBS-a132c6f83b127890a27c",
+      "raw_value": 7.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-87a9bee44c5931f0f878"
+      ],
+      "field_path": "/input/financials/periods/1/revenue",
+      "observation_id": "A15-OBS-87a9bee44c5931f0f878",
+      "raw_value": 1282184.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-feeabc31ff1f34098018"
+      ],
+      "field_path": "/input/financials/periods/1/total_debt",
+      "observation_id": "A15-OBS-feeabc31ff1f34098018",
+      "raw_value": 730603.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1637b622e105978cb8a2"
+      ],
+      "field_path": "/input/financials/periods/2/cash_and_equivalents",
+      "observation_id": "A15-OBS-1637b622e105978cb8a2",
+      "raw_value": 165570.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d096b3be610f96b919fc"
+      ],
+      "field_path": "/input/financials/periods/2/cfo",
+      "observation_id": "A15-OBS-d096b3be610f96b919fc",
+      "raw_value": 775563.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-29163f5f509903af3e8e"
+      ],
+      "field_path": "/input/financials/periods/2/disclosed_roce_pct",
+      "observation_id": "A15-OBS-29163f5f509903af3e8e",
+      "raw_value": 10.76,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-c143d174acf4662f2454"
+      ],
+      "field_path": "/input/financials/periods/2/ebit",
+      "observation_id": "A15-OBS-c143d174acf4662f2454",
+      "raw_value": 461327.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-ab91479f3db9fff35f4b"
+      ],
+      "field_path": "/input/financials/periods/2/ebitda",
+      "observation_id": "A15-OBS-ab91479f3db9fff35f4b",
+      "raw_value": 733816.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-75b84a45702a46cced7e"
+      ],
+      "field_path": "/input/financials/periods/2/fy",
+      "observation_id": "A15-OBS-75b84a45702a46cced7e",
+      "raw_value": "FY2026",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-b777dec6c6ac7c75f2d8"
+      ],
+      "field_path": "/input/financials/periods/2/interest_expense",
+      "observation_id": "A15-OBS-b777dec6c6ac7c75f2d8",
+      "raw_value": 86534.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-528b4541f8f830e2b598"
+      ],
+      "field_path": "/input/financials/periods/2/net_worth",
+      "observation_id": "A15-OBS-528b4541f8f830e2b598",
+      "raw_value": 3359769.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-16c1597252c5a1142344"
+      ],
+      "field_path": "/input/financials/periods/2/pat",
+      "observation_id": "A15-OBS-16c1597252c5a1142344",
+      "raw_value": 300527.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1d5ce0c7cbbfcb28375e"
+      ],
+      "field_path": "/input/financials/periods/2/receivable_days",
+      "observation_id": "A15-OBS-1d5ce0c7cbbfcb28375e",
+      "raw_value": 6.3,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-3114e6b5a701a5934d33"
+      ],
+      "field_path": "/input/financials/periods/2/revenue",
+      "observation_id": "A15-OBS-3114e6b5a701a5934d33",
+      "raw_value": 1468853.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-125fbd777fa20abab965"
+      ],
+      "field_path": "/input/financials/periods/2/total_debt",
+      "observation_id": "A15-OBS-125fbd777fa20abab965",
+      "raw_value": 707810.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1fdfd58416610f7d11cb",
+        "EV-financials-reporting_unit"
+      ],
+      "field_path": "/input/financials/reporting_unit",
+      "observation_id": "A15-OBS-1fdfd58416610f7d11cb",
+      "raw_value": "INR_MILLIONS",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1a6d001f0b0db066c2d6",
+        "EV-governance-auditor_changed_3y"
+      ],
+      "field_path": "/input/governance/auditor_changed_3y",
+      "observation_id": "A15-OBS-1a6d001f0b0db066c2d6",
+      "raw_value": false,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-5ddb01ef3c487dcfbf21",
+        "EV-governance-auditor_opinion"
+      ],
+      "field_path": "/input/governance/auditor_opinion",
+      "observation_id": "A15-OBS-5ddb01ef3c487dcfbf21",
+      "raw_value": "unqualified",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-7d4a1a07e76dca4cdc4a",
+        "EV-governance-auditor_reputed"
+      ],
+      "field_path": "/input/governance/auditor_reputed",
+      "observation_id": "A15-OBS-7d4a1a07e76dca4cdc4a",
+      "raw_value": true,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-cfd5b5ff59f80146f6ac",
+        "EV-governance-board_independent_majority"
+      ],
+      "field_path": "/input/governance/board_independent_majority",
+      "observation_id": "A15-OBS-cfd5b5ff59f80146f6ac",
+      "raw_value": false,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-bcec53768313b760f595"
+      ],
+      "field_path": "/input/governance/eom_materiality",
+      "observation_id": "A15-OBS-bcec53768313b760f595",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-bcec53768313b760f595"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-57d16606c5a4db6b457a"
+      ],
+      "field_path": "/input/governance/going_concern_uncertainty",
+      "observation_id": "A15-OBS-57d16606c5a4db6b457a",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-57d16606c5a4db6b457a"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-ea89f45c1e8f87bf5cb6"
+      ],
+      "field_path": "/input/governance/kmp_exits_2y",
+      "observation_id": "A15-OBS-ea89f45c1e8f87bf5cb6",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-ea89f45c1e8f87bf5cb6"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-8eec89c78076d04ed1c3",
+        "EV-governance-litigation_bucket"
+      ],
+      "field_path": "/input/governance/litigation_bucket",
+      "observation_id": "A15-OBS-8eec89c78076d04ed1c3",
+      "raw_value": "criminal_or_regulatory",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-194069a09fde0592d497",
+        "EV-governance-repeated_eom"
+      ],
+      "field_path": "/input/governance/repeated_eom",
+      "observation_id": "A15-OBS-194069a09fde0592d497",
+      "raw_value": false,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e923de09ad65cd8b089f"
+      ],
+      "field_path": "/input/governance/rpt_pct_of_revenue_growth",
+      "observation_id": "A15-OBS-e923de09ad65cd8b089f",
+      "raw_value": -0.1141,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-be97a14b7664411bbadf"
+      ],
+      "field_path": "/input/governance/rpt_pct_revenue",
+      "observation_id": "A15-OBS-be97a14b7664411bbadf",
+      "raw_value": 4.3094,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-bead970df1e84daeccb0"
+      ],
+      "field_path": "/input/governance/sebi_ed_action_active",
+      "observation_id": "A15-OBS-bead970df1e84daeccb0",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-bead970df1e84daeccb0"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e33b6b43b0182b2bfc68"
+      ],
+      "field_path": "/input/icdr_route",
+      "observation_id": "A15-OBS-e33b6b43b0182b2bfc68",
+      "raw_value": "6(1)",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-579684577fada9b11f6a"
+      ],
+      "field_path": "/input/ipo_id",
+      "observation_id": "A15-OBS-579684577fada9b11f6a",
+      "raw_value": "JIO-PLATFORMS-LIMITED",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-624ed4834fa5854fde3b",
+        "EV-issue-close_date"
+      ],
+      "field_path": "/input/issue/close_date",
+      "observation_id": "A15-OBS-624ed4834fa5854fde3b",
+      "raw_value": "2026-10-23",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e0bff349016e4565c8a2",
+        "EV-issue.fresh_issue"
+      ],
+      "field_path": "/input/issue/fresh_issue",
+      "observation_id": "A15-OBS-e0bff349016e4565c8a2",
+      "raw_value": 302130.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-02edfcf95cfb34279a77",
+        "EV-issue-fresh_shares"
+      ],
+      "field_path": "/input/issue/fresh_shares",
+      "observation_id": "A15-OBS-02edfcf95cfb34279a77",
+      "raw_value": 270000000,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-f837cb231de4a02cd79a",
+        "EV-issue.lot_size"
+      ],
+      "field_path": "/input/issue/lot_size",
+      "observation_id": "A15-OBS-f837cb231de4a02cd79a",
+      "raw_value": 12,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-c4c93b5ab0b8389e828b",
+        "EV-issue-ofs"
+      ],
+      "field_path": "/input/issue/ofs",
+      "observation_id": "A15-OBS-c4c93b5ab0b8389e828b",
+      "raw_value": 0.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-0907af4852a0bd78aa22",
+        "EV-issue-open_date"
+      ],
+      "field_path": "/input/issue/open_date",
+      "observation_id": "A15-OBS-0907af4852a0bd78aa22",
+      "raw_value": "2026-10-21",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-525b46a5cb69eea09996"
+      ],
+      "field_path": "/input/issue/post_issue_eps",
+      "observation_id": "A15-OBS-525b46a5cb69eea09996",
+      "raw_value": 32.63,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-ca396a3fd92b2b325c7a"
+      ],
+      "field_path": "/input/issue/post_issue_shares",
+      "observation_id": "A15-OBS-ca396a3fd92b2b325c7a",
+      "raw_value": 9209030830,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-925e04a92ab028e6085b",
+        "EV-issue-pre_issue_shares"
+      ],
+      "field_path": "/input/issue/pre_issue_shares",
+      "observation_id": "A15-OBS-925e04a92ab028e6085b",
+      "raw_value": 8939030830,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-54553e7b46fbb42b34a1",
+        "EV-issue.price_band_high"
+      ],
+      "field_path": "/input/issue/price_band_high",
+      "observation_id": "A15-OBS-54553e7b46fbb42b34a1",
+      "raw_value": 1119.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d57726b0c3195ae13640",
+        "EV-issue.price_band_low"
+      ],
+      "field_path": "/input/issue/price_band_low",
+      "observation_id": "A15-OBS-d57726b0c3195ae13640",
+      "raw_value": 1065.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-d52ba3bc9235790331be"
+      ],
+      "field_path": "/input/peers/0/as_of",
+      "observation_id": "A15-OBS-d52ba3bc9235790331be",
+      "raw_value": "2026-10-13",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-e400c40859e9af9e8631"
+      ],
+      "field_path": "/input/peers/0/business_match",
+      "observation_id": "A15-OBS-e400c40859e9af9e8631",
+      "raw_value": "partial",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-df7fd217e433e7d4fad4"
+      ],
+      "field_path": "/input/peers/0/listed_years",
+      "observation_id": "A15-OBS-df7fd217e433e7d4fad4",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-df7fd217e433e7d4fad4"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-3a846e2973d1a06fd9c2"
+      ],
+      "field_path": "/input/peers/0/name",
+      "observation_id": "A15-OBS-3a846e2973d1a06fd9c2",
+      "raw_value": "Bharti Airtel Limited",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-6d29448e85c8cc4323ff"
+      ],
+      "field_path": "/input/peers/0/pb",
+      "observation_id": "A15-OBS-6d29448e85c8cc4323ff",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-6d29448e85c8cc4323ff"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-7ba588732fdf946c92a9"
+      ],
+      "field_path": "/input/peers/0/pe",
+      "observation_id": "A15-OBS-7ba588732fdf946c92a9",
+      "raw_value": 40.71,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-b132887b3c54125068a8"
+      ],
+      "field_path": "/input/peers/0/roe_pct",
+      "observation_id": "A15-OBS-b132887b3c54125068a8",
+      "raw_value": 20.32,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-2a27a90e8c6009bd5b4d"
+      ],
+      "field_path": "/input/peers/0/source_id",
+      "observation_id": "A15-OBS-2a27a90e8c6009bd5b4d",
+      "raw_value": "RHP-FILING-72480c2e",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-042fbbcbbb2839207de9"
+      ],
+      "field_path": "/input/peers/1/as_of",
+      "observation_id": "A15-OBS-042fbbcbbb2839207de9",
+      "raw_value": "2026-10-13",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-024ae5a907b9a31ca351"
+      ],
+      "field_path": "/input/peers/1/business_match",
+      "observation_id": "A15-OBS-024ae5a907b9a31ca351",
+      "raw_value": "partial",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-31a4fc3d1b65a9e7952e"
+      ],
+      "field_path": "/input/peers/1/listed_years",
+      "observation_id": "A15-OBS-31a4fc3d1b65a9e7952e",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-31a4fc3d1b65a9e7952e"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-2adcba6c100ea9446e66"
+      ],
+      "field_path": "/input/peers/1/name",
+      "observation_id": "A15-OBS-2adcba6c100ea9446e66",
+      "raw_value": "Vodafone Idea Limited",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-a63f7ed0f13e57d0e095"
+      ],
+      "field_path": "/input/peers/1/pb",
+      "observation_id": "A15-OBS-a63f7ed0f13e57d0e095",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-a63f7ed0f13e57d0e095"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-1758993280abd511b43e"
+      ],
+      "field_path": "/input/peers/1/pe",
+      "observation_id": "A15-OBS-1758993280abd511b43e",
+      "raw_value": 3.99,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-347c08f28e0162ba8e1c"
+      ],
+      "field_path": "/input/peers/1/roe_pct",
+      "observation_id": "A15-OBS-347c08f28e0162ba8e1c",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-347c08f28e0162ba8e1c"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-5697008ecb1070cab941"
+      ],
+      "field_path": "/input/peers/1/source_id",
+      "observation_id": "A15-OBS-5697008ecb1070cab941",
+      "raw_value": "RHP-FILING-72480c2e",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-6b5b9b7d0b3b8ebf8766"
+      ],
+      "field_path": "/input/sector",
+      "observation_id": "A15-OBS-6b5b9b7d0b3b8ebf8766",
+      "raw_value": "Diversified / General",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-8b20daaa3e07c07a7399"
+      ],
+      "field_path": "/input/sector_profile",
+      "observation_id": "A15-OBS-8b20daaa3e07c07a7399",
+      "raw_value": "standard",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-0898cc14c82a925e0a7a",
+        "EV-use_of_proceeds_0-amount"
+      ],
+      "field_path": "/input/use_of_proceeds/0/amount",
+      "observation_id": "A15-OBS-0898cc14c82a925e0a7a",
+      "raw_value": 275000.0,
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-147bf8961d48bf80c966"
+      ],
+      "field_path": "/input/use_of_proceeds/0/category",
+      "observation_id": "A15-OBS-147bf8961d48bf80c966",
+      "raw_value": "debt_repayment",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-db43a5ab1f86c4b6799a",
+        "EV-use_of_proceeds_1-amount"
+      ],
+      "field_path": "/input/use_of_proceeds/1/amount",
+      "observation_id": "A15-OBS-db43a5ab1f86c4b6799a",
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-INPUT-db43a5ab1f86c4b6799a",
+          "EV-use_of_proceeds_1-amount"
+        ],
+        "message": "The frozen v1.5 input snapshot contains null; no zero or substitute is recorded."
+      },
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "UNKNOWN"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-f8d887b379a849a1b71a"
+      ],
+      "field_path": "/input/use_of_proceeds/1/category",
+      "observation_id": "A15-OBS-f8d887b379a849a1b71a",
+      "raw_value": "gcp",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    },
+    {
+      "evidence_refs": [
+        "A15-INPUT-fd39cb3175531f66ca10"
+      ],
+      "field_path": "/input/use_of_proceeds/1/undisclosed_marker",
+      "observation_id": "A15-OBS-fd39cb3175531f66ca10",
+      "raw_value": "[●]",
+      "source_id": "A15-LOCAL-INPUT",
+      "timestamps": [],
+      "value_state": "VALUE"
+    }
+  ],
+  "record": {
+    "company_name": "JIO PLATFORMS LIMITED",
+    "config_hash": "4a5d92e867aea681127352c628522f9a9c5841b89ea7a47736bf55e617526d2b",
+    "config_version": "1.5.0",
+    "engine_version": "1.5.0",
+    "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-085409Z-final-b3626c11",
+    "ipo_id": "JIO-PLATFORMS-LIMITED",
+    "spec_version": "1.5"
+  },
+  "record_schema_version": "1.1.0",
+  "result": {
+    "critical_safety": {
+      "missing_evidence_refs": [
+        "A15-RESULT-8992b0e1f5c77288b1d0",
+        "A15-RESULT-e3a8c28aa5710e56d890"
+      ],
+      "reason": "Configured v1.5 critical-data inputs are UNKNOWN: going_concern_uncertainty, sebi_ed_action_active",
+      "status": "INCOMPLETE"
+    },
+    "diagnostics": [
+      {
+        "code": "A9_GMP_FINAL_WITHHELD",
+        "evidence_refs": [
+          "A15-RESULT-09767a568834916577e8"
+        ],
+        "message": "A9 requires a qualifying GMP snapshot and its required hash for FINAL, but the projected GMP block has no non-null pct or trend observation. The generic market-snapshot digest is a local digest over all market blocks, not a GMP qualification hash. FINAL is withheld."
+      },
+      {
+        "code": "INSUFFICIENT_DATA",
+        "evidence_refs": [
+          "A15-RESULT-8992b0e1f5c77288b1d0",
+          "A15-RESULT-e3a8c28aa5710e56d890"
+        ],
+        "message": "The existing v1.5 score marks one or more configured critical inputs unavailable."
+      },
+      {
+        "code": "VERDICT_UNCERTAIN",
+        "evidence_refs": [],
+        "message": "The existing v1.5 score interval crosses configured verdict bands."
+      }
+    ],
+    "knockouts": [
+      {
+        "evidence_refs": [
+          "A15-RESULT-4d2e6ca918ae8b707e5e"
+        ],
+        "missing_input_refs": [
+          "going_concern_uncertainty"
+        ],
+        "rule_id": "K1",
+        "state": "UNVERIFIED"
+      },
+      {
+        "evidence_refs": [
+          "A15-RESULT-3cfc2f86cc2ad9eb0f1e"
+        ],
+        "missing_input_refs": [
+          "sebi_ed_action_active"
+        ],
+        "rule_id": "K2",
+        "state": "UNVERIFIED"
+      },
+      {
+        "evidence_refs": [
+          "A15-RESULT-763b8ece13cb81ead18b"
+        ],
+        "missing_input_refs": [],
+        "rule_id": "K3",
+        "state": "CLEAR"
+      },
+      {
+        "evidence_refs": [
+          "A15-RESULT-337efd1b37f684bb3ff4"
+        ],
+        "missing_input_refs": [],
+        "rule_id": "K4",
+        "state": "CLEAR"
+      },
+      {
+        "evidence_refs": [
+          "A15-RESULT-ce8f87c51186b50d25c5"
+        ],
+        "missing_input_refs": [
+          "contingent_liab_unquantified"
+        ],
+        "rule_id": "K5",
+        "state": "UNVERIFIED"
+      },
+      {
+        "evidence_refs": [
+          "A15-RESULT-cb1bd163db399748e773"
+        ],
+        "missing_input_refs": [],
+        "rule_id": "K6",
+        "state": "CLEAR"
+      }
+    ],
+    "outcome_resolution": {
+      "reason": {
+        "code": "MISSING",
+        "evidence_refs": [
+          "A15-RESULT-09767a568834916577e8"
+        ],
+        "message": "A9 requires a qualifying GMP snapshot and its required hash for FINAL, but the projected GMP block has no non-null pct or trend observation. The generic market-snapshot digest is a local digest over all market blocks, not a GMP qualification hash. FINAL is withheld."
+      },
+      "state": "NONTERMINAL_UNRESOLVED"
+    },
+    "score": {
+      "available_points": 57.0,
+      "base_score": 34.0,
+      "completeness_pct": 56.99999999999999,
+      "final_score": 34.0,
+      "total_evaluable_points": 100.0,
+      "unknown_points": 43.0,
+      "unresolved_penalty_points": 10.0
+    },
+    "score_interval": {
+      "lower_bound": 24.0,
+      "state": "AVAILABLE",
+      "upper_bound": 77.0
+    },
+    "score_verdict": {
+      "insufficient_data": true,
+      "uncertain": true,
+      "value": "INSUFFICIENT_DATA"
+    }
+  },
+  "serialization_profile": {
+    "array_order": "stable-id/path; timestamp-kind/source-text",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "final_newline": true,
+    "indent": 2,
+    "line_ending": "LF",
+    "non_finite_numbers": "REJECT",
+    "profile_id": "ipo-evaluation-record-json/1.0.0",
+    "sort_keys": true,
+    "string_normalization": "PRESERVE_SOURCE_TEXT"
+  },
+  "snapshots": {
+    "artifact_refs": {
+      "evidence": "evidence.json",
+      "input": "input.json",
+      "manifest": "manifest.json",
+      "market": "market.json",
+      "peers": "peers.json",
+      "result": "result.json"
+    },
+    "input_snapshot_hash": "ba27fc4b99e3ac6ad28ec065e788d7beb57cfb8b9f1fc71e09b3839b93a8f04f",
+    "market_snapshot_hash": "c595db55360d53c902ed30deb8aab6ba01dfd6c42294ae47585121227d7e5f53",
+    "peer_snapshot_hash": "61f5c9132e97baf987f2693568ab5b4b5ec748136b05453f0e2d155b842edb9b",
+    "source_manifest_hash": "74fb2529579904b20d71bc4002e6dc96359ed41ad741180a78fdd0fc45299f16"
+  },
+  "sources": [
+    {
+      "source_id": "A15-LOCAL-INPUT",
+      "source_type": "STRUCTURED_INPUT",
+      "timestamps": []
+    },
+    {
+      "source_id": "A15-LOCAL-RESULT",
+      "source_type": "DERIVED",
+      "timestamps": []
+    },
+    {
+      "digest_refs": [
+        "source-content-hash-5e00286c948e20dc4f3f"
+      ],
+      "source_id": "RHP-FILING-72480c2e",
+      "source_type": "RHP",
+      "timestamps": [
+        {
+          "evidence_refs": [],
+          "kind": "LOCAL_RETRIEVED_AT",
+          "normalized_utc": "2026-10-23T08:53:46Z",
+          "source_text": "2026-10-23T08:53:46Z",
+          "state": "KNOWN"
+        }
+      ],
+      "uri": "/tmp/ipo_ingest/72480c2e249eb8da/filing.pdf"
+    },
+    {
+      "digest_refs": [
+        "source-content-hash-42169e64bfafa0070e3a"
+      ],
+      "source_id": "SRC-AGG-AB6F20DC33FD66BE",
+      "source_type": "MARKET_DATA",
+      "timestamps": [
+        {
+          "evidence_refs": [],
+          "kind": "LOCAL_RETRIEVED_AT",
+          "normalized_utc": "2026-10-21T20:19:43.817744Z",
+          "source_text": "2026-10-21T20:19:43.817744Z",
+          "state": "KNOWN"
+        }
+      ],
+      "uri": "https://www.chittorgarh.com/ipo/jio-platforms-ipo/3152/"
+    }
+  ]
+}

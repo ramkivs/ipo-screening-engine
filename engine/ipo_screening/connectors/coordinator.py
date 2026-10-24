@@ -167,6 +167,15 @@ class ConnectorCoordinator:
         # ------------------------------------------------------------------
         # 2. Reconcile GMP (Secondary signal, never statutory)
         # ------------------------------------------------------------------
+        if len(sec_snaps) > 1:
+            # A28 explicit-only: list order, freshness and identical content do
+            # not select an observation or adjudicate corrections/withdrawals.
+            # The caller must supply one explicitly selected observation. This
+            # boundary never grants source qualification, even for one snapshot.
+            raise ConflictingSourceError(
+                "Multiple GMP snapshots require one explicitly selected observation; "
+                "duplicates, revisions and competing readings cannot be selected by list order"
+            )
         if sec_snaps:
             gmp_snap = sec_snaps[0]
             data = gmp_snap.normalized_data

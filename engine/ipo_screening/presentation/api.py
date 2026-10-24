@@ -385,15 +385,22 @@ def create_router(service: PresentationService) -> APIRouter:
         price_band_low: Optional[float] = Form(None),
         price_band_high: Optional[float] = Form(None),
         lot_size: Optional[float] = Form(None),
+        ofs: Optional[float] = Form(None),
+        fresh_issue: Optional[float] = Form(None),
         explanation: Optional[str] = Form(None),
         confirm_conflicts: bool = Form(False),
     ) -> Response:
         """Step 5: filing ingestion with bounded, provenance-labelled manual
-        entry of price_band_low / price_band_high / lot_size (Step 4 Area C).
+        entry of the required issue terms (price_band_low /
+        price_band_high / lot_size / ofs / fresh_issue).
 
-        Manual values are recorded as MANUAL_ENTRY and are never presented
-        as official-source verification. Conflicts with extracted or
-        verified values block with 409 until explicitly confirmed; a
+        issue.ofs is the Offer-for-Sale monetary amount in the filing's
+        reporting unit (v1.5 contract: number, minimum 0). issue.fresh_issue
+        is the fresh-issue monetary amount in the same reporting unit
+        (v1.5 contract: number, minimum 0; explicit 0 states a pure-OFS
+        offer). Manual values are recorded as MANUAL_ENTRY and are never
+        presented as official-source verification. Conflicts with extracted
+        or verified values block with 409 until explicitly confirmed; a
         verified official value is never displaced by a manual entry.
         """
         form_data = await request.form()
@@ -439,6 +446,14 @@ def create_router(service: PresentationService) -> APIRouter:
             manual_terms["price_band_high"] = price_band_high
         if lot_size is not None:
             manual_terms["lot_size"] = lot_size
+        if ofs is not None:
+            # Explicit 0 is an operator statement of "no offer for sale"
+            # and is preserved exactly; only an absent field is omitted.
+            manual_terms["ofs"] = ofs
+        if fresh_issue is not None:
+            # Explicit 0 is an operator statement of a pure-OFS offer (no
+            # fresh issue) and is preserved exactly; absent stays absent.
+            manual_terms["fresh_issue"] = fresh_issue
 
         try:
             ingest_res = service.ingest_document(
@@ -454,12 +469,12 @@ def create_router(service: PresentationService) -> APIRouter:
         except IngestionPayloadTooLargeError as exc:
             raise HTTPException(
                 status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                detail={"error": "Payload Too Large", "message": str(exc), "code": "PAYLOAD_TOO_LARGE"},
+                detail={"error": "Payload Too Large", "message": str(exc), "code": "PAYLOAD_TOO_LARGE", **_activity_ref(exc)},
             ) from exc
         except IngestionValidationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "Bad Request", "message": str(exc), "code": "VALIDATION_ERROR"},
+                detail={"error": "Bad Request", "message": str(exc), "code": "VALIDATION_ERROR", **_activity_ref(exc)},
             ) from exc
         except IngestionIssueTermConflictError as exc:
             raise HTTPException(
@@ -469,6 +484,7 @@ def create_router(service: PresentationService) -> APIRouter:
                     "message": str(exc),
                     "code": "ISSUE_TERM_CONFLICT",
                     "conflicts": exc.conflicts,
+                    **_activity_ref(exc),
                 },
             ) from exc
         except IngestionAwaitingIssueTermsError as exc:
@@ -486,12 +502,12 @@ def create_router(service: PresentationService) -> APIRouter:
         except (IngestionExtractionError, IngestionEvaluationError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail={"error": "Unprocessable Entity", "message": str(exc), "code": "PROCESSING_FAILED"},
+                detail={"error": "Unprocessable Entity", "message": str(exc), "code": "PROCESSING_FAILED", **_activity_ref(exc)},
             ) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={"error": "Internal Error", "message": f"Unexpected ingestion error: {exc}", "code": "INGESTION_INTERNAL_ERROR"},
+                detail={"error": "Internal Error", "message": f"Unexpected ingestion error: {exc}", "code": "INGESTION_INTERNAL_ERROR", **_activity_ref(exc)},
             ) from exc
 
     # -------------------------------------------------------------------------
@@ -551,7 +567,7 @@ def create_router(service: PresentationService) -> APIRouter:
             content={
                 "ingestion_id": recorder.ingestion_id,
                 "correlation_id": recorder.ingestion_id,
-                "status": "RUNNING",
+                "status": recorder.snapshot()["status"],
                 "activity_url": f"/api/v1/ingestions/{recorder.ingestion_id}",
                 "events_url": f"/api/v1/ingestions/{recorder.ingestion_id}/events",
             },

@@ -1,0 +1,101 @@
+........................................................................ [  4%]
+........................................................................ [  8%]
+........................................................................ [ 12%]
+........................................................................ [ 17%]
+........................................................................ [ 21%]
+........................................................................ [ 25%]
+........................................................................ [ 30%]
+........................................................................ [ 34%]
+........................................................................ [ 38%]
+........................................................................ [ 43%]
+........................................................................ [ 47%]
+........................................................................ [ 51%]
+........................................................................ [ 56%]
+........................................................................ [ 60%]
+......................................F................................. [ 64%]
+........................................................................ [ 68%]
+........................................................................ [ 73%]
+........................................................................ [ 77%]
+........................................................................ [ 81%]
+....................................................F................... [ 86%]
+........................................................................ [ 90%]
+........................................................................ [ 94%]
+........................................................................ [ 99%]
+..............                                                           [100%]
+=================================== FAILURES ===================================
+_____________ test_jio_correct_structure_is_29_and_inverted_is_21 ______________
+
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-11/test_jio_correct_structure_is_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f5848f25890>
+
+    def test_jio_correct_structure_is_29_and_inverted_is_21(tmp_path, monkeypatch):
+        # Historical reproduction: the frozen pre-remediation canonical input is
+        # reused for both evaluations (the issue terms are the only difference
+        # and are applied after extraction).
+>       doc = json.loads(HISTORICAL_CANONICAL.read_text())
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_jio_score_bridge.py:84: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.11/pathlib.py:1059: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/home/user/jio-pubtree/fixtures/jio/jio_canonical_2026-10-19_pre_evidence_remediation.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/home/user/jio-pubtree/fixtures/jio/jio_canonical_2026-10-19_pre_evidence_remediation.json'
+
+/usr/lib/python3.11/pathlib.py:1045: FileNotFoundError
+____________________ test_workbook_bytes_are_deterministic _____________________
+
+golden_input = {'ipo_id': 'VISHAL-NIRMITI-LIMITED', 'company_name': 'Vishal Nirmiti Limited', 'board': 'mainboard', 'icdr_route': '6(1)', ...}
+config = {'config_version': '1.5.0', 'spec_version': '1.5', '_conventions': {'bands': "[operator, value, score]; evaluated top-...n whose metric is NOT_APPLICABLE is removed from both numerator and denominator.', ...}, 'currency': 'INR_CRORES', ...}
+tmp_path = PosixPath('/tmp/pytest-of-user/pytest-11/test_workbook_bytes_are_determ0')
+
+    def test_workbook_bytes_are_deterministic(golden_input, config, tmp_path):
+        """Spec s22: the same record must project to byte-identical output."""
+        from ipo_screening.excel import workbook_bytes
+    
+        outcome, _ = run_and_store(golden_input, config, tmp_path)
+        first = workbook_bytes([outcome.record.to_dict()])
+        second = workbook_bytes([outcome.record.to_dict()])
+>       assert first == second
+E       AssertionError: assert b'PK\x03\x04\...0\x00\x00\x00' == b'PK\x03\x04\...0\x00\x00\x00'
+E         
+E         At index 209 diff: b'\xbf' != b'\x19'
+E         Use -v to get more diff
+
+tests/test_reproducibility_store.py:489: AssertionError
+=============================== warnings summary ===============================
+../jio-env/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /home/user/jio-env/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_cross_ipo_issue_term_provenance.py: 1 warning
+tests/test_four_field_manual_terms.py: 8 warnings
+tests/test_fresh_issue_manual_entry.py: 3 warnings
+tests/test_ingestion_activity.py: 2 warnings
+tests/test_issue_terms_runtime_path.py: 3 warnings
+tests/test_manual_terms_audit_log.py: 2 warnings
+tests/test_step5_auditor_and_manual_terms.py: 3 warnings
+tests/test_ui7_ingestion.py: 2 warnings
+  /home/user/jio-env/lib/python3.11/site-packages/fastapi/routing.py:360: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    return await dependant.call(**values)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_jio_score_bridge.py::test_jio_correct_structure_is_29_and_inverted_is_21
+FAILED tests/test_reproducibility_store.py::test_workbook_bytes_are_deterministic
+2 failed, 1668 passed, 25 warnings in 1202.35s (0:20:02)
