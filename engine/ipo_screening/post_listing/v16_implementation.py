@@ -65,7 +65,12 @@ FROZEN_CORE_HASHES: Dict[str, str] = {
     # A15 adds only an output artifact to evaluation.py; pin that reviewed hash
     # here while the golden-result check independently protects scoring output.
     "engine/ipo_screening/evaluation.py": "1258cd82145b6ce2813687a3fe072a2aaad304522abd8d34553eacc8ac4f92e6",
-    "engine/ipo_screening/extraction/price_band_notice.py": "779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4",
+    # A30 (RAMKI-authorized 2026-10-23) corrected document-class recognition and
+    # field-level withholding in this file; the reviewed result is pinned here,
+    # exactly as A15 pinned evaluation.py.  The golden-result check
+    # (verify_golden_result) remains the independent protection for scoring
+    # output, and it is unchanged: it still reproduces e84f8bc0... exactly.
+    "engine/ipo_screening/extraction/price_band_notice.py": "5f6f0262f0e68acfe9feb1e2b44a6a0409c16fdf8b847763f86ba72fa3b9ed29",
 }
 
 

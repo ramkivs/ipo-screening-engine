@@ -1160,15 +1160,32 @@ class NoticeSnapshotCache:
             return None, False
         stale = (_utcnow() - fetched_at) > self.ttl
         suffix = ".pdf" if bin_path.read_bytes()[:5] == b"%PDF-" else ".txt"
+        # Re-read the snapshot under the document class it was stored as.
+        # A cached final Prospectus re-parsed with the *notice* parser is now
+        # refused by class (A30: a document is read under its own class), so
+        # an unconditional notice parse silently turned a verified cached
+        # Prospectus into "no evidence".  Entries written before the class was
+        # recorded fall back to the provider name, then to the notice path.
+        document_class = meta.get("document_class") or (
+            "OFFICIAL_PROSPECTUS"
+            if meta.get("provider") == "official-prospectus"
+            else "PRICE_BAND_NOTICE"
+        )
         try:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as handle:
                 handle.write(bin_path.read_bytes())
                 temp_path = Path(handle.name)
             try:
-                from .extraction.official_notice_ocr import parse_if_scanned
-                result = parse_if_scanned(bin_path.read_bytes(), meta.get("uri", ""))
-                if result is None:
-                    result = PriceBandNoticeParser().parse_from_file(temp_path)
+                if document_class == "OFFICIAL_PROSPECTUS":
+                    result = ProspectusTermsParser().parse_from_file(temp_path)
+                elif document_class == "OFFICIAL_RHP_TERMS":
+                    from .extraction.official_offer_amounts import parse_official_rhp
+                    result = parse_official_rhp(bin_path.read_bytes(), meta.get("uri", ""))
+                else:
+                    from .extraction.official_notice_ocr import parse_if_scanned
+                    result = parse_if_scanned(bin_path.read_bytes(), meta.get("uri", ""))
+                    if result is None:
+                        result = PriceBandNoticeParser().parse_from_file(temp_path)
             finally:
                 _best_effort_unlink(temp_path)
         except Exception:
@@ -1192,6 +1209,14 @@ class NoticeSnapshotCache:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         bin_path, meta_path = self._paths(ipo_id)
         bin_path.write_bytes(candidate.raw_bytes)
+        # Record the class the candidate was parsed as: the snapshot is only
+        # meaningful when it is re-read by the parser that produced it.
+        result = getattr(candidate, "result", None)
+        document_class = getattr(result, "document_class", None) or (
+            "OFFICIAL_PROSPECTUS"
+            if getattr(result, "is_classified_prospectus", False)
+            else "PRICE_BAND_NOTICE"
+        )
         meta_path.write_text(
             json.dumps(
                 {
@@ -1201,6 +1226,7 @@ class NoticeSnapshotCache:
                     "retrieved_at": candidate.retrieved_at,
                     "verified": bool(candidate.verified),
                     "content_hash": hashlib.sha256(candidate.raw_bytes).hexdigest(),
+                    "document_class": document_class,
                 },
                 indent=2,
             ),

@@ -5,9 +5,11 @@
 - **Branch:** `arena/07f3439f-ipo-screening-engine` (working branch; `main` untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`).
 - **Baseline this pass:** `8939b05be00a23d5733163cdb6a280b0578cfd10`.
 - **Scope:** the extraction path that produced a rejected official document and an unresolved `issue.ofs`: Price Band Notice classification, current-issue date extraction, field-conflict handling, the RHP document class, and the OFS resolution chain. Corrections are issuer-independent.
+- **Execution status (2026-10-24, revision 6 — final regression gate):** the **full backend suite was executed** against the corrected tree: **1772 collected / 1772 passed / 0 failed / 0 skipped** (31 m 17 s, exit 0). Ten failures in the first full run were diagnosed: nine were one stale frozen-core pin for the A30-corrected parser, and one was a genuine A30 regression in the snapshot cache that turned a *verified cached Prospectus* into "no evidence". Both are corrected and documented in **§14**; the golden result still reproduces `e84f8bc0…` exactly. Evaluation remains NOT RUN and no evaluation was created.
 - **Execution status (2026-10-24, revision 5):** the **upload path** — the extractor `PresentationService.ingest_document` actually uses — is corrected for all issuers: the closed issue window behind a footnote marker, the disclosed monetary Offer for Sale, and the monetary unit of both issue components. A controlled non-production re-ingestion of the retained RHP now resolves the issuer, opening date, closing date, fresh issue and OFS, and is **correctly blocked** on price band and bid lot alone. No evaluation was created; nothing was persisted. See **§13**. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-24, revision 4):** the **wider focused suites** were executed (221 passed / 0 failed / 0 skipped across nine modules) and a **controlled non-production ingestion** was run against the retained RHP. The ingestion is **correctly blocked** on price band and bid lot, but it **also** leaves `issue.ofs` and `issue.close_date` unresolved — a defect in the *upload* extraction path (`sections.py`) that the A30 corrections never reached. It is diagnosed and documented in **§12**, not corrected in this pass. No evaluation was created, no durable state changed. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-23, revision 3):** the two focused regression modules were **executed and passed on 2026-10-23** (45 collected / 45 passed / 0 skipped, commit `4b1c67f`) — see **§11.8**, which records the command, the one test-side defect that was fixed, and the checks performed. The **full backend suite (~3 h) was NOT run**, and **no ingestion, evaluation or scored artifact** was produced or modified. Statements in §§1–10 that predate the document remain as written; where they say "not executed", §11.8 supersedes them for these two modules only.
+- **Revision 6 (2026-10-24):** final regression gate — full suite run twice (first run 10 failed, final run 1772/1772), two corrections (snapshot-cache document class; frozen-core pin re-established with authority recorded), plus four cache regression cases.
 - **Revision 5 (2026-10-24):** upload-path correction pass — the three defects found by revision 4's ingestion are corrected in the shared extractor and builder, with 27 new upload-path cases and five cross-path cases on the real filing.
 - **Revision 4 (2026-10-24):** wider validation and controlled ingestion pass — four failures across the wider suites diagnosed, two narrow production corrections made (unreadable-OCR marker, Draft-RHP class message), one stale test contract updated, three new regression cases; then a controlled non-production ingestion which surfaced the upload-path gap recorded in **§12**.
 - **Revision 3 (2026-10-23):** controlled validation pass — the focused modules were run, one test-side defect corrected, and the behavioural checks A–F executed against the retained artifact (§11.8). No production code was changed in this revision.
@@ -693,3 +695,68 @@ The gate then blocked on the three genuinely undisclosed terms, ran no evaluatio
 | Evaluation created/updated | **none** — store never created, `persisted: False` |
 | Engine evaluation-ready for this filing | **No** — a price band notice or the final Prospectus is required |
 | Full regression suite | **NOT RUN** |
+
+---
+
+## 14. Final regression gate — 2026-10-24 (revision 6)
+
+**Baseline:** `415a883e709c87aeda02aa36d254b534145c2f07`. **Environment:** CPython 3.11.2, pytest 9.1.1, pypdf 6.20.1 (from `requirements.txt`), `PYTHONPATH=engine`, interpreter `/home/user/ev/bin/python`.
+
+### 14.1 The full suite, run twice
+
+```bash
+cd /home/user/jio-k15
+PYTHONPATH=engine /home/user/ev/bin/python -m pytest -q -p no:cacheprovider tests/
+```
+
+| Run | Commit | Collected | Passed | Failed | Skipped | Exit | Duration |
+|---|---|---|---|---|---|---|---|
+| 1 (first full run in this project's recent history) | `415a883` | 1768 | 1758 | **10** | 0 | 1 | 30 m 32 s |
+| 2 (after the two corrections below) | `415a883` + fixes | 1772 | **1772** | 0 | 0 | **0** | 31 m 17 s |
+
+The four extra cases in run 2 are the new cache regressions (§14.3).
+
+### 14.2 What the ten failures were
+
+Nine of the ten shared **one** root cause; the tenth was a separate, genuine regression.
+
+| # | Failure(s) | Root cause | Correction |
+|---|---|---|---|
+| 1 | `test_d_peer_1_no_synthetic_peers::test_frozen_core_unchanged`, `test_frozen_core_line_endings` ×3, `test_presentation_api::test_configuration_status_governance_invariants`, `test_v16_implementation::t7_29/t7_34/t7_39/t7_42` | The **frozen-core pin** for `engine/ipo_screening/extraction/price_band_notice.py` was still the pre-A30 hash (`779afb0b…`, commit `0e15ac7`). A30 legitimately changed that file, but the pin was never re-established, so the engine reported the file — and the presentation API's `frozen_core_status` — as `CORRUPTED`. The control worked; the record was stale. | The pin is re-established at the reviewed A30 content (`5f6f0262…`), with a comment naming A30 as the authorising decision, exactly as the existing A15 precedent pinned `evaluation.py`. **The golden-result check is unchanged and still reproduces `e84f8bc0…`**, which is the independent proof that no scoring output moved. |
+| 2 | `test_issue_terms_windows_retrieval::test_cache_read_survives_windows_unlink_failure` | **Genuine A30 regression, and a real evidence-loss bug.** `NoticeSnapshotCache.get()` re-parsed every cached snapshot with `PriceBandNoticeParser`. A30 made that parser refuse a prospectus **by class**, so a final Prospectus that had been retrieved, verified and cached came back from the cache as `(None, False)` — *verified official evidence silently disappeared on the second resolution*. The `[●]` unlink simulation in the test was incidental: the cache failed for any prospectus, patched unlink or not. | The cache records `document_class` at `put()` and dispatches on read: `OFFICIAL_PROSPECTUS` → `ProspectusTermsParser`, `OFFICIAL_RHP_TERMS` → `parse_official_rhp`, otherwise the existing OCR-aware notice path. Entries written before the class was recorded fall back to the provider name, then to the notice path, so no existing cache file becomes unreadable. |
+
+No assertion was weakened, no test removed, and nothing converted to a skip.
+
+### 14.3 Cache regression coverage (new)
+
+`tests/test_notice_cache_document_class.py` — 4 cases: a cached Prospectus round-trips as a Prospectus (this is the case that returned `None` before the fix); the class is recorded beside the snapshot with the existing provenance fields intact; a cached notice still round-trips through the notice path with its values intact; and an entry written before `document_class` existed is still read.
+
+### 14.4 Frozen-core amendment — stated explicitly
+
+Re-pinning a frozen-core hash is a governance-relevant act, so it is recorded rather than absorbed:
+
+* **What changed:** one expected hash in `FROZEN_CORE_HASHES`.
+* **Why:** A30 (RAMKI-authorised, 2026-10-23) authorised corrections in `price_band_notice.py`; the reviewed result was committed and is covered by 36 parser cases plus 14 real-filing cases. Leaving the stale pin would have made the engine report `CORRUPTED` permanently, which is both a false alarm about scoring integrity and camouflage for a genuine future corruption.
+* **What protects the scoring path instead:** `verify_golden_result()` — unchanged, still `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`. The five other frozen files are byte-identical to their pins.
+* **Authority note:** this is bookkeeping for an authorised change, not a new policy. It is flagged for RAMKI's ratification in the tracker (revision 8); if ratification is withheld, the correct remedy is to revisit the A30 change, not to restore the stale pin.
+
+### 14.5 Focused re-verification against the final code
+
+| Command target | Collected | Passed | Failed | Skipped |
+|---|---|---|---|---|
+| ten-module focused command + `test_notice_cache_document_class.py` | 257 | **257** | 0 | 0 |
+| `test_upload_path_issue_terms.py` + `test_paras_evidence_regression.py` + `test_official_rhp_terms_and_dates.py` | 78 | **78** | 0 | 0 |
+| frozen-core / v16 / peer / presentation modules (the nine failures) | 80 | **80** | 0 | 0 |
+
+Verified on the real filing after the full suite: open `2026-10-21`, close `2026-10-23`, fresh issue `50000.0` INR_LAKHS (₹5,000 m), OFS `95000.0` INR_LAKHS (₹9,500 m), price band and bid lot still unresolved and diagnosed as `[●]`, parser and upload path in agreement. Evidence artifact sha256 `E0A3187FE18D1C12F88F29170291972714CF15BE7946E8A7F4A7D8C914570E74`, 11,577,075 bytes — unchanged.
+
+### 14.6 Status after the gate
+
+| Claim | State |
+|---|---|
+| Full backend suite | **PASSED** — 1772/1772, 0 failed, 0 skipped, exit 0, against the final code |
+| Frozen core | 6/6 verified; golden result `e84f8bc0…` reproduced |
+| Parser ↔ upload path agreement | Verified on the 651-page filing |
+| Ingestion gate | Correctly blocked on price band and bid lot (`[●]`) |
+| Evaluation | **NOT RUN** — none created, updated or persisted |
+| Engine evaluation-ready for this filing | **No** — required issue terms remain unavailable |
