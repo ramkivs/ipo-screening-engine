@@ -1289,3 +1289,5 @@ This is recorded because it is exactly the class of defect a "green focused test
 The first full-suite run of this pass was **1864 passed / 1 failed**; the failure was the determinism defect in §19.5, not a test defect. It was fixed in the production writer, re-tested, and the suite was then run again **in full against the final tree** — the table above is that second run. No assertion was weakened, no test converted to a skip, and no test removed.
 
 A passing suite remains evidence about the code, not about the network: **no test in this repository reached an official host**, and nothing here shows that the operator's retrieval will bind. §19.2 is the step that decides that.
+
+**Publication and CI.** The code above is commit `1ad6412` on `arena/07f3439f-ipo-screening-engine`; the repository's `regression` job for that commit passed (21 m 04 s, run `40086752768`), independently of the local runs in the table. A documentation-only commit follows it and changes no code. PR #7 remains **open** with `main` untouched at `01ba66c`.
