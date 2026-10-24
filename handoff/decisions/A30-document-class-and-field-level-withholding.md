@@ -3,7 +3,7 @@
 - **Decision ID:** A30
 - **Title:** a document is read under its own class, and a conflicting field is withheld rather than rejecting the document
 - **Record type:** **IMPLEMENTATION RECORD — no new policy, no new criterion, no scoring change.** Per `handoff/decisions/CONVENTION.md` rule 4, the approved text below is the correction contract that the investigation was authorised to implement; the analysis and residual risks are Arena's and are recorded, not decided.
-- **Decision status:** **IMPLEMENTED 2026-10-23; UPLOAD PATH CORRECTED AND VALIDATED 2026-10-24; FULL BACKEND SUITE GREEN 1772/1772 2026-10-24** — see §5.4. Parser and upload paths were separately corrected and now agree on the real filing; the ingestion gate is correctly blocked on the two genuinely undisclosed terms. **FOCUSED AND WIDER REGRESSION EXECUTED AND GREEN 2026-10-24** (45/45 focused; 221/221 wider across nine modules, 0 skipped — §5). A controlled non-production ingestion was then run: it is **correctly blocked** on price band and bid lot, and it exposed a **separate defect in the upload extractor** (`issue.ofs` and `issue.close_date` unreachable there) recorded in §5.3 and left uncorrected by design. Full backend suite (~3 h) still unexecuted.
+- **Decision status:** **IMPLEMENTED 2026-10-23; UPLOAD PATH CORRECTED AND VALIDATED 2026-10-24; FULL BACKEND SUITE GREEN 1772/1772 2026-10-24; FROZEN-CORE PIN VERIFIED — READY FOR RAMKI RATIFICATION (NOT RATIFIED) 2026-10-24** — see §5.4. Parser and upload paths were separately corrected and now agree on the real filing; the ingestion gate is correctly blocked on the two genuinely undisclosed terms. **FOCUSED AND WIDER REGRESSION EXECUTED AND GREEN 2026-10-24** (45/45 focused; 221/221 wider across nine modules, 0 skipped — §5). A controlled non-production ingestion was then run: it is **correctly blocked** on price band and bid lot, and it exposed a **separate defect in the upload extractor** (`issue.ofs` and `issue.close_date` unreachable there) recorded in §5.3 and left uncorrected by design. Full backend suite (~3 h) still unexecuted.
 - **Decision authority:** RAMKI — 2026-10-23 investigation directive for the Paras Healthcare ingestion failure (general, issuer-independent correction; no hardcoding, no policy change).
 - **Decision date:** 2026-10-23 (Asia/Calcutta).
 - **Repository:** `ramkivs/ipo-screening-engine`
@@ -113,6 +113,33 @@ Two defects, one of them a real consequence of this decision:
 No assertion was weakened, no test removed, none converted to a skip.
 
 **Re-verification after the gate:** ten-module focused command plus the new cache module **257 passed**; upload-path + Paras + RHP modules **78 passed**; the nine previously failing modules **80 passed**. On the real filing: open `2026-10-21`, close `2026-10-23`, fresh `50000.0` INR_LAKHS (₹5,000 m), OFS `95000.0` INR_LAKHS (₹9,500 m), price band and bid lot unresolved as `[●]`. Evidence sha256 `e0a3187f…570e74` unchanged. **No evaluation was created, updated or persisted.**
+
+### 5.6 Frozen-core pin — verification for ratification (2026-10-24)
+
+The pin this decision required (§5.5, defect 2) was checked independently against the **published** tree before being put in front of RAMKI. Full dossier: `docs/investigation/PARAS-INGESTION-FAILURE-2026-10-23.md` §15.
+
+| Check | Result |
+|---|---|
+| Pin equals the CRLF-normalised sha256 of the committed file | **Yes** — `5f6f0262…b9ed29` equals the digest of blob `6dd36d20…`, the reviewed A30 content at `4b1c67f`, still the blob at the published tip |
+| The stale pin really was the pre-A30 content | **Yes** — `779afb0b…` is the digest at `0e15ac7`; A30's two commits changed the file |
+| Manifest diff | one hash line + four comment lines; no other entry, no verifier change |
+| Behaviour added by the pin | **none** — a constant consumed by an existing integrity check; the parser change it guards was authorised by this decision, separately |
+| Golden result | **unchanged** — `e84f8bc0…` reproduced; `GOLDEN_RESULT_HASH` never edited |
+| Integrity tests with the new pin | **39 passed / 0 failed / 0 skipped** (LF/CRLF acceptance, real-content-change rejection, CLI verify, provenance chain, `frozen_core_status` = VERIFIED) |
+| Tamper detection | **caught** — append, mid-file class rename and a single-byte flip each yielded `False` for that file only; an unchanged control file yielded `True` |
+| Alteration reverted | **yes** — byte-identical restore, empty `git status`, empty diff, same blob at `HEAD`; nothing committed |
+
+**Status: VERIFIED — READY FOR RAMKI RATIFICATION.** The pin is technically sound and leaves no residue. **RAMKI has not ratified it**, and no part of this repository may state otherwise until he does. If ratification is withheld, the remedy is to revisit this decision's parser change — not to restore the stale pin.
+
+### 5.7 The withheld fields — official evidence located, still not resolvable (2026-10-24)
+
+This decision withholds `price_band_low`, `price_band_high` and `lot_size` because the RHP discloses `[●]`. That is still the correct outcome, and the evidence workstream has now established *why* it is still open, which is different from assuming the terms are unpublished. Details: report §16.
+
+* **Official evidence exists and was retrieved.** BSE's own issue-information page for this issue (issue 8048, symbol `PARASHLTH`, period 21–23 Oct 2026) publishes **Price Band `660.00-693.00`** and **Market Lot `21`**; a BSE notice corroborates the ₹693 cap, and a SEBI filing independently states the ₹5,000.00 m / ₹9,500.00 m components of the offer. All four are retained with provenance in `evidence/non-authoritative/paras-healthcare-issue-terms-20261024/`.
+* **It is not admissible through the current contract.** The page is BSE's *historical* view (`status=H`) of a closed issue. The engine searches the **live** listing, closed SPA records are excluded by contract, and the historical listing is deliberately not among the searched listings. Nothing was changed to admit it.
+* **The sandbox cannot reach any official host.** The engine's discovery returns `UNAVAILABLE` (never `NOT_FOUND`) for every listing, and the Price-Band Advertisement PDF itself could not be fetched by any route available here.
+* **The extraction layer is not the blocker.** Against a transcription of the real page's labelled rows, the unmodified `ExchangeIssuePageParser` returns `660.0` / `693.0` / lot `21` / both dates / the issuer, and the general discovery provider returns `FOUND`. 17 new cases in `tests/test_paras_official_issue_page_terms.py`; no production code changed.
+* **Nothing was resolved.** The three values exist in this repository only as investigation evidence and test input — not in any configuration, canonical record, snapshot or evaluation. The gate stays closed and evaluation remains NOT RUN.
 
 **Still not run, and not claimed:** the full backend suite (`PYTHONPATH=engine python -m pytest -q tests/`, ≈ 3 h); any evaluation; any production ingestion. **Parser-level green is not ingestion-level green** — §12.5 of the investigation report says exactly where the two part company.
 

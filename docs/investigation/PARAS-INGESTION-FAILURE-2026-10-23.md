@@ -5,10 +5,12 @@
 - **Branch:** `arena/07f3439f-ipo-screening-engine` (working branch; `main` untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`).
 - **Baseline this pass:** `8939b05be00a23d5733163cdb6a280b0578cfd10`.
 - **Scope:** the extraction path that produced a rejected official document and an unresolved `issue.ofs`: Price Band Notice classification, current-issue date extraction, field-conflict handling, the RHP document class, and the OFS resolution chain. Corrections are issuer-independent.
+- **Execution status (2026-10-24, revision 7 — ratification evidence + official-source discovery):** the frozen-core re-pin is independently verified against the published bytes and recorded **VERIFIED — READY FOR RAMKI RATIFICATION** (**not ratified**) — §15. Issuer-matched **official** sources for the three `[●]` terms were located and retained with provenance (BSE issue page: price band `660.00-693.00`, market lot `21`; SEBI filing corroborating ₹5,000.00 m / ₹9,500.00 m) — but they are **not admissible through the current contract**: the carrying page is BSE's *historical* view of a closed issue, the engine searches only the live listing, and this sandbox cannot reach any official host at all. **The terms remain unresolved and the gate stays closed**; nothing was written into the engine, a store or an evaluation — §16.
 - **Execution status (2026-10-24, revision 6 — final regression gate):** the **full backend suite was executed** against the corrected tree: **1772 collected / 1772 passed / 0 failed / 0 skipped** (31 m 17 s, exit 0). Ten failures in the first full run were diagnosed: nine were one stale frozen-core pin for the A30-corrected parser, and one was a genuine A30 regression in the snapshot cache that turned a *verified cached Prospectus* into "no evidence". Both are corrected and documented in **§14**; the golden result still reproduces `e84f8bc0…` exactly. Evaluation remains NOT RUN and no evaluation was created.
 - **Execution status (2026-10-24, revision 5):** the **upload path** — the extractor `PresentationService.ingest_document` actually uses — is corrected for all issuers: the closed issue window behind a footnote marker, the disclosed monetary Offer for Sale, and the monetary unit of both issue components. A controlled non-production re-ingestion of the retained RHP now resolves the issuer, opening date, closing date, fresh issue and OFS, and is **correctly blocked** on price band and bid lot alone. No evaluation was created; nothing was persisted. See **§13**. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-24, revision 4):** the **wider focused suites** were executed (221 passed / 0 failed / 0 skipped across nine modules) and a **controlled non-production ingestion** was run against the retained RHP. The ingestion is **correctly blocked** on price band and bid lot, but it **also** leaves `issue.ofs` and `issue.close_date` unresolved — a defect in the *upload* extraction path (`sections.py`) that the A30 corrections never reached. It is diagnosed and documented in **§12**, not corrected in this pass. No evaluation was created, no durable state changed. The **full backend suite (~3 h) was still NOT run**.
 - **Execution status (2026-10-23, revision 3):** the two focused regression modules were **executed and passed on 2026-10-23** (45 collected / 45 passed / 0 skipped, commit `4b1c67f`) — see **§11.8**, which records the command, the one test-side defect that was fixed, and the checks performed. The **full backend suite (~3 h) was NOT run**, and **no ingestion, evaluation or scored artifact** was produced or modified. Statements in §§1–10 that predate the document remain as written; where they say "not executed", §11.8 supersedes them for these two modules only.
+- **Revision 7 (2026-10-24):** frozen-core ratification dossier (independent hash, manifest-diff, golden-result, integrity and tamper checks, all reverted) and the official price-band / lot-size evidence workstream (4 official sources retained, 2 not retrieved, contract and transport blockers stated, 17 new focused cases). No code change to extraction or discovery.
 - **Revision 6 (2026-10-24):** final regression gate — full suite run twice (first run 10 failed, final run 1772/1772), two corrections (snapshot-cache document class; frozen-core pin re-established with authority recorded), plus four cache regression cases.
 - **Revision 5 (2026-10-24):** upload-path correction pass — the three defects found by revision 4's ingestion are corrected in the shared extractor and builder, with 27 new upload-path cases and five cross-path cases on the real filing.
 - **Revision 4 (2026-10-24):** wider validation and controlled ingestion pass — four failures across the wider suites diagnosed, two narrow production corrections made (unreadable-OCR marker, Draft-RHP class message), one stale test contract updated, three new regression cases; then a controlled non-production ingestion which surfaced the upload-path gap recorded in **§12**.
@@ -760,3 +762,210 @@ Verified on the real filing after the full suite: open `2026-10-21`, close `2026
 | Ingestion gate | Correctly blocked on price band and bid lot (`[●]`) |
 | Evaluation | **NOT RUN** — none created, updated or persisted |
 | Engine evaluation-ready for this filing | **No** — required issue terms remain unavailable |
+
+---
+
+## 15. Frozen-core pin — independent verification for ratification — 2026-10-24 (revision 7)
+
+The re-pin in §14.4 was performed by the same pass that diagnosed the failure, so it is verified here separately, from the published tree, before it is put in front of RAMKI. **Every check below was executed on the published commit `14a0047`, not on an intention.**
+
+### 15.1 The replacement hash is the byte identity of the reviewed file
+
+The verifier hashes `file.read_bytes().replace(b'\r\n', b'\n')`, so the check is on the CRLF-normalised content — the same subject the pin is compared against.
+
+```bash
+for c in 0e15ac7 3699df2 4b1c67f HEAD; do
+  git show $c:engine/ipo_screening/extraction/price_band_notice.py \
+    | python -c "import sys,hashlib;print(hashlib.sha256(sys.stdin.buffer.read().replace(b'\r\n',b'\n')).hexdigest())"
+done
+```
+
+| Commit | Meaning | CRLF-normalised sha256 | Blob |
+|---|---|---|---|
+| `0e15ac7` | pre-A30 content — **the stale pin** | `779afb0b1ba309913974edee4c09109b4e4da2806c3e49277e902e86a7c994e4` | — |
+| `3699df2` | A30, first pass | `395977ae7744429353e6183189a8780c174a776041802a13b7dacb3c4364c28f` | `2ca043c2…` |
+| `4b1c67f` | A30, reviewed final content | `5f6f0262f0e68acfe9feb1e2b44a6a0409c16fdf8b847763f86ba72fa3b9ed29` | `6dd36d20e8f5561ff110af0ae3986e1e329d829c` |
+| `HEAD` | published tree | `5f6f0262…` — **identical** | `6dd36d20…` — **identical** |
+
+The pin equals the sha256 of the exact blob committed at `4b1c67f` and still present at `HEAD`: the pin records published bytes, not a working copy.
+
+### 15.2 The manifest diff contains only the one entry and its comment
+
+```
+@@ -65,7 +65,12 @@ FROZEN_CORE_HASHES: Dict[str, str] = {
+     # A15 adds only an output artifact to evaluation.py; pin that reviewed hash
+     # here while the golden-result check independently protects scoring output.
+     "engine/ipo_screening/evaluation.py": "1258cd82…",
+-    "engine/ipo_screening/extraction/price_band_notice.py": "779afb0b…",
++    # A30 (RAMKI-authorized 2026-10-23) corrected document-class recognition and
++    # field-level withholding in this file; the reviewed result is pinned here,
++    # exactly as A15 pinned evaluation.py.  The golden-result check
++    # (verify_golden_result) remains the independent protection for scoring
++    # output, and it is unchanged: it still reproduces e84f8bc0... exactly.
++    "engine/ipo_screening/extraction/price_band_notice.py": "5f6f0262…",
+ }
+```
+
+One hash line changed, four comment lines added. No other frozen-core entry, no verifier logic, no comparison subject, and no other production file is touched by the re-pin.
+
+### 15.3 The pin adds no behaviour and no policy
+
+`verify_frozen_core` is unchanged; its comparison is unchanged; the six paths are unchanged. The pin is a constant consumed by an integrity check that already existed. The parser behaviour it guards was authorised separately by **A30** (RAMKI-authorised 2026-10-23, `handoff/decisions/A30-document-class-and-field-level-withholding.md`), and that change is covered by the parser, upload-path and real-filing suites. Re-pinning therefore asserts "this file is the reviewed A30 file", not "any change to this file is allowed": the next edit to that file will fail the check exactly as this one did.
+
+### 15.4 Golden result unchanged
+
+| Check | Command | Result |
+|---|---|---|
+| Frozen core (6/6) | `verify_frozen_core(Path('.'))` | `True` for all six files |
+| Golden result | `verify_golden_result()` | `True`, `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1` |
+
+`GOLDEN_RESULT_HASH` is byte-identical to its pre-A30 value and was not edited in `14a0047` or `415a883`. The scoring output is reproduced from the frozen inputs, so it independently protects what the pin cannot.
+
+### 15.5 Integrity tests pass with the replacement pin
+
+```bash
+PYTHONPATH=engine python -m pytest -q tests/test_frozen_core_line_endings.py \
+  tests/test_d_peer_1_no_synthetic_peers.py \
+  tests/test_v16_implementation.py::test_t7_29_cli_config_verify \
+  tests/test_v16_implementation.py::test_t7_34_frozen_core_verification \
+  tests/test_v16_implementation.py::test_t7_39_provenance_chain_verification \
+  tests/test_v16_implementation.py::test_t7_42_end_to_end_v15_v16_workflow \
+  tests/test_presentation_api.py
+```
+
+**39 passed, 0 failed, 0 skipped, 15.9 s.** This includes the LF/CRLF acceptance cases, the real-content-change rejection, the CLI `config verify` path, the provenance chain, and the presentation API's `frozen_core_status` = `VERIFIED`.
+
+### 15.6 Tamper detection — a real alteration is caught
+
+A controlled alteration of the frozen file was made and reverted in the working tree. Three genuine mutations were used, because a check that only appends bytes would not show that a *semantic* edit is caught:
+
+| Mutation | File changed? | `verify_frozen_core` | Other five files |
+|---|---|---|---|
+| append `# tamper probe` | yes | **False** (`price_band_notice.py` False) | all True |
+| rename `class PriceBandNoticeParser:` → `…ParserX:` (mid-file, semantic) | yes | **False** | all True |
+| single-byte flip at the file midpoint | yes | **False** | all True |
+| (control) no-op replacement of a non-existent string | no | True | all True |
+
+The control row matters: an unchanged file is reported unchanged, so the three `False` verdicts above come from the verifier detecting the edit, not from a check that always fails. An earlier attempt at the semantic probe targeted a symbol that does not exist in the file; it changed nothing and the verifier (correctly) said so — which is why the control row is recorded rather than quietly dropped.
+
+### 15.7 The alteration was fully reverted
+
+| Check | Result |
+|---|---|
+| restored bytes identical to the pre-tamper file | `True` |
+| restored CRLF-normalised sha256 | `5f6f0262…b9ed29` |
+| `verify_frozen_core` after restore | `True` for all six |
+| `git status --porcelain` | empty |
+| `git diff HEAD` | empty |
+| blob at `HEAD` | `6dd36d20e8f5561ff110af0ae3986e1e329d829c` (unchanged) |
+
+No altered file was committed or published: the published tip predates the tamper probe, and the probe never entered an index.
+
+### 15.8 Ratification status
+
+**VERIFIED — READY FOR RAMKI RATIFICATION.**
+
+That is a technical statement: the pin matches the reviewed published bytes, changes nothing but the constant and its comment, adds no policy, leaves the golden result intact, passes the integrity tests, catches a real tamper, and left no residue. **It is not ratification.** RAMKI has not ratified it, and the record says so wherever the pin is described.
+
+---
+
+## 16. Official price-band and lot-size evidence — 2026-10-24 (revision 7)
+
+This section is a separate workstream from §15. It asks one question: **do issuer-matched official sources disclose the three terms the RHP leaves as `[●]`?** It does not resolve them in the engine (§16.5).
+
+### 16.1 What was searched, and with what
+
+Two retrieval routes were used, and the difference between them is the whole result:
+
+| Route | What it is | Reachability on 2026-10-24 |
+|---|---|---|
+| The engine's own transport (`OfficialDiscoveryProvider`, `urllib`, cookie-jar session) | the supported discovery path | **blocked** — every official host fails at TLS from this sandbox |
+| Arena's `functions.fetch_page` proxy | agent-side retrieval, outside the engine | **working** — BSE and SEBI pages were read |
+
+The engine was run first, unmodified:
+
+```
+OfficialDiscoveryProvider(timeout_seconds=15).find("PARAS HEALTHCARE LIMITED", "paras-healthcare")
+→ provider: official-discovery | outcome: UNAVAILABLE | candidate: None
+  "no valid official listing could be retrieved: https://www.nseindia.com/…: listing retrieval failed
+   (URLError: <urlopen error TLS/SSL connection has been closed (EOF) (_ssl.c:992)>)"  × 6 listings
+```
+
+`UNAVAILABLE` is the correct verdict and the important one: it is **not** `NOT_FOUND`, so nothing in this run may be read as "the terms are unpublished". The same TLS failure blocks this sandbox for all four hosts:
+
+```
+curl https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P  → curl: (35) OpenSSL SSL_connect: SSL_ERROR_SYSCALL
+curl https://www.nseindia.com/api/all-upcoming-issues?category=ipo      → curl: (35) …
+curl https://www.sebi.gov.in/sebiweb/home/handleAction?…                → curl: (35) …
+curl https://api.bseindia.com/BseIndiaAPI/api/GetPublicIssue…           → curl: (35) …
+```
+
+DNS resolves for all four, so this is egress filtering, not a broken URL.
+
+### 16.2 Sources retrieved — every one of them official
+
+Retained in `evidence/non-authoritative/paras-healthcare-issue-terms-20261024/` with a README, a capture manifest and SHA-256 digests.
+
+| # | Source | Publisher / type | Issuer + issue identity | Disclosed values | Result |
+|---|---|---|---|---|---|
+| 1 | `DisplayIPO?id=4895&type=IPO&idtype=2&status=H&IPONo=8048&startdt=21/10/2026` | BSE — official exchange issue-information page | heading `Paras Healthcare Limited`; **Symbol `PARASHLTH`**; **Issue Period `21 Oct 2026 to 23 Oct 2026`** | **Price Band `660.00-693.00`**; **Market Lot `21`**; Minimum Bid Quantity `21`; Face Value `1.00` | **retrieved** |
+| 2 | `https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P` | BSE — official historical public-issues listing | row `Paras Healthcare Limited` → `IPONo=8048` | `21-10-2026 | 23-10-2026 | 660.00 - 693.00 | 1.00 | Book Building` | **retrieved** (chunk 0 of 2, prefix retained) |
+| 3 | `https://www.bseindia.com/downloads/UploadDocs/Notices/20261019-49/20261019-49.pdf` | BSE — official notice 20261019-49 (19 Oct 2026) | "Public Issue of **Paras Healthcare Limited** — Allocation to Anchor Investor" | anchor portion subscribed "at **Rs. 693/-** per equity share" | **retrieved** — corroborates the cap price only; an allocation price is not a price-band declaration |
+| 4 | `https://www.sebi.gov.in/sebi_data/commondocs/oct-2026/Paras%20Healthcare%20Limited_p.pdf` | SEBI — official filing (abridged prospectus / RHP memorandum) | `PARAS HEALTHCARE LIMITED`, CIN `U85110HR1987PLC035823` | fresh issue **₹5,000.00 million**, OFS **₹9,500.00 million**, total **₹14,500.00 million**; bid/offer 21–23 Oct 2026; **no price band or lot in the retained prefix** | **retrieved** — independently corroborates the date and monetary terms already resolved from the RHP |
+| 5 | `https://listing.bseindia.com/Download/8888888/PreAnchor/PBA_20261015184043.pdf` | BSE — **Price-Band Advertisement** linked from source 1 (dated 2026-10-15) | same issue | not read | **NOT retrieved** — `functions.fetch_page` returned "Failed to fetch page" on 3 attempts. Cause not diagnosed (host-level proxy restriction, block, or unrenderable PDF). **A retrieval failure of that host, never evidence that the notice does not exist.** |
+| 6 | `https://listing.bseindia.com/download/8888888/preanchor/rhp_20261016122004.zip` | BSE — Prospectus & GID archive linked from source 1 | same issue | not read | not attempted after the sibling `listing.bseindia.com` URL failed 3× |
+
+Nothing third-party was used. A dozen aggregators publish "₹660–₹693, lot 21"; none was retained, cited as authority, or entered into evidence, because a snippet is not an official source and an aggregator is not the issuer or the exchange.
+
+### 16.3 The evidence is genuinely there; it is also genuinely out of reach
+
+Two independent obstacles stand between this evidence and a resolved term, and neither is a parser defect:
+
+1. **Transport.** The engine cannot fetch any official host from this sandbox (§16.1). This would be solved by running on a host with egress; it is not a code problem.
+2. **Discoverability, by contract.** Source 1 is served under `status=H` — BSE's *historical* view of a closed issue. The engine searches BSE's **live** public-issues listing (`IPOIssues?id=1&Type=P`), which no longer carries the Paras row: the live page was retrieved and, as of its own `23 Oct 26 | 16:00` stamp, the issue had moved to the historical view (source 2). Two separate mechanisms reinforce this and both are deliberate:
+   * the BSE SPA record path follows only records whose `Status` is `F` or `L` (`official_issue_sources.py:175`) — a closed record supplies nothing;
+   * the historical listing (`id=2`) is not among `OfficialDiscoveryProvider.LISTING_URLS`.
+
+   **No code was changed to admit the closed page.** Adding the historical listing would let *any* past issue by a similarly named issuer supply terms — the engine matches issuer by name, not by issue identity, so an issuer with two IPOs in different years could be resolved from the wrong one. That is a contract decision for RAMKI, not a bug to slip in.
+
+So the honest classification of the outstanding evidence is: **official evidence exists and was retrieved; it is not admissible through the current contract, and it is not retrievable from this environment.** That is different from "unpublished", and it is different from "the parser cannot read it" (§16.4).
+
+### 16.4 The shared path reads this field set correctly — no correction needed
+
+The BSE issue page is exactly the page class `ExchangeIssuePageParser` was built for. Its labelled rows were transcribed into a BSE-shaped table (documented as a transcription, not provider bytes: `functions.fetch_page` returns rendered text, and the sandbox cannot fetch the HTML). Against that input the **unmodified** parser returns:
+
+| Expected | Parsed | Note |
+|---|---|---|
+| price band low `660.00` | `660.0` | quote `Price Band\n660.00-693.00`; class `EXCHANGE_ISSUE_PAGE` |
+| price band high `693.00` | `693.0` | same quote |
+| market lot `21` | `21` | locator `Exchange issue information - Market Lot` |
+| issue period | `2026-10-21` / `2026-10-23` | both dates |
+| issuer | `Paras Healthcare Limited` | from the page's own heading |
+
+and, through the general discovery provider, `outcome: FOUND` with all three values, and `resolver.resolve(missing_fields=PRICE_AND_LOT) → RESOLVED`. **The parser and the discovery path already handle the official page; nothing in the extraction layer needed changing**, and none was changed.
+
+New coverage: `tests/test_paras_official_issue_page_terms.py` — 17 cases. They are issuer-independent in their logic (they exercise the shared parser, the shared provider and the shared resolver), and they pin the fixture to the retained capture two ways: every quoted value must still appear in `bse-displayipo-4895-chunk-0.md`, and every manifest digest must match its file. Also covered: the lot is never taken from a maximum bid quantity; two contradictory `Market Lot` values withhold the field with an `issue_term_errors` entry; another issuer's page cannot supply these terms; a similarly named issuer's listing row is not followed; a missing lot leaves the term unresolved (`PARTIAL`); no provider yields `UNAVAILABLE` and no resolved field; a searched listing without the issuer yields `UNPUBLISHED` with all four required terms unresolved.
+
+### 16.5 Decision
+
+**No term was resolved. Nothing was written into the engine, a config, a store or an evaluation.** The values `660.00`, `693.00` and `21` appear in this repository **only** as investigator evidence and as test input; they are not in any issuer configuration, canonical record, snapshot or evaluation.
+
+| Term | Status | Reason |
+|---|---|---|
+| `issue.price_band_low` | **UNRESOLVED** | official evidence exists (BSE issue page: 660.00) but is a closed-issue page, not searchable under the current contract, and not retrievable from this sandbox |
+| `issue.price_band_high` | **UNRESOLVED** | same (693.00) |
+| `issue.lot_size` | **UNRESOLVED** | same (market lot 21) |
+| `issue.open_date` | resolved `2026-10-21` | unchanged from the RHP, cross-confirmed by sources 1, 2 and 4 |
+| `issue.close_date` | resolved `2026-10-23` | unchanged from the RHP, cross-confirmed by sources 1, 2 and 4 |
+| `issue.fresh_issue` | resolved `50000.0` lakh (₹5,000 m) | unchanged; source 4 independently states ₹5,000.00 million |
+| `issue.ofs` | resolved `95000.0` lakh (₹9,500 m) | unchanged; source 4 independently states ₹9,500.00 million |
+
+The last two rows are a free corroboration worth recording: an official SEBI filing states the same two monetary totals the upload path extracted, so that part of §13 is now confirmed by a second official document.
+
+### 16.6 Next concrete discovery step
+
+In order, and none of them is a code change to make the terms appear:
+
+1. **Retrieve on a host with egress**, then re-run the unmodified engine: `OfficialDiscoveryProvider.find("PARAS HEALTHCARE LIMITED", …)` will still be UNAVAILABLE while the issue is closed — this step alone cannot resolve the terms and is listed to close the transport question, not to produce a resolution.
+2. **Configure the price-band notice URL through the existing supported mechanism** — `IPO_NOTICE_URLS` for this issuer — pointing at the BSE Price-Band Advertisement (`…/PBA_20261015184043.pdf`). `listing.bseindia.com` is already an allow-listed official host and the notice path is not restricted to live issues, so this needs **no policy change and no new code**. It is blocked here only by transport: the URL could not be read from this sandbox (§16.2, source 5).
+3. **If RAMKI wants closed issues discoverable at all**, decide the contract explicitly — including how a discovered page is tied to *this* issue (issue number, symbol or issue period) rather than to a same-named issuer's earlier IPO. Until that decision exists, the historical listing stays out of `LISTING_URLS`.

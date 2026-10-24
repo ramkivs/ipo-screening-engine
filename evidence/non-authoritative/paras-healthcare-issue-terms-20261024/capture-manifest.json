@@ -1,0 +1,138 @@
+{
+  "artifactType": "paras-official-issue-term-source-capture-manifest",
+  "status": "NON-AUTHORITATIVE INVESTIGATION EVIDENCE. Not a source approval, not an issue-term resolution, not a canonical record, and not an evaluation input. The values captured here were NOT written into the engine.",
+  "recordRef": "docs/investigation/PARAS-INGESTION-FAILURE-2026-10-23.md",
+  "createdDate": "2026-10-24",
+  "manifestCreatedUtc": "2026-10-24T07:52:35.011Z",
+  "subject": {
+    "issuerAsFiled": "PARAS HEALTHCARE LIMITED",
+    "cin": "U85110HR1987PLC035823",
+    "exchangeSymbol": "PARASHLTH",
+    "bseIssueNumber": 8048,
+    "bseScripId": 4895,
+    "issuePeriod": "2026-10-21 to 2026-10-23",
+    "purpose": "Locate issuer-matched official evidence for issue.price_band_low, issue.price_band_high and issue.lot_size, which the retained RHP states as [\u25cf] placeholders."
+  },
+  "captureMethod": {
+    "tool": "functions.fetch_page (agent-side retrieval proxy)",
+    "representation": "rendered Markdown text returned by the tool as the JSON-decoded 'content' string for the stated chunk; not HTML and not provider response bytes",
+    "rawProviderResponseBytesCaptured": false,
+    "responseHeadersCaptured": false,
+    "exactReceiptTimeCaptured": false,
+    "toolCacheStatusDisclosed": false,
+    "transcription": "Each file holds the tool-returned content string written as UTF-8. The tool result is not delivered to the sandbox filesystem, so transcription fidelity cannot be machine-verified against the tool output.",
+    "retrievalWindowBasis": "NOT BRACKETED. This pass did not read the sandbox clock before and after each tool call, so no per-artifact window is claimed. All four retrievals occurred on 2026-10-24 between the session start and the manifest creation time above.",
+    "directSandboxRetrieval": {
+      "possible": false,
+      "evidence": "From the sandbox, curl to https://www.bseindia.com/..., https://www.nseindia.com/..., https://www.sebi.gov.in/... and https://api.bseindia.com/... each returned 'curl: (35) OpenSSL SSL_connect: SSL_ERROR_SYSCALL' after DNS resolution succeeded (four hosts, 2026-10-24). The engine's own urllib transport failed identically (URLError: TLS/SSL connection has been closed (EOF)); see docs/investigation/PARAS-INGESTION-FAILURE-2026-10-23.md \u00a715.2. So the engine cannot retrieve these documents from this sandbox, and the official-discovery provider correctly reports UNAVAILABLE rather than NOT_FOUND."
+    }
+  },
+  "artifacts": [
+    {
+      "id": "bse-displayipo-4895",
+      "file": "source-captures/bse-displayipo-4895-chunk-0.md",
+      "url": "https://www.bseindia.com/markets/publicIssues/DisplayIPO?id=4895&type=IPO&idtype=2&status=H&IPONo=8048&startdt=21/10/2026",
+      "toolPageTitle": "LIVE Stock/Share Market | Indian Stock/Share Market LIVE | BSE SENSEX | BSE (formerly Bombay Stock Exchange)",
+      "publisher": "BSE Limited (official exchange)",
+      "sourceType": "official exchange issue-information page",
+      "chunkIndex": 0,
+      "totalChunks": 1,
+      "toolResultStatus": "success",
+      "issuerIdentityOnPage": "Paras Healthcare Limited (table heading); Symbol PARASHLTH; Issue Period 21 Oct 2026 to 23 Oct 2026",
+      "relevantDisclosedValues": [
+        {"term": "issue.price_band_low", "displayed": "660.00", "locator": "Price Band row", "quote": "Price Band | 660.00-693.00"},
+        {"term": "issue.price_band_high", "displayed": "693.00", "locator": "Price Band row", "quote": "Price Band | 660.00-693.00"},
+        {"term": "issue.lot_size", "displayed": "21", "locator": "Market Lot row", "quote": "Market Lot | 21"},
+        {"term": "(corroboration) minimum bid quantity", "displayed": "21", "locator": "Minimum Bid Quantity row"},
+        {"term": "(corroboration) face value", "displayed": "1.00", "locator": "Face Value row"},
+        {"term": "(corroboration) issue period", "displayed": "21 Oct 2026 to 23 Oct 2026", "locator": "Issue Period row"}
+      ],
+      "linksRecorded": {
+        "priceBandAdvertisement": "https://listing.bseindia.com/Download/8888888/PreAnchor/PBA_20261015184043.pdf",
+        "prospectusAndGid": "https://listing.bseindia.com/download/8888888/preanchor/rhp_20261016122004.zip"
+      },
+      "sha256": "908ED21835C0952F763E6BB052247F8879328F863BC8E12C5878660F14CC0B70",
+      "bytes": 3220
+    },
+    {
+      "id": "bse-historical-listing-prefix",
+      "file": "source-captures/bse-historical-listing-chunk-0-prefix.md",
+      "url": "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P",
+      "publisher": "BSE Limited (official exchange)",
+      "sourceType": "official exchange public-issues listing (historical)",
+      "chunkIndex": 0,
+      "totalChunks": 2,
+      "toolResultStatus": "success",
+      "excerpt": "Prefix of the returned chunk 0. The site navigation and 'Related Links' blocks between the filter controls and the issue table are elided and marked in the file; the issue table rows are reproduced as returned, starting at the Jio Platforms and Paras Healthcare rows. The file ends where the tool's chunk 0 ended, mid-row at 'HITECH CORPORATION LTD'.",
+      "relevantDisclosedValues": [
+        {"term": "Paras Healthcare Limited issue row", "displayed": "MainBoard | 21-10-2026 | 23-10-2026 | 660.00 - 693.00 | 1.00 | Book Building", "locator": "history table row 2"},
+        {"term": "detail link", "displayed": "DisplayIPO?id=4895&type=IPO&idtype=2&status=H&IPONo=8048&startdt=21/10/2026", "locator": "row 2 security-name hyperlink"}
+      ],
+      "sha256": "D8A54F26A17A1B31D13040B4ECFBCD5E08B601772F0D7F469B3CCE38EA27C590",
+      "bytes": 5443
+    },
+    {
+      "id": "bse-notice-20261019-49",
+      "file": "source-captures/bse-notice-20261019-49-chunk-0.md",
+      "url": "https://www.bseindia.com/downloads/UploadDocs/Notices/20261019-49/20261019-49.pdf",
+      "publisher": "BSE Limited (official exchange notice)",
+      "sourceType": "official exchange notice (anchor-investor allocation)",
+      "chunkIndex": 0,
+      "totalChunks": 1,
+      "toolResultStatus": "success",
+      "relevantDisclosedValues": [
+        {"term": "anchor allocation price", "displayed": "Rs. 693/- per equity share", "locator": "notice body", "note": "Corroborates the cap price; it is an allocation price, not a price-band declaration."},
+        {"term": "anchor shares", "displayed": "94,15,584", "locator": "notice body"}
+      ],
+      "sha256": "CF158F9DDA463D021A0417D5A2DDFCB5C721DC6F51D9CA478AB28BADBB5A11F4",
+      "bytes": 744
+    },
+    {
+      "id": "sebi-abridged-prospectus-prefix",
+      "file": "source-captures/sebi-abridged-prospectus-chunk-0-prefix.md",
+      "url": "https://www.sebi.gov.in/sebi_data/commondocs/oct-2026/Paras%20Healthcare%20Limited_p.pdf",
+      "publisher": "Securities and Exchange Board of India (official regulator filing)",
+      "sourceType": "official filing (abridged prospectus / RHP memorandum)",
+      "chunkIndex": 0,
+      "totalChunks": 8,
+      "toolResultStatus": "success",
+      "excerpt": "Prefix of chunk 0, ending mid-sentence in the abridged-prospectus preamble. Chunks 1-7 were not retained.",
+      "relevantDisclosedValues": [
+        {"term": "fresh issue amount", "displayed": "aggregating up to \u20b95,000.00 million", "locator": "Details of the Offer to the Public table"},
+        {"term": "offer for sale amount", "displayed": "aggregating up to \u20b99,500.00 million", "locator": "Details of the Offer to the Public table"},
+        {"term": "total offer size", "displayed": "aggregating up to \u20b914,500.00 million", "locator": "Details of the Offer to the Public table"},
+        {"term": "bid/offer period", "displayed": "opens WEDNESDAY, OCTOBER 21, 2026; closes FRIDAY, OCTOBER 23, 2026", "locator": "BID/OFFER PERIOD table"},
+        {"term": "issue.price_band_low / _high / lot_size", "displayed": "not stated in the retained prefix; the cover states [\u25cf] share counts", "locator": "n/a"}
+      ],
+      "sha256": "01C3D61FD6A541E9C3E3AD5A6E1933A9519F8BC0029B2C284755220DFFD72168",
+      "bytes": 8256
+    }
+  ],
+  "attemptedAndNotRetrieved": [
+    {
+      "url": "https://listing.bseindia.com/Download/8888888/PreAnchor/PBA_20261015184043.pdf",
+      "description": "The Price-Band Advertisement linked from the BSE issue page (dated 2026-10-15). This is the exact document class the engine's HttpNoticeProvider parses.",
+      "attempts": 3,
+      "result": "functions.fetch_page returned 'Failed to fetch page' on every attempt. Cause not diagnosed: could be host-level proxy restriction, a block on the listing.bseindia.com host, or a PDF the proxy could not render. Treated as a retrieval failure of that host, never as evidence that the price-band notice does not exist.",
+      "directSandboxRetrieval": "not attempted for this host; sandbox egress to bseindia.com hosts already fails at TLS (see captureMethod.directSandboxRetrieval)"
+    },
+    {
+      "url": "https://listing.bseindia.com/download/8888888/preanchor/rhp_20261016122004.zip",
+      "description": "Prospectus & GID archive linked from the BSE issue page.",
+      "attempts": 0,
+      "result": "not retrieved; no attempt was made after the sibling listing.bseindia.com URL failed three times"
+    },
+    {
+      "url": "https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=1&Type=P",
+      "description": "BSE live public-issues listing.",
+      "attempts": 1,
+      "result": "retrieved (success) but the Paras row is absent: as of the page's '23 Oct 26 | 16:00' stamp the issue had closed and had moved to the historical listing. Recorded because it shows the engine's live-listing discovery can no longer see a closed issue."
+    }
+  ],
+  "limitsOnReuse": {
+    "admissibility": "These captures are investigation evidence. They do not constitute a resolved issue term, a canonical record, a source approval or an evaluation input, and nothing here was written into the engine or any store.",
+    "closedIssue": "The BSE issue page is served under status=H (historical/closed). The engine's discovery contract deliberately follows only BSE records whose Status is F (forthcoming) or L (live) (engine/ipo_screening/official_issue_sources.py), so this page is NOT admissible to the engine as it stands. Recording it does not change that contract.",
+    "mutable": "The publisher pages are mutable, so re-fetching will not reproduce these files.",
+    "thirdParty": "Numerous third-party IPO aggregators publish the same 660-693 band and 21-share lot. None was used and none is retained: a snippet is not an official source and cannot supply an issue term."
+  }
+}
