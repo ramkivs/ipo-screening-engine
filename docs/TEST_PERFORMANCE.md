@@ -146,3 +146,87 @@ integrity, compileall and clean-tree steps passed. The results report records
 runner notices and the unavailable bulk-log/pytest-warning-count limitation.
 A documentation-only receipt follows that tested code head; its final SHA and
 full-CI result are verified separately in the PR's final comment.
+
+## Windows portability follow-up (2026-10-25; correctness, not a speed claim)
+
+The user's Windows run at `dfa34b2` reported **1,907 passed, 7 failed, 57 warnings
+in 26m42s**. The original `dedb4b8` comparison reran only those seven cases
+(**7 failed**, 103.81s), not the full baseline. These are user-supplied Windows
+results and are not interchangeable with Arena/Linux timings above. Windows
+acceptance remains open until the unresolved R.K. extraction difference is
+explained and a corrected Windows run is supplied.
+
+### Environment and byte preservation
+
+- Install the **complete** `requirements.txt` with the same interpreter that
+  executes `python -m pytest`. Pillow is required by the OCR render-to-image
+  runtime and imported directly by the image-only regression. It was already
+  a transitive RapidOCR dependency; it is now pinned directly as
+  `Pillow==13.0.0`. Missing `PIL` means that interpreter's installation is
+  incomplete/mismatched, not a reason to skip OCR. No optional dependency group
+  is declared in this repository.
+- `.gitattributes` now protects only the InvestorGain retained transcription and
+  the Paras issue-terms package's four Markdown captures with `-text`. Their
+  original bytes and declared digests are **unchanged**. Actual Git checkout
+  tests cover `core.autocrlf=true` and `input` using a private index/work tree;
+  an unprotected control demonstrates that CRLF conversion is really active.
+- Updating attributes does **not** repair a previously transformed working copy.
+  Do not change manifests, regenerate expected hashes, run blanket renormalizing
+  commands, or discard the user's `tests/gmp_mechanics_harness.py` edit. After
+  capturing diagnostics, validate in a **separate fresh clone/directory** with
+  the corrected attributes. That leaves the existing Windows checkout and its
+  local harness edit untouched.
+- The reproducibility test's child now opens the golden JSON explicitly as
+  UTF-8; a second parameter forces CP1252 defaults inside the child while retaining
+  all three hash seeds and the original equality assertions. The pre-correction
+  child fails on byte `0x8f` at position 1843 under that emulation. This proves
+  a portability defect, not the content of the still-missing original Windows
+  traceback.
+
+### Single read-only diagnostic needed from the failing Windows interpreter
+
+After obtaining the correction without discarding local edits, run this **before
+repairing the failing environment/capture bytes**, with the SAME Python used by
+pytest (PowerShell):
+
+```powershell
+python tests/diagnose_windows_portability.py --full-extraction --output "$env:TEMP\ipo-windows-before-repair-18.json"
+```
+
+Choose a new filename if it already exists. Return that one JSON artifact. The
+script reports interpreter/dependency versions and actual Pillow import, native
+child encoding failure/stdout/stderr for the exact published original script,
+actual versus declared capture hashes and CRLF fingerprints, R.K. PDF hash,
+routing, extraction statuses, raw pages 125/126 and canonical capital fields.
+It never installs dependencies, changes checkout files, patches parser/cache
+state or writes an evaluation/store. Optional `--output` exclusively creates a
+UTF-8 receipt **outside** the repository and refuses to overwrite an existing
+file. The harness is only queried for Git status, never read or rewritten.
+
+This artifact supplies the currently unavailable Windows facts: Paras's actual
+checkout digest; the original reproducibility child exception under that native
+interpreter; and the R.K. dependency/PDF/page-text differences. No parser or score
+change is justified by the truncated failures alone.
+
+After diagnostics, the required environment action in either a preserved
+checkout or a separate fresh validation clone is:
+
+```powershell
+python -m pip install -r requirements.txt
+python -m pip check
+python -c "import sys, PIL, pypdf; print(sys.executable, PIL.__version__, pypdf.__version__)"
+```
+
+For clean byte-preservation validation, use a **new** destination, not a reset or
+clean of the existing checkout:
+
+```powershell
+git -c core.autocrlf=true clone --single-branch --branch arena/cf756dd1-ipo-screening-engine https://github.com/ramkivs/ipo-screening-engine.git C:\path\to\NEW-ipo-portability-check
+```
+
+Create/install a separate virtual environment there using the existing README
+instructions, then run the focused cases and documented full command. A fresh
+clone does not contain the user's local harness edit: record that difference in
+any full-suite comparison rather than discarding or silently copying the edit.
+Do not copy the transformed captures into that clone. None of these Windows commands
+has been executed or claimed as executed by Arena.

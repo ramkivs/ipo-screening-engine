@@ -2,6 +2,7 @@
 
 > **Controlling status (A16, 2026-10-14):** Ramki's single-user personal-use objective controls this register. Routine in-scope investigation, implementation, testing, documentation, commit/push on the fixed session branch, and remote verification do not require renewed approval or an independent-review/canonical-selection ceremony. The detailed Candidate M/Phase history later in this file is retained for audit; any blanket procedural hold in it is superseded by A16. Concrete evidence and product-decision blockers remain active only for the specific metric behavior they affect. This is not a production, release, or enterprise programme.
 
+- **Updated:** 2026-10-25 (Asia/Calcutta) — **Windows portability continuation / revision 18: Windows acceptance OPEN.** Narrow retained-byte checkout guards, direct Pillow declaration and explicit UTF-8 child read are justified; no parser/score/assertion weakening. Three R.K. failures remain unexplained on the Windows interpreter despite Linux independent/cache-disabled passes. Original Windows baseline comparison was targeted, not full. Detailed evidence, checkout reconciliation and the single outstanding Windows diagnostic are appended below and in `docs/TEST_PERFORMANCE_RESULTS.md`.
 - **Updated:** 2026-10-25 (Asia/Calcutta) — **Test-suite performance optimization / revision 17:** all 1,908 original tests retained; six isolation/inventory checks added; unfiltered 1,914-test suite independently reproduced at 16m44.233s versus 32m52.110s baseline (49.08% reduction). Fixed branch `arena/cf756dd1-ipo-screening-engine`, authoritative base `dedb4b876cdc68bdf3023d9740dc13f6888b45b3`. See the final test-performance entry and `docs/TEST_PERFORMANCE_RESULTS.md`; local results are not remote CI proof.
 - **Updated:** 2026-10-23 (Asia/Calcutta) — **Official-notice OCR segmented-heading CI failure fixed and CI-confirmed green.** The one test that kept every run red (`test_image_only_official_notice_uses_real_offline_ocr_and_preserves_original_pdf_hash`) failed because the runner's OCR merges heading spacing (`INITIAL PUBLICOFFERINGOFACMEFORGELIMITED`, `aggregatingup toRs 240million`, `forSale Size:NotApplicable`): the frozen fallback needs whitespace before `LIMITED`, so `company_name` was `None`. `_norm_name()` was not at fault. Correction is confined to the OCR pre-pass in `official_notice_ocr.py`: one `_restore_heading_spacing()` now normalises the identity header as well as the financial tiles (previously only the tiles), extends the fixed vocabulary with `AGGREGATING UP TO` / `OFFER FOR SALE` / `NOT APPLICABLE`, and separates a fused `LIMITED`/`LTD` suffix without repairing any issuer letter or digit; it is idempotent and also applied to the decoded child payload. No frozen file, weight, criterion, A9 rule or knockout touched; issuer identity checks unchanged and still rejecting different issuers. Six regression cases added (both segmentation forms, parity of extracted terms, wrong-issuer rejection), and the image-only fixture was re-laid out as a narrow single-column advertisement so its lines fit one OCR tile instead of being cut at a crop boundary. 1676 backend tests pass locally and in CI (0 failures), frontend 93/93, frozen core/golden result PASS. Report: `docs/investigation/OFFICIAL-NOTICE-OCR-SEGMENTATION-CI-FIX-2026-10-23.md`.
 - **Updated:** 2026-10-23 (Asia/Calcutta) — **Jio publication verified, validation complete, evidence blockers isolated.** Remote lineage re-checked (`589e468` ← `e612702` ← `8a1a3702`, 181 tracked files re-hashed with 0 mismatches, A9 files byte-identical to the parent); branch CI on both commits is **red for one environment-dependent OCR test** (1670 tests, 1 failure each, `test_image_only_official_notice_…`; every other step green and the same test passes locally); exact-commit backend suite **1670 passed** (1206.58 s) and frontend 93/93; upload → evaluation → evidence path accepted at the API boundary (DOM criteria untested — no browser here). No new evaluation: the fresh run is hash-identical to `…final-29d9a601`. Evidence work kept A9/K1/K2/K5 fail-closed and produced four separate findings plus three governance questions (K1 going-concern negative, K2 SEBI/ED scope, K5 unquantified-contingent scope) and the net-worth basis question. Official issue terms are published but unreachable from this sandbox (TLS EOF). See the 2026-10-23 entry at the end; documenting is not resolving.
@@ -1908,3 +1909,117 @@ All eight required Pass-9 paths existed in the tested final tree:
   the successful code/CI head. Final documentation-head SHA and its own remote
   full-check receipt are recorded in PR #10's final verification comment. No
   merge, release, deployment, production change or Windows validation implied.
+
+
+## Windows test portability continuation — 2026-10-25 (revision 18)
+
+### Authority, actual checkout and scope
+
+- This continues the user's one-pass execution on the fixed branch
+  `arena/cf756dd1-ipo-screening-engine` and existing **PR #10**, which remains open;
+  no merge is authorized or performed. Baseline `dedb4b876cdc68bdf3023d9740dc13f6888b45b3`
+  and published optimization `dfa34b26a45b672dc92bcaed337e48f7a2b4ca13` are preserved.
+- Arena restoration actual HEAD was **dedb4b8**, with all 19 optimization files
+  byte-identical to fetched **dfa34b2**: **13 unstaged tracked edits + 6 untracked
+  files, no staged changes and no unrelated/harness edit**. This is separate
+  from the user's Windows checkout at dfa34b2 with a local harness modification.
+- No reset, clean or file overwrite conceals this discrepancy. The verified
+  correction index tree is committed with published dfa34b2 as parent, then the
+  existing branch ref is advanced by compare-and-swap; published history stays
+  intact and the focused diff excludes the already published optimization.
+- Eight correction paths: `.gitattributes`, `requirements.txt`,
+  `tests/test_reproducibility_store.py`, `tests/test_retained_bytes_portability.py`,
+  `tests/diagnose_windows_portability.py`, the two performance documents and this
+  tracker. No production/config/scoring/schema/fixture/retained-evidence/CI or
+  `tests/gmp_mechanics_harness.py` content changes. Combined PR scope is 24 paths,
+  versus the original optimization's 19; correction alone is eight paths.
+
+### Windows observations and justified corrections
+
+- User-supplied optimized Windows full run: **1,907 passed, 7 failed, 57 warnings,
+  26m42s**. The original-baseline comparison selected only the same seven cases:
+  **7 failed, 1 warning, 103.81s**. It was **not a full-suite baseline** or an
+  independent Arena/Windows run; timing cannot establish a Windows speed ratio.
+- InvestorGain retained transcription: original/declared `bd6bea50…51d772`,
+  CRLF-converted `bbffd774…620d60` **exactly matches** the reported failure.
+  Narrow `-text` attributes preserve it; original bytes/checksum unchanged.
+- Paras exact failing capture is
+  `evidence/non-authoritative/paras-healthcare-issue-terms-20261024/source-captures/bse-displayipo-4895-chunk-0.md`.
+  Original/declared `908ed218…c0b70`; old Git autocrlf checkout yields
+  `cac731bf…a803f`; corrected checkout yields the original. All four captures
+  are narrowly protected. The actual Windows Paras digest is still missing,
+  so the reported instance is not falsely labelled confirmed. No manifest edits.
+- Pillow is required by OCR's `to_pil()` path and imported by the real OCR test;
+  RapidOCR already depends on it transitively. Direct pin **Pillow 13.0.0** makes
+  the required runtime/test dependency explicit. A complete requirements install
+  with the same interpreter as pytest is needed on Windows; no skip/transient-only
+  fix is claimed. No optional OCR dependency group exists.
+- The published child script fails at implicit `json.load(open(...))` under
+  emulated CP1252 with `UnicodeDecodeError` at byte 0x8f / offset1843. Explicit
+  UTF-8 plus native/CP1252-default parameters preserves all hash assertions and
+  seeds0/1/12345. The original Windows traceback is still absent; this is a
+  demonstrated portability defect, not an invented traceback for that machine.
+
+### Three R.K. failures remain evidence-blocked, not patched speculatively
+
+- Source SHA-256 in Arena:
+  `9a46095da97b4aea8dc9fe67df2a5923dcbb1968323f32ce2cb609d72b975198`,
+  17,310,664 bytes / 496 pages. At pinned pypdf6.20.1, capital routing106–133,
+  header page125 and labelled promoter/group rows page126 establish **72.22 +
+  0.03 = 72.25**. Canonical value is72.25; evaluation score44.0. A controlled
+  missing-value copy yields UNKNOWN and40.0, explaining the four-point effect
+  without defaults or a scoring change. Existing raw page locator is section
+  start106; actual table pages are separately documented, not silently relabelled.
+- All three tests pass independently with cache disabled (12.05s,11.76s,12.39s),
+  and together disabled **3 passed,1 warning,36.56s**. Seeds0/1/12345 agree on
+  extracted value, routing and text. Production extraction/PDF blobs are identical
+  at original baseline and optimization; fixture-fallback test is uncached.
+  No direct evidence supports blaming the performance cache.
+- Missing Windows facts: dependency/interpreter versions, actual PDF hash,
+  page125/126 text/status/routing/canonical fields; original child traceback and
+  actual Paras capture digest. Request exactly one read-only diagnostic JSON,
+  from the SAME failing interpreter before environment/byte repairs:
+  `python tests/diagnose_windows_portability.py --full-extraction --output <NEW-EXTERNAL-PATH.json>`.
+  The script reports these facts, does not write a store/evaluation or checkout,
+  refuses repository output, exclusively creates an external UTF-8 receipt and
+  never overwrites the local harness. Preserve that edit; fresh-clone comparisons
+  must state that they do not contain an unreviewed local patch.
+
+### Available-platform validation and acceptance boundary
+
+- Fresh installed Arena environment before corrections: reported seven **7 passed,
+  1 warning,28.64s**. Focused corrected suite **45 passed,1 warning,35.27s**;
+  byte/hash/repro subset **33 passed,1.83s**; cache/tier guards **6 passed,0.04s**.
+- Real Git fresh-checkout tests exercise autocrlf=true/input with private
+  index/work trees and a CRLF-positive unprotected control; original capture bytes
+  and all declared digests preserved. No blanket normalization/expected-hash edits.
+- Pass-9 **88 passed,1 warning,0.78s**; frontend **93 passed**, no failures/skips;
+  all4 schemas, all6 frozen-core pins, golden, inactivev1.6, compileall, whitespace
+  and pip dependency checks PASS. Correctness timings are not performance claims.
+- Full-suite and remote publication receipts follow in the PR closeout. Windows
+  acceptance remains **OPEN** pending native diagnostic/revalidation; neither
+  Linux passes nor green Linux CI closes the three R.K. causes or proves that
+  the user's corrected Windows environment passes. No merge/release/deployment,
+  source qualification or scoring/golden/core activation change is implied.
+
+### Revision 18 full validation and publication boundary
+
+- Corrected full Arena regression **1,917 passed**, **0 failed/skipped/deselected**,
+  **25 warnings**; **710.07s pytest / 711.133s wall (11m51.133s)**. The three
+  extra cases are two real Git checkout modes and one CP1252 child-default
+  parameter, not weaker/replacement assertions. Cache remains13,585 hits/1,596
+  decoded pages. Fast1,040 + integration877 = full1,917 (collection checked).
+- These are Linux correctness observations in the available sandbox, not a
+  re-baseline of performance and not proof of Windows acceptance. Previous
+  optimization timing/CI receipts remain historical facts, not new-check proof.
+- The verified eight-path correction is committed with published **dfa34b2 as
+  parent**, with the existing branch/index reconciled without reset/clean/file
+  overwrites and normal fast-forward publication to the same branch/PR#10. Exact
+  correction SHA, new full-CI API receipts and final remote OPEN/unmerged state
+  belong to the PR's portability closeout comment, not an inferred earlier run.
+- **Windows acceptance remains OPEN / evidence required:** actual Paras checkout
+  digest, original native child exception, and the three R.K. extraction causes
+  need the read-only diagnostic from the failing Windows interpreter. Preserve
+  its local harness modification; no hard-coded value, score adjustment or
+  speculative parser change is made. One JSON diagnostic is the outstanding
+  request, not another approval/plan or an unsupported completion claim.
