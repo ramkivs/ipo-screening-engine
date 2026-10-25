@@ -1,3 +1,107 @@
+# Revision20 — wrapped capital-table row repair
+
+**Current status: repair implemented; Arena/Linux validation below; Windows
+acceptance remains OPEN until the user reruns focused tests and the full suite.**
+The revision19 blocker and full score trace retained below are historical.
+
+## Newly supplied Windows evidence and root cause
+
+The user reports `rk-windows-score-before-repair-20261026-2.json` confirms the
+expected PDF hash, successful pages125/126, complete source percentages but a
+wrappedTotal(A) row starting`Total (A) 1,12,06,6`. The published helper returns
+only99.61; Total(B) has pre0.06/post0.03/post0.03. The actual JSON file was not
+attached in Arena; its confirmed observations are user-supplied evidence. The
+layout regression reconstructs this shape, not an asserted verbatim JSON copy.
+
+The old `_row_percentages` joined at most **one** next line and only if it had
+at most **five tokens**. This rejects a longer numeric continuation or stops
+before further wrapped cells. Post parsing then sees fewer than two percentage
+cells and correctly refuses to label the pre-offer99.61 as post-offer. Builder
+maps absent post extraction toNone. CriterionD/promoter_post_holding becomes
+UNKNOWN, loses4 earned/available points and explains44→40. The scoring rule is
+not defective and is unchanged.
+
+An external AST probe executes the exact published59fe97e helper against a
+layout reconstruction: old `[99.61]`, repaired `[99.61,72.22,72.22]`. This
+isolates the parser cause without altering the source PDF, reference facts,
+company-specific behaviour or any production scoring function.
+
+## General repair and safety boundaries
+
+- Assemble a labelled total's adjacent numeric/percentage/undisclosed-cell lines
+  in their original order, up to16 continuation lines. No search beyond a named
+  shareholder, category heading, another total, numbered-row prefix or prose.
+- No arbitrary prose/footnote decimal harvesting. A malformed unterminated run
+  beyond the bound yields no values. Wrapped percentage overflow beyond the
+  supported pre/lower-post/upper-post layout is ambiguous and stays UNKNOWN.
+- Preserve post-context validation and promoter/public category classification.
+  The established parser uses the final (upper price-band) post column; wrapping
+  does not substitute maximum/average or change that column order. R.K.'s two
+  post scenarios both print72.22 forA and0.03 forB; existing category arithmetic
+  therefore gives72.25. No issuer name, special row match or72.25 in production.
+- Undisclosed placeholder/dash cells are not collapsed out of column positions.
+  Partial post disclosure cannot promote a lower-band percentage to upper-band.
+  When source post cells/context/category cannot be established, post remains
+  UNKNOWN. No pre-only value or public total is used as post promoter holding.
+- This is text-layout assembly, not a general geometric table recognizer: a
+  numeric-only ambiguous run beyond supported columns/bounds is refused rather
+  than guessed. No fixture fallback, original-byte normalization or PDF rewrite.
+- Raw extraction/canonical source identifiers, original PDF hash, processing
+  summary flags and the existing section-start provenance remain intact. The
+  section-startpage106 is still distinguished from actual table125/126; it is
+  not silently promoted to a verbatim table locator. Scoring/config untouched.
+
+## Regression and integrity receipts
+
+-24 added cases:23 parser cases plus1 real-filing layout canary. Cover long and
+ multi-line continuations, split integer share counts, category/total/name/prose/
+ numbered-row boundaries, pre-only context, missing upper-band cells (bullets,
+ asterisk and dashes), missing group post value, numeric overflow, bounded runs
+ and non-maximum upper-band ordering.
+- Real-filing layout canary changes only whitespace in decodedTotal(A) text,
+ verifies that the real row was exercised, then builds canonical input with
+ `allow_fixture_fallbacks=False`: pre99.67/post72.25 with source evidence. The
+ original PDF bytes are never modified. Original real-filing/native-layout
+ extraction, reconciliation, UI7 ingestion and missing-evidence scoring tests
+ remain intact.
+- Related parser + full R.K. reconciliation module + both requested extraction/
+ UI7 boundaries: **40passed,1warning,40.21s**. All three requested cases pass.
+- Full available suite: **1,942passed,0failed/skipped/deselected,25warnings,
+ 892.74s pytest (14m52.74s)**, Linux only. Cache14,627hits/1,596decoded
+ pages. +24 regressions, no tests removed. Correctness timing, not a new
+ performance comparison.
+- Frontend93passed,0fail/skip; pip check,4schemas,6frozen pins, golden,
+ inactivev1.6, compileall and diff/whitespace checks PASS.
+- The harness equals published59fe97e, and all five retained captures remain
+ byte-identical. The user's Windows-local uncommitted harness correction and
+ restored evidence are not accessible here and are not overwritten or committed.
+
+## Publication and required native verification
+
+Scope is5 paths relative59fe97e: production`extraction/sections.py`, two parser/
+real-filing test modules, this report and authoritative tracker. Combined PR27
+paths. No scoring/config/schema/fixture/retained-evidence/harness/CI changes.
+Exact commit, remote tree/full-CI JUnit totals and final OPEN/unmerged PR state
+are recorded in PR#10's revision20 closeout comment. Linux green is not native
+Windows acceptance. Do not merge/claim Windows green based on Arena alone.
+
+After updating only the PR's changed files without discarding local changes,
+use the same Windows interpreter to run:
+
+```powershell
+python -m pytest -q tests/test_fixture_fallback_isolation.py::test_d_rk_fashion_deterministic_extraction tests/test_rk_fashion_reconciliation.py::test_rk_fashion_accessories_extraction_and_reconciliation tests/test_ui7_ingestion.py::test_ingest_rk_fashion_accessories_real_statutory_filing
+python -m pytest -q tests/test_promoter_holding_extraction.py tests/test_rk_fashion_reconciliation.py
+python -m pytest tests/ -q
+```
+
+Share focused/full summaries and warnings. If anything fails, collect a new
+external diagnostic with`--full-extraction --score-trace` and a new output name;
+keep all local harness/evidence restorations intact. No reset/clean/restore/
+normalization is required or recommended.
+
+---
+# Historical revision19 investigation (59fe97e, before Windows evidence)
+
 # R.K. Fashion: remaining Windows failures — investigation, NOT a repair
 
 ## Revision 19 status / concrete blocker

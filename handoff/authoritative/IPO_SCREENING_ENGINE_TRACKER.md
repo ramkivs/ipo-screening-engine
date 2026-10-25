@@ -1,3 +1,14 @@
+> **Revision20 — wrapped promoter-total repair implemented; Windows acceptance
+> OPEN.** User-supplied native diagnostic identifies multi-lineTotal(A) cells
+> truncated by the old one-line/five-token helper. General bounded numeric-row
+> assembly now preserves columns/category boundaries and refuses ambiguous or
+> undisclosed post values. Scoring unchanged; the missing holding caused the
+> four-point difference. Related40passed; full/Linux and publication receipts
+> are in docs/RK_FASHION_WINDOWS_INVESTIGATION.md and PR#10 revision20 closeout.
+> The revision19 blocked status below is historical, superseded by this new
+> evidence/repair. Native focused/full reruns are still REQUIRED; no Windows
+> acceptance claim. Harness and five retained captures preserved; PR OPEN.
+
 > **Revision19 — R.K. Windows investigation: BLOCKED, NOT REPAIRED.** The user
 > reports three failures on reconciled Windows (the earlier seven-failure list
 > is historical; no new native full-suite totals were supplied). Source columns independently
@@ -2071,3 +2082,38 @@ All eight required Pass-9 paths existed in the tested final tree:
   interpreter: `python tests/diagnose_windows_portability.py --full-extraction
   --score-trace --output "$env:TEMP\rk-windows-score-before-repair-19.json"`.
   Preserve local restored captures/harness and collect before package/file repairs.
+
+
+## Revision 20 — wrapped capital-total repair / native acceptance pending
+
+- User-confirmed Windows diagnostic `rk-windows-score-before-repair-20261026-2.json`
+  establishes unchanged source hash, readable125/126 and wrappedTotal(A). The old
+  one-next-line/five-token helper exposes only99.61 instead of99.61/72.22/72.22.
+  This is the confirmed parser failure, not a scoring defect. A reconstructed
+  layout control executes the exact published59fe97e helper versus repaired helper
+  and proves that difference; the full JSON itself was not attached in Arena.
+- General numeric-only continuation assembly preserves order, bounds and category/
+  row boundaries. Incomplete/malformed/overflow post columns remain UNKNOWN;
+  printed promoter and promoter-group totals are combined under existing rules.
+  No issuer/value hardcode, scoring change, fixture fallback or evidence rewrite.
+-24 new cases:23 parser boundary/column/missing-value cases and1 real-filing
+  whitespace-layout canary with fallback disabled. Original requested real PDF
+  extraction/reconciliation and UI7 tests preserved and passing (score44 derives
+  from the supported holding, never a forced four-point addition).
+- Arena/Linux related **40passed,1warning,40.21s**; full **1,942passed,0failed/
+  skipped/deselected,25warnings,892.74s pytest (14m52.74s)**. Cache14,627hits/
+  1,596decoded pages. No tests removed. Frontend93passed/no failures/skips;
+  pip check,4schemas,6frozen pins, golden, inactivev1.6, compileall/diff checks PASS.
+  Timings are correctness receipts, not a new comparative performance benchmark.
+- Scope5 paths vs59fe97e: sections.py, promoter parser tests, R.K. reconciliation
+  tests, investigation report, this tracker. Combined PR27 paths. No scoring/
+  config/schema/fixture/evidence/harness/CI/dependency changes. Five protected
+  retained captures and harness byte-identical; user's Windows-local correction
+  not accessible here, never overwritten/incorporated. No reset/restore/clean/
+  normalization/force push. Published ancestry is retained on the existing branch.
+- Exact new commit/remote tree/full-CI JUnit receipt and final OPEN/unmerged state
+  are recorded in PR#10 revision20 closeout. **Windows acceptance remains OPEN**:
+  user must rerun both extraction tests, UI7 test, relevant parser tests and full
+  suite with the same Windows interpreter, preserving local harness/evidence.
+  No unprovided native pass is inferred from Linux CI. Updated commands and
+  provenance/column details are in docs/RK_FASHION_WINDOWS_INVESTIGATION.md.

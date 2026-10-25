@@ -353,3 +353,27 @@ def test_missing_promoter_post_holding_remains_unknown_not_four_earned_points():
     assert supported.score["final_score"] == 44.0
     assert missing.score["final_score"] == 40.0
     assert canonical["capital_structure"]["promoter_post_pct"] == 72.25
+
+
+def test_real_filing_wrapped_total_extracts_without_fixture_fallbacks(monkeypatch):
+    """Simulate the reported PDF text layout, not different filing facts."""
+    import re
+    from ipo_screening.extraction.sections import SectionExtractor
+
+    original = SectionExtractor.extract_page_text
+    changed = []
+
+    def wrapped(self, page):
+        text = original(self, page)
+        if page == 126:
+            text, count = re.subn(r"(?m)^(Total\s*\(A\)\s+[\d,]{6})([^\n]+)$",
+                                  r"\1\n\2", text)
+            changed.append(count)
+        return text
+
+    monkeypatch.setattr(SectionExtractor, "extract_page_text", wrapped)
+    canonical, _ = DocumentExtractor().extract_from_pdf(RK_PDF, allow_fixture_fallbacks=False)
+    assert any(changed), "real source total row must be exercised"
+    assert canonical["capital_structure"]["promoter_pre_pct"] == 99.67
+    assert canonical["capital_structure"]["promoter_post_pct"] == 72.25
+    assert canonical["_evidence"]["capital_structure.promoter_post_pct"]["source_id"]
