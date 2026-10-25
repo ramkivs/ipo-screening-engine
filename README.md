@@ -55,3 +55,14 @@ The browser UI is static JavaScript and needs no npm install. Python test/API de
 - This repository intentionally does not add authentication/RBAC, multi-user support, PostgreSQL, enterprise architecture, or production deployment requirements.
 
 See [`docs/RUNBOOK.md`](docs/RUNBOOK.md) for CLI, persistence, replay, and analytical workflows. The current personal-use operating boundary is recorded in [`handoff/decisions/A16-personal-use-operating-scope-and-gate-disposition.md`](handoff/decisions/A16-personal-use-operating-scope-and-gate-disposition.md).
+
+### Regression test tiers
+
+The default backend command still runs **all** tests, with no exclusions.
+For change feedback use `PYTHONPATH=engine python -m pytest tests/ -q -m fast`
+plus `npm --prefix frontend test`. Run the complementary integration tier with
+`PYTHONPATH=engine python -m pytest tests/ -q -m integration --durations=30`.
+Before release, run `PYTHONPATH=engine python -m pytest tests/ -q --durations=30`
+and the schema/frozen-core/golden/v1.6 checks.
+See [test tiers and safe caching](docs/TEST_PERFORMANCE.md) for exact commands,
+cache controls, classification policy, and measured results.

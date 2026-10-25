@@ -2,6 +2,7 @@
 
 > **Controlling status (A16, 2026-10-14):** Ramki's single-user personal-use objective controls this register. Routine in-scope investigation, implementation, testing, documentation, commit/push on the fixed session branch, and remote verification do not require renewed approval or an independent-review/canonical-selection ceremony. The detailed Candidate M/Phase history later in this file is retained for audit; any blanket procedural hold in it is superseded by A16. Concrete evidence and product-decision blockers remain active only for the specific metric behavior they affect. This is not a production, release, or enterprise programme.
 
+- **Updated:** 2026-10-25 (Asia/Calcutta) — **Test-suite performance optimization / revision 17:** all 1,908 original tests retained; six isolation/inventory checks added; unfiltered 1,914-test suite independently reproduced at 16m44.233s versus 32m52.110s baseline (49.08% reduction). Fixed branch `arena/cf756dd1-ipo-screening-engine`, authoritative base `dedb4b876cdc68bdf3023d9740dc13f6888b45b3`. See the final test-performance entry and `docs/TEST_PERFORMANCE_RESULTS.md`; local results are not remote CI proof.
 - **Updated:** 2026-10-23 (Asia/Calcutta) — **Official-notice OCR segmented-heading CI failure fixed and CI-confirmed green.** The one test that kept every run red (`test_image_only_official_notice_uses_real_offline_ocr_and_preserves_original_pdf_hash`) failed because the runner's OCR merges heading spacing (`INITIAL PUBLICOFFERINGOFACMEFORGELIMITED`, `aggregatingup toRs 240million`, `forSale Size:NotApplicable`): the frozen fallback needs whitespace before `LIMITED`, so `company_name` was `None`. `_norm_name()` was not at fault. Correction is confined to the OCR pre-pass in `official_notice_ocr.py`: one `_restore_heading_spacing()` now normalises the identity header as well as the financial tiles (previously only the tiles), extends the fixed vocabulary with `AGGREGATING UP TO` / `OFFER FOR SALE` / `NOT APPLICABLE`, and separates a fused `LIMITED`/`LTD` suffix without repairing any issuer letter or digit; it is idempotent and also applied to the decoded child payload. No frozen file, weight, criterion, A9 rule or knockout touched; issuer identity checks unchanged and still rejecting different issuers. Six regression cases added (both segmentation forms, parity of extracted terms, wrong-issuer rejection), and the image-only fixture was re-laid out as a narrow single-column advertisement so its lines fit one OCR tile instead of being cut at a crop boundary. 1676 backend tests pass locally and in CI (0 failures), frontend 93/93, frozen core/golden result PASS. Report: `docs/investigation/OFFICIAL-NOTICE-OCR-SEGMENTATION-CI-FIX-2026-10-23.md`.
 - **Updated:** 2026-10-23 (Asia/Calcutta) — **Jio publication verified, validation complete, evidence blockers isolated.** Remote lineage re-checked (`589e468` ← `e612702` ← `8a1a3702`, 181 tracked files re-hashed with 0 mismatches, A9 files byte-identical to the parent); branch CI on both commits is **red for one environment-dependent OCR test** (1670 tests, 1 failure each, `test_image_only_official_notice_…`; every other step green and the same test passes locally); exact-commit backend suite **1670 passed** (1206.58 s) and frontend 93/93; upload → evaluation → evidence path accepted at the API boundary (DOM criteria untested — no browser here). No new evaluation: the fresh run is hash-identical to `…final-29d9a601`. Evidence work kept A9/K1/K2/K5 fail-closed and produced four separate findings plus three governance questions (K1 going-concern negative, K2 SEBI/ED scope, K5 unquantified-contingent scope) and the net-worth basis question. Official issue terms are published but unreachable from this sandbox (TLS EOF). See the 2026-10-23 entry at the end; documenting is not resolving.
 - **Updated:** 2026-10-21 (Asia/Calcutta) — **automatic official Jio discovery: PARTIAL, end-to-end acceptance BLOCKED**. Actual NSE prices/lot/dates and RHP OFS 0 verified; fresh monetary amount remains unestablished, no evaluation/persistence. See the final “Automatic official discovery / Jio ingestion” entry and linked report; no manual-entry workaround or publication-absence claim.
@@ -1826,3 +1827,41 @@ All eight required Pass-9 paths existed in the tested final tree:
 - The full backend and frontend suites, local workflow-equivalent integrity checks, and targeted final-main run all passed. The only observed test warnings are the deprecations recorded above; they did not conceal failures or skips.
 - There is no separate GitHub Actions check attached to the final merge commit because the repository workflow is configured for the A9 branch push/workflow-dispatch boundary rather than `main`; the successful PR #7 check and the exact final-main local runs are not conflated with a post-merge GitHub check.
 - Windows-local validation remains **not run by Arena and not claimed**. Official-source reachability, browser acceptance, or any user-local Windows runtime behavior remains outside this remote Linux verification.
+
+
+## Test-suite performance optimization — 2026-10-25 (revision 17)
+
+- **Authority and baseline:** standing personal-use authority plus explicit
+  one-pass commit/push/PR approval; fixed branch
+  `arena/cf756dd1-ipo-screening-engine`, fetched authoritative `origin/main`
+  `dedb4b876cdc68bdf3023d9740dc13f6888b45b3`. No branch switch or main update.
+- **Scope:** test-only opt-in immutable page-text reuse in eight audited modules;
+  conservative fast/integration/slow classification; five cache-isolation tests
+  and one inventory guard; commands and evidence documentation. The initial
+  17-file diff was fully audited; this append-only tracker reconciliation is an
+  intentional 18th path, not unreported implementation scope.
+- **Independent local verification:** unfiltered **1,914 passed**, 0 failed,
+  skipped or deselected, 25 unchanged deprecation warnings; pytest 1,002.76 s,
+  shell wall **16m44.233s**. All original 1,908 tests retained; no consolidation
+  or removal. Original function/class bodies and parametrization unchanged in
+  the eight modified test modules (102 top-level test functions).
+- **Performance:** original baseline **32m52.110s**, first optimized run
+  **16m30.112s** (49.79% reduction); independent rerun **16m44.233s** (49.08%).
+  Single-run observations, not controlled statistical/Windows benchmarks.
+- **Additional local checks:** Pass-9 **88 passed**, 1 warning, 1.29 s pytest
+  elapsed; frontend **93 passed**, no failures/skips; all four schemas, six
+  frozen-core pins, golden result, inactive v1.6 and compileall/whitespace PASS.
+- **Isolation:** fresh real readers, domain extractors and canonical builds;
+  issue-term/evaluation/persistence gates unchanged; no shared mutable service
+  stores or canonical data. First parses, separate CLI processes, issuer
+  canaries, fallback-isolation, notice-cache invalidation and Windows retrieval
+  boundaries remain uncached where documented.
+- **Governance:** no scoring, schema, frozen-core, source-qualification,
+  official-source acceptance or evaluation-admission change. Golden hash stays
+  `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`;
+  active baseline v1.5.0, v1.6 inactive. No issuer store, release or deployment
+  written. Windows-local validation not performed or claimed.
+- **Publication/evidence:** `docs/TEST_PERFORMANCE.md` holds commands and cache
+  boundaries; `docs/TEST_PERFORMANCE_RESULTS.md` preserves original and independent
+  results/limitations. Publication and remote CI receipts are recorded on the PR
+  separately from local regression evidence. No merge is requested by this entry.

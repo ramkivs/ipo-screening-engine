@@ -27,6 +27,10 @@ from ipo_screening.pipeline import evaluate, load_config
 from ipo_screening.presentation.api import create_app
 from ipo_screening.presentation.service import PresentationConfig, PresentationService
 
+
+# These tests never mutate PDF readers/pages; only immutable text is reused.
+pytestmark = pytest.mark.usefixtures("cached_pdf_text")
+
 FILINGS_DIR = REPO_ROOT / "fixtures" / "filings"
 SAMPLE_RHP_PDF = FILINGS_DIR / "complete_sample_rhp.pdf"
 SAMPLE_RHP_2_PDF = FILINGS_DIR / "complete_sample_rhp_2.pdf"

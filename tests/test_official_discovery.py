@@ -22,6 +22,10 @@ from ipo_screening.issue_terms import (
     OfficialDiscoveryProvider,
 )
 
+
+# These tests never mutate PDF readers/pages; only immutable text is reused.
+pytestmark = pytest.mark.usefixtures("cached_pdf_text")
+
 NOTICE = """PRICE BAND ADVERTISEMENT
 INITIAL PUBLIC OFFERING OF ACME FORGE LIMITED
 NOTICE TO INVESTORS

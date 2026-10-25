@@ -22,6 +22,10 @@ import pytest
 from ipo_screening.extraction.extractor import DocumentExtractor
 from ipo_screening.pipeline import evaluate, load_config
 
+
+# These tests never mutate PDF readers/pages; only immutable text is reused.
+pytestmark = pytest.mark.usefixtures("cached_pdf_text")
+
 REPO_ROOT = Path(__file__).parent.parent
 RK_PDF = REPO_ROOT / "handoff" / "reference" / "U18109WB2010PLC144256-R.K Fashion accessories.pdf"
 CONFIG_FILE = REPO_ROOT / "config" / "ipo-config.v1.5.0.json"
