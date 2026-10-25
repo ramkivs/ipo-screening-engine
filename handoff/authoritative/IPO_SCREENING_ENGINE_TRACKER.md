@@ -1740,3 +1740,30 @@ Revision 10 told the operator to resolve terms from `.../PublicIssues/IPOIssues?
 - Required-term gate: **CLOSED** and behaved correctly on both issuers. Readiness: **NOT ESTABLISHED**. Evaluation: **NOT RUN**.
 
 - **Disposition: NOT ISSUANCE-SPECIFIC — PROVEN BY RUNNING A SECOND ISSUER, WHICH ALSO EXPOSED A LAYOUT-SPECIFIC READER NOW FIXED; VISHAL'S FOUR BLOCKS ARE ONE MISSING OFFICIAL DOCUMENT; HISTORICAL-LISTING GUIDANCE RETRACTED; THIRD-PARTY REFUSAL NOW STATES ITS CAUSE; ONE-SHOT OFFICIAL URL FLAGS ADDED; GATE CLOSED; NO EVALUATION.**
+
+## Pass-9 Arena remote verification — 2026-10-25 (revision 15)
+
+**Scope: remote/source verification only. No Windows checkout accessed. No issuer evaluation or persistence performed.**
+
+### Remote publication and content readback
+- Pass-9 target is commit `a6f9bb3dd4647dad5b9546d466d6db8d0c2d3fd1` (parent `b15203875f7bf340b5d9e768c7e8da572b8f1505`). GitHub independently identifies its eight changed paths as the Paras report, `aggregator_issue_terms.py`, `financial_tables.py`, `ipo_screen.py`, this tracker, and the three requested tests.
+- The target commit is already published as an ancestor of PR #7 head `dd94cb8120916044499769ead02785eb673db126` on `arena/07f3439f-ipo-screening-engine`. PR #7 is OPEN and unmerged; it is based on PR #6's branch `arena/5dd3fe52-ipo-screening-engine`. `main` remains at `01ba66c12ca1195fd7acbd287c3e39a019808094` and does not contain the target.
+- Remote readback at the PR #7 head: all eight Pass-9 paths exist; seven are byte-identical to target. The Paras report has four later-added lines documenting the read-only Windows verifier. No Pass-9 code or test changes were missing. The local Arena checkout initially contained none of the eight paths because its starting HEAD was the handoff-only `main`; the fetched authoritative PR branch did contain them.
+
+### Arena execution at the exact target
+The source snapshot was created from target commit `a6f9bb3...` in an isolated temporary directory, with the repository's pinned `requirements.txt` installed in a fresh Python 3.11 virtual environment. Commands executed:
+
+```text
+python -m pytest -q tests/test_aggregator_issue_terms.py tests/test_issue_terms_cli.py tests/test_paras_extraction_gaps_20261024.py
+88 passed, 0 failed, 0 skipped; 1 Starlette/httpx deprecation warning; exit 0.
+
+python engine/tools/ipo_screen.py issue-terms --help
+exit 0; output includes --notice-url NOTICE_URL and --prospectus-url PROSPECTUS_URL.
+```
+
+No failures required correction. The combined targeted run covered 41 aggregator tests, 24 CLI tests and 23 extraction tests. This is not a claim that the full suite was run in Arena for this verification.
+
+### PR/CI evidence and disposition
+- Target commit's GitHub Actions `regression` check: **SUCCESS**, completed 2026-10-24 19:26:35 UTC (run 40123391593).
+- PR #7 latest head check: **regression PASS**, completed 2026-10-25; PR remains **OPEN / UNMERGED**. The target is therefore remotely published for review, not integrated into `main`.
+- **Disposition:** Pass-9 implementation and tests were already present remotely; Arena independently executed all requested focused tests and confirmed both CLI flags. This revision records that evidence; it does not represent local Windows verification or a full-suite run.
