@@ -1461,6 +1461,10 @@ python engine\tools\ipo_screen.py issue-terms `
 
 `--notice-url` behaves the same way for a Price Band Notice. A URL outside `OFFICIAL_HOSTS` (including `listing.bseindia.com`, which is discovery-only — A31 §5) is refused as a usage error **before any retrieval**, so a wrong host costs nothing. For the deployment itself, the durable fix is still the environment variable, which is what makes the UI ingestion path resolve.
 
+**Verifying a build checkout.** `engine\tools\Verify-Fixes.ps1` answers "is this checkout the fixed one?" without running the engine. Pointed at `G:\IIPS-IPD-GATE-BUILD-CEC7080` (or `-Root <path>`) it checks: the checkout exists; the commit object is present; the commit is an ancestor of `HEAD`; all eight files are **byte-identical** to the commit; and each of the fifteen source/test/doc markers the commit introduced is present *verbatim*. With `-RunTests` it also exercises the CLI surface and the three suites. It writes nothing, makes no network call, sets no persistent variable, and **exits 0 only when every required check actually ran and passed** — a missing file, a locked file, missing git or missing Python is recorded as a failure, never as a pass. Exit 2 means the checkout was not found at all.
+
+The file contains no `else`, no `elseif` and no `finally`: every decision is an early return or an early exit, so there is no branch in which a check is skipped and the verdict still passes. `-AllowNoGit` / `-AllowNoPython` exist for a host that only inspects source; without them, an unverifiable commit identity or an unexercised CLI is a failure.
+
 ### 21.6 Non-claims and status
 
 * **Nothing here says Vishal's terms are unpublished.** The RHP states them as `[●]` by design; the official document that fills them is a configuration dependency.
