@@ -39,7 +39,11 @@ imply integration. Every collected case belongs to exactly one tier.
 Fast is not a replacement for full release validation. The existing workflow's
 mandatory/default `full` path and explicit `workflow_dispatch` full choice are
 unchanged; its pre-existing focused linkage choice does not prove full-suite
-acceptance. No CI failure handling, existing assertions, skips or production code changed.
+acceptance. Finalization adds a `pull_request` trigger targeting `main` because
+this integration cannot dispatch workflows (HTTP 403) and the prior push trigger
+names an older Arena branch. Pull requests execute the unchanged **full** job,
+including frontend and integrity checks. No CI failure handling, existing
+assertions, skips or production code changed.
 
 ## Optimization boundary
 
@@ -121,3 +125,15 @@ git diff --check
 
 Measured results and remaining limitations are recorded in
 [TEST_PERFORMANCE_RESULTS.md](TEST_PERFORMANCE_RESULTS.md).
+
+
+## Publication and remote evidence
+
+Published from `arena/cf756dd1-ipo-screening-engine` to
+[PR #10](https://github.com/ramkivs/ipo-screening-engine/pull/10), based on
+`dedb4b876cdc68bdf3023d9740dc13f6888b45b3`. The initial implementation and tracker
+commit is `96cd9bd548b24b86caa1f89e2c0ab0a6cf509cd8`; its follow-up changes only
+publication documentation/tracker and the two-line PR-trigger addition above.
+The PR's **Checks** tab and final verification comment are the authoritative
+remote CI/branch-state receipts; local benchmark timings are not GitHub runner
+timings. Publication does not authorize or claim a merge, release or deployment.

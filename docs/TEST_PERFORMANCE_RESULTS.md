@@ -92,7 +92,8 @@ canonical results or service state. No duplicate assertion was removed.
   function/class body in the eight modified test modules is unchanged
   (102 top-level test functions; parametrization also unchanged).
 - Updated README/RUNBOOK and added tier design and this results report. Existing
-  A9 full regression path, dispatch choice, and failure propagation unchanged.
+  A9 full regression job, dispatch choice, and failure propagation unchanged;
+  finalization adds the PR trigger described below.
 
 Uncached real-file coverage remains for Vishal, R.K., Jio, and Paras. Existing
 manual-term, discovered-prospectus and R.K. ingestion canaries retain the
@@ -176,6 +177,7 @@ modules were verified not to activate the cache.
 | Independently reproduced check | Result |
 |---|---|
 | Unfiltered backend, `--durations=30` | **1,914 passed**, 0 failed/skipped/deselected, **25 warnings**; pytest **1,002.76 s**, shell wall **1,004.233 s (16m44.233s)** |
+| Fast tier, independently rerun | **1,037 passed**, 877 explicitly deselected, 0 failed/skipped, **1 warning**; pytest **75.85 s**, shell wall **76.908 s** |
 | Cache accounting | **13,585 hits / 1,596 decoded pages / 1,596 strings**, identical to first optimized run |
 | Pass-9 | **88 passed**, 0 failed/skipped/deselected, **1 warning**; pytest **1.29 s**, shell wall **2.284 s** |
 | Frontend | **93 passed**, 0 failed/skipped; Node **1.137349414 s**, npm shell wall **1.292 s**; no test warnings |
@@ -196,11 +198,59 @@ repository's authoritative tracker exists, so reconciliation adds an 18th,
 documentation-only path (`handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md`)
 beyond the audited 17. Historical tracker entries are retained.
 
-## Git and artifacts
+## Publication, CI trigger correction and artifacts
 
-The user authorized commit, push and PR publication on the existing fixed branch
-in this finalization pass. No merge, release or deployment is implied. Remote
-publication/check receipts are separate from the locally reproduced results
-above and will be linked from the PR. Raw validation logs remain under
-`/home/user/test-performance/` in Arena (finalization reruns in `finalization/`),
-outside Git. Generated caches and the virtual environment remain ignored.
+- Authoritative remote: `https://github.com/ramkivs/ipo-screening-engine.git`.
+  Baseline fetched/verified as `dedb4b876cdc68bdf3023d9740dc13f6888b45b3`.
+- Initial implementation/docs/tracker commit:
+  `96cd9bd548b24b86caa1f89e2c0ab0a6cf509cd8`, pushed only to the fixed branch
+  `arena/cf756dd1-ipo-screening-engine`.
+- Published [PR #10](https://github.com/ramkivs/ipo-screening-engine/pull/10)
+  against `main`. Direct remote readback at that commit: **OPEN, MERGEABLE,
+  mergeStateStatus CLEAN**, 18 changed paths, no checks attached. This is a
+  timestamped initial-publication observation, not an assertion that no checks
+  can subsequently appear.
+- Explicit full dispatch of the existing A9 workflow failed with **HTTP 403,
+  Resource not accessible by integration**. The old automatic push trigger only
+  covers `arena/07f3439f-ipo-screening-engine`, not this branch. No successful
+  remote CI run was inferred from local tests or the absence of checks.
+- To obtain applicable full CI without extra approval or permissions, the
+  follow-up adds only `pull_request: branches: [main]` to that workflow's event
+  configuration. Its complete job, default full selection, manual choices,
+  frontend/integrity checks, permissions and failure propagation are unchanged.
+  PR events have no push `head_commit.message` linkage marker, so they select
+  **full**, not focused linkage. This intentional CI correction is a **19th**
+  changed path, beyond the original 17 and tracker reconciliation; no silent
+  expansion or accidental CI modification is claimed.
+- The PR's **Checks** tab and final verification comment hold remote run URLs,
+  exact tested SHA, status/conclusion and final branch/mergeability receipts.
+  Those are remote evidence, distinct from the locally reproduced measurements
+  above. The final published HEAD is available from PR `headRefOid` / the remote
+  branch; a commit cannot embed its own SHA in its tracked contents.
+- No merge, release or deployment is implied or performed by publication.
+  Production/scoring/schema/golden/fixture paths remain unchanged. Raw local logs
+  remain under `/home/user/test-performance/` in Arena, finalization reruns in
+  `finalization/`, outside Git; caches and `.venv` remain ignored. Prior local
+  baseline/optimized timing records are preserved without rewriting results.
+
+### Complete final changed-path manifest
+
+1. `.github/workflows/a9-contract-regression.yml` — PR trigger only (two lines).
+2. `README.md` — tier entry points.
+3. `docs/RUNBOOK.md` — operational tier commands.
+4. `docs/TEST_PERFORMANCE.md` — design, boundaries, controls, publication links.
+5. `docs/TEST_PERFORMANCE_RESULTS.md` — exact benchmark/verification evidence.
+6. `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` — bounded reconciliation.
+7. `tests/conftest.py` — opt-in fixture, markers, classification, cache summary.
+8. `tests/pdf_text_cache.py` — immutable-text-only helper.
+9. `tests/test_pdf_text_cache.py` — five isolation checks.
+10. `tests/test_suite_tiers.py` — one completeness guard.
+11. `tests/tier_inventory.py` — explicit integration inventory.
+12. `tests/test_cross_ipo_issue_term_provenance.py` — fixture activation only.
+13. `tests/test_derived_evidence_registration.py` — fixture activation/import only.
+14. `tests/test_extraction.py` — fixture activation only.
+15. `tests/test_official_discovery.py` — fixture activation only.
+16. `tests/test_rk_fashion_reconciliation.py` — fixture activation only.
+17. `tests/test_rpt_extraction.py` — fixture activation only.
+18. `tests/test_step5_auditor_and_manual_terms.py` — fixture activation only.
+19. `tests/test_ui7_ingestion.py` — fixture activation only.

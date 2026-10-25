@@ -1865,3 +1865,24 @@ All eight required Pass-9 paths existed in the tested final tree:
   boundaries; `docs/TEST_PERFORMANCE_RESULTS.md` preserves original and independent
   results/limitations. Publication and remote CI receipts are recorded on the PR
   separately from local regression evidence. No merge is requested by this entry.
+
+### Revision 17 publication reconciliation
+
+- Initial 18-path implementation/tracker commit
+  `96cd9bd548b24b86caa1f89e2c0ab0a6cf509cd8` is published on the fixed branch as
+  [PR #10](https://github.com/ramkivs/ipo-screening-engine/pull/10), base `main`.
+  Initial direct readback: OPEN, MERGEABLE, CLEAN; no merge performed.
+- Independent fast rerun: **1,037 passed**, 877 explicit deselections, 0 failed/
+  skipped, 1 warning, 75.85 s pytest / 76.908 s shell wall. The unfiltered rerun
+  still executes all 1,914 cases without deselections.
+- Full workflow dispatch was actually attempted and rejected with HTTP 403
+  (integration permission); the prior push trigger targets an older Arena branch.
+  The follow-up therefore deliberately adds a two-line `pull_request` event for
+  `main` to the existing A9 workflow, an explicit **19th** changed path. Its full
+  job, permissions, scope choices and failure propagation remain unchanged;
+  PR events select full. This is CI reachability repair, not test exclusion or
+  permission expansion. Complete changed-path manifest is in the results report.
+- Final remote run/SHA/conclusion and PR mergeability receipts belong on PR #10's
+  Checks tab and final verification comment, distinct from the local benchmark
+  evidence above. This entry does not pre-claim green CI, merge, release, source
+  qualification or Windows validation. Historical tracker entries remain intact.
