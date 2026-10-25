@@ -1767,3 +1767,62 @@ No failures required correction. The combined targeted run covered 41 aggregator
 - Target commit's GitHub Actions `regression` check: **SUCCESS**, completed 2026-10-24 19:26:35 UTC (run 40123391593).
 - PR #7 latest head check: **regression PASS**, completed 2026-10-25; PR remains **OPEN / UNMERGED**. The target is therefore remotely published for review, not integrated into `main`.
 - **Disposition:** Pass-9 implementation and tests were already present remotely; Arena independently executed all requested focused tests and confirmed both CLI flags. This revision records that evidence; it does not represent local Windows verification or a full-suite run.
+
+## Pass-9 post-merge integrity and regression closeout — 2026-10-25 (revision 16)
+
+**Scope:** one-pass post-merge verification against the fetched authoritative `main`. The historical target-commit evidence below is preserved and is not reused as proof of the final-`main` run. No Windows checkout was accessed; no Windows-local test is claimed.
+
+### Baseline frozen before testing
+
+- `git fetch --prune origin` and the required history fetch completed successfully. The checkout was initially shallow; `git fetch --unshallow origin` completed before ancestry verification. The tested baseline was clean, with the fixed session branch and `HEAD` both at `aef84b17463a638f4c6f9a0086bc6c9d780e1da6`.
+- `origin/main` was exactly `aef84b17463a638f4c6f9a0086bc6c9d780e1da6`; it had **not advanced** beyond the requested authoritative commit. Its subject is the PR #7 merge, its tree is `97b4dbbd9b5bc23c0dbaedf25efd3c454410e56c`, and its parents are `01ba66c12ca1195fd7acbd287c3e39a019808094` and `199629074a6130d620a07936fe9bf700534ce244`.
+- The tested tree was therefore the final merged `main`, not the earlier `a6f9bb3` snapshot. The working tree remained clean after the test/check phase; the local `.venv`, Python bytecode, and pytest caches are ignored environment output.
+
+### Target evidence versus final-main evidence
+
+- **Target-commit evidence, retained from revision 15:** at `a6f9bb3dd4647dad5b9546d466d6db8d0c2d3fd1`, the earlier Arena run reported **88 passed, 0 failed, 0 skipped** for the focused suite and confirmed the two CLI flags. That is historical evidence for the target commit only, not evidence for this final-main run.
+- **Final-main targeted command, executed here:**
+
+  ```text
+  PYTHONPATH="$PWD/engine" .venv/bin/python -m pytest -q tests/test_aggregator_issue_terms.py tests/test_issue_terms_cli.py tests/test_paras_extraction_gaps_20261024.py
+  ```
+
+  Exit `0`; **88 passed, 0 failed, 0 skipped** in 1.20 s. One warning was emitted: `StarletteDeprecationWarning` from `fastapi.testclient` because using `httpx` with `starlette.testclient` is deprecated and `httpx2` is recommended. The three module totals were 41 + 24 + 23.
+- **Final-main CLI command, executed here:** `PYTHONPATH="$PWD/engine" .venv/bin/python engine/tools/ipo_screen.py issue-terms --help`. Exit `0`. Help output contains both `--notice-url NOTICE_URL` and `--prospectus-url PROSPECTUS_URL`.
+
+### Broader regression and required checks
+
+The documented Python invocation was run in a fresh repository `.venv` after installing the pinned `requirements.txt` (Linux, Python 3.11.2). Node was v22.22.3 and npm was 10.9.8.
+
+- `PYTHONPATH="$PWD/engine" .venv/bin/python -m pytest tests/ -q` — **1908 collected and 1908 passed, 0 failed, 0 skipped**, exit `0`, 1635.50 s. The 25 warnings were all Starlette deprecation warnings: one `httpx`/`TestClient` warning and 24 `HTTP_422_UNPROCESSABLE_ENTITY` deprecations from the FastAPI routing path. No deselection or skip was used or concealed.
+- `npm --prefix frontend test` — **93 passed, 0 failed, 0 skipped**, exit `0`. npm printed only its available-version notice.
+- The workflow-required schema/integrity script passed: all four JSON schemas validated; `verify_frozen_core()` **PASS**; `verify_golden_result()` **PASS**; `verify_v1_6_implementation()` **PASS** (v1.6 inactive). `python -m compileall -q engine` exited `0`.
+- The pre-publication clean-tree checks `git diff --exit-code` and `git diff --check` both exited `0`. GitHub's PR #7 `regression` check also succeeded on its final pre-merge head `199629074a6130d620a07936fe9bf700534ce244` (run `40177190214`, completed 2026-10-25 08:55:28 UTC). GitHub returned no check-runs for the merge commit itself; the final-main full-suite and required checks above are the direct evidence for this closeout.
+
+### Eight-path and history integrity
+
+All eight required Pass-9 paths existed in the tested final tree:
+
+1. `engine/ipo_screening/aggregator_issue_terms.py`
+2. `engine/tools/ipo_screen.py`
+3. `engine/ipo_screening/extraction/financial_tables.py`
+4. `tests/test_aggregator_issue_terms.py`
+5. `tests/test_issue_terms_cli.py`
+6. `tests/test_paras_extraction_gaps_20261024.py`
+7. `docs/investigation/PARAS-INGESTION-FAILURE-2026-10-23.md`
+8. `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md`
+
+- `a6f9bb3` is an ancestor of final `origin/main`; `git merge-base a6f9bb3 origin/main` is exactly `a6f9bb3`. The PR #7 head `1996290` has the same tree as final `main`, so the merge introduced no tree drift. The final tree has no deletions relative to the target, PR #7 head, or PR #6 head. The six Pass-9 implementation/test blobs are byte-identical to the target. The Paras report and tracker intentionally have later documentation updates, so they are not incorrectly described as byte-identical; no Pass-9 code or test path was lost.
+- PR #6 head `e05c0efbca1ecb3024e52da73a22e180ea171118` is also an ancestor of final `main`; `git diff origin/main...e05c0efbca1ecb3024e52da73a22e180ea171118` is empty. No PR #6-only effective change remains. The absence of deletions, the exact merge-tree equality, the eight-path readback, and the clean pre-publication diff checks cover the accidental-change/missing-file check for this closeout.
+
+### PR #6 reconciliation and remote status
+
+- PR #6 was `OPEN` before this reconciliation, with head `e05c0efbca1ecb3024e52da73a22e180ea171118` on `arena/5dd3fe52-ipo-screening-engine` and base `arena/573e69a4-ipo-screening-engine`. Its effective diff against final `main` was empty; it was not merged and its commits were already incorporated through the PR #7 lineage.
+- PR #6 was therefore closed on 2026-10-25 with a factual comment citing the ancestor and empty effective diff. Remote readback confirms PR #6 is now **CLOSED**, `mergeCommit: null`; no distinct follow-up action remains. This is a lifecycle disposition, not a claim that the historical PR #6 branch was independently merged.
+- Final remote readback before this tracker publication: `git ls-remote origin refs/heads/main` resolved to `aef84b17463a638f4c6f9a0086bc6c9d780e1da6`; PR #7 is `MERGED` at that SHA; the fixed session branch remains the only branch used for this reconciliation. Tracker revision before this entry was **15**; this append-only reconciliation is **revision 16**. The publication commit and final post-publication remote SHA are supplied in the closeout receipt after the tracker change is integrated.
+
+### Remaining limitations and boundary
+
+- The full backend and frontend suites, local workflow-equivalent integrity checks, and targeted final-main run all passed. The only observed test warnings are the deprecations recorded above; they did not conceal failures or skips.
+- There is no separate GitHub Actions check attached to the final merge commit because the repository workflow is configured for the A9 branch push/workflow-dispatch boundary rather than `main`; the successful PR #7 check and the exact final-main local runs are not conflated with a post-merge GitHub check.
+- Windows-local validation remains **not run by Arena and not claimed**. Official-source reachability, browser acceptance, or any user-local Windows runtime behavior remains outside this remote Linux verification.
