@@ -1,3 +1,15 @@
+> **Revision19 — R.K. Windows investigation: BLOCKED, NOT REPAIRED.** The user
+> reports three failures on reconciled Windows (the earlier seven-failure list
+> is historical; no new native full-suite totals were supplied). Source columns independently
+> verified: post promoters72.22 + promoter group0.03 =72.25; Arena extracts it.
+> Controlled evidence removal proves44→40 is correct missing-value scoring,
+> not justification to award4 points. Native source/text/gates/canonical and
+> criterion trace remain absent. No parser/scorer/config/evidence patch selected.
+> Enhanced read-only diagnostic and real-filing missing-value regression added;
+> see `docs/RK_FASHION_WINDOWS_INVESTIGATION.md` for full criterion/provenance trace,
+> current validation, preservation audit and exact missing artifact. Windows
+> acceptance OPEN; PR#10 stays OPEN/unmerged, irrespective of green Linux CI.
+
 # IPO Screening Engine — Project Tracker (Personal-Use Status)
 
 > **Controlling status (A16, 2026-10-14):** Ramki's single-user personal-use objective controls this register. Routine in-scope investigation, implementation, testing, documentation, commit/push on the fixed session branch, and remote verification do not require renewed approval or an independent-review/canonical-selection ceremony. The detailed Candidate M/Phase history later in this file is retained for audit; any blanket procedural hold in it is superseded by A16. Concrete evidence and product-decision blockers remain active only for the specific metric behavior they affect. This is not a production, release, or enterprise programme.
@@ -2023,3 +2035,39 @@ All eight required Pass-9 paths existed in the tested final tree:
   its local harness modification; no hard-coded value, score adjustment or
   speculative parser change is made. One JSON diagnostic is the outstanding
   request, not another approval/plan or an unsupported completion claim.
+
+
+## Revision 19 — remaining R.K. Windows investigation publication
+
+- User's reconciled Windows report has three remaining failures (two post-holding
+  None vs72.25, UI7 score40 vs44). **Unresolved extraction cause; Windows acceptance
+  OPEN.** No native diagnostic/criterion record supplied. This is a concrete repair
+  blocker, not approval pending. Do not infer a parser/scorer fix from Linux green.
+- Original physical125/126 table and column meanings verified; lower/upper post
+  columns both showA72.22/B0.03. PublicC is excluded. Raw/canonical72.25 and existing
+  section-start processing-summary provenance traced; page106 is not a literal
+  table locator. No evidence is manufactured or changed.
+- Full criterion/penalty comparison: supported base47/final44, controlled missing
+  base43/final40; same−3 margin-spike deduction, all other criteria and penalties
+  identical. Unknown points33→37, available67→63, lower31→27, upper77 unchanged.
+  Missing-value scoring is correct in this controlled case; no independent native
+  scoring defect is established. New real-filing regression preserves this contract.
+- Diagnostic adds actual parser gates/rows/pages,11 source/config/harness byte
+  fingerprints and an opt-in in-memory full evaluation. No store/workbook/evidence/
+  harness writes. External-only exclusive output guard preserved and checked.
+- Arena/Linux: first focus11passed/1warning/39.16s; related42passed/3warnings/128.11s;
+  **full1,918passed,0failed/skipped/deselected,25warnings,947.53s** (pytest15m47s).
+  No tests removed; +1 regression. Cache14,106hits/1,596decoded. Frontend93passed,
+  nofail/skip; schemas4/frozen6/golden/inactivev1.6/pip/compile checks PASS.
+- Scope exactly4 paths vs43a49497: diagnostic, R.K. reconciliation test, this
+  tracker and docs/RK_FASHION_WINDOWS_INVESTIGATION.md. Combined PR25 paths.
+  Protected production/config/schema/fixture/evidence/CI/harness unchanged.
+  Source tree restored exactly43a49497 despite old Arena HEADdedb; parented scoped
+  commit reconciles metadata without reset/clean/restore/force push. Windows-local
+  uncommitted harness edit is unavailable here and never incidentally committed.
+- Publication and independent new full-CI JUnit receipt are in PR#10's revision19
+  closeout comment; PR stays OPEN/unmerged. **This publication is NOT an extraction
+  repair.** Exact outstanding artifact is a new external JSON from the SAME failing
+  interpreter: `python tests/diagnose_windows_portability.py --full-extraction
+  --score-trace --output "$env:TEMP\rk-windows-score-before-repair-19.json"`.
+  Preserve local restored captures/harness and collect before package/file repairs.

@@ -16,6 +16,7 @@ import locale
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
 
@@ -49,10 +50,40 @@ def capture(path, expected):
             "reencoded_crlf_sha256": digest(lf.replace(b"\n", b"\r\n"))}
 
 
+def capital_parser_trace(sections, limits):
+    """Observe the existing parser's gates; do not change its inputs/results."""
+    rows = []
+    for page in range(limits[0], min(limits[1], sections.page_count) + 1):
+        rows.extend((page, line.strip()) for line in sections.extract_page_text(page).split("\n")
+                    if line.strip())
+    lines = [line for _, line in rows]
+    totals = []
+    for index, (page, line) in enumerate(rows):
+        if not sections._TOTAL_A_LABEL.search(line):
+            continue
+        entry = {"page": page, "line": line, "section_line_index": index,
+                 "percentages": sections._row_percentages(lines, index),
+                 "post_context_matches": [
+                     {"page": rows[j][0], "line": lines[j], "distance": index - j}
+                     for j in range(max(0, index - 120), index)
+                     if sections._POST_ISSUE_CONTEXT.search(lines[j])], "b_total": None}
+        for j in range(index + 1, min(index + 200, len(lines))):
+            if re.search(r"Total\s*\(\s*B\s*\)", lines[j], re.IGNORECASE):
+                category = sections._promoter_category_before(lines, j)
+                entry["b_total"] = {"page": rows[j][0], "line": lines[j],
+                    "percentages": sections._row_percentages(lines, j),
+                    "category": category, "category_kind": sections._category_kind(category)}
+                break
+        totals.append(entry)
+    return totals
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--full-extraction", action="store_true",
                         help="Also build canonical R.K. input, without evaluation or persistence")
+    parser.add_argument("--score-trace", action="store_true",
+                        help="Also evaluate full canonical input in memory; no store or workbook writes")
     parser.add_argument("--output", type=Path,
                         help="Create a new UTF-8 JSON receipt outside the repository (never overwrite)")
     args = parser.parse_args()
@@ -75,6 +106,20 @@ def main():
     report["git_head"] = git("rev-parse", "HEAD")
     report["git_autocrlf"] = git("config", "--get", "core.autocrlf")
     report["harness_status"] = git("status", "--short", "--", "tests/gmp_mechanics_harness.py")
+    report["checkout_status"] = git("status", "--short")
+    report["implementation_hashes"] = {}
+    for relative in (
+        "engine/ipo_screening/extraction/pdf_source.py", "engine/ipo_screening/extraction/toc.py",
+        "engine/ipo_screening/extraction/sections.py", "engine/ipo_screening/extraction/extractor.py",
+        "engine/ipo_screening/extraction/builder.py", "engine/ipo_screening/canonical_input.py",
+        "engine/ipo_screening/derived.py", "engine/ipo_screening/scoring.py",
+        "engine/ipo_screening/pipeline.py", "config/ipo-config.v1.5.0.json",
+        "tests/gmp_mechanics_harness.py",
+    ):
+        raw = (ROOT / relative).read_bytes()
+        report["implementation_hashes"][relative] = {
+            "sha256": digest(raw), "normalized_lf_sha256": digest(raw.replace(b"\r\n", b"\n"))}
+
     try:
         checksum, relative = (ROOT / IG / "SHA256SUMS").read_text(encoding="utf-8").strip().split(maxsplit=1)
         captures = [capture(relative, checksum)]
@@ -101,7 +146,8 @@ def main():
         for number in (125, 126):
             text = reader.pages[number - 1].extract_text() or ""
             report["rk"]["pages"][number] = {"utf8_sha256": digest(text.encode("utf-8")), "text": text}
-        if args.full_extraction:
+        report["rk"]["capital_parser_gates"] = capital_parser_trace(sections, limits)
+        if args.full_extraction or args.score_trace:
             from ipo_screening.extraction import DocumentExtractor
             canonical, extraction = DocumentExtractor().extract_from_pdf(ROOT / RK, allow_fixture_fallbacks=False)
             report["rk"]["canonical_capital_structure"] = canonical["capital_structure"]
@@ -109,6 +155,14 @@ def main():
                 k: v for k, v in canonical.get("_evidence", {}).items()
                 if k.startswith("capital_structure.")}
             report["rk"]["page_routing"] = extraction.metadata.get("page_routing")
+            if args.score_trace:
+                from datetime import datetime, timezone
+                from ipo_screening.pipeline import evaluate, load_config
+                outcome = evaluate(canonical, load_config(ROOT / "config/ipo-config.v1.5.0.json"),
+                                   mode="final",
+                                   evaluation_datetime=datetime(2026, 10, 5, 12, tzinfo=timezone.utc))
+                report["rk"]["evaluation"] = outcome.record.to_dict()
+
     except Exception as exc:
         report["rk_error"] = repr(exc)
     try:

@@ -316,3 +316,40 @@ def test_defect3_operating_cash_flow_field_selection():
     cfo_crit = next(c for c in mod_a["criteria"] if c["criterion_id"] == "cfo_quality")
     assert cfo_crit["state"] == "SCORED"
     assert cfo_crit["score"] == 0.0
+
+
+def test_missing_promoter_post_holding_remains_unknown_not_four_earned_points():
+    """Real canonical input: losing source evidence is not a scoring repair.
+
+    This controlled intervention explains the reported 44 -> 40 symptom; it
+    deliberately does not claim to reproduce the native Windows extraction.
+    """
+    from copy import deepcopy
+
+    canonical, _ = DocumentExtractor().extract_from_pdf(RK_PDF, allow_fixture_fallbacks=False)
+    config = load_config(CONFIG_FILE)
+    at = datetime(2026, 10, 5, 12, tzinfo=timezone.utc)
+    supported = evaluate(canonical, config, mode="final", evaluation_datetime=at).record
+    missing_input = deepcopy(canonical)
+    missing_input["capital_structure"]["promoter_post_pct"] = None
+    missing_input.get("_evidence", {}).pop("capital_structure.promoter_post_pct", None)
+    missing = evaluate(missing_input, config, mode="final", evaluation_datetime=at).record
+
+    def criteria(record):
+        return {(m["module_id"], c["criterion_id"]): c
+                for m in record.score["modules"] for c in m["criteria"]}
+
+    yes, no = criteria(supported), criteria(missing)
+    key = ("D", "promoter_post_holding")
+    assert yes[key]["state"] == "SCORED"
+    assert yes[key]["score"] == 4.0
+    assert no[key]["state"] == "UNKNOWN"
+    assert no[key].get("score") is None
+    assert {k: v for k, v in yes.items() if k != key} == {k: v for k, v in no.items() if k != key}
+    assert supported.score["base_score"] == 47.0
+    assert missing.score["base_score"] == 43.0
+    assert supported.score["penalties_total"] == missing.score["penalties_total"] == -3.0
+    assert supported.penalties == missing.penalties
+    assert supported.score["final_score"] == 44.0
+    assert missing.score["final_score"] == 40.0
+    assert canonical["capital_structure"]["promoter_post_pct"] == 72.25
