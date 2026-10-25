@@ -137,3 +137,12 @@ publication documentation/tracker and the two-line PR-trigger addition above.
 The PR's **Checks** tab and final verification comment are the authoritative
 remote CI/branch-state receipts; local benchmark timings are not GitHub runner
 timings. Publication does not authorize or claim a merge, release or deployment.
+
+
+The code/CI head `3ba28f6f67998cb6c9b6b1abf5f4fcf5b75ee502` passed
+[full remote run 40194048213](https://github.com/ramkivs/ipo-screening-engine/actions/runs/40194048213):
+1,914 tests, zero failures/errors/skips, 1,048.850s JUnit suite time. Frontend,
+integrity, compileall and clean-tree steps passed. The results report records
+runner notices and the unavailable bulk-log/pytest-warning-count limitation.
+A documentation-only receipt follows that tested code head; its final SHA and
+full-CI result are verified separately in the PR's final comment.

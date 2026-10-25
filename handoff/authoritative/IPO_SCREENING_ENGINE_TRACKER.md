@@ -1886,3 +1886,25 @@ All eight required Pass-9 paths existed in the tested final tree:
   Checks tab and final verification comment, distinct from the local benchmark
   evidence above. This entry does not pre-claim green CI, merge, release, source
   qualification or Windows validation. Historical tracker entries remain intact.
+
+### Revision 17 remote full-CI receipt
+
+- Code/CI head **`3ba28f6f67998cb6c9b6b1abf5f4fcf5b75ee502`**, PR #10:
+  [Actions run 40194048213](https://github.com/ramkivs/ipo-screening-engine/actions/runs/40194048213)
+  **SUCCESS**, check-run/job **121170970031**, 12:39:09–12:57:09 UTC on
+  2026-10-25. Direct JUnit annotation: **1,914 tests, 0 failures, 0 errors,
+  0 skipped, 1,048.850s**. All backend/frontend/integrity/compileall/clean-tree
+  steps succeeded. These are remote API receipts, separate from Arena timings.
+- Post-run PR state **OPEN / MERGEABLE / CLEAN**, not merged; remote main stays
+  `dedb4b876cdc68bdf3023d9740dc13f6888b45b3`. All 19 remote file blobs match
+  local committed blobs. Synthetic PR merge `3d91b72241c058eb39d185f6cb368bd7391e7eed`
+  has the same tree as the code head; it is not a merge into main.
+- Remote action annotations warn about Node.js 20 actions being forced onto 24
+  and announce the Ubuntu 26 label migration. Bulk log download hit an external
+  results-host EOF, so remote pytest warning count/frontend count are not
+  independently asserted; local **25 warnings / frontend 93 passed** remain the
+  local evidence. Full counts and every step conclusion were recovered via API.
+- This receipt is documentation/tracker-only; tests and workflow unchanged from
+  the successful code/CI head. Final documentation-head SHA and its own remote
+  full-check receipt are recorded in PR #10's final verification comment. No
+  merge, release, deployment, production change or Windows validation implied.

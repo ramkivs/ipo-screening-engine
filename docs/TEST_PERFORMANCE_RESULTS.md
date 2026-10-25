@@ -233,6 +233,41 @@ beyond the audited 17. Historical tracker entries are retained.
   `finalization/`, outside Git; caches and `.venv` remain ignored. Prior local
   baseline/optimized timing records are preserved without rewriting results.
 
+### Remotely verified full CI receipt (code/CI head)
+
+- [Run **40194048213**](https://github.com/ramkivs/ipo-screening-engine/actions/runs/40194048213),
+  event `pull_request`, head **`3ba28f6f67998cb6c9b6b1abf5f4fcf5b75ee502`**:
+  **completed / success**. Job `regression` / check-run **121170970031** ran
+  2026-10-25 **12:39:09–12:57:09 UTC** (**18m00s** including setup/teardown).
+- Direct API readback of its JUnit notice: **tests 1,914; failures 0; errors 0;
+  skipped 0; suite time 1,048.850 s**. This is remote evidence, not the Arena
+  benchmark. The unchanged job's full target is `tests/`, with no marker filter.
+- Backend, frontend, schema/integrity, compileall and both clean-tree/diff checks
+  all returned **success**. The remote frontend step's count was not recovered
+  separately; **93 passed** above is the independently reproduced local count.
+- Remote check annotations separately report a Node.js 20 action-runtime
+  deprecation warning (actions forced to Node.js 24) and an `ubuntu-latest` →
+  Ubuntu 26 migration notice. These are runner/action notices, not pytest
+  warning counts. The remote pytest warning total was **not independently
+  retrieved**; the verified local total remains exactly **25**, unsuppressed.
+- Bulk `gh run view --log` retrieval failed with EOF at the redirect to the
+  external Actions results host, outside the sandbox's permitted hosts. No log
+  contents were fabricated. Completion, every step conclusion, exact JUnit
+  counts/time, and annotations were recovered directly through `api.github.com`.
+- PR API reported synthetic merge **`3d91b72241c058eb39d185f6cb368bd7391e7eed`**;
+  its tree **`33aff794bc804a2fcdefe1a81ce5c7c3889d4ab4`** exactly matches the
+  published code/CI head tree. All 19 published file blobs were independently
+  matched to the local committed tree through the contents API.
+- Direct post-run readback: PR #10 **OPEN, MERGEABLE, CLEAN**, `mergedAt: null`;
+  `origin/main` unchanged at the authoritative baseline. Only the fixed Arena
+  branch was pushed; no force push, merge, release or deployment.
+- This receipt's follow-up changes **only these documentation/tracker paths**:
+  `docs/TEST_PERFORMANCE.md`, `docs/TEST_PERFORMANCE_RESULTS.md`, and
+  `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md`. Test code and the
+  workflow are unchanged from the successfully tested code/CI head. The final
+  documentation-head SHA and its own completed full-CI run are recorded in the
+  PR's final verification comment (not conflated with the code-head run here).
+
 ### Complete final changed-path manifest
 
 1. `.github/workflows/a9-contract-regression.yml` — PR trigger only (two lines).
