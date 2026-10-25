@@ -1,0 +1,137 @@
+{
+  "engine/ipo_screening/gmp_binding.py": {
+    "branch": {
+      "present": true,
+      "sha256": "a46daa550b989cdf945763f72affdc54b183dc2480518edfa93a160950886b7f",
+      "lines": 170
+    },
+    "peer_line": {
+      "present": true,
+      "sha256": "a46daa550b989cdf945763f72affdc54b183dc2480518edfa93a160950886b7f",
+      "lines": 170
+    },
+    "integrated": {
+      "present": true,
+      "sha256": "a46daa550b989cdf945763f72affdc54b183dc2480518edfa93a160950886b7f",
+      "lines": 170
+    }
+  },
+  "engine/ipo_screening/gmp_evidence.py": {
+    "branch": {
+      "present": true,
+      "sha256": "fccef52b23707f50d982cb0056ebb6a5798f422661aa8e172977c25c7d6e295a",
+      "lines": 1362
+    },
+    "peer_line": {
+      "present": true,
+      "sha256": "fccef52b23707f50d982cb0056ebb6a5798f422661aa8e172977c25c7d6e295a",
+      "lines": 1362
+    },
+    "integrated": {
+      "present": true,
+      "sha256": "fccef52b23707f50d982cb0056ebb6a5798f422661aa8e172977c25c7d6e295a",
+      "lines": 1362
+    }
+  },
+  "engine/ipo_screening/gmp_policy.py": {
+    "branch": {
+      "present": true,
+      "sha256": "712b5764d635ca6918c57b02ea1fa07c9da0f808e547ec0d66761c2e5c1b71a8",
+      "lines": 88
+    },
+    "peer_line": {
+      "present": true,
+      "sha256": "712b5764d635ca6918c57b02ea1fa07c9da0f808e547ec0d66761c2e5c1b71a8",
+      "lines": 88
+    },
+    "integrated": {
+      "present": true,
+      "sha256": "712b5764d635ca6918c57b02ea1fa07c9da0f808e547ec0d66761c2e5c1b71a8",
+      "lines": 88
+    }
+  },
+  "engine/ipo_screening/connectors/coordinator.py": {
+    "branch": {
+      "present": true,
+      "sha256": "31fffaa8ff0e1289d3a04d41f1c576bb8a2d3d7b9a305f73a6bac6f93d0e5771",
+      "lines": 248
+    },
+    "peer_line": {
+      "present": true,
+      "sha256": "31fffaa8ff0e1289d3a04d41f1c576bb8a2d3d7b9a305f73a6bac6f93d0e5771",
+      "lines": 248
+    },
+    "integrated": {
+      "present": true,
+      "sha256": "31fffaa8ff0e1289d3a04d41f1c576bb8a2d3d7b9a305f73a6bac6f93d0e5771",
+      "lines": 248
+    }
+  },
+  "schema/gmp-qualification-binding.v1.schema.json": {
+    "branch": {
+      "present": true,
+      "sha256": "300ddb9085c02e51f1b0153e7a03aeed4b6c8a8f76fb51a707b1d82f238d5e1d",
+      "lines": 258
+    },
+    "peer_line": {
+      "present": true,
+      "sha256": "300ddb9085c02e51f1b0153e7a03aeed4b6c8a8f76fb51a707b1d82f238d5e1d",
+      "lines": 258
+    },
+    "integrated": {
+      "present": true,
+      "sha256": "300ddb9085c02e51f1b0153e7a03aeed4b6c8a8f76fb51a707b1d82f238d5e1d",
+      "lines": 258
+    }
+  },
+  "_diffstats_branch_vs_peer": {
+    "engine/ipo_screening/gmp_binding.py": "0\t170\tengine/ipo_screening/gmp_binding.py",
+    "engine/ipo_screening/gmp_evidence.py": "11\t51\tengine/ipo_screening/gmp_evidence.py",
+    "engine/ipo_screening/gmp_policy.py": "identical",
+    "engine/ipo_screening/connectors/coordinator.py": "0\t9\tengine/ipo_screening/connectors/coordinator.py",
+    "schema/gmp-qualification-binding.v1.schema.json": "0\t258\tschema/gmp-qualification-binding.v1.schema.json"
+  },
+  "_a9_tests": {
+    "tests/test_gmp_binding.py": {
+      "branch": true,
+      "peer_line": false,
+      "integrated": true
+    },
+    "tests/test_gmp_source_safeguards.py": {
+      "branch": true,
+      "peer_line": false,
+      "integrated": true
+    },
+    "tests/test_gmp_mechanics.py": {
+      "branch": true,
+      "peer_line": false,
+      "integrated": true
+    },
+    "tests/test_gmp_retained_inventory.py": {
+      "branch": true,
+      "peer_line": false,
+      "integrated": true
+    },
+    "tests/test_gmp_evidence_linkage.py": {
+      "branch": true,
+      "peer_line": true,
+      "integrated": true
+    },
+    "tests/test_a17_gmp_policy.py": {
+      "branch": true,
+      "peer_line": true,
+      "integrated": true
+    },
+    "tests/test_d1_d3_gmp_source_policy.py": {
+      "branch": true,
+      "peer_line": true,
+      "integrated": true
+    },
+    "tests/gmp_mechanics_harness.py": {
+      "branch": true,
+      "peer_line": false,
+      "integrated": true
+    }
+  },
+  "_direction": "diffstats are branch(d9012a2) -> peer(e8f9a28); \"0\\tN\" means the branch has N lines the peer line lacks"
+}

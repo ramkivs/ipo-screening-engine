@@ -1,0 +1,525 @@
+{
+  "artifactType": "official-index-history-alignment-validation",
+  "createdDate": "2026-10-13",
+  "sourceEndpoints": [
+    "https://www.nseindia.com/api/historicalOR/indicesHistory?indexType=NIFTY%2050&from=01-07-2026&to=13-10-2026",
+    "https://www.nseindia.com/api/historicalOR/vixhistory?from=01-07-2026&to=13-10-2026"
+  ],
+  "provenanceNote": "Hashes identify locally saved JSON file bytes. Retrieval timestamp was not recorded. Calculated returns are derived values, not source-reported observations.",
+  "inputs": [
+    {
+      "index": "NIFTY 50",
+      "file": "nse-nifty50-20260701-20261013.json",
+      "sha256": "8796E50DFE19BBDD887BCBCC29F7D609C26182EA9BB40DFF2BDDFDD876E4B17B",
+      "records": 70
+    },
+    {
+      "index": "INDIA VIX",
+      "file": "nse-india-vix-20260701-20261013.json",
+      "sha256": "A23ACBA678C0A8B0BD03F8DE53D7B5FBA63AA2CDACC0FDB35812777C7104D32A",
+      "records": 70
+    }
+  ],
+  "validation": {
+    "uniqueNiftySessions": 70,
+    "uniqueVixSessions": 70,
+    "sharedSessions": 70,
+    "niftyOnlySessions": [],
+    "vixOnlySessions": [],
+    "firstSharedSession": "2026-07-01",
+    "lastSharedSession": "2026-10-08",
+    "allSharedSessionsHaveBothCloses": true
+  },
+  "observations": [
+    {
+      "sessionDate": "2026-07-01",
+      "nifty50Close": 24005.85,
+      "nifty50CloseToCloseChangePct": null,
+      "indiaVixClose": 13.24,
+      "indiaVixCloseToCloseChangePct": null
+    },
+    {
+      "sessionDate": "2026-07-02",
+      "nifty50Close": 24175.7,
+      "nifty50CloseToCloseChangePct": 0.707536,
+      "indiaVixClose": 12.29,
+      "indiaVixCloseToCloseChangePct": -7.175227
+    },
+    {
+      "sessionDate": "2026-07-03",
+      "nifty50Close": 24270.85,
+      "nifty50CloseToCloseChangePct": 0.393577,
+      "indiaVixClose": 11.8,
+      "indiaVixCloseToCloseChangePct": -3.986981
+    },
+    {
+      "sessionDate": "2026-07-06",
+      "nifty50Close": 24430.35,
+      "nifty50CloseToCloseChangePct": 0.657167,
+      "indiaVixClose": 11.82,
+      "indiaVixCloseToCloseChangePct": 0.169492
+    },
+    {
+      "sessionDate": "2026-07-07",
+      "nifty50Close": 24398.7,
+      "nifty50CloseToCloseChangePct": -0.129552,
+      "indiaVixClose": 11.65,
+      "indiaVixCloseToCloseChangePct": -1.43824
+    },
+    {
+      "sessionDate": "2026-07-08",
+      "nifty50Close": 23882.05,
+      "nifty50CloseToCloseChangePct": -2.117531,
+      "indiaVixClose": 14.68,
+      "indiaVixCloseToCloseChangePct": 26.008584
+    },
+    {
+      "sessionDate": "2026-07-09",
+      "nifty50Close": 23962.8,
+      "nifty50CloseToCloseChangePct": 0.33812,
+      "indiaVixClose": 13.36,
+      "indiaVixCloseToCloseChangePct": -8.991826
+    },
+    {
+      "sessionDate": "2026-07-10",
+      "nifty50Close": 24206.9,
+      "nifty50CloseToCloseChangePct": 1.018662,
+      "indiaVixClose": 12.25,
+      "indiaVixCloseToCloseChangePct": -8.308383
+    },
+    {
+      "sessionDate": "2026-07-13",
+      "nifty50Close": 24211.0,
+      "nifty50CloseToCloseChangePct": 0.016937,
+      "indiaVixClose": 13.28,
+      "indiaVixCloseToCloseChangePct": 8.408163
+    },
+    {
+      "sessionDate": "2026-07-14",
+      "nifty50Close": 24052.05,
+      "nifty50CloseToCloseChangePct": -0.65652,
+      "indiaVixClose": 13.75,
+      "indiaVixCloseToCloseChangePct": 3.539157
+    },
+    {
+      "sessionDate": "2026-07-15",
+      "nifty50Close": 24078.5,
+      "nifty50CloseToCloseChangePct": 0.10997,
+      "indiaVixClose": 13.27,
+      "indiaVixCloseToCloseChangePct": -3.490909
+    },
+    {
+      "sessionDate": "2026-07-16",
+      "nifty50Close": 24072.75,
+      "nifty50CloseToCloseChangePct": -0.02388,
+      "indiaVixClose": 12.88,
+      "indiaVixCloseToCloseChangePct": -2.93896
+    },
+    {
+      "sessionDate": "2026-07-17",
+      "nifty50Close": 24334.3,
+      "nifty50CloseToCloseChangePct": 1.086498,
+      "indiaVixClose": 13.15,
+      "indiaVixCloseToCloseChangePct": 2.096273
+    },
+    {
+      "sessionDate": "2026-07-20",
+      "nifty50Close": 24238.5,
+      "nifty50CloseToCloseChangePct": -0.393683,
+      "indiaVixClose": 12.98,
+      "indiaVixCloseToCloseChangePct": -1.292776
+    },
+    {
+      "sessionDate": "2026-07-21",
+      "nifty50Close": 24187.7,
+      "nifty50CloseToCloseChangePct": -0.209584,
+      "indiaVixClose": 12.6,
+      "indiaVixCloseToCloseChangePct": -2.927581
+    },
+    {
+      "sessionDate": "2026-07-22",
+      "nifty50Close": 23996.25,
+      "nifty50CloseToCloseChangePct": -0.791518,
+      "indiaVixClose": 13.29,
+      "indiaVixCloseToCloseChangePct": 5.47619
+    },
+    {
+      "sessionDate": "2026-07-23",
+      "nifty50Close": 23869.6,
+      "nifty50CloseToCloseChangePct": -0.527791,
+      "indiaVixClose": 13.48,
+      "indiaVixCloseToCloseChangePct": 1.429646
+    },
+    {
+      "sessionDate": "2026-07-24",
+      "nifty50Close": 23767.45,
+      "nifty50CloseToCloseChangePct": -0.42795,
+      "indiaVixClose": 14.03,
+      "indiaVixCloseToCloseChangePct": 4.080119
+    },
+    {
+      "sessionDate": "2026-07-27",
+      "nifty50Close": 23995.95,
+      "nifty50CloseToCloseChangePct": 0.961399,
+      "indiaVixClose": 12.66,
+      "indiaVixCloseToCloseChangePct": -9.76479
+    },
+    {
+      "sessionDate": "2026-07-28",
+      "nifty50Close": 23985.35,
+      "nifty50CloseToCloseChangePct": -0.044174,
+      "indiaVixClose": 12.56,
+      "indiaVixCloseToCloseChangePct": -0.789889
+    },
+    {
+      "sessionDate": "2026-07-29",
+      "nifty50Close": 24250.2,
+      "nifty50CloseToCloseChangePct": 1.104216,
+      "indiaVixClose": 12.01,
+      "indiaVixCloseToCloseChangePct": -4.378981
+    },
+    {
+      "sessionDate": "2026-07-30",
+      "nifty50Close": 24317.15,
+      "nifty50CloseToCloseChangePct": 0.27608,
+      "indiaVixClose": 12.16,
+      "indiaVixCloseToCloseChangePct": 1.248959
+    },
+    {
+      "sessionDate": "2026-07-31",
+      "nifty50Close": 24383.6,
+      "nifty50CloseToCloseChangePct": 0.273264,
+      "indiaVixClose": 11.76,
+      "indiaVixCloseToCloseChangePct": -3.289474
+    },
+    {
+      "sessionDate": "2026-08-03",
+      "nifty50Close": 24774.3,
+      "nifty50CloseToCloseChangePct": 1.602306,
+      "indiaVixClose": 11.93,
+      "indiaVixCloseToCloseChangePct": 1.445578
+    },
+    {
+      "sessionDate": "2026-08-04",
+      "nifty50Close": 24614.9,
+      "nifty50CloseToCloseChangePct": -0.643409,
+      "indiaVixClose": 12.19,
+      "indiaVixCloseToCloseChangePct": 2.17938
+    },
+    {
+      "sessionDate": "2026-08-05",
+      "nifty50Close": 24624.65,
+      "nifty50CloseToCloseChangePct": 0.03961,
+      "indiaVixClose": 12.06,
+      "indiaVixCloseToCloseChangePct": -1.066448
+    },
+    {
+      "sessionDate": "2026-08-06",
+      "nifty50Close": 24636.0,
+      "nifty50CloseToCloseChangePct": 0.046092,
+      "indiaVixClose": 12.16,
+      "indiaVixCloseToCloseChangePct": 0.829187
+    },
+    {
+      "sessionDate": "2026-08-07",
+      "nifty50Close": 24570.65,
+      "nifty50CloseToCloseChangePct": -0.265262,
+      "indiaVixClose": 12.16,
+      "indiaVixCloseToCloseChangePct": 0.0
+    },
+    {
+      "sessionDate": "2026-08-10",
+      "nifty50Close": 24583.8,
+      "nifty50CloseToCloseChangePct": 0.053519,
+      "indiaVixClose": 12.25,
+      "indiaVixCloseToCloseChangePct": 0.740132
+    },
+    {
+      "sessionDate": "2026-08-11",
+      "nifty50Close": 24471.7,
+      "nifty50CloseToCloseChangePct": -0.455991,
+      "indiaVixClose": 11.86,
+      "indiaVixCloseToCloseChangePct": -3.183673
+    },
+    {
+      "sessionDate": "2026-08-12",
+      "nifty50Close": 24435.95,
+      "nifty50CloseToCloseChangePct": -0.146087,
+      "indiaVixClose": 11.69,
+      "indiaVixCloseToCloseChangePct": -1.43339
+    },
+    {
+      "sessionDate": "2026-08-13",
+      "nifty50Close": 24395.85,
+      "nifty50CloseToCloseChangePct": -0.164102,
+      "indiaVixClose": 11.42,
+      "indiaVixCloseToCloseChangePct": -2.309666
+    },
+    {
+      "sessionDate": "2026-08-14",
+      "nifty50Close": 24366.0,
+      "nifty50CloseToCloseChangePct": -0.122357,
+      "indiaVixClose": 11.31,
+      "indiaVixCloseToCloseChangePct": -0.963222
+    },
+    {
+      "sessionDate": "2026-08-17",
+      "nifty50Close": 24287.65,
+      "nifty50CloseToCloseChangePct": -0.321555,
+      "indiaVixClose": 11.33,
+      "indiaVixCloseToCloseChangePct": 0.176835
+    },
+    {
+      "sessionDate": "2026-08-18",
+      "nifty50Close": 24154.9,
+      "nifty50CloseToCloseChangePct": -0.546574,
+      "indiaVixClose": 11.39,
+      "indiaVixCloseToCloseChangePct": 0.529568
+    },
+    {
+      "sessionDate": "2026-08-19",
+      "nifty50Close": 24078.3,
+      "nifty50CloseToCloseChangePct": -0.31712,
+      "indiaVixClose": 11.32,
+      "indiaVixCloseToCloseChangePct": -0.614574
+    },
+    {
+      "sessionDate": "2026-08-20",
+      "nifty50Close": 24231.85,
+      "nifty50CloseToCloseChangePct": 0.637711,
+      "indiaVixClose": 10.76,
+      "indiaVixCloseToCloseChangePct": -4.946996
+    },
+    {
+      "sessionDate": "2026-08-21",
+      "nifty50Close": 24252.0,
+      "nifty50CloseToCloseChangePct": 0.083155,
+      "indiaVixClose": 11.2,
+      "indiaVixCloseToCloseChangePct": 4.089219
+    },
+    {
+      "sessionDate": "2026-08-24",
+      "nifty50Close": 24219.05,
+      "nifty50CloseToCloseChangePct": -0.135865,
+      "indiaVixClose": 11.53,
+      "indiaVixCloseToCloseChangePct": 2.946429
+    },
+    {
+      "sessionDate": "2026-08-25",
+      "nifty50Close": 24334.55,
+      "nifty50CloseToCloseChangePct": 0.476897,
+      "indiaVixClose": 11.08,
+      "indiaVixCloseToCloseChangePct": -3.902862
+    },
+    {
+      "sessionDate": "2026-08-26",
+      "nifty50Close": 24207.75,
+      "nifty50CloseToCloseChangePct": -0.52107,
+      "indiaVixClose": 10.57,
+      "indiaVixCloseToCloseChangePct": -4.602888
+    },
+    {
+      "sessionDate": "2026-08-27",
+      "nifty50Close": 24090.85,
+      "nifty50CloseToCloseChangePct": -0.482903,
+      "indiaVixClose": 11.07,
+      "indiaVixCloseToCloseChangePct": 4.730369
+    },
+    {
+      "sessionDate": "2026-08-28",
+      "nifty50Close": 24175.65,
+      "nifty50CloseToCloseChangePct": 0.352001,
+      "indiaVixClose": 10.68,
+      "indiaVixCloseToCloseChangePct": -3.523035
+    },
+    {
+      "sessionDate": "2026-08-31",
+      "nifty50Close": 24080.4,
+      "nifty50CloseToCloseChangePct": -0.393991,
+      "indiaVixClose": 11.19,
+      "indiaVixCloseToCloseChangePct": 4.775281
+    },
+    {
+      "sessionDate": "2026-09-01",
+      "nifty50Close": 24055.8,
+      "nifty50CloseToCloseChangePct": -0.102158,
+      "indiaVixClose": 11.49,
+      "indiaVixCloseToCloseChangePct": 2.680965
+    },
+    {
+      "sessionDate": "2026-09-02",
+      "nifty50Close": 23914.45,
+      "nifty50CloseToCloseChangePct": -0.587592,
+      "indiaVixClose": 11.59,
+      "indiaVixCloseToCloseChangePct": 0.870322
+    },
+    {
+      "sessionDate": "2026-09-03",
+      "nifty50Close": 23873.45,
+      "nifty50CloseToCloseChangePct": -0.171444,
+      "indiaVixClose": 11.34,
+      "indiaVixCloseToCloseChangePct": -2.157032
+    },
+    {
+      "sessionDate": "2026-09-04",
+      "nifty50Close": 23897.7,
+      "nifty50CloseToCloseChangePct": 0.101577,
+      "indiaVixClose": 10.68,
+      "indiaVixCloseToCloseChangePct": -5.820106
+    },
+    {
+      "sessionDate": "2026-09-07",
+      "nifty50Close": 23779.15,
+      "nifty50CloseToCloseChangePct": -0.496073,
+      "indiaVixClose": 11.16,
+      "indiaVixCloseToCloseChangePct": 4.494382
+    },
+    {
+      "sessionDate": "2026-09-08",
+      "nifty50Close": 23635.1,
+      "nifty50CloseToCloseChangePct": -0.605783,
+      "indiaVixClose": 11.23,
+      "indiaVixCloseToCloseChangePct": 0.62724
+    },
+    {
+      "sessionDate": "2026-09-09",
+      "nifty50Close": 23431.5,
+      "nifty50CloseToCloseChangePct": -0.861431,
+      "indiaVixClose": 11.92,
+      "indiaVixCloseToCloseChangePct": 6.144256
+    },
+    {
+      "sessionDate": "2026-09-10",
+      "nifty50Close": 23477.8,
+      "nifty50CloseToCloseChangePct": 0.197597,
+      "indiaVixClose": 11.8,
+      "indiaVixCloseToCloseChangePct": -1.006711
+    },
+    {
+      "sessionDate": "2026-09-11",
+      "nifty50Close": 23398.1,
+      "nifty50CloseToCloseChangePct": -0.33947,
+      "indiaVixClose": 12.29,
+      "indiaVixCloseToCloseChangePct": 4.152542
+    },
+    {
+      "sessionDate": "2026-09-15",
+      "nifty50Close": 23118.6,
+      "nifty50CloseToCloseChangePct": -1.194541,
+      "indiaVixClose": 13.43,
+      "indiaVixCloseToCloseChangePct": 9.275834
+    },
+    {
+      "sessionDate": "2026-09-16",
+      "nifty50Close": 23217.6,
+      "nifty50CloseToCloseChangePct": 0.428227,
+      "indiaVixClose": 13.17,
+      "indiaVixCloseToCloseChangePct": -1.935964
+    },
+    {
+      "sessionDate": "2026-09-17",
+      "nifty50Close": 23270.6,
+      "nifty50CloseToCloseChangePct": 0.228275,
+      "indiaVixClose": 12.29,
+      "indiaVixCloseToCloseChangePct": -6.681853
+    },
+    {
+      "sessionDate": "2026-09-18",
+      "nifty50Close": 23346.4,
+      "nifty50CloseToCloseChangePct": 0.325733,
+      "indiaVixClose": 11.39,
+      "indiaVixCloseToCloseChangePct": -7.323027
+    },
+    {
+      "sessionDate": "2026-09-21",
+      "nifty50Close": 23414.3,
+      "nifty50CloseToCloseChangePct": 0.290837,
+      "indiaVixClose": 11.25,
+      "indiaVixCloseToCloseChangePct": -1.229148
+    },
+    {
+      "sessionDate": "2026-09-22",
+      "nifty50Close": 23329.0,
+      "nifty50CloseToCloseChangePct": -0.364307,
+      "indiaVixClose": 11.0,
+      "indiaVixCloseToCloseChangePct": -2.222222
+    },
+    {
+      "sessionDate": "2026-09-23",
+      "nifty50Close": 23446.8,
+      "nifty50CloseToCloseChangePct": 0.504951,
+      "indiaVixClose": 10.35,
+      "indiaVixCloseToCloseChangePct": -5.909091
+    },
+    {
+      "sessionDate": "2026-09-24",
+      "nifty50Close": 23063.1,
+      "nifty50CloseToCloseChangePct": -1.636471,
+      "indiaVixClose": 12.69,
+      "indiaVixCloseToCloseChangePct": 22.608696
+    },
+    {
+      "sessionDate": "2026-09-25",
+      "nifty50Close": 23140.5,
+      "nifty50CloseToCloseChangePct": 0.335601,
+      "indiaVixClose": 12.16,
+      "indiaVixCloseToCloseChangePct": -4.176517
+    },
+    {
+      "sessionDate": "2026-09-28",
+      "nifty50Close": 22780.25,
+      "nifty50CloseToCloseChangePct": -1.556794,
+      "indiaVixClose": 13.64,
+      "indiaVixCloseToCloseChangePct": 12.171053
+    },
+    {
+      "sessionDate": "2026-09-29",
+      "nifty50Close": 22716.2,
+      "nifty50CloseToCloseChangePct": -0.281165,
+      "indiaVixClose": 13.41,
+      "indiaVixCloseToCloseChangePct": -1.686217
+    },
+    {
+      "sessionDate": "2026-09-30",
+      "nifty50Close": 22620.45,
+      "nifty50CloseToCloseChangePct": -0.421505,
+      "indiaVixClose": 13.49,
+      "indiaVixCloseToCloseChangePct": 0.59657
+    },
+    {
+      "sessionDate": "2026-10-01",
+      "nifty50Close": 22421.95,
+      "nifty50CloseToCloseChangePct": -0.877525,
+      "indiaVixClose": 14.46,
+      "indiaVixCloseToCloseChangePct": 7.190511
+    },
+    {
+      "sessionDate": "2026-10-05",
+      "nifty50Close": 22555.75,
+      "nifty50CloseToCloseChangePct": 0.596737,
+      "indiaVixClose": 14.78,
+      "indiaVixCloseToCloseChangePct": 2.213001
+    },
+    {
+      "sessionDate": "2026-10-06",
+      "nifty50Close": 22776.1,
+      "nifty50CloseToCloseChangePct": 0.976913,
+      "indiaVixClose": 13.61,
+      "indiaVixCloseToCloseChangePct": -7.916103
+    },
+    {
+      "sessionDate": "2026-10-07",
+      "nifty50Close": 22603.05,
+      "nifty50CloseToCloseChangePct": -0.759788,
+      "indiaVixClose": 13.89,
+      "indiaVixCloseToCloseChangePct": 2.057311
+    },
+    {
+      "sessionDate": "2026-10-08",
+      "nifty50Close": 22231.8,
+      "nifty50CloseToCloseChangePct": -1.642477,
+      "indiaVixClose": 15.28,
+      "indiaVixCloseToCloseChangePct": 10.007199
+    }
+  ]
+}

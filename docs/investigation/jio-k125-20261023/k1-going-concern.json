@@ -1,0 +1,99 @@
+{
+ "investigation_date": "2026-10-23",
+ "branch": "arena/07f3439f-ipo-screening-engine",
+ "branch_tip_at_start": "d894ba53f242987fdd89220032bd5c331760bb08",
+ "evaluation": "JIO-PLATFORMS-LIMITED-20261023-085751Z-final-29d9a601",
+ "retained_source": {
+  "path": "evidence/non-authoritative/jio/U72900GJ2019PLC110816_JIO.pdf",
+  "sha256": "72480c2e249eb8da19a23283ecc6dec74627ed3caa2f8c370684acf9a59a1b6d",
+  "pages": 591,
+  "type": "NON-AUTHORITATIVE retained filing copy (RHP), issuer-matched to Jio Platforms Limited (CIN U72900GJ2019PLC110816)"
+ },
+ "method": "Read-only. Existing artifacts and the retained PDF were inspected; the engine's own extractor and regexes were applied to page text in a probe script (no ingestion, no evaluation, no regression suite, no code change).",
+ "criterion": "K1 / going_concern_uncertainty",
+ "engine_disposition": {
+  "K1": "UNVERIFIED (missing: going_concern_uncertainty)",
+  "metric": {
+   "state": "UNKNOWN",
+   "reason": "the supplied input does not establish whether going-concern uncertainty exists"
+  },
+  "sibling_leaves": {
+   "auditor_opinion": "unqualified -> FALSE",
+   "net_worth_latest": "335976.9 -> FALSE (>0)"
+  }
+ },
+ "governing_rule": {
+  "config": "config/ipo-config.v1.5.0.json K1 required [auditor_opinion, going_concern_uncertainty, net_worth_latest]; when any(auditor_opinion in [qualified,adverse,disclaimer], flag going_concern_uncertainty, net_worth_latest < 0)",
+  "decision": "handoff/decisions/A19-k1-going-concern-positive-evidence.md (RAMKI-APPROVED 2026-10-20, decision D-1) \u2014 positive evidence only; absent paragraph, negated language and an unmodified opinion alone never set the field; negative-confirmation rule DEFERRED with four stated prerequisites",
+  "code": "engine/ipo_screening/extraction/sections.py::_going_concern_uncertainty_match (single consumer) + builder._pick_gov(..., None) + derived._going_concern_uncertainty (passthrough, absent -> UNKNOWN)",
+  "authoritative_source_note": "A19 is authoritative; the decision file is NOT present on this branch's handoff/decisions (it lives at commit ebb8a6c on the sibling line). See provenance_gap."
+ },
+ "evidence_found": [
+  {
+   "page": 321,
+   "what": "Independent Auditor's Examination Report on Restated Consolidated Financial Information, jointly issued by Deloitte Haskins & Sells LLP and Chaturvedi & Shah LLP, dated 7 October 2026 (UDINs 26100459QBZXUZ8355 / 26122179ZKMPTF3256).",
+   "use": "The report the engine scans."
+  },
+  {
+   "page": "321-324",
+   "what": "Full examination-report text: no going-concern paragraph, no 'material uncertainty related to going concern', no emphasis-of-matter paragraph, no adverse/disclaimer language; para 8 opinion unmodified.",
+   "use": "No positive evidence exists."
+  },
+  {
+   "page": 323,
+   "what": "Verbatim: 'Our opinion on the Special Purpose Interim Consolidated Financial Statements and Consolidated Financial Statements is not modified in respect of above matters with respect to our reliance on work done and the reports of the other auditors...'",
+   "use": "Modified-opinion absence is not going-concern absence (A19)."
+  },
+  {
+   "page": 430,
+   "what": "Note 47.4 'Non-adjusting events': (a) 'There are no audit qualification in auditor's report for the financial period / year ended 30th June, 2026, 30th June, 2025, 31st March, 2026, 31st March, 2025 and 31st March, 2024 which require adjustments.'; (b) 'There are no matters reported with respect to Other Legal and Regulatory Requirements in auditor's report for [the same five periods]'; (c) 'There are no Emphasis of matters in auditor's report for the period / year ended 30th June, 2026, 30th June, 2025, 31st March, 2026, 31st March, 2025 and 31st March, 2024.'",
+   "use": "NEW this pass: a scoped, five-period negative about qualifications, other legal/regulatory matters and EOM in the auditor's reports. It is silent on going concern, and it is in the notes, not the auditor's report."
+  },
+  {
+   "page": 253,
+   "what": "The only occurrence of the phrase 'going concern' in all 591 pages: '...all assets and liabilities of the optic fibre cable undertaking of RJIL stood transferred to and vested with JDFPL, at their carrying values, on a going concern basis with effect from March 31, 2019...' (Composite Scheme of Arrangement narrative).",
+   "use": "Accounting basis of a 2019 scheme transfer \u2014 not auditor uncertainty. Not evidence either way."
+  },
+  {
+   "page": "322 (para 5)",
+   "what": "The examination report relies on the auditors' reports dated 7 October 2026 (interim), 24 April 2026, 24 April 2025 and 22 April 2024 for the underlying consolidated financial statements. Those underlying reports are NOT reproduced in the filing.",
+   "use": "The documents that would carry an SA 570 material-uncertainty paragraph are referenced but absent from the retained corpus."
+  }
+ ],
+ "evidence_not_found": [
+  "'material uncertainty related to going concern' \u2014 0 occurrences in 591 pages",
+  "'significant doubt' / 'ability to continue as a going concern' \u2014 0 occurrences",
+  "'no material uncertainty' / negated uncertainty \u2014 0 occurrences (so the engine's polarity guard was never even reached)",
+  "the underlying statutory audit reports on the Consolidated Financial Statements for FY2024, FY2025, FY2026 and the June 2026 interim period",
+  "any management or director going-concern assertion"
+ ],
+ "technical_findings": {
+  "extraction_scan_ran": true,
+  "pages_scanned": [
+   320,
+   321,
+   322,
+   323,
+   324
+  ],
+  "page_status": "all READ (no FAILED/BLANK pages)",
+  "candidate_lost": false,
+  "assessment": "No evidence was lost between source and canonical input. The field is absent because no qualifying statement exists in the filing and A19 forbids deriving a negative from an unmodified opinion, from silence, or from a negated statement."
+ },
+ "classification": "SEMANTIC / GOVERNANCE (A19 negative-confirmation rule deferred). Not factual-missing in the ordinary sense: the filing is silent, and the reports that could speak are not in the corpus. Not technical.",
+ "is_unknown_justified": true,
+ "justification": "A19 (approved) requires UNKNOWN in exactly this state, and the critical_data list converts the missing flag into INSUFFICIENT_DATA rather than a favourable verdict. The recorded disposition is correct under the governing rule.",
+ "minimum_evidence_to_resolve_factually": [
+  "The statutory auditor's report(s) on the Consolidated Financial Statements for FY2026 (and the June 2026 interim statements), showing whether an SA 570 material-uncertainty section exists; or",
+  "an auditor confirmation scoped to going concern covering the same periods",
+  "both would be source evidence, not a rule change; either would set the field only if it contained positive uncertainty language"
+ ],
+ "governance_question": {
+  "exists": false,
+  "note": "A19 already answers the question and explicitly defers the negative rule. Re-opening it requires A19's four prerequisites: (1) evidence-coverage definition, (2) required-language specification, (3) false-negative measurement on filings that DO carry a paragraph, (4) re-score decision for historical records.",
+  "narrowed_question_this_pass": "If Ramki ever revisits it, the question is now sharper than 'silence': would note 47.4 (a)+(b)+(c) \u2014 an explicit, five-period negative for audit qualifications, other legal/regulatory matters and Emphasis of Matter \u2014 together with the examination report's silence, be accepted as a negative confirmation of going-concern uncertainty? A19's text says an unmodified opinion alone may not; it does not address this broader scoped negative.",
+  "why_not_auto_accepted": "An SA 570 material-uncertainty section is not a qualification and not an Emphasis of Matter, so a 'no qualification / no EOM' statement is logically silent on going concern. Accepting it would be a new rule with a false-negative boundary."
+ },
+ "recommended_next_action": "No action that changes the record. Optionally obtain the underlying auditor's reports (external evidence) in a later pass; otherwise leave K1 UNVERIFIED.",
+ "provenance_gap": "handoff/decisions/A19-k1-going-concern-positive-evidence.md is implemented in code but absent from this branch's handoff/decisions directory; it exists at commit ebb8a6c6b0d12e54228ec6b523bda025e927fb0b on the sibling line and is cited by the tracker. Recorded, not fixed (copying decision records across branches is a records action, not an investigation edit)."
+}

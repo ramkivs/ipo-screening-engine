@@ -1,0 +1,240 @@
+{
+  "artifactType": "investorgain-gmp-rendered-source-capture-manifest",
+  "status": "NON-AUTHORITATIVE INVESTIGATION EVIDENCE. Not a source approval, not an A9 qualification, not a qualifying GMP snapshot, and not an A9 required hash.",
+  "recordRef": "docs/investigation/A9-GMP-INVESTORGAIN-QUALIFICATION-2026-10-15.md",
+  "createdDate": "2026-10-15",
+  "publisherIssuePage": {
+    "url": "https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/",
+    "publisherPageId": "2369",
+    "displayedIssueName": "Tonbo Imaging India IPO"
+  },
+  "captureMethod": {
+    "tool": "functions.fetch_page",
+    "representation": "rendered Markdown text: the tool's JSON-decoded 'content' string for the stated chunk; not HTML and not provider response bytes",
+    "rawProviderResponseBytesCaptured": false,
+    "responseHeadersCaptured": false,
+    "exactReceiptTimeCaptured": false,
+    "toolCacheStatusDisclosed": false,
+    "directSandboxRetrieval": {
+      "possible": false,
+      "evidence": "curl -sS -m 8 https://www.investorgain.com/robots.txt from the sandbox returned 'curl: (35) OpenSSL SSL_connect: SSL_ERROR_SYSCALL in connection to www.investorgain.com:443' (sandbox egress allowlist). Run between 2026-10-15T12:29:51.831Z and 2026-10-15T12:34:24.387Z; exact time not recorded."
+    },
+    "transcription": "Each scratch input held the tool-returned content string in its JSON-escaped form as returned to the agent; it was JSON-decoded and written without adding a trailing newline. The tool result is not delivered to the sandbox filesystem, so transcription fidelity cannot be machine-verified against the tool output; invisible code points (for example emoji variation selectors) are the most likely to differ.",
+    "retrievalWindowBasis": "sandbox UTC clock read immediately before and after each sequential tool call. The window brackets the tool call; it does not establish when the publisher generated the content or whether the tool served cached content.",
+    "sandboxClockCheck": [
+      {
+        "sandboxBeforeUtc": "2026-10-15T12:37:15.200Z",
+        "githubApiDateHeader": "Thu, 15 Oct 2026 12:37:15 GMT",
+        "sandboxAfterUtc": "2026-10-15T12:37:15.495Z"
+      },
+      {
+        "sandboxBeforeUtc": "2026-10-15T12:37:15.496Z",
+        "githubApiDateHeader": "Thu, 15 Oct 2026 12:37:15 GMT",
+        "sandboxAfterUtc": "2026-10-15T12:37:15.740Z"
+      }
+    ],
+    "sandboxClockCheckResult": "consistent with https://api.github.com/ Date header to the header's one-second resolution",
+    "robotsCompliance": "robots.txt for User-agent * states 'Allow: /' (retained as ig-robots-txt). Only public HTML pages were requested; no API path was queried.",
+    "sha256Scope": "exact bytes of each retained local UTF-8 file as stored in this directory; never provider response bytes",
+    "fileEncoding": "UTF-8 without BOM; no trailing newline added",
+    "hashFormat": "SHA-256, uppercase hexadecimal (repository evidence convention)"
+  },
+  "artifacts": [
+    {
+      "id": "ig-tonbo-2369-gmp-chunk-0",
+      "url": "https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/",
+      "toolResultStatus": "success",
+      "toolPageTitle": "Tonbo Imaging India IPO GMP Today & History",
+      "chunkIndex": 0,
+      "totalChunks": 2,
+      "hasMore": true,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T12:29:10.103Z",
+        "notAfter": "2026-10-15T12:29:12.222Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T17:59:10.103+05:30",
+        "notAfter": "2026-10-15T17:59:12.222+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/investorgain-gmp-tonbo-2369-chunk-0.md",
+      "bytes": 8286,
+      "sha256": "EC6911AEBC53ABAC4BE5041D9F457BA86849416DCE168AADFB76624E737288F3",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": []
+    },
+    {
+      "id": "ig-tonbo-2369-gmp-chunk-1",
+      "url": "https://www.investorgain.com/gmp/tonbo-imaging-india-ipo/2369/",
+      "toolResultStatus": "success",
+      "toolPageTitle": "Tonbo Imaging India IPO GMP Today & History",
+      "chunkIndex": 1,
+      "totalChunks": 2,
+      "hasMore": false,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T12:29:50.668Z",
+        "notAfter": "2026-10-15T12:29:51.831Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T17:59:50.668+05:30",
+        "notAfter": "2026-10-15T17:59:51.831+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/investorgain-gmp-tonbo-2369-chunk-1-redacted.md",
+      "bytes": 2658,
+      "sha256": "08B43A6D7295E3EEAA999339B26667CA1A495087DF68E2809597B0A5B3379715",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": [
+        {
+          "id": "R1",
+          "removed": "user-comment section: comment-widget labels, four third-party comments (commenter display names, comment text, comment timestamps, permalinks) and the 'Post New Message' label",
+          "retainedAroundIt": "the '## Comments4' heading before it and the final page-title line after it",
+          "reason": "not GMP evidence; third-party personal data in a public repository",
+          "gmpContentRemoved": false
+        }
+      ]
+    },
+    {
+      "id": "ig-ipo-gmp-live-331-chunk-0",
+      "url": "https://www.investorgain.com/report/ipo-gmp-live/331/",
+      "toolResultStatus": "success",
+      "toolPageTitle": "IPO GMP Live | Latest Grey Market Premium Today",
+      "chunkIndex": 0,
+      "totalChunks": 4,
+      "hasMore": true,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T12:34:37.198Z",
+        "notAfter": "2026-10-15T12:34:38.218Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T18:04:37.198+05:30",
+        "notAfter": "2026-10-15T18:04:38.218+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/investorgain-ipo-gmp-live-331-chunk-0.md",
+      "bytes": 8395,
+      "sha256": "7F53B405FED442AC724E8A8A4F5A8FF724AA20D04B99AA2C276AA9A93C2ACD51",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": []
+    },
+    {
+      "id": "ig-ipo-gmp-live-331-chunk-2",
+      "url": "https://www.investorgain.com/report/ipo-gmp-live/331/",
+      "toolResultStatus": "success",
+      "toolPageTitle": "IPO GMP Live | Latest Grey Market Premium Today",
+      "chunkIndex": 2,
+      "totalChunks": 4,
+      "hasMore": true,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T12:35:02.011Z",
+        "notAfter": "2026-10-15T12:35:02.654Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T18:05:02.011+05:30",
+        "notAfter": "2026-10-15T18:05:02.654+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/investorgain-ipo-gmp-live-331-chunk-2-redacted.md",
+      "bytes": 6209,
+      "sha256": "0747316B5FDFCC873186C427F40569CA98B226A083626ED907D0A68ED5A3D631",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": [
+        {
+          "id": "R2",
+          "removed": "everything after the '## Comments1367' heading to the chunk boundary: comment-widget labels and third-party user comments (display names, one email address used as a display name, comment text, timestamps, permalinks)",
+          "retainedAroundIt": "the '## Comments1367' heading before it",
+          "reason": "not GMP evidence; third-party personal data in a public repository",
+          "gmpContentRemoved": false
+        }
+      ]
+    },
+    {
+      "id": "ig-disclaimer-4-chunk-0",
+      "url": "https://www.investorgain.com/article/disclaimer/4/",
+      "toolResultStatus": "success",
+      "toolPageTitle": "⚠️ Full Disclaimer and 💼 Advertiser Disclosure",
+      "chunkIndex": 0,
+      "totalChunks": 2,
+      "hasMore": true,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T12:35:22.034Z",
+        "notAfter": "2026-10-15T12:35:23.021Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T18:05:22.034+05:30",
+        "notAfter": "2026-10-15T18:05:23.021+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/investorgain-disclaimer-4-chunk-0-redacted.md",
+      "bytes": 5247,
+      "sha256": "FEBF7EDD32074893A870239EDF223C7F2F155AEB90C7D0EC9AAA09B634769A2B",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": [
+        {
+          "id": "R3",
+          "removed": "everything after the Company Information CIN line to the chunk boundary: broker authorised-person registration blocks (Angel One Limited, Zerodha Broking Limited), named individuals' contact details, broker link lists and the start of a broker advertisement",
+          "retainedAroundIt": "all GMP, data-accuracy, privacy and company-information sections before it",
+          "reason": "not GMP evidence; named individuals' contact details",
+          "gmpContentRemoved": false
+        }
+      ]
+    },
+    {
+      "id": "ig-robots-txt",
+      "url": "https://www.investorgain.com/robots.txt",
+      "toolResultStatus": "success",
+      "toolPageTitle": "",
+      "chunkIndex": 0,
+      "totalChunks": 1,
+      "hasMore": false,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T12:34:24.387Z",
+        "notAfter": "2026-10-15T12:34:25.443Z"
+      },
+      "retrievalWindowAsiaKolkata": {
+        "notBefore": "2026-10-15T18:04:24.387+05:30",
+        "notAfter": "2026-10-15T18:04:25.443+05:30",
+        "basis": "arithmetic conversion of the sandbox UTC window; not a publisher time"
+      },
+      "file": "source-captures/investorgain-robots.txt",
+      "bytes": 250,
+      "sha256": "BFAEBF2C594F4DAF8D3420AC42900D5A1705DC192A529AD26EAB30447F1BA804",
+      "hashScope": "exact bytes of this retained local file; not provider response bytes",
+      "redactions": []
+    }
+  ],
+  "derivedChecks": {
+    "tonboChunkJoin": "chunk 0 ends with 'Tonbo Imagin' and chunk 1 begins with 'g India'; direct concatenation yields 'Tonbo Imaging India', consistent with one rendered document split by the tool. Whether the two chunks came from one HTTP retrieval is not disclosed by the tool.",
+    "reassembledTonboPage": {
+      "procedure": "cat source-captures/investorgain-gmp-tonbo-2369-chunk-0.md source-captures/investorgain-gmp-tonbo-2369-chunk-1-redacted.md | sha256sum",
+      "bytes": 10944,
+      "sha256": "F3C0CE56743DA1D245E60898E4B669FFA322A997BB699C2FEA1A6C840AF74A31",
+      "hashScope": "concatenated bytes of the two retained local files (chunk 1 as redacted by R1); not provider response bytes"
+    }
+  },
+  "retrievedNotRetained": [
+    {
+      "url": "https://www.investorgain.com/report/ipo-gmp-live/331/",
+      "chunkIndex": 3,
+      "totalChunks": 4,
+      "retrievalWindowUtc": {
+        "notBefore": "2026-10-15T12:34:56.277Z",
+        "notAfter": "2026-10-15T12:34:57.259Z"
+      },
+      "reason": "contained only third-party user comments; no GMP figure, timestamp or publisher statement; not relied upon"
+    }
+  ],
+  "notRetrieved": [
+    {
+      "url": "https://www.investorgain.com/report/ipo-gmp-live/331/",
+      "chunkIndex": 1,
+      "reason": "further dashboard rows; the Tonbo row and the '--'/'0' rows relied upon are in chunks 0 and 2"
+    },
+    {
+      "url": "https://www.investorgain.com/article/disclaimer/4/",
+      "chunkIndex": 1,
+      "reason": "chunk 0 already contained the GMP, data-accuracy and company-information sections relied upon; chunk 1 content is unknown"
+    }
+  ],
+  "a9HashStatement": "The A9 decision defines no required GMP hash algorithm or subject. These digests establish integrity of the retained local files only; they do not establish source authenticity, provider-byte identity, or the truth of any GMP value."
+}

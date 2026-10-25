@@ -1,0 +1,29 @@
+[
+  {
+    "contract_version": 1,
+    "ingestion_id": "ing-fc0ce8366cbc430c",
+    "correlation_id": "ing-fc0ce8366cbc430c",
+    "filename": "U72900GJ2019PLC110816_JIO.pdf",
+    "mode": "final",
+    "status": "SUCCEEDED",
+    "started_at": "2026-10-23T08:50:33.456412Z",
+    "finished_at": "2026-10-23T08:50:55.235342Z",
+    "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-085055Z-final-4220b641",
+    "evaluation_run": true,
+    "persisted": true,
+    "is_duplicate": false,
+    "error_code": null,
+    "error_message": null,
+    "missing_fields": [],
+    "result": {
+      "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-085055Z-final-4220b641",
+      "ipo_id": "JIO-PLATFORMS-LIMITED",
+      "company_name": "JIO PLATFORMS LIMITED",
+      "evaluation_mode": "FINAL",
+      "final_score": 33.0,
+      "verdict": "INSUFFICIENT_DATA",
+      "confidence": "Low",
+      "is_duplicate": false
+    }
+  }
+]

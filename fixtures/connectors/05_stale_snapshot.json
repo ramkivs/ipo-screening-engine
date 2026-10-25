@@ -1,0 +1,10 @@
+{
+  "snapshot_id": "STALE-SUB-20260925",
+  "provider_id": "NSE-OFFICIAL-FEED",
+  "as_of": "2026-09-25T10:00:00Z",
+  "retrieval_timestamp": "2026-10-04T19:30:00Z",
+  "qib_x": 0.45,
+  "nii_x": 0.12,
+  "retail_x": 0.08,
+  "overall_x": 0.15
+}

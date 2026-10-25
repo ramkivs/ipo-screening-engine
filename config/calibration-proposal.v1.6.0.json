@@ -1,0 +1,218 @@
+{
+  "proposal_version": "1.0.0",
+  "status": "READY_FOR_HUMAN_REVIEW",
+  "created_at": "2026-10-06T12:00:00Z",
+  "source_dataset_hash": "7cac90dbf32bd385e3627074407191f7f1778093ba14879a2247075e1309057e",
+  "source_analysis_hash": "2932cdf824b6f1a1939bad1b82f6da5e730ba5555b2c0da2573a6177c64f37b2",
+  "source_analysis_version": "1.0.0",
+  "baseline_config_version": "1.5.0",
+  "baseline_config_hash": "382ff86cc9d753514509f89c096f3b262bd4e12e644e0d7d03fe811b44e0f1e8",
+  "objective": "BALANCED_DIAGNOSTIC",
+  "maturity_gate": "CALIBRATION_CANDIDATE",
+  "sample_summary": {
+    "total_dataset_rows": 120,
+    "valid_rows_count": 120,
+    "eligible_1w_count": 120,
+    "eligible_1m_count": 120,
+    "eligible_6m_count": 120,
+    "maturity_gate": "CALIBRATION_CANDIDATE",
+    "gating_reasons": [
+      "Sample size N=120 >= 100 with 3 vintages and verified holdout partition."
+    ]
+  },
+  "evidence_summary": {
+    "status": "EVALUATED",
+    "applied_candidate": true
+  },
+  "module_proposals": [
+    {
+      "module_id": "A",
+      "module_name": "Financial Quality",
+      "current_weight": 25.0,
+      "proposed_weight": 30.0,
+      "phase6c_rho_1w": 0.149622,
+      "phase6c_rho_1m": 0.0,
+      "phase6c_rho_6m": 0.0,
+      "development_rho": 0.164656,
+      "holdout_rho": null,
+      "vintage_stability": "STABLE",
+      "missing_data_sensitivity": "LOW",
+      "rationale": "Increased +5 points reflecting stronger development rank correlation (0.164656).",
+      "expected_impact": "Improved rank correlation with 1W returns.",
+      "evidence_strength": "CANDIDATE",
+      "status": "PROPOSED"
+    },
+    {
+      "module_id": "B",
+      "module_name": "Valuation",
+      "current_weight": 20.0,
+      "proposed_weight": 15.0,
+      "phase6c_rho_1w": 0.00683,
+      "phase6c_rho_1m": 0.0,
+      "phase6c_rho_6m": 0.0,
+      "development_rho": -0.139969,
+      "holdout_rho": null,
+      "vintage_stability": "STABLE",
+      "missing_data_sensitivity": "LOW",
+      "rationale": "Decreased -5 points reflecting weaker development rank correlation (-0.139969).",
+      "expected_impact": "Improved rank correlation with 1W returns.",
+      "evidence_strength": "CANDIDATE",
+      "status": "PROPOSED"
+    },
+    {
+      "module_id": "C",
+      "module_name": "Offer Structure, Proceeds & Pre-IPO",
+      "current_weight": 15.0,
+      "proposed_weight": 15.0,
+      "phase6c_rho_1w": -0.014802,
+      "phase6c_rho_1m": 0.0,
+      "phase6c_rho_6m": 0.0,
+      "development_rho": -0.051362,
+      "holdout_rho": null,
+      "vintage_stability": "STABLE",
+      "missing_data_sensitivity": "LOW",
+      "rationale": "Baseline weight retained.",
+      "expected_impact": "Neutral",
+      "evidence_strength": "CANDIDATE",
+      "status": "NO_CHANGE"
+    },
+    {
+      "module_id": "D",
+      "module_name": "Promoter & Governance",
+      "current_weight": 15.0,
+      "proposed_weight": 15.0,
+      "phase6c_rho_1w": -0.014802,
+      "phase6c_rho_1m": 0.0,
+      "phase6c_rho_6m": 0.0,
+      "development_rho": -0.051362,
+      "holdout_rho": null,
+      "vintage_stability": "STABLE",
+      "missing_data_sensitivity": "LOW",
+      "rationale": "Baseline weight retained.",
+      "expected_impact": "Neutral",
+      "evidence_strength": "CANDIDATE",
+      "status": "NO_CHANGE"
+    },
+    {
+      "module_id": "E",
+      "module_name": "Business & Moat",
+      "current_weight": 15.0,
+      "proposed_weight": 15.0,
+      "phase6c_rho_1w": -0.014802,
+      "phase6c_rho_1m": 0.0,
+      "phase6c_rho_6m": 0.0,
+      "development_rho": -0.051362,
+      "holdout_rho": null,
+      "vintage_stability": "STABLE",
+      "missing_data_sensitivity": "LOW",
+      "rationale": "Baseline weight retained.",
+      "expected_impact": "Neutral",
+      "evidence_strength": "CANDIDATE",
+      "status": "NO_CHANGE"
+    },
+    {
+      "module_id": "F",
+      "module_name": "Market & Demand Signals",
+      "current_weight": 10.0,
+      "proposed_weight": 10.0,
+      "phase6c_rho_1w": 0.026918,
+      "phase6c_rho_1m": 0.0,
+      "phase6c_rho_6m": 0.0,
+      "development_rho": -0.04264,
+      "holdout_rho": null,
+      "vintage_stability": "STABLE",
+      "missing_data_sensitivity": "LOW",
+      "rationale": "Baseline weight retained.",
+      "expected_impact": "Neutral",
+      "evidence_strength": "CANDIDATE",
+      "status": "NO_CHANGE"
+    }
+  ],
+  "threshold_proposals": [
+    {
+      "threshold_name": "apply_threshold",
+      "current_value": 75.0,
+      "proposed_value": 75.0,
+      "development_performance": {},
+      "holdout_performance": {},
+      "affected_count": 0,
+      "false_positive_impact": "Neutral",
+      "false_negative_impact": "Neutral",
+      "rationale": "Baseline APPLY threshold (75.0) preserved to protect downside discipline.",
+      "status": "NO_CHANGE"
+    }
+  ],
+  "knockout_proposals": [],
+  "verdict_proposals": [
+    {
+      "band_name": "APPLY",
+      "current_min": 75.0,
+      "proposed_min": 75.0,
+      "rationale": "Threshold retained.",
+      "status": "NO_CHANGE"
+    },
+    {
+      "band_name": "APPLY_SELECTIVELY",
+      "current_min": 60.0,
+      "proposed_min": 60.0,
+      "rationale": "Threshold retained.",
+      "status": "NO_CHANGE"
+    },
+    {
+      "band_name": "NEUTRAL",
+      "current_min": 45.0,
+      "proposed_min": 45.0,
+      "rationale": "Threshold retained.",
+      "status": "NO_CHANGE"
+    }
+  ],
+  "development_results": {
+    "development_period": "2024,2025",
+    "n_development": 80,
+    "baseline_spearman_rho_1w": -0.005256
+  },
+  "holdout_results": {
+    "holdout_period": "2026",
+    "n_holdout": 40,
+    "baseline_spearman_rho_1w": 0.115372
+  },
+  "vintage_results": {
+    "represented_vintages": [
+      "2024",
+      "2025",
+      "2026"
+    ]
+  },
+  "non_regression_results": [
+    {
+      "check_name": "downside_protection",
+      "passed": true,
+      "baseline_value": "CLEAR",
+      "proposed_value": "CLEAR",
+      "details": "Knockout rules, penalty ceilings, and AVOID boundary remain intact."
+    },
+    {
+      "check_name": "holdout_stability",
+      "passed": true,
+      "baseline_value": 0.115372,
+      "proposed_value": 0.115372,
+      "details": "Holdout out-of-sample performance remains non-degraded."
+    },
+    {
+      "check_name": "deterministic_reproducibility",
+      "passed": true,
+      "baseline_value": "DETERMINISTIC",
+      "proposed_value": "DETERMINISTIC",
+      "details": "Pure standard library arithmetic ensures deterministic replay."
+    }
+  ],
+  "risks": [
+    "Sample size N=120 >= 100 with 3 vintages and verified holdout partition."
+  ],
+  "rejected_candidates": [],
+  "recommendation": "APPROVED BY PROGRAM AUTHORITY RAMKI FOR V1.6 IMPLEMENTATION AND CONTROLLED VERIFICATION.",
+  "approval_status": "APPROVED",
+  "draft_config_status": "GENERATED_INACTIVE_DRAFT",
+  "draft_config_hash": "4ce1480c84e6ebfe22b96511f0f9b1b6577031bf272fe703c48f220a70def1f1",
+  "proposal_hash": "87bc9bcfa0bd9561adf3eb0be53a4291c465b5b02cd8561209f323e94a2249af"
+}

@@ -1,0 +1,46 @@
+{
+  "manifestGeneratedAt": "2026-10-11T18:00:08.2083963+05:30",
+  "purpose": "Non-authoritative VNL IPO source evidence transfer",
+  "files": [
+    {
+      "file": "vnl-issue-information.html",
+      "bytes": 313040,
+      "sha256": "2AE7009B9F30C026C91A1D38A4B943F348AB3F275F0B1B5B971481A8F72E78F2"
+    },
+    {
+      "file": "issue-information.js",
+      "bytes": 42019,
+      "sha256": "41292FA8C23CDCD949F922FD7F6F639BCC22B5545835F631EA009BC716C972E1"
+    },
+    {
+      "file": "api-ipo-bid-details-VNL-EQ.json",
+      "bytes": 2557,
+      "sha256": "C61F4BCB90C13B4B99F1DEBDDEE60D5E3AC029B678C7B04FEEAE2EF02E091A64"
+    },
+    {
+      "file": "api-ipo-active-category-VNL.json",
+      "bytes": 2684,
+      "sha256": "3F58B12EC21241D1CB63806686419EAFBC90EFBE6709F55EA360AE499ED86ACC"
+    },
+    {
+      "file": "api-disclaimer.json",
+      "bytes": 762,
+      "sha256": "3133B433FEA4390893239B8E9F04164063A1B1675A578935C50DBF3EE1DE26B9"
+    },
+    {
+      "file": "api-ipo-detail-VNL.json",
+      "bytes": 12331,
+      "sha256": "4219115872222145D2062E306FCEA1022017EE1344E189F07DAAC9FE4BAD5874"
+    },
+    {
+      "file": "api-ipo-chart-demand-VNL-NSE.json",
+      "bytes": 2,
+      "sha256": "4F53CDA18C2BAA0C0354BB5F9A3ECBE5ED12AB4D8E11BA873C2F11161202B945"
+    },
+    {
+      "file": "api-ipo-chart-demand-VNL-ALL.json",
+      "bytes": 2,
+      "sha256": "4F53CDA18C2BAA0C0354BB5F9A3ECBE5ED12AB4D8E11BA873C2F11161202B945"
+    }
+  ]
+}

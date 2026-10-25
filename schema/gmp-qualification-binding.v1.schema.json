@@ -1,0 +1,258 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "subject",
+    "sha256"
+  ],
+  "properties": {
+    "subject": {
+      "$ref": "#/$defs/subject"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ipo-screening-engine:gmp-qualification-binding:1",
+  "title": "A28.1 binding representation and integrity ONLY; not publisher approval",
+  "$defs": {
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "publisher_id",
+        "issuer_id",
+        "issue_id",
+        "publisher_issue_url",
+        "qualification_decision",
+        "qualification_scope",
+        "qualification_evidence",
+        "observation",
+        "evidence",
+        "selection",
+        "context"
+      ],
+      "properties": {
+        "contract_version": {
+          "const": "A28.1"
+        },
+        "publisher_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issue_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher_issue_url": {
+          "type": "string",
+          "pattern": "^https://[^/\\s]+/[^\\s]+$"
+        },
+        "qualification_decision": {
+          "$ref": "#/$defs/pin"
+        },
+        "qualification_scope": {
+          "$ref": "#/$defs/pin"
+        },
+        "qualification_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pin"
+          },
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "observation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_id",
+            "pct",
+            "as_of",
+            "trend"
+          ],
+          "properties": {
+            "source_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pct": {
+              "type": "string",
+              "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]*[1-9])?$"
+            },
+            "as_of": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            },
+            "trend": {
+              "enum": [
+                null,
+                "strong",
+                "flat",
+                "falling"
+              ]
+            }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "manifest",
+            "artifact_id",
+            "artifact",
+            "capture_start",
+            "capture_end",
+            "identity_quote",
+            "pct_quote",
+            "as_of_quote",
+            "trend_quote"
+          ],
+          "properties": {
+            "manifest": {
+              "$ref": "#/$defs/pin"
+            },
+            "artifact_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact": {
+              "$ref": "#/$defs/pin"
+            },
+            "capture_start": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            },
+            "capture_end": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            },
+            "identity_quote": {
+              "$ref": "#/$defs/quote"
+            },
+            "pct_quote": {
+              "$ref": "#/$defs/quote"
+            },
+            "as_of_quote": {
+              "$ref": "#/$defs/quote"
+            },
+            "trend_quote": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/quote"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy",
+            "adjudications"
+          ],
+          "properties": {
+            "policy": {
+              "const": "explicit-only-a1"
+            },
+            "adjudications": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/pin"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "evaluation_at",
+            "mode",
+            "engine_version",
+            "spec_version",
+            "config_sha256",
+            "policy_refs"
+          ],
+          "properties": {
+            "evaluation_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            },
+            "mode": {
+              "const": "FINAL"
+            },
+            "engine_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "spec_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "config_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "policy_refs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/pin"
+              },
+              "uniqueItems": true,
+              "minItems": 1
+            }
+          }
+        }
+      }
+    },
+    "pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "sha256"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "pattern": "^(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9][A-Za-z0-9_.-]*(?:#[A-Za-z0-9_.:/-]+)?$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "quote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "locator",
+        "quote"
+      ],
+      "properties": {
+        "locator": {
+          "type": "string",
+          "pattern": "^line [1-9][0-9]*$"
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

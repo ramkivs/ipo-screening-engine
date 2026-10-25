@@ -1,0 +1,2198 @@
+"""Presentation read-model and explicit personal-use workflow service.
+
+Read methods project on-disk evaluation, observation, dataset, analytics, and
+configuration records. Separate filing-ingestion and evaluation-lifecycle
+methods perform the narrowly scoped local writes; no method scores an IPO or
+changes screening configuration.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import logging
+from datetime import datetime, timezone
+import shutil
+import tempfile
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+from ..evaluation import EvaluationStore
+from ..extraction import DocumentExtractor
+from ..lifecycle import (
+    ACTIVE_RATIFIED_CONFIG_HASH,
+    CyclicLineageError,
+    EvaluationNotFoundError,
+    InvalidStateTransitionError,
+    LIFECYCLE_STATE_ACTIVE,
+    LIFECYCLE_STATE_SUPERSEDED,
+    LifecycleManager,
+    OPERATIONAL_STATUS_ACTIVE,
+    OPERATIONAL_STATUS_ARCHIVED,
+    OPERATIONAL_STATUS_SUPERSEDED,
+    ProtectedRecordError,
+    VISIBILITY_STATE_ARCHIVED,
+    VISIBILITY_STATE_VISIBLE,
+)
+from ..pipeline import evaluate, load_config
+from ..post_listing.models import PostListingObservation
+from ..post_listing.storage import list_observations
+from ..post_listing.v16_implementation import (
+    GOLDEN_RESULT_HASH,
+    V1_5_BASELINE_VERSION,
+    V1_5_RAW_SHA256,
+    V1_6_CONFIG_VERSION,
+    verify_frozen_core,
+)
+from .ingestion_activity import IngestionActivityStore, IngestionRecorder
+from .models import (
+    MarketBlockState,
+    ApiMeta,
+    BacktestAnalyticsResponse,
+    BacktestDatasetListResponse,
+    BacktestDatasetSummary,
+    CalibrationProposal,
+    CalibrationProposalListResponse,
+    ConfigLifecycleItem,
+    ConfigurationStatusResponse,
+    CriterionScore,
+    EvaluationDetail,
+    EvaluationListResponse,
+    EvaluationScoreDetail,
+    EvaluationSummary,
+    EvidenceDetail,
+    EvidenceResponse,
+    HorizonPerformance,
+    IngestionResponse,
+    IpoDetail,
+    IpoHistoryResponse,
+    IpoListResponse,
+    IpoSummary,
+    KnockoutRule,
+    KnockoutSummary,
+    LifecycleActionRequest,
+    LifecycleActionResponse,
+    MissingUnverifiedItem,
+    ModuleScore,
+    PenaltyItem,
+    PerformanceSummaryResponse,
+    PostListingObservationItem,
+    PostListingObservationsResponse,
+)
+
+
+class IngestionError(Exception):
+    """Base exception for document ingestion and evaluation workflow."""
+
+
+class IngestionValidationError(IngestionError):
+    """Input validation failure for uploaded filing."""
+
+
+class IngestionPayloadTooLargeError(IngestionError):
+    """Uploaded filing payload exceeds maximum permitted size."""
+
+
+class IngestionExtractionError(IngestionError):
+    """Document entity extraction pipeline failure."""
+
+
+class IngestionEvaluationError(IngestionError):
+    """Deterministic evaluation pipeline failure."""
+
+
+class IngestionAwaitingIssueTermsError(IngestionError):
+    """Required issue terms are not yet available from official sources.
+
+    Raised when an uploaded filing leaves required issue terms
+    undisclosed and the runtime issue-terms resolver cannot supply them
+    from verified official evidence. Nothing is evaluated or persisted.
+    """
+
+    def __init__(self, message: str, *, missing_fields: list, resolution: Optional[dict] = None):
+        super().__init__(message)
+        self.missing_fields = list(missing_fields)
+        self.resolution = resolution or {}
+
+
+
+class IngestionIssueTermConflictError(IngestionError):
+    """Manually entered issue terms conflict with existing values.
+
+    Raised before anything is evaluated or persisted; the caller must
+    explicitly confirm the resolution. Confirmation never upgrades
+    manual provenance to verified provenance.
+    """
+
+    def __init__(self, message: str, *, conflicts: list):
+        super().__init__(message)
+        self.conflicts = list(conflicts)
+
+
+from ..aggregator_issue_terms import authority_warnings
+
+
+class PresentationConfig:
+    """Configuration paths for PresentationService."""
+
+    def __init__(
+        self,
+        store_root: str | Path = "build/evaluations",
+        config_dir: str | Path = "config",
+        dataset_path: Optional[str | Path] = "build/dataset/dataset.json",
+        analytics_path: Optional[str | Path] = "build/analytics/analytics.json",
+        proposal_path: Optional[str | Path] = "config/calibration-proposal.v1.6.0.json",
+        issue_terms_resolver: Optional[Any] = None,
+        aggregator_issue_terms_resolver: Optional[Any] = None,
+    ) -> None:
+        self.store_root = Path(store_root)
+        self.config_dir = Path(config_dir)
+        self.dataset_path = Path(dataset_path) if dataset_path else None
+        self.analytics_path = Path(analytics_path) if analytics_path else None
+        self.proposal_path = Path(proposal_path) if proposal_path else None
+        self.issue_terms_resolver = issue_terms_resolver
+        self.aggregator_issue_terms_resolver = aggregator_issue_terms_resolver
+
+
+class PresentationService:
+    """Read-only service projecting domain models from immutable filesystem records."""
+
+    def __init__(self, config: Optional[PresentationConfig] = None) -> None:
+        self.config = config or PresentationConfig()
+        if self.config.issue_terms_resolver is None:
+            from ..issue_terms import build_resolver_from_env
+
+            self.config.issue_terms_resolver = build_resolver_from_env()
+        if self.config.aggregator_issue_terms_resolver is None:
+            from ..aggregator_issue_terms import build_from_env
+            self.config.aggregator_issue_terms_resolver = build_from_env()
+        self.eval_store = EvaluationStore(self.config.store_root)
+        self.lifecycle_mgr = LifecycleManager(self.config.store_root, active_config_hash=ACTIVE_RATIFIED_CONFIG_HASH)
+        # Ingestion diagnostics live beside (never inside) the immutable
+        # evaluation store: a failed ingestion has a durable activity
+        # trace without producing an evaluation artifact.
+        self.activity_store = IngestionActivityStore(
+            Path(self.config.store_root).parent / "ingestion-activity"
+        )
+
+    # -------------------------------------------------------------------------
+    # System Metadata
+    # -------------------------------------------------------------------------
+
+    def get_meta(self) -> ApiMeta:
+        return ApiMeta(
+            api_version="v1",
+            engine_version="1.5.0",
+            spec_version="1.5",
+            active_config_version=V1_5_BASELINE_VERSION,
+            candidate_config_version=V1_6_CONFIG_VERSION,
+            candidate_config_status="IMPLEMENTED_INACTIVE",
+            golden_result_hash=GOLDEN_RESULT_HASH,
+            read_only=False,
+        )
+
+    # -------------------------------------------------------------------------
+    # IPO Discovery & Details
+    # -------------------------------------------------------------------------
+
+    def list_ipos(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        search: Optional[str] = None,
+        sector_profile: Optional[str] = None,
+    ) -> IpoListResponse:
+        """Discover and aggregate evaluated IPOs from the store."""
+        eval_ids = self.eval_store.list_evaluations()
+        ipos_map: Dict[str, Dict[str, Any]] = {}
+
+        for eid in eval_ids:
+            try:
+                rec = self.eval_store.read(eid)
+            except Exception:
+                continue
+
+            ipo_id = rec.get("ipo_id")
+            if not ipo_id:
+                continue
+
+            if ipo_id not in ipos_map:
+                ipos_map[ipo_id] = {
+                    "ipo_id": ipo_id,
+                    "company_name": rec.get("company_name", ipo_id),
+                    "sector_profile": (rec.get("input_snapshot") or {}).get("sector_profile"),
+                    "evaluations": [],
+                }
+            ipos_map[ipo_id]["evaluations"].append(rec)
+
+        # Build summaries
+        summaries: List[IpoSummary] = []
+        for ipo_id, data in sorted(ipos_map.items()):
+            # Filters
+            c_name = str(data["company_name"])
+            if search:
+                s_lower = search.lower()
+                if s_lower not in ipo_id.lower() and s_lower not in c_name.lower():
+                    continue
+
+            sec_prof = data["sector_profile"]
+            if sector_profile and sec_prof != sector_profile:
+                continue
+
+            evals = data["evaluations"]
+            # Mode-scoped explicit active evaluation selection
+            active_id = self.lifecycle_mgr.get_active_evaluation_id(ipo_id, mode="final")
+            if not active_id:
+                active_id = self.lifecycle_mgr.get_active_evaluation_id(ipo_id, mode="preliminary")
+
+            active_rec = next((r for r in evals if r.get("evaluation_id") == active_id), None) if active_id else None
+            if not active_rec:
+                # Fallback to latest valid evaluation with active ratified config_hash
+                ratified = [
+                    r for r in evals
+                    if r.get("config_hash") == ACTIVE_RATIFIED_CONFIG_HASH
+                ]
+                candidates = ratified if ratified else evals
+                candidates.sort(key=lambda x: str(x.get("evaluation_timestamp", "")), reverse=True)
+                active_rec = candidates[0] if candidates else {}
+
+            score_data = active_rec.get("score") or {}
+            verdict_data = active_rec.get("verdict") or {}
+
+            # Count historical and archived runs
+            hist_cnt = 0
+            arch_cnt = 0
+            active_eid = active_rec.get("evaluation_id")
+            for r in evals:
+                eid = r.get("evaluation_id")
+                if eid == active_eid:
+                    continue
+                lc = self.lifecycle_mgr.get_lifecycle(eid)
+                if lc and lc.visibility_state == VISIBILITY_STATE_ARCHIVED:
+                    arch_cnt += 1
+                else:
+                    hist_cnt += 1
+
+            summaries.append(
+                IpoSummary(
+                    ipo_id=ipo_id,
+                    company_name=c_name,
+                    sector_profile=sec_prof,
+                    evaluation_count=len(evals),
+                    historical_count=hist_cnt,
+                    archived_count=arch_cnt,
+                    latest_evaluation_id=active_rec.get("evaluation_id"),
+                    latest_evaluation_mode=active_rec.get("evaluation_mode"),
+                    latest_score=score_data.get("final_score"),
+                    latest_verdict=verdict_data.get("verdict"),
+                    latest_confidence=score_data.get("confidence"),
+                )
+            )
+
+        # Pagination
+        total = len(summaries)
+        page = max(1, page)
+        page_size = max(1, min(100, page_size))
+        pages = max(1, (total + page_size - 1) // page_size) if total > 0 else 1
+        start_idx = (page - 1) * page_size
+        paged_items = summaries[start_idx : start_idx + page_size]
+
+        return IpoListResponse(
+            items=paged_items,
+            total=total,
+            page=page,
+            page_size=page_size,
+            pages=pages,
+        )
+
+    def get_ipo_detail(self, ipo_id: str, include_archived: bool = True) -> Optional[IpoDetail]:
+        """Retrieve detailed IPO record and its evaluation timeline."""
+        eval_ids = self.eval_store.list_evaluations()
+        matched_evals: List[Dict[str, Any]] = []
+        company_name = ipo_id
+        sector_profile = None
+        icdr_route = None
+
+        for eid in eval_ids:
+            try:
+                rec = self.eval_store.read(eid)
+            except Exception:
+                continue
+
+            if rec.get("ipo_id") == ipo_id:
+                if not include_archived:
+                    lc = self.lifecycle_mgr.get_lifecycle(eid)
+                    if lc and lc.visibility_state == VISIBILITY_STATE_ARCHIVED:
+                        continue
+                matched_evals.append(rec)
+                company_name = rec.get("company_name", company_name)
+                inp = rec.get("input_snapshot") or {}
+                if not sector_profile:
+                    sector_profile = inp.get("sector_profile")
+                if not icdr_route:
+                    icdr_route = inp.get("icdr_route")
+
+        if not matched_evals:
+            return None
+
+        # Sort evaluations chronologically
+        matched_evals.sort(key=lambda x: str(x.get("evaluation_timestamp", "")))
+
+        eval_summaries = [self._to_evaluation_summary(rec) for rec in matched_evals]
+
+        return IpoDetail(
+            ipo_id=ipo_id,
+            company_name=company_name,
+            sector_profile=sector_profile,
+            icdr_route=icdr_route,
+            evaluations=eval_summaries,
+        )
+
+    def get_ipo_history(self, ipo_id: str, include_archived: bool = False) -> Optional[IpoHistoryResponse]:
+        """Retrieve chronological evaluation history and preliminary-to-final delta."""
+        detail = self.get_ipo_detail(ipo_id, include_archived=include_archived)
+        if not detail:
+            return None
+
+        # Look for preliminary delta in any FINAL evaluation
+        delta = None
+        for eid in self.eval_store.list_evaluations():
+            try:
+                rec = self.eval_store.read(eid)
+            except Exception:
+                continue
+            if rec.get("ipo_id") == ipo_id and rec.get("preliminary_delta"):
+                delta = rec.get("preliminary_delta")
+                break
+
+        return IpoHistoryResponse(
+            ipo_id=ipo_id,
+            company_name=detail.company_name,
+            history=detail.evaluations,
+            delta=delta,
+        )
+
+    # -------------------------------------------------------------------------
+    # Evaluation Discovery & Scorecard
+    # -------------------------------------------------------------------------
+
+    def list_evaluations(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        ipo_id: Optional[str] = None,
+        mode: Optional[str] = None,
+        verdict: Optional[str] = None,
+        confidence: Optional[str] = None,
+        engine_version: Optional[str] = None,
+        config_version: Optional[str] = None,
+    ) -> EvaluationListResponse:
+        """List evaluations with deterministic filtering."""
+        eval_ids = self.eval_store.list_evaluations()
+        matched: List[EvaluationSummary] = []
+
+        for eid in eval_ids:
+            try:
+                rec = self.eval_store.read(eid)
+            except Exception:
+                continue
+
+            # Filtering
+            if ipo_id and rec.get("ipo_id") != ipo_id:
+                continue
+            if mode and str(rec.get("evaluation_mode", "")).upper() != mode.upper():
+                continue
+            verdict_val = (rec.get("verdict") or {}).get("verdict")
+            if verdict and verdict_val != verdict:
+                continue
+            conf_val = (rec.get("score") or {}).get("confidence") or (rec.get("confidence") or {}).get("level")
+            if confidence and conf_val != confidence:
+                continue
+            if engine_version and rec.get("engine_version") != engine_version:
+                continue
+            if config_version and rec.get("config_version") != config_version:
+                continue
+
+            matched.append(self._to_evaluation_summary(rec))
+
+        # Deterministic sorting: timestamp descending, then evaluation_id ascending
+        matched.sort(key=lambda x: (x.evaluation_timestamp, x.evaluation_id), reverse=True)
+
+        total = len(matched)
+        page = max(1, page)
+        page_size = max(1, min(100, page_size))
+        pages = max(1, (total + page_size - 1) // page_size) if total > 0 else 1
+        start_idx = (page - 1) * page_size
+        paged_items = matched[start_idx : start_idx + page_size]
+
+        return EvaluationListResponse(
+            items=paged_items,
+            total=total,
+            page=page,
+            page_size=page_size,
+            pages=pages,
+        )
+
+    def get_evaluation_detail(self, evaluation_id: str) -> Optional[EvaluationDetail]:
+        """Retrieve full scorecard detail for an evaluation."""
+        if not self.eval_store.exists(evaluation_id):
+            return None
+
+        try:
+            rec = self.eval_store.read_full(evaluation_id)
+        except Exception:
+            return None
+
+        score_raw = rec.get("score") or {}
+        score_range = rec.get("score_range") or {}
+        confidence_raw = rec.get("confidence") or {}
+
+        # Parse modules
+        modules_list: List[ModuleScore] = []
+        for m in score_raw.get("modules") or []:
+            crit_list: List[CriterionScore] = []
+            for c in m.get("criteria") or []:
+                crit_list.append(
+                    CriterionScore(
+                        id=c.get("criterion_id") or c.get("id", ""),
+                        label=c.get("label", c.get("criterion_id", c.get("id", ""))),
+                        max=float(c.get("max", 0.0)),
+                        score=float(c.get("score", 0.0)),
+                        metric=c.get("metric"),
+                        value=c.get("value"),
+                        state=c.get("state", "SCORED"),
+                        reason=c.get("reason"),
+                        capped_by=c.get("capped_by"),
+                    )
+                )
+            modules_list.append(
+                ModuleScore(
+                    id=m.get("module_id") or m.get("id", ""),
+                    name=m.get("name", m.get("module_id", m.get("id", ""))),
+                    max=float(m.get("max", 0.0)),
+                    score=float(m.get("score", 0.0)),
+                    criteria=crit_list,
+                )
+            )
+
+        # Parse knockouts
+        ko_raw = rec.get("knockouts") or {}
+        ko_rules: List[KnockoutRule] = []
+        raw_rules = ko_raw.get("results") or ko_raw.get("rules") or []
+        for k in raw_rules:
+            ko_rules.append(
+                KnockoutRule(
+                    id=k.get("rule_id", k.get("id", "")),
+                    label=k.get("label", k.get("id", "")),
+                    state=k.get("state", "UNVERIFIED"),
+                    missing_inputs=list(k.get("missing") or k.get("missing_inputs") or []),
+                )
+            )
+
+        # Parse penalties
+        penalties_list: List[PenaltyItem] = []
+        for p in rec.get("penalties") or []:
+            penalties_list.append(
+                PenaltyItem(
+                    id=p.get("id", ""),
+                    label=p.get("label", p.get("id", "")),
+                    points=float(p.get("points", 0.0)),
+                    state=p.get("state", "SCORED"),
+                    trigger=p.get("trigger"),
+                    reason=p.get("reason"),
+                )
+            )
+
+        # Parse missing_unverified
+        missing_list: List[MissingUnverifiedItem] = []
+        for mu in rec.get("missing_unverified") or []:
+            missing_list.append(
+                MissingUnverifiedItem(
+                    category=mu.get("category", "CRITERION"),
+                    item=mu.get("item", ""),
+                    rule_id=mu.get("rule_id"),
+                    description=mu.get("description"),
+                )
+            )
+
+        score_detail = EvaluationScoreDetail(
+            final_score=float(score_raw.get("final_score", 0.0)),
+            base_score=float(score_raw.get("base_score", 0.0)),
+            penalties_total=float(score_raw.get("penalties_total", 0.0)),
+            lower_bound=float(score_range.get("lower_bound", 0.0)),
+            upper_bound=float(score_range.get("upper_bound", 0.0)),
+            available_points=score_range.get("available_points"),
+            unknown_points=score_range.get("unknown_points"),
+            total_evaluable_points=score_range.get("total_evaluable_points"),
+            confidence=str(confidence_raw.get("level") or score_raw.get("confidence", "Low")),
+            completeness_pct=float(confidence_raw.get("completeness_pct") or score_raw.get("completeness_pct", 0.0)),
+            modules=modules_list,
+        )
+
+        eval_id = rec.get("evaluation_id", evaluation_id)
+        lc = self.lifecycle_mgr.get_lifecycle(eval_id)
+        lifecycle_state = lc.lifecycle_state if lc else LIFECYCLE_STATE_ACTIVE
+        visibility_state = lc.visibility_state if lc else VISIBILITY_STATE_VISIBLE
+        operational_status = lc.operational_status if lc else OPERATIONAL_STATUS_ACTIVE
+        superseded_by = lc.superseded_by if lc else None
+        supersedes = lc.supersedes if lc else None
+        lc_dict = lc.to_dict() if lc else None
+
+        market_blocks = [
+            MarketBlockState(
+                block=str(b.get("block", "")),
+                status=str(b.get("status", "MISSING")),
+                as_of=b.get("as_of"),
+                source_id=b.get("source_id"),
+                reason=b.get("reason"),
+            )
+            for b in (rec.get("market_snapshot") or {}).get("blocks", [])
+            if isinstance(b, dict)
+        ]
+
+        return EvaluationDetail(
+            authority_warnings=authority_warnings(rec),
+            evaluation_id=eval_id,
+            ipo_id=rec.get("ipo_id", ""),
+            company_name=rec.get("company_name", ""),
+            evaluation_mode=rec.get("evaluation_mode", "FINAL"),
+            evaluation_timestamp=rec.get("evaluation_timestamp", ""),
+            engine_version=rec.get("engine_version", "1.5.0"),
+            spec_version=rec.get("spec_version", "1.5"),
+            config_version=rec.get("config_version", "1.5.0"),
+            config_hash=rec.get("config_hash", ""),
+            input_snapshot_hash=rec.get("input_snapshot_hash", ""),
+            source_manifest_hash=rec.get("source_manifest_hash", ""),
+            market_snapshot_hash=rec.get("market_snapshot_hash"),
+            peer_snapshot_hash=rec.get("peer_snapshot_hash"),
+            market_blocks=market_blocks,
+            result_hash=rec.get("result_hash", ""),
+            score=score_detail,
+            knockouts=KnockoutSummary(status=ko_raw.get("status", "UNVERIFIED"), rules=ko_rules),
+            penalties=penalties_list,
+            verdict=rec.get("verdict") or {},
+            missing_unverified=missing_list,
+            preliminary_delta=rec.get("preliminary_delta"),
+            provenance=rec.get("provenance") or {},
+            lifecycle_state=lifecycle_state,
+            visibility_state=visibility_state,
+            operational_status=operational_status,
+            superseded_by=superseded_by,
+            supersedes=supersedes,
+            lifecycle=lc_dict,
+        )
+
+    # -------------------------------------------------------------------------
+    # Evidence Registry
+    # -------------------------------------------------------------------------
+
+    def get_evaluation_evidence(self, evaluation_id: str) -> Optional[EvidenceResponse]:
+        """Retrieve evidence citations for an evaluation."""
+        if not self.eval_store.exists(evaluation_id):
+            return None
+
+        try:
+            ev_artifact = self.eval_store.read_artifact(evaluation_id, "evidence")
+            rec = self.eval_store.read(evaluation_id)
+        except Exception:
+            return None
+
+        evidence_payload = ev_artifact.get("evidence") or {}
+        raw_items = evidence_payload.get("evidence") or []
+        sources = list(evidence_payload.get("sources") or [])
+        sources_by_id = {
+            s.get("source_id"): s for s in sources if isinstance(s, dict) and s.get("source_id")
+        }
+
+        # The persisted evidence artifact is a citation registry (quote,
+        # locator, source); canonical values live in the persisted input
+        # snapshot. Join them here -- read-only, without mutating stored
+        # records -- so the Explorer shows the value each citation
+        # supports, its unit, the source document identity, and an honest
+        # verification classification. Values are taken from the
+        # canonical field itself, never parsed out of the quotation, so
+        # floor/cap (or any pair sharing one quote) cannot be swapped.
+        snapshot = rec.get("input_snapshot") or {}
+        canonical_input = snapshot.get("input") if isinstance(snapshot.get("input"), dict) else snapshot
+        reporting_unit = (
+            snapshot.get("reporting_unit")
+            or canonical_input.get("reporting_unit")
+            or (canonical_input.get("financials") or {}).get("reporting_unit")
+        )
+
+        def _resolve_path(path: str):
+            """Resolve a canonical path, including list indices written
+            as ``field[0]`` (e.g. ``issue.ofs_sellers[0].shares_sold``),
+            against the persisted input snapshot. Read-only."""
+            node: Any = canonical_input
+            for part in path.split("."):
+                bracket = part.find("[")
+                key = part if bracket < 0 else part[:bracket]
+                if not isinstance(node, dict) or key not in node:
+                    return None
+                node = node[key]
+                rest = part[bracket:] if bracket >= 0 else ""
+                while rest.startswith("["):
+                    close = rest.find("]")
+                    if close < 0 or not rest[1:close].isdigit():
+                        return None
+                    index = int(rest[1:close])
+                    if not isinstance(node, list) or index >= len(node):
+                        return None
+                    node = node[index]
+                    rest = rest[close + 1:]
+            return node
+
+        def _canonical_value(path: str):
+            node = _resolve_path(path)
+            return node if isinstance(node, (int, float, str)) and not isinstance(node, bool) else None
+
+        def _canonical_node(path: str):
+            return _resolve_path(path)
+
+        def _value_summary(path: str, node: Any) -> Optional[str]:
+            """Read-only rendering of a non-scalar canonical value from
+            the persisted snapshot. Never parses the quotation and never
+            substitutes a count for the actual structured value."""
+            if isinstance(node, list):
+                if not node:
+                    return "No entries recorded"
+                labels: List[str] = []
+                for entry in node[:8]:
+                    if isinstance(entry, dict):
+                        label = entry.get("fy") or entry.get("label") or entry.get("name") or entry.get("category")
+                        labels.append(str(label) if label is not None else "entry")
+                    else:
+                        labels.append(str(entry))
+                suffix = ", ".join(labels)
+                if path.endswith("financials.periods") or path == "financials.periods":
+                    return f"{len(node)} reporting periods: {suffix}"
+                return f"{len(node)} entries: {suffix}"
+            if isinstance(node, dict):
+                keys = ", ".join(list(node.keys())[:6])
+                return f"Structured value with {len(node)} fields: {keys}"
+            return None
+
+        def _unit_for(path: str) -> Optional[str]:
+            leaf = path.rsplit(".", 1)[-1]
+            if leaf in ("price_band_low", "price_band_high"):
+                return "INR per equity share"
+            if leaf == "lot_size":
+                return "equity shares"
+            if leaf in ("ofs", "fresh_issue", "issue_size") and reporting_unit:
+                # Canonical monetary fields are stated in the document's
+                # reporting unit (v1.5: financials.reporting_unit).
+                pretty = {
+                    "INR_LAKHS": "INR lakh",
+                    "INR_CRORES": "INR crore",
+                }.get(str(reporting_unit), f"INR {reporting_unit}")
+                return pretty
+            if leaf in (
+                "fresh_shares",
+                "post_issue_shares",
+                "pre_issue_shares",
+                "shares_sold",
+            ):
+                return "equity shares"
+            return None
+
+        items: List[EvidenceDetail] = []
+        for idx, item in enumerate(raw_items):
+            ev_id = item.get("evidence_id") or f"ev_{idx+1:03d}"
+            field_path = item.get("field") or item.get("evidence_id") or f"field_{idx+1}"
+            source_id = item.get("source_id") or item.get("source")
+            source_entry = sources_by_id.get(source_id) or {}
+
+            extracted_value = item.get("extracted_value")
+            unit = item.get("unit")
+            value_summary = item.get("value_summary")
+            candidate_paths = []
+            if isinstance(field_path, str) and "." in field_path:
+                candidate_paths.append(field_path)
+            if ev_id.startswith("EV-"):
+                candidate_paths.append(ev_id[3:])
+                # Extraction evidence IDs join the section with a hyphen
+                # (EV-issue-price_band_low -> issue.price_band_low).
+                candidate_paths.append(ev_id[3:].replace("-", ".", 1))
+            if extracted_value is None:
+                for candidate in candidate_paths:
+                    value = _canonical_value(candidate)
+                    if value is not None:
+                        extracted_value = value
+                        if unit is None:
+                            unit = _unit_for(candidate)
+                        break
+                if extracted_value is None and value_summary is None:
+                    for candidate in candidate_paths:
+                        node = _canonical_node(candidate)
+                        if isinstance(node, (list, dict)):
+                            value_summary = _value_summary(candidate, node)
+                            break
+
+            # Document identity comes from the source manifest only:
+            # the display name is the final path segment of a recorded
+            # document URI. Descriptive text (not a document reference)
+            # stays honestly unresolved; only the basename is exposed,
+            # never a local directory path.
+            document = item.get("document")
+            if not document:
+                uri = source_entry.get("uri")
+                if isinstance(uri, str) and uri:
+                    cleaned = uri.strip()
+                    if "/" in cleaned or "\\" in cleaned:
+                        candidate = cleaned.replace("\\", "/").rsplit("/", 1)[-1]
+                        # Accept a path/URL final segment only when it
+                        # plausibly names a document (file extension, or
+                        # a URL reference); descriptive manifest text
+                        # stays unresolved.
+                        if candidate and ("." in candidate or "://" in cleaned):
+                            document = candidate
+                    elif "." in cleaned and " " not in cleaned:
+                        document = cleaned
+
+            note = item.get("note")
+            quote_text_value = item.get("quoted_text") or item.get("quote")
+            if isinstance(note, str) and note.startswith("PROCESSING_SUMMARY:"):
+                quote_kind = "PROCESSING"
+            elif quote_text_value:
+                quote_kind = "RECORDED"
+            else:
+                quote_kind = None
+
+            source_type = source_entry.get("source_type")
+            uri = source_entry.get("uri") or ""
+            host = ""
+            if isinstance(uri, str) and "://" in uri:
+                host = uri.split("://", 1)[1].split("/", 1)[0].lower()
+            from ..issue_terms import OFFICIAL_HOSTS
+
+            if str(source_id or "").startswith("SRC-AGG-"):
+                verification = "THIRD_PARTY_AGGREGATOR_OVERRIDE"
+            elif item.get("extraction_method") == "DERIVED" or source_type == "DERIVED":
+                verification = "DERIVED"
+            elif not source_entry:
+                verification = "UNVERIFIED"
+            elif source_type in ("RHP", "DRHP"):
+                verification = "FILING"
+            elif host in OFFICIAL_HOSTS:
+                verification = "OFFICIAL_VERIFIED"
+            elif source_type == "EXCHANGE":
+                verification = "RETAINED_UNVERIFIED"
+            else:
+                verification = "UNVERIFIED"
+
+            items.append(
+                EvidenceDetail(
+                    evidence_id=ev_id,
+                    field=field_path,
+                    source=source_id,
+                    document=document,
+                    page=item.get("page"),
+                    locator=item.get("locator") or item.get("section"),
+                    quote=item.get("quoted_text") or item.get("quote"),
+                    extracted_value=extracted_value,
+                    unit=unit,
+                    verification=verification,
+                    value_summary=value_summary,
+                    quote_kind=quote_kind,
+                    note=note,
+                    extraction_method=item.get("extraction_method"),
+                )
+            )
+
+        return EvidenceResponse(
+            evaluation_id=evaluation_id,
+            source_manifest_hash=rec.get("source_manifest_hash", ""),
+            sources=sources,
+            evidence_count=len(items),
+            items=items,
+        )
+
+    def get_evidence_item(self, evidence_id: str) -> Optional[EvidenceDetail]:
+        """Look up a specific evidence item."""
+        # Check compound format: {evaluation_id}:{field_or_ev_id}
+        if ":" in evidence_id:
+            eval_id, item_id = evidence_id.split(":", 1)
+            resp = self.get_evaluation_evidence(eval_id)
+            if resp:
+                for it in resp.items:
+                    if it.evidence_id == item_id or it.field == item_id:
+                        return it
+                return None
+
+        # Search across all evaluations
+        for eid in self.eval_store.list_evaluations():
+            resp = self.get_evaluation_evidence(eid)
+            if resp:
+                for it in resp.items:
+                    if it.evidence_id == evidence_id:
+                        return it
+
+        return None
+
+    # -------------------------------------------------------------------------
+    # Post-Listing & Performance
+    # -------------------------------------------------------------------------
+
+    def get_post_listing_observations(self, evaluation_id: str) -> Optional[PostListingObservationsResponse]:
+        """Retrieve child observations for an evaluation."""
+        if not self.eval_store.exists(evaluation_id):
+            return None
+
+        rec = self.eval_store.read(evaluation_id)
+        ipo_id = rec.get("ipo_id", "")
+
+        obs_list = list_observations(self.config.store_root, evaluation_id)
+        items: List[PostListingObservationItem] = []
+
+        for obs in obs_list:
+            items.append(
+                PostListingObservationItem(
+                    observation_id=obs.observation_id,
+                    horizon=obs.horizon,
+                    version=obs.version,
+                    target_date=obs.target_observation_date,
+                    actual_trading_date=obs.actual_observation_date,
+                    status=obs.observation_status,
+                    issue_price=str(obs.prices.issue_price) if obs.prices else "0.0",
+                    prices=obs.prices.to_dict() if obs.prices else None,
+                    benchmark=obs.benchmark.to_dict() if obs.benchmark else None,
+                    returns=obs.returns.to_dict() if obs.returns else None,
+                )
+            )
+
+        return PostListingObservationsResponse(
+            final_evaluation_id=evaluation_id,
+            ipo_id=ipo_id,
+            observation_count=len(items),
+            observations=items,
+        )
+
+    def get_performance_summary(self, evaluation_id: str) -> Optional[PerformanceSummaryResponse]:
+        """Retrieve structured multi-horizon return and benchmark alpha tracker."""
+        if not self.eval_store.exists(evaluation_id):
+            return None
+
+        rec = self.eval_store.read(evaluation_id)
+        ipo_id = rec.get("ipo_id", "")
+        company_name = rec.get("company_name", ipo_id)
+
+        obs_list = list_observations(self.config.store_root, evaluation_id)
+        obs_by_horizon = {obs.horizon.upper(): obs for obs in obs_list}
+
+        horizons: Dict[str, HorizonPerformance] = {}
+        for h_key, h_label in [
+            ("1W", "one_week"),
+            ("1M", "one_month"),
+            ("6M", "six_month"),
+        ]:
+            if h_key in obs_by_horizon:
+                o = obs_by_horizon[h_key]
+                rs = o.returns
+                horizons[h_label] = HorizonPerformance(
+                    status=o.observation_status,
+                    ipo_return_pct=str(rs.absolute_return_pct) if (rs and rs.absolute_return_pct is not None) else None,
+                    benchmark_return_pct=str(rs.benchmark_return_pct) if (rs and rs.benchmark_return_pct is not None) else None,
+                    excess_return_pct=str(rs.excess_return_pct) if (rs and rs.excess_return_pct is not None) else None,
+                )
+            else:
+                horizons[h_label] = HorizonPerformance(
+                    status="INCOMPLETE",
+                    ipo_return_pct=None,
+                    benchmark_return_pct=None,
+                    excess_return_pct=None,
+                )
+
+        issue_price = None
+        listing_date = None
+        if obs_list:
+            issue_price = str(obs_list[0].prices.issue_price) if obs_list[0].prices else None
+            listing_date = obs_list[0].listing_date
+
+        return PerformanceSummaryResponse(
+            final_evaluation_id=evaluation_id,
+            ipo_id=ipo_id,
+            company_name=company_name,
+            issue_price=issue_price,
+            listing_date=listing_date,
+            horizons=horizons,
+        )
+
+    # -------------------------------------------------------------------------
+    # Backtest Datasets & Analytics
+    # -------------------------------------------------------------------------
+
+    def list_backtest_datasets(self) -> BacktestDatasetListResponse:
+        """List available assembled backtest datasets."""
+        datasets: List[BacktestDatasetSummary] = []
+        if self.config.dataset_path and self.config.dataset_path.is_file():
+            try:
+                with self.config.dataset_path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                manifest = data.get("manifest") or {}
+                datasets.append(
+                    BacktestDatasetSummary(
+                        dataset_id=data.get("dataset_id", "default"),
+                        dataset_hash=manifest.get("dataset_hash", ""),
+                        row_count=manifest.get("row_count", 0),
+                        included_observation_count=manifest.get("included_observation_count", 0),
+                        generated_at=data.get("generated_at"),
+                        status_counts=manifest.get("status_counts") or {},
+                    )
+                )
+            except Exception:
+                pass
+
+        return BacktestDatasetListResponse(datasets=datasets, total=len(datasets))
+
+    def get_backtest_analytics(self) -> Optional[BacktestAnalyticsResponse]:
+        """Retrieve latest backtest statistical diagnostics."""
+        if not self.config.analytics_path or not self.config.analytics_path.is_file():
+            return None
+
+        try:
+            with self.config.analytics_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return None
+
+        manifest = data.get("manifest") or {}
+        rank_ic = data.get("rank_ic") or {}
+        hit_rates = data.get("hit_rates") or {}
+        avoided_loss = data.get("avoided_loss_rates") or {}
+        deciles = data.get("decile_buckets") or []
+
+        return BacktestAnalyticsResponse(
+            analysis_hash=manifest.get("analysis_hash", ""),
+            dataset_hash=manifest.get("dataset_hash", ""),
+            sample_maturity={
+                "one_week": manifest.get("sample_maturity_1w", "DESCRIPTIVE_ONLY"),
+                "one_month": manifest.get("sample_maturity_1m", "DESCRIPTIVE_ONLY"),
+                "six_month": manifest.get("sample_maturity_6m", "DESCRIPTIVE_ONLY"),
+            },
+            leakage_audit_passed=bool(manifest.get("leakage_audit_passed", True)),
+            rank_ic=rank_ic if rank_ic else None,
+            hit_rates=hit_rates if hit_rates else None,
+            avoided_loss_rates=avoided_loss if avoided_loss else None,
+            decile_buckets=deciles if deciles else None,
+        )
+
+    # -------------------------------------------------------------------------
+    # Governed Calibration Proposals
+    # -------------------------------------------------------------------------
+
+    def list_calibration_proposals(self) -> CalibrationProposalListResponse:
+        """List calibration proposals."""
+        proposals: List[CalibrationProposal] = []
+        if self.config.proposal_path and self.config.proposal_path.is_file():
+            p = self.get_calibration_proposal("v1.6.0")
+            if p:
+                proposals.append(p)
+
+        return CalibrationProposalListResponse(proposals=proposals, total=len(proposals))
+
+    def get_calibration_proposal(self, proposal_id: str) -> Optional[CalibrationProposal]:
+        """Retrieve calibration proposal details."""
+        if not self.config.proposal_path or not self.config.proposal_path.is_file():
+            return None
+
+        try:
+            with self.config.proposal_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return None
+
+        prop_version = data.get("proposal_version", "1.6.0")
+        prop_id = data.get("proposal_id", f"PROP-{prop_version}")
+        # Match either exact ID or version slug
+        if proposal_id not in (prop_id, prop_version, f"v{prop_version}", "v1.6.0", "1.6.0"):
+            return None
+
+        # Build module adjustments mapping
+        mod_adj: Dict[str, float] = {}
+        for m in data.get("module_proposals") or []:
+            if "module_id" in m and "proposed_weight" in m:
+                mod_adj[m["module_id"]] = float(m["proposed_weight"])
+
+        return CalibrationProposal(
+            proposal_id=prop_id,
+            proposal_hash=data.get("proposal_hash", ""),
+            baseline_config_version=data.get("baseline_config_version", "1.5.0"),
+            candidate_config_version="1.6.0",
+            baseline_config_hash=data.get("baseline_config_hash", ""),
+            candidate_config_hash=data.get("draft_config_hash", ""),
+            source_dataset_hash=data.get("source_dataset_hash", ""),
+            source_analysis_hash=data.get("source_analysis_hash", ""),
+            maturity_gate=data.get("maturity_gate", "CALIBRATION_CANDIDATE"),
+            status=data.get("status", "DRAFT"),
+            approval_status=data.get("approval_status", "APPROVED"),
+            module_weight_adjustments=mod_adj if mod_adj else None,
+            overfitting_safeguards=data.get("development_results"),
+            knockout_firewall_status=(data.get("knockout_proposals") or {}).get("status", "FIREWALL_EMPTY"),
+            objective=data.get("objective"),
+            sample_summary=data.get("sample_summary"),
+            evidence_summary=data.get("evidence_summary"),
+            module_proposals=data.get("module_proposals"),
+            threshold_proposals=data.get("threshold_proposals"),
+            non_regression_results=data.get("non_regression_results"),
+            recommendation=data.get("recommendation"),
+        )
+
+    # -------------------------------------------------------------------------
+    # Configuration Status & Governance
+    # -------------------------------------------------------------------------
+
+    def get_configuration_status(self) -> ConfigurationStatusResponse:
+        """Verify active v1.5 vs candidate v1.6 configuration status."""
+        v1_5_file = self.config.config_dir / "ipo-config.v1.5.0.json"
+        v1_6_file = self.config.config_dir / "ipo-config.v1.6.0.json"
+
+        v1_5_hash = V1_5_RAW_SHA256
+        if v1_5_file.is_file():
+            import hashlib
+            v1_5_hash = hashlib.sha256(v1_5_file.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
+
+        v1_6_hash = ""
+        v1_6_status = "IMPLEMENTED_INACTIVE"
+        v1_6_is_active = False
+        v1_6_prop_hash = ""
+        if v1_6_file.is_file():
+            import hashlib
+            v1_6_hash = hashlib.sha256(v1_6_file.read_bytes().replace(b'\r\n', b'\n')).hexdigest()
+            try:
+                cfg_16 = json.loads(v1_6_file.read_text(encoding="utf-8"))
+                v1_6_status = cfg_16.get("status", "IMPLEMENTED_INACTIVE")
+                v1_6_is_active = cfg_16.get("is_active", False)
+                v1_6_prop_hash = cfg_16.get("source_proposal_hash", "")
+            except Exception:
+                pass
+
+        core_ok, _ = verify_frozen_core(base_dir=self.config.config_dir.parent)
+
+        return ConfigurationStatusResponse(
+            active_configuration=ConfigLifecycleItem(
+                version=V1_5_BASELINE_VERSION,
+                status="ACTIVE",
+                is_active=True,
+                config_hash=v1_5_hash,
+                description="Production executable policy v1.5.0",
+            ),
+            candidate_configuration=ConfigLifecycleItem(
+                version=V1_6_CONFIG_VERSION,
+                status=v1_6_status,
+                is_active=v1_6_is_active,
+                config_hash=v1_6_hash,
+                source_proposal_hash=v1_6_prop_hash,
+                description="Authorized candidate v1.6 configuration (strictly inactive, promotion gated)",
+            ),
+            frozen_core_status="VERIFIED" if core_ok else "CORRUPTED",
+            golden_result_status="VERIFIED",
+        )
+
+    # -------------------------------------------------------------------------
+    # Ingestion & Evaluation Workflow (UI-7)
+    # -------------------------------------------------------------------------
+
+    MAX_INGEST_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB bound
+
+    # The required issue terms that the filing may leave undisclosed, all
+    # manually enterable (Step 4 Area C bounded entry, 2026-10-17; four-field
+    # scope directed 2026-10-18 so initial screening never waits for
+    # official-source retrieval; issue.fresh_issue added 2026-10-19 to close
+    # the Jio manual-entry dead end -- the canonical input contract v1.5
+    # requires it for every evaluation and the broker's IPO page states it).
+    # issue.ofs is the Offer-for-Sale MONETARY amount in the filing's
+    # financials.reporting_unit (v1.5 input contract: number, minimum 0,
+    # "in reporting_unit") -- never a share count and never assumed zero.
+    # issue.fresh_issue is the fresh-issue MONETARY amount in the same
+    # reporting unit (v1.5 input contract: number, minimum 0): explicit 0 is
+    # an operator statement of a pure-OFS offer, never a default.
+    MANUAL_ISSUE_TERM_FIELDS = (
+        "price_band_low",
+        "price_band_high",
+        "lot_size",
+        "ofs",
+        "fresh_issue",
+    )
+    MANUAL_ENTRY_SOURCE_ID = "SRC-MANUAL-ENTRY"
+
+    def ingest_document(
+        self,
+        file_bytes: bytes,
+        filename: str = "filing.pdf",
+        mode: str = "final",
+        manual_terms: Optional[Dict[str, Any]] = None,
+        manual_explanation: Optional[str] = None,
+        confirm_conflicts: bool = False,
+        recorder: Optional[IngestionRecorder] = None,
+    ) -> IngestionResponse:
+        """Ingest with a durable activity trace (see ingestion_activity).
+
+        The trace is generated by the actual execution below; the
+        terminal outcome is recorded before any exception propagates,
+        and the ingestion id is attached to the exception so API error
+        responses can correlate to the recoverable history.
+        """
+        act = recorder or self.activity_store.new_recorder(filename=filename, mode=mode)
+        try:
+            result = self._ingest_document_impl(
+                file_bytes=file_bytes,
+                filename=filename,
+                mode=mode,
+                manual_terms=manual_terms,
+                manual_explanation=manual_explanation,
+                confirm_conflicts=confirm_conflicts,
+                act=act,
+            )
+        except IngestionAwaitingIssueTermsError as exc:
+            act.record["evaluation_run"] = False
+            act.record["persisted"] = False
+            act.finish(
+                "BLOCKED",
+                error_code="AWAITING_ISSUE_TERMS",
+                error_message=str(exc),
+                missing_fields=[f"issue.{f}" for f in exc.missing_fields],
+            )
+            exc.ingestion_id = act.ingestion_id  # type: ignore[attr-defined]
+            raise
+        except IngestionIssueTermConflictError as exc:
+            act.finish("BLOCKED", error_code="ISSUE_TERM_CONFLICT", error_message=str(exc))
+            exc.ingestion_id = act.ingestion_id  # type: ignore[attr-defined]
+            raise
+        except IngestionError as exc:
+            code = {
+                IngestionValidationError: "VALIDATION_ERROR",
+                IngestionPayloadTooLargeError: "PAYLOAD_TOO_LARGE",
+                IngestionExtractionError: "PROCESSING_FAILED",
+                IngestionEvaluationError: "PROCESSING_FAILED",
+            }.get(type(exc), "INGESTION_ERROR")
+            stage = {
+                IngestionValidationError: "document_validation",
+                IngestionPayloadTooLargeError: "upload",
+                IngestionExtractionError: "filing_extraction",
+                IngestionEvaluationError: "evaluation",
+            }.get(type(exc), "finalization")
+            act.emit(stage, "failed", "FAILED", str(exc), error_code=code,
+                     retryable=(code == "PROCESSING_FAILED"))
+            act.finish("FAILED", error_code=code, error_message=str(exc))
+            exc.ingestion_id = act.ingestion_id  # type: ignore[attr-defined]
+            raise
+        except Exception as exc:  # unexpected: still leave a safe trail
+            act.emit("finalization", "failed", "FAILED",
+                     f"Unexpected ingestion error ({type(exc).__name__}).",
+                     error_code="INGESTION_INTERNAL_ERROR", retryable=True)
+            act.finish("FAILED", error_code="INGESTION_INTERNAL_ERROR",
+                       error_message=f"Unexpected ingestion error ({type(exc).__name__}).")
+            exc.ingestion_id = act.ingestion_id  # type: ignore[attr-defined]
+            raise
+        act.record["evaluation_id"] = result.evaluation_id
+        act.record["evaluation_run"] = True
+        act.record["persisted"] = not result.is_duplicate
+        act.record["is_duplicate"] = bool(result.is_duplicate)
+        act.record["result"] = {
+            "evaluation_id": result.evaluation_id,
+            "ipo_id": result.ipo_id,
+            "company_name": result.company_name,
+            "evaluation_mode": result.evaluation_mode,
+            "final_score": result.final_score,
+            "verdict": result.verdict,
+            "confidence": result.confidence,
+            "is_duplicate": result.is_duplicate,
+        }
+        act.finish("SUCCEEDED")
+        result.ingestion_id = act.ingestion_id
+        result.correlation_id = act.ingestion_id
+        return result
+
+    # ------------------------------------------------------------------
+    # Ingestion activity (durable diagnostics; separate from evaluations)
+    # ------------------------------------------------------------------
+    def get_ingestion_activity(self, ingestion_id: str) -> Optional[Dict[str, Any]]:
+        return self.activity_store.get(ingestion_id)
+
+    def list_ingestion_activities(self, limit: int = 50) -> List[Dict[str, Any]]:
+        return self.activity_store.list_recent(limit)
+
+    def start_ingestion_async(
+        self,
+        file_bytes: bytes,
+        filename: str = "filing.pdf",
+        mode: str = "final",
+    ) -> IngestionRecorder:
+        """Dispatch a traced worker; never assume inner terminal recording ran.
+
+        A live but blocked thread cannot safely be killed or labelled failed:
+        it may later persist an evaluation. This boundary handles dispatch and
+        exited workers, not an unsafe wall-clock cancellation of live work.
+        """
+        import threading as _threading
+        from .ingestion_activity import TERMINAL_STATUSES
+
+        logger = logging.getLogger(__name__)
+        recorder = self.activity_store.new_recorder(filename=filename, mode=mode)
+
+        def _failed(code: str, message: str) -> None:
+            snapshot = recorder.snapshot()
+            if snapshot["status"] in TERMINAL_STATUSES:
+                # Memory is not proof of durability: finish mutates the record
+                # before its atomic filesystem write, which can itself fail.
+                try:
+                    saved = self.activity_store.get(recorder.ingestion_id)
+                except (OSError, ValueError):
+                    logger.exception("Ingestion %s terminal activity could not be read",
+                                     recorder.ingestion_id)
+                    saved = None  # retry the trusted worker snapshot below
+                if saved != snapshot:
+                    try:
+                        self.activity_store.save(snapshot)
+                    except Exception:
+                        logger.exception("Ingestion %s existing terminal activity write failed",
+                                         recorder.ingestion_id)
+                return  # preserve specific BLOCKED/FAILED or genuine success
+            try:
+                recorder.finish("FAILED", error_code=code, error_message=message)
+            except Exception:
+                logger.exception("Ingestion %s terminal activity write failed", recorder.ingestion_id)
+                # finish updated the in-memory terminal record/event before
+                # writing it. Retry that exact snapshot once (no duplicate event).
+                try:
+                    self.activity_store.save(recorder.snapshot())
+                except Exception:
+                    logger.exception("Ingestion %s terminal activity retry failed; storage unavailable",
+                                     recorder.ingestion_id)
+
+        def _run() -> None:
+            try:
+                recorder.emit("background_execution", "started", "RUNNING",
+                              "Background ingestion worker entered processing.")
+                self.ingest_document(
+                    file_bytes=file_bytes, filename=filename, mode=mode, recorder=recorder
+                )
+            except BaseException as exc:
+                # SystemExit in a daemon thread is not process termination;
+                # Exception-only handlers otherwise leave a durable RUNNING row.
+                if recorder.snapshot()["status"] not in TERMINAL_STATUSES:
+                    logger.exception("Ingestion %s worker exited (%s)",
+                                     recorder.ingestion_id, type(exc).__name__)
+                    _failed("INGESTION_WORKER_FAILED",
+                            f"Background ingestion worker failed ({type(exc).__name__}); see server logs.")
+            finally:
+                _failed("INGESTION_WORKER_INCOMPLETE",
+                        "Background ingestion worker returned without a terminal processing result.")
+
+        try:
+            _threading.Thread(target=_run, daemon=True,
+                              name=f"ingest-{recorder.ingestion_id}").start()
+        except Exception as exc:
+            logger.exception("Ingestion %s dispatch failed (%s)",
+                             recorder.ingestion_id, type(exc).__name__)
+            _failed("INGESTION_DISPATCH_FAILED",
+                    f"Could not start ingestion worker ({type(exc).__name__}); see server logs.")
+        return recorder
+
+    def _ingest_document_impl(
+        self,
+        file_bytes: bytes,
+        filename: str = "filing.pdf",
+        mode: str = "final",
+        manual_terms: Optional[Dict[str, Any]] = None,
+        manual_explanation: Optional[str] = None,
+        confirm_conflicts: bool = False,
+        act: Optional[IngestionRecorder] = None,
+    ) -> IngestionResponse:
+        """Process an uploaded PDF filing through extraction and evaluation pipelines.
+
+        Enforces:
+        - Zero caller-controlled filesystem paths: reference_base_path is strictly excluded.
+        - Bounded payload size (max 50 MB).
+        - Magic bytes '%PDF-' validation.
+        - Evaluation mode validation ('final' or 'preliminary').
+        - Secure isolated temporary staging with automated cleanup.
+        - Execution of existing DocumentExtractor and CanonicalInputBuilder.
+        - Execution of deterministic v1.5 evaluate() pipeline.
+        - Duplicate detection & idempotency: returns existing evaluation if result_hash matches.
+        - Persistent storage of new evaluations in EvaluationStore.
+        """
+        def _emit(stage, event_type, status, message, **kw):
+            if act is not None:
+                act.emit(stage, event_type, status, message, **kw)
+
+        def _emit_term_evidence(field, origin, state, index, candidate):
+            # Preserve selected field evidence even when another field blocks
+            # evaluation. Flat events respect the existing depth/item limits.
+            # Long quotations are lossless numbered parts, never a silently
+            # truncated assertion. These are diagnostics, not new authority.
+            evidence_key = f"{origin}:issue.{field}:{index}"
+            keys = ("value", "unit", "source_id", "document_class", "uri",
+                    "content_hash", "page", "locator", "extraction_method",
+                    "confidence", "verification", "quote", "retrieved_at")
+            details = {"field": "issue." + field, "origin": origin,
+                       "state": state, "evidence_key": evidence_key}
+            long_values = {}
+            for key in keys:
+                value = candidate.get(key)
+                if isinstance(value, str) and len(value) > 500:
+                    long_values[key] = value
+                else:
+                    details[key] = value
+            evidence_status = ("SUCCEEDED" if origin in ("filing", "THIRD_PARTY_AGGREGATOR_OVERRIDE") or
+                               (state == "VERIFIED" and candidate.get("verification") == "VERIFIED")
+                               else "BLOCKED")
+            _emit("term_resolution", "field_evidence", evidence_status,
+                  f"Recorded evidence candidate for issue.{field}; field state: {state}.",
+                  details=details)
+            for key, value in long_values.items():
+                count = (len(value) + 499) // 500
+                digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+                for part in range(count):
+                    _emit("term_resolution", "field_evidence_part", evidence_status,
+                          f"Evidence {key} part {part + 1}/{count} for issue.{field}.",
+                          details={"evidence_key": evidence_key, "key": key,
+                                   "part": part, "parts": count, "sha256": digest,
+                                   "text": value[part * 500:(part + 1) * 500]})
+
+        _emit("upload", "received", "SUCCEEDED",
+              "File received by the ingestion service.",
+              details={"filename": filename, "size_bytes": len(file_bytes) if file_bytes else 0, "mode": mode})
+
+        if not file_bytes or len(file_bytes) == 0:
+            raise IngestionValidationError("Uploaded file is empty.")
+
+        if len(file_bytes) > self.MAX_INGEST_SIZE_BYTES:
+            raise IngestionPayloadTooLargeError(
+                f"File size ({len(file_bytes)} bytes) exceeds the maximum allowed limit of 50 MB."
+            )
+
+        if not file_bytes.startswith(b"%PDF-"):
+            raise IngestionValidationError(
+                "Invalid document format. Only valid PDF files starting with '%PDF-' magic bytes are supported."
+            )
+
+        mode_clean = (mode or "final").strip().lower()
+        if mode_clean not in ("final", "preliminary"):
+            raise IngestionValidationError(
+                f"Invalid evaluation mode '{mode}'. Allowed modes are 'final' and 'preliminary'."
+            )
+
+        # Step 5 (Step 4 Area C, approved 2026-10-17; four-field scope
+        # directed 2026-10-18): manual entry for the four required issue
+        # terms price_band_low / price_band_high / lot_size / ofs. Manual
+        # values are provenance-labelled MANUAL_ENTRY and are never
+        # source-verified. issue.ofs is the Offer-for-Sale monetary amount
+        # in the filing's financials.reporting_unit (v1.5 contract:
+        # number, minimum 0): an explicit 0 is an operator statement of
+        # "no offer for sale", never a default for an unknown value.
+        manual_clean: Dict[str, Any] = {}
+        if manual_terms:
+            submitted_fields = sorted(str(k) for k in manual_terms.keys())
+            submitted_values = {k: v for k, v in manual_terms.items() if v is not None}
+            # Audit receipt: the submission itself is an auditable act,
+            # recorded before validation so a rejected submission still
+            # shows exactly what was submitted (values are operator
+            # issue-term figures, sanitized/bounded like all details).
+            _emit("term_resolution", "manual_submission", "SUCCEEDED",
+                  "Manual issue-term submission received (MANUAL_ENTRY; not source-verified).",
+                  details={"fields": submitted_fields,
+                           "values": submitted_values,
+                           "explanation_supplied": bool((manual_explanation or "").strip())})
+            try:
+                unknown_keys = sorted(set(manual_terms) - set(self.MANUAL_ISSUE_TERM_FIELDS))
+                if unknown_keys:
+                    raise IngestionValidationError(
+                        "Manual issue-term entry is limited to price_band_low, "
+                        "price_band_high, lot_size, ofs and fresh_issue; "
+                        f"unsupported field(s): {unknown_keys}."
+                    )
+                manual_clean = {k: v for k, v in manual_terms.items() if v is not None}
+                if manual_clean:
+                    if not (manual_explanation or "").strip():
+                        raise IngestionValidationError(
+                            "An explanation is required for manually entered issue terms."
+                        )
+                    for field_name, value in manual_clean.items():
+                        if isinstance(value, bool) or not isinstance(value, (int, float)):
+                            raise IngestionValidationError(
+                                f"Manually entered issue.{field_name} must be a number."
+                            )
+                        if not math.isfinite(float(value)):
+                            raise IngestionValidationError(
+                                f"Manually entered issue.{field_name} must be a finite number."
+                            )
+                        if field_name in ("ofs", "fresh_issue"):
+                            # Monetary amounts in the filing's reporting
+                            # unit: explicit 0 is an operator statement
+                            # (no OFS / pure-OFS offer), never a default.
+                            if float(value) < 0:
+                                raise IngestionValidationError(
+                                    f"Manually entered issue.{field_name} must be zero or a "
+                                    "positive amount in the filing's reporting unit."
+                                )
+                        elif field_name == "lot_size":
+                            if float(value) != int(value) or int(value) <= 0:
+                                raise IngestionValidationError(
+                                    "Manually entered issue.lot_size must be a whole number of shares."
+                                )
+                        else:
+                            if value <= 0:
+                                raise IngestionValidationError(
+                                    f"Manually entered issue.{field_name} must be positive."
+                                )
+                    if "price_band_low" in manual_clean and "price_band_high" in manual_clean:
+                        if float(manual_clean["price_band_low"]) > float(manual_clean["price_band_high"]):
+                            raise IngestionValidationError(
+                                "Manually entered price_band_low must not exceed price_band_high."
+                            )
+            except IngestionValidationError as exc:
+                # The rejection is an auditable outcome in its own right;
+                # nothing proceeds and no value is silently replaced.
+                _emit("term_resolution", "manual_validation", "FAILED",
+                      f"Manual issue-term submission rejected: {exc}",
+                      details={"fields": submitted_fields,
+                               "values": submitted_values},
+                      error_code="VALIDATION_ERROR")
+                raise
+
+        _emit("document_validation", "passed", "SUCCEEDED",
+              "Document passed format, size and mode validation.",
+              details={"filename": filename, "mode": mode_clean})
+
+        config_path = self.config.config_dir / f"ipo-config.v{V1_5_BASELINE_VERSION}.json"
+        if not config_path.is_file():
+            config_path = self.config.config_dir / "ipo-config.v1.5.0.json"
+        if not config_path.is_file():
+            raise IngestionEvaluationError(
+                f"Active policy configuration file not found at {config_path}."
+            )
+
+        active_config = load_config(config_path)
+
+        # Stage in deterministic isolated temporary path based on content hash
+        file_sha256 = hashlib.sha256(file_bytes).hexdigest()
+        staging_dir = Path(tempfile.gettempdir()) / "ipo_ingest" / file_sha256[:16]
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        temp_pdf_path = staging_dir / "filing.pdf"
+        temp_pdf_path.write_bytes(file_bytes)
+
+        _emit("filing_extraction", "started", "RUNNING",
+              "Extracting the filing (tables, sections, canonical input).")
+        try:
+            extractor = DocumentExtractor()
+            canonical_dict, extraction_report = extractor.extract_from_pdf(
+                pdf_path=temp_pdf_path,
+                allow_fixture_fallbacks=False,
+            )
+        except Exception as exc:
+            raise IngestionExtractionError(
+                f"Filing document extraction failed: {exc}"
+            ) from exc
+        finally:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+
+        _emit("filing_extraction", "completed", "SUCCEEDED",
+              "Filing extraction completed.",
+              details={"company_name": str(canonical_dict.get("company_name", "")),
+                       "ipo_id": str(canonical_dict.get("ipo_id", ""))})
+        _emit("issuer_identification", "identified", "SUCCEEDED",
+              "Issuer identified from the filing.",
+              details={"company_name": str(canonical_dict.get("company_name", "")),
+                       "ipo_id": str(canonical_dict.get("ipo_id", ""))})
+        _filing_issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+        for _f in ("price_band_low", "price_band_high", "lot_size", "ofs", "fresh_issue",
+                   "open_date", "close_date", "fresh_shares"):
+            _emit("term_resolution", "term_status",
+                  "SUCCEEDED" if _filing_issue.get(_f) is not None else "BLOCKED",
+                  f"issue.{_f}: " + ("disclosed by the filing." if _filing_issue.get(_f) is not None else "not established by filing extraction."),
+                  details={"field": f"issue.{_f}",
+                           "state": "extracted" if _filing_issue.get(_f) is not None else "missing",
+                           "origin": "filing"})
+
+            if _filing_issue.get(_f) is not None:
+                spec = (canonical_dict.get("_evidence") or {}).get("issue." + _f) or {}
+                source = next((src for src in canonical_dict.get("_sources", [])
+                               if src.get("source_id") == spec.get("source_id")), {})
+                _emit_term_evidence(_f, "filing", "extracted", 0, {
+                    **spec, "value": _filing_issue[_f],
+                    "unit": (canonical_dict.get("financials") or {}).get("reporting_unit")
+                            if _f in ("ofs", "fresh_issue") else None,
+                    "uri": source.get("uri"), "content_hash": source.get("content_hash"),
+                    "confidence": spec.get("extraction_confidence"),
+                    "document_class": source.get("source_type"),
+                })
+
+        # Peer rows enter the canonical input here and are schema-bound
+        # (roe_pct and the sibling percentage fields share the contract's
+        # pct bounds). The full document gate runs at evaluation time;
+        # validating the peers array at ingestion time rejects
+        # out-of-contract peer data EARLY with a diagnostic naming the
+        # peer and field, instead of the anonymous evaluation-time
+        # SCHEMA_VIOLATION wall (audit trace ing-81fd285e5b8248c6:
+        # peers/0/roe_pct 26957.28, peers/1/roe_pct 21700.34). Raw values
+        # are never clamped, substituted or silently dropped.
+        from ..schema_validation import validate_peer_records
+
+        peer_findings = validate_peer_records(
+            (canonical_dict.get("peers") if isinstance(canonical_dict, dict) else None) or []
+        )
+        if peer_findings:
+            detail = "; ".join(f"{f.location}: {f.message}" for f in peer_findings)
+            _emit("validation", "peer_contract", "FAILED",
+                  "Peer data violates the canonical input contract.",
+                  details={"findings": [f.to_dict() for f in peer_findings[:5]]},
+                  error_code="SCHEMA_VIOLATION")
+            raise IngestionValidationError(
+                "Peer data in the filing violates the canonical input contract: "
+                + detail
+                + ". Raw values are never clamped or substituted; correct the "
+                "peer source data and re-upload the filing."
+            )
+
+        # Automatically resolve required issue terms the filing does not
+        # disclose ([●] placeholders pending the Price Band Notice) from
+        # official sources, through the established enrichment assembly.
+        # Fail closed with an AWAITING_ISSUE_TERMS status when no verified
+        # official evidence is available: no value is invented, substituted
+        # or borrowed, and nothing is evaluated or persisted.
+        issue_terms_report: Optional[Dict[str, Any]] = None
+        resolution_dict: Optional[Dict[str, Any]] = None
+        pending_awaiting: Optional[Tuple[list, dict, str]] = None
+        issue = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+        missing_issue_fields = [
+            field
+            for field in ("price_band_low", "price_band_high", "lot_size", "ofs", "fresh_issue", "open_date", "close_date")
+            if issue.get(field) is None
+        ]
+        if missing_issue_fields:
+            from ..enrichment_engine import EnrichmentEngine
+            from ..issue_terms import IssueTermsResolver
+
+            _emit("official_discovery", "started", "RUNNING",
+                  "Searching official sources for the missing issue terms.",
+                  details={"missing_fields": [f"issue.{f}" for f in missing_issue_fields]})
+            resolver: IssueTermsResolver = self.config.issue_terms_resolver
+            outcome = resolver.resolve(
+                company_name=str(canonical_dict.get("company_name", "")),
+                ipo_id=str(canonical_dict.get("ipo_id", "")),
+                missing_fields=missing_issue_fields,
+                issue_context=issue,
+            )
+            resolution_dict = outcome.to_dict()
+            for field, diagnostic in resolution_dict.get("fields", {}).items():
+                for index, candidate in enumerate(diagnostic.get("candidates", [])):
+                    _emit_term_evidence(field, "official_discovery", diagnostic.get("state"),
+                                        index, candidate)
+            for _rep in outcome.provider_reports:
+                _emit("official_discovery", "source_attempt",
+                      "SUCCEEDED" if _rep.outcome == "FOUND" else ("BLOCKED" if _rep.outcome in ("NOT_FOUND",) else "FAILED"),
+                      f"{_rep.provider}: {_rep.outcome} -- {_rep.detail}",
+                      details={"provider": _rep.provider, "outcome": _rep.outcome,
+                               "detail": _rep.detail,
+                               "listing_searched": bool(_rep.listing_searched),
+                               "searched_listings": list(_rep.searched_listings),
+                               "notes": list(_rep.notes),
+                               "sources": [
+                                   {"url": s.url, "classification": s.classification,
+                                    "searched": bool(s.searched), "issue_entries": s.issue_entries,
+                                    "detail": s.detail}
+                                   for s in _rep.sources
+                               ]},
+                      source_reference=outcome.source_uri)
+                # One event per configured source, whatever it
+                # yielded: a source that was searched and a source
+                # that could not be used must both be visible, so
+                # no source can contribute to the aggregate outcome
+                # without a trace of its own.
+                for _attempt in _rep.sources:
+                    _emit("official_discovery", "source_attempt",
+                          "SUCCEEDED" if _attempt.searched else "FAILED",
+                          f"{_attempt.url}: {_attempt.detail}",
+                          details={"provider": _rep.provider, "outcome": _rep.outcome,
+                                   "url": _attempt.url,
+                                   "classification": _attempt.classification,
+                                   "searched": bool(_attempt.searched),
+                                   "issue_entries": _attempt.issue_entries,
+                                   "source_unusable": not _attempt.searched},
+                          source_reference=outcome.source_uri)
+                # One event per remaining reason (a candidate
+                # document that could not be used), so every reason
+                # survives the bounded event message and is visible
+                # on its own in the activity trace.  Reasons that
+                # already have their own source event are not
+                # repeated.
+                _covered = {f"{s.url}: {s.detail}" for s in _rep.sources}
+                for _note in _rep.notes:
+                    if _note in _covered:
+                        continue
+                    _emit("official_discovery", "source_attempt", "FAILED",
+                          _note,
+                          details={"provider": _rep.provider, "outcome": _rep.outcome,
+                                   "source_unusable": True},
+                          source_reference=outcome.source_uri)
+            _emit("official_discovery", "completed",
+                  "SUCCEEDED" if outcome.notice is not None else "BLOCKED",
+                  f"Official discovery outcome: {outcome.status}.",
+                  details={"status": outcome.status,
+                           "resolved_fields": list(outcome.resolved_fields),
+                           "unresolved_fields": list(outcome.unresolved_fields),
+                           "conflicts": list(outcome.conflicts)},
+                  source_reference=outcome.source_uri)
+            if outcome.notice is not None:
+                try:
+                    # Carry the verified retrieval provenance (official
+                    # URL + retrieval timestamp) into the canonical source
+                    # manifest so the persisted record identifies the
+                    # actual disclosure document, not a local filename.
+                    notice_payload = outcome.enrichment_payload or outcome.notice.to_enrichment_dict()
+                    if outcome.enrichment_payload is None and notice_payload.get("sources"):
+                        source_ref = dict(notice_payload["sources"][0])
+                        if outcome.source_uri:
+                            source_ref["uri"] = outcome.source_uri
+                        if outcome.retrieved_at:
+                            source_ref["retrieval_timestamp"] = outcome.retrieved_at
+                        notice_payload["sources"] = [source_ref]
+                    assembled = EnrichmentEngine.assemble(
+                        base_input=canonical_dict,
+                        price_band_notice=notice_payload,
+                        mode=mode_clean,
+                        partial_issue_terms=True,  # retain partial facts; readiness gate below remains mandatory
+                    )
+                    canonical_dict = assembled.canonical_input
+                except Exception as exc:
+                    # Diagnosable, not silent: the terms were verified
+                    # but could not be assembled into the canonical
+                    # input (e.g. an identity inconsistency). Surface it
+                    # in the resolution diagnostics; still fail closed.
+                    resolution_dict["assembly_error"] = (
+                        f"{type(exc).__name__}: {exc}"
+                    )
+            elif set(missing_issue_fields) == {"ofs"}:
+                # Terms are disclosed in the filing itself; only the OFS
+                # amount needs the approved enrichment derivation
+                # (seller shares x cap price).
+                try:
+                    assembled = EnrichmentEngine.assemble(
+                        base_input=canonical_dict,
+                        mode=mode_clean,
+                    )
+                    canonical_dict = assembled.canonical_input
+                except Exception as exc:
+                    resolution_dict["assembly_error"] = (
+                        f"{type(exc).__name__}: {exc}"
+                    )
+
+            issue_after = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+            still_missing = [f for f in missing_issue_fields if issue_after.get(f) is None]
+            for _f in missing_issue_fields:
+                _resolved = issue_after.get(_f) is not None
+                _emit("term_resolution", "term_status",
+                      "SUCCEEDED" if _resolved else "BLOCKED",
+                      f"issue.{_f}: " + ("resolved from official evidence." if _resolved else "still missing after official discovery."),
+                      details={"field": f"issue.{_f}",
+                               "state": "accepted" if _resolved else (
+                                   "conflicting" if outcome.status == "CONFLICT" else
+                                   "unavailable" if outcome.status == "UNAVAILABLE" else "missing"),
+                               "origin": "official_discovery"},
+                      source_reference=outcome.source_uri)
+            if not still_missing and issue_after.get("fresh_issue") is None:
+                # The pricing terms resolved, but the stated fresh-issue
+                # amount (a canonical input requirement, schema
+                # issue.required) is only established by the filing, the
+                # final Prospectus or the bounded manual entry; fail closed
+                # with that precise field rather than a schema failure.
+                still_missing = ["fresh_issue"]
+            resolution_dict["remaining_required_fields"] = ["issue." + f for f in still_missing]
+            resolution_dict["ready"] = not still_missing
+            if not still_missing:
+                issue_terms_report = resolution_dict
+            else:
+                unresolved = still_missing or list(missing_issue_fields)
+                reason = {
+                    "CONFLICT": "official sources conflict and no value was arbitrarily selected",
+                    "UNAVAILABLE": "no usable official listing was searched: official sources could not be retrieved, or returned unusable content (this is not evidence that the terms are unpublished)",
+                    "PARTIAL": "only some required terms could be verified from official sources",
+                    "UNVERIFIED": "an issuer-matched notice exists only as a retained copy whose official provenance is not established (configure the official exchange announcement via IPO_PRICE_BAND_NOTICE_URLS to use it)",
+                }.get(outcome.status, "no issuer-matched official document was found by automatic discovery or the configured official sources (this does not by itself establish that the terms are unpublished)")
+                if outcome.status == "UNAVAILABLE" and any(
+                    r.outcome == "REJECTED" for r in outcome.provider_reports
+                ):
+                    # Retrieval succeeded but the document failed
+                    # classification/identity/value checks -- a different
+                    # failure from "could not be retrieved", and the
+                    # operator must be able to tell them apart.
+                    reason = (
+                        "official source documents were retrieved but rejected "
+                        "(classification, issuer identity or value checks failed; "
+                        "see the resolution diagnostics)"
+                    )
+                if resolution_dict.get("assembly_error"):
+                    reason = (
+                        "verified official terms could not be assembled into "
+                        "the evaluation input (see the resolution diagnostics)"
+                    )
+                # Defer the awaiting raise: authorized manual entry (Step 5)
+                # may still resolve the bounded terms below. Without manual
+                # terms the deferred raise fires unchanged before evaluation.
+                pending_awaiting = (unresolved, resolution_dict, reason)
+
+        # PA-authorized third-party fallback is a separate authority path,
+        # never passed through the official enrichment verification gate.
+        fallback = self.config.aggregator_issue_terms_resolver
+        if (fallback is not None and pending_awaiting is not None
+                and not (resolution_dict or {}).get("conflicts")
+                and (resolution_dict or {}).get("status") != "CONFLICT"
+                and not (resolution_dict or {}).get("assembly_error")):
+            from ..aggregator_issue_terms import apply_override, TAG
+            _emit("aggregator_fallback", "started", "RUNNING",
+                  "Official discovery incomplete; checking PA-authorized third-party issue data.")
+            try:
+                override = fallback.resolve(company_name=str(canonical_dict.get("company_name", "")),
+                    ipo_id=str(canonical_dict.get("ipo_id", "")), issue_context=canonical_dict.get("issue", {}),
+                    missing_fields=pending_awaiting[0])
+                canonical_dict = apply_override(canonical_dict, override, pending_awaiting[0])
+            except Exception as exc:
+                override = {"authority": TAG, "verified": False, "applied_fields": [],
+                            "error": f"{type(exc).__name__}: {exc}"}
+            for attempt in override.get("attempts", []):
+                _emit("aggregator_fallback", "source_attempt", "SUCCEEDED" if attempt.get("content_hash") else "FAILED",
+                      "Third-party fallback source: " + attempt.get("outcome", "UNKNOWN"),
+                      details=attempt, source_reference=attempt.get("uri"))
+            for field in override.get("applied_fields", []):
+                sid = canonical_dict["_evidence"]["issue." + field]["source_id"]
+                item = next(item for item in override["fields"][field] if item["source_id"] == sid)
+                _emit_term_evidence(field, TAG, TAG, 0, {**item, "value": canonical_dict["issue"][field],
+                    "unit": ((canonical_dict.get("financials") or {}).get("reporting_unit") if field in ("fresh_issue", "ofs") else item["unit"]),
+                    "document_class": "THIRD_PARTY_IPO_TABLE"})
+            _emit("aggregator_fallback", "completed", "SUCCEEDED" if override.get("applied_fields") else "BLOCKED",
+                  "PA-authorized aggregator fallback processed; never official verification.",
+                  details={"authority": TAG, "verified": False, "fields": override.get("applied_fields", []),
+                           "conflicts": override.get("conflicts", []), "error": override.get("error")})
+            issue_terms_report = dict(resolution_dict or {})
+            issue_terms_report["aggregator_override"] = override
+            remaining = [f for f in pending_awaiting[0] if canonical_dict.get("issue", {}).get(f) is None]
+            issue_terms_report["remaining_required_fields"] = ["issue." + f for f in remaining]
+            issue_terms_report["ready"] = not remaining
+            pending_awaiting = (remaining, issue_terms_report, pending_awaiting[2]) if remaining else None
+
+        # --- Step 5: bounded manual issue-term entry ---------------------
+        # Runs after verified-official resolution. Manual values never
+        # upgrade provenance: they are recorded as MANUAL_ENTRY against a
+        # STRUCTURED_INPUT operator source, and a conflicting verified
+        # official value always wins over a manual value.
+        if manual_clean:
+            issue_now = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+            evidence_map = canonical_dict.get("_evidence", {})
+            if not isinstance(evidence_map, dict):
+                evidence_map = {}
+
+            def _origin(field_name: str) -> str:
+                spec = evidence_map.get(f"issue.{field_name}")
+                src = spec.get("source_id", "") if isinstance(spec, dict) else ""
+                return "OFFICIAL_VERIFIED" if str(src).startswith(("SRC-PBN-", "SRC-PROSPECTUS-")) else "FILING_EXTRACTION"
+
+            conflicts = []
+            for field_name, value in manual_clean.items():
+                existing = issue_now.get(field_name)
+                if existing is not None and float(existing) != float(value):
+                    conflicts.append(
+                        {
+                            "field": f"issue.{field_name}",
+                            "manual_value": value,
+                            "existing_value": existing,
+                            "existing_origin": _origin(field_name),
+                        }
+                    )
+            if conflicts and not confirm_conflicts:
+                # The conflict and its requirement for explicit
+                # confirmation are auditable outcomes of the submission;
+                # nothing was evaluated or persisted.
+                _emit("term_resolution", "conflict", "BLOCKED",
+                     "Manual issue terms conflict with existing values; "
+                     "explicit confirmation is required before proceeding. "
+                     "Nothing was evaluated or persisted.",
+                     details={"conflicts": conflicts,
+                              "fields": [c["field"] for c in conflicts],
+                              "confirmation_required": True},
+                     error_code="ISSUE_TERM_CONFLICT")
+                raise IngestionIssueTermConflictError(
+                    "Manually entered issue terms conflict with existing "
+                    "values; explicit confirmation is required before "
+                    "proceeding. Nothing was evaluated or persisted.",
+                    conflicts=conflicts,
+                )
+
+            sources = canonical_dict.setdefault("_sources", [])
+            if not any(
+                isinstance(s, dict) and s.get("source_id") == self.MANUAL_ENTRY_SOURCE_ID
+                for s in sources
+            ):
+                sources.append(
+                    {
+                        "source_id": self.MANUAL_ENTRY_SOURCE_ID,
+                        "source_type": "STRUCTURED_INPUT",
+                        "retrieval_timestamp": datetime.now(timezone.utc).strftime(
+                            "%Y-%m-%dT%H:%M:%SZ"
+                        ),
+                    }
+                )
+            manual_applied: List[str] = []
+            overridden_by_verified: List[str] = []
+            for field_name, value in manual_clean.items():
+                existing = issue_now.get(field_name)
+                if (
+                    existing is not None
+                    and float(existing) != float(value)
+                    and _origin(field_name) == "OFFICIAL_VERIFIED"
+                ):
+                    # A verified official value is never displaced by a
+                    # manual entry, even after explicit confirmation.
+                    overridden_by_verified.append(field_name)
+                    continue
+                issue_now[field_name] = int(value) if field_name == "lot_size" else float(value)
+                prev_spec = evidence_map.get(f"issue.{field_name}")
+                new_spec = dict(prev_spec) if isinstance(prev_spec, dict) else {}
+                new_spec.update(
+                    {
+                        "source_id": self.MANUAL_ENTRY_SOURCE_ID,
+                        "extraction_method": "MANUAL_ENTRY",
+                        "section": "Operator Manual Entry",
+                        "locator": "Pre-processing manual issue-term entry (Step 5)",
+                        "note": (
+                            "Manually entered by the operator; NOT source-verified. "
+                            f"Explanation: {(manual_explanation or '').strip()}"
+                        ),
+                    }
+                )
+                new_spec.pop("quote", None)
+                new_spec.pop("quoted_text", None)
+                evidence_map[f"issue.{field_name}"] = new_spec
+                manual_applied.append(field_name)
+            canonical_dict["issue"] = issue_now
+            canonical_dict["_evidence"] = evidence_map
+
+            low_now, high_now = issue_now.get("price_band_low"), issue_now.get("price_band_high")
+            if low_now is not None and high_now is not None and float(low_now) > float(high_now):
+                raise IngestionValidationError(
+                    "price_band_low must not exceed price_band_high after manual entry."
+                )
+
+            if issue_terms_report is None:
+                # Preserve the official-discovery outcome alongside the
+                # manual completion: a manual term set is a separate input
+                # source and never evidence that an official source
+                # published or verified anything (stays UNAVAILABLE etc.).
+                issue_terms_report = dict(resolution_dict) if resolution_dict else {}
+            reporting_unit = str(
+                (canonical_dict.get("financials") or {}).get("reporting_unit")
+                or "INR_LAKHS"
+            )
+            issue_terms_report["manual_entry"] = {
+                "fields": manual_applied,
+                "values": {f: manual_clean[f] for f in manual_applied},
+                "explanation": (manual_explanation or "").strip(),
+                "provenance": "MANUAL_ENTRY",
+                "verified": False,
+                "overridden_by_verified": overridden_by_verified,
+                "reporting_unit": reporting_unit,
+            }
+            _emit("term_resolution", "manual_entry", "SUCCEEDED",
+                  "Operator manual issue-term entry applied (MANUAL_ENTRY; not source-verified).",
+                  details={"fields": [f"issue.{f}" for f in manual_applied],
+                           "values": {f: manual_clean[f] for f in manual_applied},
+                           "explanation": (manual_explanation or "").strip(),
+                           "overridden_by_verified": overridden_by_verified,
+                           "provenance": "MANUAL_ENTRY",
+                           "verified": False,
+                           "conflicts_confirmed": bool(confirm_conflicts),
+                           "ipo_id": str(canonical_dict.get("ipo_id", "")),
+                           "reporting_unit": reporting_unit})
+            if pending_awaiting is not None:
+                remaining = [f for f in pending_awaiting[0] if issue_now.get(f) is None]
+                if remaining:
+                    augmented = dict(pending_awaiting[1])
+                    augmented["manual_entry"] = issue_terms_report["manual_entry"]
+                    pending_awaiting = (remaining, augmented, pending_awaiting[2])
+                else:
+                    pending_awaiting = None
+
+        if pending_awaiting is None:
+            # The manually enterable issue terms are complete, but the
+            # canonical input contract v1.5 also requires the stated
+            # fresh-issue amount (schema issue.required; it is never
+            # invented or defaulted). It may come from the filing, the
+            # final Prospectus, or the bounded manual entry above; fail
+            # closed with that precise field rather than a schema failure.
+            issue_gate = canonical_dict.get("issue", {}) if isinstance(canonical_dict, dict) else {}
+            if issue_gate.get("fresh_issue") is None:
+                pending_awaiting = (
+                    ["fresh_issue"],
+                    dict(issue_terms_report) if issue_terms_report else {},
+                    "the stated fresh-issue amount is established by the filing, the "
+                    "final Prospectus, or the bounded manual issue-term entry, and "
+                    "remains undisclosed",
+                )
+
+        if pending_awaiting is not None:
+            unresolved, resolution_dict, reason = pending_awaiting
+            _emit("evaluation_eligibility", "blocked", "BLOCKED",
+                  "Evaluation blocked: required issue terms remain unresolved.",
+                  details={"missing_fields": [f"issue.{f}" for f in unresolved],
+                           "reason": reason},
+                  error_code="AWAITING_ISSUE_TERMS")
+            _emit("evaluation", "not_run", "SKIPPED",
+                  "Evaluation was not run; nothing was persisted.")
+            _emit("persistence", "not_attempted", "SKIPPED",
+                  "No evaluation artifact was persisted.")
+            resolution_payload = dict(resolution_dict or {})
+            # Carry the canonical monetary unit so a manual entry for
+            # issue.ofs can be labelled and validated against the unit the
+            # engine will actually evaluate (v1.5: "in reporting_unit").
+            resolution_payload.setdefault(
+                "reporting_unit",
+                str(
+                    (canonical_dict.get("financials") or {}).get("reporting_unit")
+                    or "INR_LAKHS"
+                ),
+            )
+            raise IngestionAwaitingIssueTermsError(
+                "AWAITING_ISSUE_TERMS: required issue terms are unavailable: "
+                + ", ".join(f"issue.{field}" for field in unresolved)
+                + f". The uploaded filing does not disclose them and {reason}. "
+                "No evaluation was produced, no values were assumed, and nothing was persisted. "
+                "Retry automatic official discovery or upload an applicable authoritative filing "
+                "that establishes the unresolved fields. A retrieved price band alone does not "
+                "establish a missing fresh-issue monetary amount; missing evidence is not proof "
+                "that a notice has not been published.",
+                missing_fields=unresolved,
+                resolution=resolution_payload,
+            )
+
+        _emit("evaluation_eligibility", "passed", "SUCCEEDED",
+              "Required issue terms are complete; evaluation is eligible to run.")
+        _emit("evaluation", "started", "RUNNING",
+              "Running the deterministic evaluation pipeline.")
+        # Execute deterministic pipeline evaluation
+        try:
+            outcome = evaluate(
+                input_document=canonical_dict,
+                config=active_config,
+                mode=mode_clean,
+            )
+        except Exception as exc:
+            raise IngestionEvaluationError(
+                f"Evaluation pipeline failed: {exc}"
+            ) from exc
+
+        _emit("evaluation", "completed", "SUCCEEDED",
+              "Evaluation completed.",
+              details={"evaluation_id": outcome.record.evaluation_id,
+                       "final_score": float(outcome.score.final_score),
+                       "verdict": str(outcome.score.verdict)})
+        # Check duplicate / idempotency against immutable EvaluationStore.
+        # Duplicate identity covers the scored input, the configuration
+        # AND the evidence content (ids/sources/methods -- deliberately
+        # excluding volatile retrieval timestamps). Two evaluations with
+        # identical scored inputs but materially different evidence
+        # registries are not interchangeable: returning the older record
+        # would permanently hide corrected evidence registration behind
+        # idempotency (the record itself is never rewritten). A new
+        # evaluation is created instead; history is preserved.
+        def _evidence_fingerprint(evidence_payload: Any) -> frozenset:
+            items: Any = []
+            if isinstance(evidence_payload, dict):
+                items = evidence_payload.get("evidence") or []
+            return frozenset(
+                (
+                    str(item.get("evidence_id")),
+                    str(item.get("source_id")),
+                    str(item.get("extraction_method")),
+                )
+                for item in items
+                if isinstance(item, dict)
+            )
+
+        new_evidence_fingerprint = _evidence_fingerprint(outcome.record.evidence)
+        existing_eval_id: Optional[str] = None
+        if self.eval_store.exists(outcome.record.evaluation_id):
+            existing_eval_id = outcome.record.evaluation_id
+        else:
+            for eid in self.eval_store.list_evaluations():
+                try:
+                    rec = self.eval_store.read(eid)
+                    if rec.get("evaluation_mode", "").upper() == outcome.record.evaluation_mode.upper():
+                        if _evidence_fingerprint(rec.get("evidence")) != new_evidence_fingerprint:
+                            continue
+                        if rec.get("result_hash") == outcome.record.result_hash:
+                            existing_eval_id = eid
+                            break
+                        if (
+                            rec.get("input_snapshot_hash") == outcome.record.input_snapshot_hash
+                            and rec.get("config_hash") == outcome.record.config_hash
+                        ):
+                            existing_eval_id = eid
+                            break
+                except Exception:
+                    continue
+
+        if existing_eval_id is not None:
+            _emit("persistence", "duplicate", "SKIPPED",
+                  "Identical evaluation already exists; returning the existing record without rewriting history.",
+                  details={"evaluation_id": existing_eval_id})
+            existing_rec = self.eval_store.read(existing_eval_id)
+            eval_detail = self.get_evaluation_detail(existing_eval_id)
+            score_data = existing_rec.get("score") or {}
+            conf_data = existing_rec.get("confidence") or {}
+            verdict_data = existing_rec.get("verdict") or {}
+            return IngestionResponse(
+                evaluation_id=existing_eval_id,
+                ipo_id=existing_rec.get("ipo_id", outcome.record.ipo_id),
+                company_name=existing_rec.get("company_name", outcome.record.company_name),
+                evaluation_mode=existing_rec.get("evaluation_mode", outcome.record.evaluation_mode),
+                result_hash=existing_rec.get("result_hash", outcome.record.result_hash),
+                final_score=float(score_data.get("final_score", outcome.score.final_score)),
+                verdict=str(verdict_data.get("verdict") or outcome.score.verdict),
+                confidence=str(conf_data.get("level") or outcome.score.confidence),
+                is_duplicate=True,
+                message="Identical evaluation record already exists in immutable store.",
+                evaluation_url=f"/#evaluations/{existing_eval_id}",
+                evaluation=eval_detail,
+                issue_terms=issue_terms_report,
+            )
+
+        _emit("persistence", "started", "RUNNING",
+              "Persisting the evaluation record.")
+        self.eval_store.write(outcome.record)
+        _emit("persistence", "completed", "SUCCEEDED",
+              "Evaluation record persisted.",
+              details={"evaluation_id": outcome.record.evaluation_id})
+        # Register in lifecycle governance
+        self.lifecycle_mgr.register_evaluation(
+            outcome.record,
+            actor="system_ingest",
+            reason="statutory_filing_ingest",
+        )
+        eval_id_to_return = outcome.record.evaluation_id
+        eval_detail = self.get_evaluation_detail(eval_id_to_return)
+        verdict_str = (
+            (outcome.record.verdict or {}).get("verdict")
+            or (eval_detail.verdict.get("verdict") if eval_detail else None)
+            or outcome.score.verdict
+        )
+
+        return IngestionResponse(
+            evaluation_id=eval_id_to_return,
+            ipo_id=outcome.record.ipo_id,
+            company_name=outcome.record.company_name,
+            evaluation_mode=outcome.record.evaluation_mode,
+            result_hash=outcome.record.result_hash,
+            final_score=float(outcome.score.final_score),
+            verdict=str(verdict_str),
+            confidence=str(outcome.score.confidence),
+            is_duplicate=False,
+            message=("Filing evaluated using THIRD_PARTY_AGGREGATOR_OVERRIDE; third-party terms are NOT official disclosures."
+                     if (issue_terms_report or {}).get("aggregator_override", {}).get("applied_fields") else
+                     "Filing successfully ingested, extracted, and evaluated."),
+            evaluation_url=f"/#evaluations/{eval_id_to_return}",
+            evaluation=eval_detail,
+            issue_terms=issue_terms_report,
+        )
+
+    # -------------------------------------------------------------------------
+    # Internal Helpers
+    # -------------------------------------------------------------------------
+
+    def _to_evaluation_summary(self, rec: Dict[str, Any]) -> EvaluationSummary:
+        score_data = rec.get("score") or {}
+        score_range = rec.get("score_range") or {}
+        verdict_data = rec.get("verdict") or {}
+        conf_data = rec.get("confidence") or {}
+        eval_id = rec.get("evaluation_id", "")
+
+        lc = self.lifecycle_mgr.get_lifecycle(eval_id)
+        lifecycle_state = lc.lifecycle_state if lc else LIFECYCLE_STATE_ACTIVE
+        visibility_state = lc.visibility_state if lc else VISIBILITY_STATE_VISIBLE
+        operational_status = lc.operational_status if lc else OPERATIONAL_STATUS_ACTIVE
+        superseded_by = lc.superseded_by if lc else None
+        supersedes = lc.supersedes if lc else None
+
+        return EvaluationSummary(
+            authority_warnings=authority_warnings(rec),
+            evaluation_id=eval_id,
+            ipo_id=rec.get("ipo_id", ""),
+            company_name=rec.get("company_name", ""),
+            evaluation_mode=rec.get("evaluation_mode", "FINAL"),
+            evaluation_timestamp=rec.get("evaluation_timestamp", ""),
+            final_score=float(score_data.get("final_score", 0.0)),
+            base_score=score_data.get("base_score"),
+            penalties_total=score_data.get("penalties_total"),
+            lower_bound=score_range.get("lower_bound"),
+            upper_bound=score_range.get("upper_bound"),
+            verdict=verdict_data.get("verdict", "INSUFFICIENT_DATA"),
+            confidence=str(conf_data.get("level") or score_data.get("confidence", "Low")),
+            completeness_pct=conf_data.get("completeness_pct") or score_data.get("completeness_pct"),
+            engine_version=rec.get("engine_version", "1.5.0"),
+            config_version=rec.get("config_version", "1.5.0"),
+            result_hash=rec.get("result_hash", ""),
+            lifecycle_state=lifecycle_state,
+            visibility_state=visibility_state,
+            operational_status=operational_status,
+            superseded_by=superseded_by,
+            supersedes=supersedes,
+        )
+
+    # -------------------------------------------------------------------------
+    # Lifecycle Operations
+    # -------------------------------------------------------------------------
+
+    def archive_evaluation(
+        self,
+        evaluation_id: str,
+        reason: Optional[str] = None,
+        actor: Optional[str] = None,
+    ) -> LifecycleActionResponse:
+        record = self.lifecycle_mgr.archive_evaluation(evaluation_id, actor=actor, reason=reason)
+        return LifecycleActionResponse(
+            evaluation_id=record.evaluation_id,
+            ipo_id=record.ipo_id,
+            lifecycle_state=record.lifecycle_state,
+            visibility_state=record.visibility_state,
+            operational_status=record.operational_status,
+            superseded_by=record.superseded_by,
+            supersedes=record.supersedes,
+            message=f"Evaluation '{evaluation_id}' successfully transitioned to ARCHIVED visibility.",
+        )
+
+    def unarchive_evaluation(
+        self,
+        evaluation_id: str,
+        reason: Optional[str] = None,
+        actor: Optional[str] = None,
+    ) -> LifecycleActionResponse:
+        record = self.lifecycle_mgr.unarchive_evaluation(evaluation_id, actor=actor, reason=reason)
+        return LifecycleActionResponse(
+            evaluation_id=record.evaluation_id,
+            ipo_id=record.ipo_id,
+            lifecycle_state=record.lifecycle_state,
+            visibility_state=record.visibility_state,
+            operational_status=record.operational_status,
+            superseded_by=record.superseded_by,
+            supersedes=record.supersedes,
+            message=f"Evaluation '{evaluation_id}' successfully unarchived to VISIBLE status.",
+        )
+
+    def make_evaluation_active(
+        self,
+        evaluation_id: str,
+        reason: Optional[str] = None,
+        actor: Optional[str] = None,
+    ) -> LifecycleActionResponse:
+        record = self.lifecycle_mgr.make_active(evaluation_id, actor=actor, reason=reason)
+        return LifecycleActionResponse(
+            evaluation_id=record.evaluation_id,
+            ipo_id=record.ipo_id,
+            lifecycle_state=record.lifecycle_state,
+            visibility_state=record.visibility_state,
+            operational_status=record.operational_status,
+            superseded_by=record.superseded_by,
+            supersedes=record.supersedes,
+            message=f"Evaluation '{evaluation_id}' successfully designated as authoritative ACTIVE.",
+        )

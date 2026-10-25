@@ -1,0 +1,129 @@
+{
+  "scope": "API-boundary acceptance of the upload -> evaluation -> evidence-display path on the exact published tree (git 589e468). Temporary store only; not published as an evaluation record.",
+  "transport": "FastAPI TestClient over the real router; base_url http://127.0.0.1:8000 with Origin: http://127.0.0.1:8000 (the API requires a loopback Host and a same-origin Origin header for workflow POSTs).",
+  "issue_terms_input": "PA-authorized aggregator path over the bytes already published at docs/investigation/jio-fresh-20261023/final-retained/retained-publisher.html (sha256 47293a7f…25fe). No live network retrieval was possible in this sandbox.",
+  "endpoint_results": [
+    {
+      "call": "POST /api/v1/ingest/document (real 11.6 MB PDF, mode=final)",
+      "status": 201
+    },
+    {
+      "call": "GET /api/v1/evaluations/{id}",
+      "status": 200,
+      "score": 34.0,
+      "interval": [
+        24.0,
+        77.0
+      ],
+      "confidence": "Low"
+    },
+    {
+      "call": "GET /api/v1/evaluations/{id}/evidence",
+      "status": 200,
+      "items": 48
+    },
+    {
+      "call": "GET /api/v1/evidence/{evidence_id}",
+      "status": 200,
+      "sample": "EV-governance-auditor_changed_3y"
+    },
+    {
+      "call": "GET /api/v1/ingestions/{ingestion_id}/events",
+      "status": 200
+    },
+    {
+      "call": "GET /api/v1/ingestions",
+      "status": 200
+    },
+    {
+      "call": "GET /api/v1/ipos",
+      "status": 200
+    },
+    {
+      "call": "GET /api/v1/health",
+      "status": 200
+    }
+  ],
+  "guard_behaviour_observed": [
+    "Without a loopback Host the API returns 400 LOOPBACK_HOST_REQUIRED.",
+    "Without an Origin header the workflow POST returns 403 (explicit same-origin Origin required)."
+  ],
+  "evidence_display_samples": [
+    {
+      "evidence_id": "EV-use_of_proceeds_0-amount",
+      "page": 116,
+      "quote": "1. Prepayment, in full or in part , of certain outstanding borrowings availed by the Material Subsidiary, RJIL 275,000 275,000"
+    },
+    {
+      "evidence_id": "EV-capital_structure-promoter_pre_pct",
+      "page": 104,
+      "quote": "Limited 5,937,841,645 66.43 5,937,841,645 [●]"
+    },
+    {
+      "evidence_id": "EV-governance-auditor_changed_3y",
+      "page": 322,
+      "quote": "b) Auditors’ report jointly issued by us dated April 24, 2026, April 24, 2025 and April 22, 2024 ..."
+    },
+    {
+      "evidence_id": "EV-governance-repeated_eom",
+      "page": 430,
+      "quote": "no Emphasis of matters in auditor’s report for the period / year ended 30th June, 2026, ..."
+    },
+    {
+      "evidence_id": "EV-financials-contingent_liabilities",
+      "page": 405,
+      "quote": "Claims / disputed liabilities against the Group not acknowledged as debts*"
+    }
+  ],
+  "artifacts_generated_by_this_acceptance": [
+    {
+      "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-111613Z-final-c8d148c1",
+      "store": "temporary directory, deleted with the test run",
+      "score": 34.0
+    },
+    {
+      "evaluation_id": "JIO-PLATFORMS-LIMITED-20261023-111642Z-final-66c25a0a",
+      "store": "/tmp/tmp_4g1qrbt (temporary; not published)",
+      "score": 34.0
+    }
+  ],
+  "equivalence_to_published_evaluation": {
+    "published_reference": "JIO-PLATFORMS-LIMITED-20261023-085751Z-final-29d9a601",
+    "input_snapshot_hash": {
+      "published": "ba27fc4b99e3ac6ad28ec065e788d7beb57cfb8b9f1fc71e09b3839b93a8f04f",
+      "acceptance": "ba27fc4b99e3ac6ad28ec065e788d7beb57cfb8b9f1fc71e09b3839b93a8f04f",
+      "equal": true
+    },
+    "peer_snapshot_hash": {
+      "published": "61f5c9132e97baf987f2693568ab5b4b5ec748136b05453f0e2d155b842edb9b",
+      "acceptance": "61f5c9132e97baf987f2693568ab5b4b5ec748136b05453f0e2d155b842edb9b",
+      "equal": true
+    },
+    "config_hash": {
+      "published": "4a5d92e867aea681127352c628522f9a9c5841b89ea7a47736bf55e617526d2b",
+      "acceptance": "4a5d92e867aea681127352c628522f9a9c5841b89ea7a47736bf55e617526d2b",
+      "equal": true
+    },
+    "source_manifest_hash": {
+      "published": "e439b9462bfc707587a348cd576dd39f7a25a87b50854defa09cf21d6f54b915",
+      "acceptance": "eb828c2196bae46f50cb0c5059ab174848b3d911d68e0cf60cac12bdc488a69e",
+      "equal": false,
+      "difference": "embedded retrieval timestamps only"
+    },
+    "market_snapshot_hash": {
+      "published": "f17cf31d29b7d79a207be85d91034e4842e0b418e1b75a3cff919edc234b382a",
+      "acceptance": "5b66fdef0b92936a0a0c02d5e5e5a060c16f6b186abcaf421b0b2e4c4e231233",
+      "equal": false,
+      "difference": "as_of/captured_at timestamps only; all four blocks are MISSING in both"
+    },
+    "evidence_objects": "48 of 48 identical apart from retrieval timestamps; sources and the 48-entry field_map identical",
+    "score": {
+      "published": 34.0,
+      "acceptance": 34.0
+    }
+  },
+  "not_covered": [
+    "Real browser rendering, the file-picker widget, polling progress UI and CSS/DOM presentation.",
+    "A live official issue-term retrieval (blocked by sandbox egress)."
+  ]
+}

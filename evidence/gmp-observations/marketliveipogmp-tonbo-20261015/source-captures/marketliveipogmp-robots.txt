@@ -1,0 +1,4 @@
+User-Agent: *
+Allow: /
+
+Sitemap: https://marketliveipogmp.com/sitemap.xml

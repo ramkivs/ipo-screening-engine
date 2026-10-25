@@ -1,0 +1,16 @@
+# Python 3.11+ runtime, local web UI, PDF ingestion, and test dependencies.
+fastapi==0.143.1
+httpx==0.28.1
+jsonschema==4.26.0
+openpyxl==3.1.5
+pydantic==2.14.1
+pypdf==6.20.1
+pytest==9.1.1
+python-multipart==0.0.32
+PyYAML==6.0.3
+uvicorn==0.54.0
+
+# Offline image-only official notice reading (bundled OCR models; no runtime model downloads).
+pypdfium2==5.14.0
+rapidocr==3.10.0
+onnxruntime==1.24.4
