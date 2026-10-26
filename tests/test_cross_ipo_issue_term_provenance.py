@@ -44,6 +44,10 @@ from ipo_screening.pipeline import evaluate
 from ipo_screening.presentation.api import create_app
 from ipo_screening.presentation.service import PresentationConfig, PresentationService
 
+
+# These tests never mutate PDF readers/pages; only immutable text is reused.
+pytestmark = pytest.mark.usefixtures("cached_pdf_text")
+
 VISHAL_RHP_PDF = REPO_ROOT / "handoff" / "reference" / "U01122MH1994PLC185445-vishal nirmiti.pdf"
 RK_RHP_PDF = REPO_ROOT / "handoff" / "reference" / "U18109WB2010PLC144256-R.K Fashion accessories.pdf"
 # Synthetic transport only: match the unchanged RHP cover issue window.

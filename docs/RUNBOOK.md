@@ -865,3 +865,22 @@ python3 -m pytest -v tests/test_v16_implementation.py
 
 
 
+
+## Test tiers and regression performance
+
+The unfiltered `PYTHONPATH=engine python -m pytest tests/ -q --durations=30`
+remains the full/nightly/release acceptance path. For PR/change feedback:
+
+```bash
+PYTHONPATH=engine python -m pytest tests/ -q -m fast --strict-markers
+npm --prefix frontend test
+```
+
+Run real-file and service/workflow coverage separately with
+`PYTHONPATH=engine python -m pytest tests/ -q -m integration --durations=30`.
+Both tiers are required for complete backend coverage; marker selections are
+explicit, never default exclusions. `slow` aliases the conservative integration
+tier, including inexpensive cases colocated with integration tests.
+See [TEST_PERFORMANCE.md](TEST_PERFORMANCE.md) for the Pass-9 command, integrity
+checks, audited text-cache boundary and uncached control command, and
+[TEST_PERFORMANCE_RESULTS.md](TEST_PERFORMANCE_RESULTS.md) for measured results.

@@ -236,6 +236,10 @@ def test_scoring_consumers_unchanged_by_structured_rpt_evidence():
 from ipo_screening.extraction.interfaces import RawExtraction
 
 
+# These tests never mutate PDF readers/pages; only immutable text is reused.
+pytestmark = pytest.mark.usefixtures("cached_pdf_text")
+
+
 def _txn(category, counterparty, period, amount, unit, idx):
     return RawExtraction(
         field_path=f"governance.related_party_transactions[{idx}]",

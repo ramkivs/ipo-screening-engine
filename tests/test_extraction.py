@@ -36,6 +36,10 @@ from ipo_screening.extraction import (
     parse_indian_number,
 )
 
+
+# These tests never mutate PDF readers/pages; only immutable text is reused.
+pytestmark = pytest.mark.usefixtures("cached_pdf_text")
+
 PDF_FIXTURE = REPO_ROOT / "handoff" / "reference" / "U01122MH1994PLC185445-vishal nirmiti.pdf"
 VISHAL_INPUT_FIXTURE = REPO_ROOT / "fixtures" / "vishal_nirmiti" / "input.json"
 CONFIG_FILE = REPO_ROOT / "config" / "ipo-config.v1.5.0.json"

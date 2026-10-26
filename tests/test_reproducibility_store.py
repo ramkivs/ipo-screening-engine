@@ -84,16 +84,30 @@ def test_result_hash_is_independent_of_key_order(golden_input, config):
     assert run(shuffled, config).record.result_hash == run(golden_input, config).record.result_hash
 
 
-def test_result_hash_is_stable_across_processes(config):
+@pytest.mark.parametrize("implicit_encoding", [None, "cp1252"], ids=["native", "cp1252-default"])
+def test_result_hash_is_stable_across_processes(config, implicit_encoding):
     """Spec s27: identical inputs must hash identically in a fresh interpreter."""
     script = (
         "import json, sys;"
         "from datetime import datetime, timezone;"
         "from ipo_screening.pipeline import evaluate, load_config;"
-        "doc = json.load(open(sys.argv[1]));"
+        "doc = json.load(open(sys.argv[1], encoding='utf-8'));"
         "out = evaluate(doc, load_config(), evaluation_datetime=datetime(2026,10,5,12,0,0,tzinfo=timezone.utc));"
         "print(out.record.result_hash)"
     )
+    if implicit_encoding:
+        # Emulate a legacy Windows text-file default inside the child. Explicit
+        # encodings remain untouched. The original implicit open fails here on
+        # the golden file's UTF-8 bytes; all hash/seed assertions remain below.
+        script = (
+            "import builtins\n"
+            "_original_open = builtins.open\n"
+            "def legacy_open(file, mode='r', *args, **kwargs):\n"
+            "    if 'b' not in mode and kwargs.get('encoding') is None:\n"
+            f"        kwargs['encoding'] = {implicit_encoding!r}\n"
+            "    return _original_open(file, mode, *args, **kwargs)\n"
+            "builtins.open = legacy_open\n"
+        ) + script
     expected = run(
         json.loads(GOLDEN_DIR.joinpath("input.json").read_text(encoding="utf-8")), config
     ).record.result_hash

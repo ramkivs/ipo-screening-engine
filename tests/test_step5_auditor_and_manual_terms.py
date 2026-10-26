@@ -46,6 +46,10 @@ from ipo_screening.presentation.service import (
     PresentationService,
 )
 
+
+# These tests never mutate PDF readers/pages; only immutable text is reused.
+pytestmark = pytest.mark.usefixtures("cached_pdf_text")
+
 PDF_BYTES = b"%PDF-1.4 step5-test"
 EXPLANATION = "Terms read from the exchange price-band announcement dated 2026-10-10."
 

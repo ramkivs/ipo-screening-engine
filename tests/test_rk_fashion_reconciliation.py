@@ -22,6 +22,10 @@ import pytest
 from ipo_screening.extraction.extractor import DocumentExtractor
 from ipo_screening.pipeline import evaluate, load_config
 
+
+# These tests never mutate PDF readers/pages; only immutable text is reused.
+pytestmark = pytest.mark.usefixtures("cached_pdf_text")
+
 REPO_ROOT = Path(__file__).parent.parent
 RK_PDF = REPO_ROOT / "handoff" / "reference" / "U18109WB2010PLC144256-R.K Fashion accessories.pdf"
 CONFIG_FILE = REPO_ROOT / "config" / "ipo-config.v1.5.0.json"
@@ -312,3 +316,64 @@ def test_defect3_operating_cash_flow_field_selection():
     cfo_crit = next(c for c in mod_a["criteria"] if c["criterion_id"] == "cfo_quality")
     assert cfo_crit["state"] == "SCORED"
     assert cfo_crit["score"] == 0.0
+
+
+def test_missing_promoter_post_holding_remains_unknown_not_four_earned_points():
+    """Real canonical input: losing source evidence is not a scoring repair.
+
+    This controlled intervention explains the reported 44 -> 40 symptom; it
+    deliberately does not claim to reproduce the native Windows extraction.
+    """
+    from copy import deepcopy
+
+    canonical, _ = DocumentExtractor().extract_from_pdf(RK_PDF, allow_fixture_fallbacks=False)
+    config = load_config(CONFIG_FILE)
+    at = datetime(2026, 10, 5, 12, tzinfo=timezone.utc)
+    supported = evaluate(canonical, config, mode="final", evaluation_datetime=at).record
+    missing_input = deepcopy(canonical)
+    missing_input["capital_structure"]["promoter_post_pct"] = None
+    missing_input.get("_evidence", {}).pop("capital_structure.promoter_post_pct", None)
+    missing = evaluate(missing_input, config, mode="final", evaluation_datetime=at).record
+
+    def criteria(record):
+        return {(m["module_id"], c["criterion_id"]): c
+                for m in record.score["modules"] for c in m["criteria"]}
+
+    yes, no = criteria(supported), criteria(missing)
+    key = ("D", "promoter_post_holding")
+    assert yes[key]["state"] == "SCORED"
+    assert yes[key]["score"] == 4.0
+    assert no[key]["state"] == "UNKNOWN"
+    assert no[key].get("score") is None
+    assert {k: v for k, v in yes.items() if k != key} == {k: v for k, v in no.items() if k != key}
+    assert supported.score["base_score"] == 47.0
+    assert missing.score["base_score"] == 43.0
+    assert supported.score["penalties_total"] == missing.score["penalties_total"] == -3.0
+    assert supported.penalties == missing.penalties
+    assert supported.score["final_score"] == 44.0
+    assert missing.score["final_score"] == 40.0
+    assert canonical["capital_structure"]["promoter_post_pct"] == 72.25
+
+
+def test_real_filing_wrapped_total_extracts_without_fixture_fallbacks(monkeypatch):
+    """Simulate the reported PDF text layout, not different filing facts."""
+    import re
+    from ipo_screening.extraction.sections import SectionExtractor
+
+    original = SectionExtractor.extract_page_text
+    changed = []
+
+    def wrapped(self, page):
+        text = original(self, page)
+        if page == 126:
+            text, count = re.subn(r"(?m)^(Total\s*\(A\)\s+[\d,]{6})([^\n]+)$",
+                                  r"\1\n\2", text)
+            changed.append(count)
+        return text
+
+    monkeypatch.setattr(SectionExtractor, "extract_page_text", wrapped)
+    canonical, _ = DocumentExtractor().extract_from_pdf(RK_PDF, allow_fixture_fallbacks=False)
+    assert any(changed), "real source total row must be exercised"
+    assert canonical["capital_structure"]["promoter_pre_pct"] == 99.67
+    assert canonical["capital_structure"]["promoter_post_pct"] == 72.25
+    assert canonical["_evidence"]["capital_structure.promoter_post_pct"]["source_id"]

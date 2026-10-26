@@ -39,8 +39,10 @@ def pytest_configure(config: pytest.Config) -> None:
     # without introducing a new configuration surface.
     config.addinivalue_line(
         "markers",
-        "slow: exercises a real filing PDF end to end (the long tail of the run).",
+        "slow: integration tier (real filings, ingestion, persistence, or mixed modules).",
     )
+    config.addinivalue_line("markers", "integration: real-file or service/workflow integration tests.")
+    config.addinivalue_line("markers", "fast: unit, synthetic parser and contract tests.")
     if os.environ.get("PYTEST_PROGRESS", "1") == "0":
         return
     from pytest_progress import PytestProgress  # noqa: PLC0415
@@ -259,3 +261,50 @@ def resolve_overlay_plan(config, derived, canonical):
     from ipo_screening.overlays import resolve_overlays
 
     return resolve_overlays(config, derived, canonical.sector_profile)
+
+
+@pytest.fixture(scope="session")
+def _pdf_text_cache(request):
+    from pdf_text_cache import PDFTextCache
+
+    cache = PDFTextCache()
+    request.config._pdf_text_cache = cache
+    return cache
+
+
+@pytest.fixture
+def cached_pdf_text(monkeypatch, _pdf_text_cache):
+    """Reuse text only in explicitly opted-in, immutable-reader test modules.
+
+    Keep fresh readers and rerun all domain extraction and downstream workflows.
+    Parser mutation/fallback-isolation/cache-invalidation suites do not opt in.
+    Set PYTEST_PDF_TEXT_CACHE=0 for an uncached control/full regression run.
+    """
+    if os.environ.get("PYTEST_PDF_TEXT_CACHE", "1") != "0":
+        from pypdf._page import PageObject
+
+        monkeypatch.setattr(
+            PageObject, "extract_text", _pdf_text_cache.wrap(PageObject.extract_text)
+        )
+    return _pdf_text_cache
+
+
+def pytest_collection_modifyitems(items):
+    from tier_inventory import INTEGRATION_MODULES
+
+    for item in items:
+        if item.path.name in INTEGRATION_MODULES or item.get_closest_marker("slow"):
+            item.add_marker(pytest.mark.integration)
+            if not item.get_closest_marker("slow"):
+                item.add_marker(pytest.mark.slow)
+        else:
+            item.add_marker(pytest.mark.fast)
+
+
+def pytest_terminal_summary(terminalreporter, config):
+    cache = getattr(config, "_pdf_text_cache", None)
+    if cache is not None:
+        terminalreporter.write_line(
+            f"PDF text cache: {cache.hits} hits, {cache.misses} decoded pages; "
+            f"{len(cache.text)} immutable strings retained (opt-in modules only)"
+        )

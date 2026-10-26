@@ -20,9 +20,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from conftest import REPO_ROOT
 from ipo_screening.issue_terms import HttpProspectusProvider, IssueTermsResolver
 from ipo_screening.presentation.service import PresentationConfig, PresentationService
+
+
+# These tests never mutate PDF readers/pages; only immutable text is reused.
+pytestmark = pytest.mark.usefixtures("cached_pdf_text")
 
 SEBI_URL = "https://www.sebi.gov.in/sebi_data/attachdocs/oct-2026/1791286596126.pdf"
 VISHAL_RHP_PDF = REPO_ROOT / "handoff" / "reference" / "U01122MH1994PLC185445-vishal nirmiti.pdf"

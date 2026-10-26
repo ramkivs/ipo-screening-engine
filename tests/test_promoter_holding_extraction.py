@@ -191,3 +191,73 @@ def test_live_jio_shareholding_pattern_is_not_fabricated():
     # unknown and no 100 % is ever emitted.
     assert out.get("capital_structure.promoter_pre_pct") == 66.43
     assert out.get("capital_structure.promoter_post_pct") is None
+
+
+@pytest.mark.parametrize("tail", [
+    "72 99.61 1,12,06,672 72.22 1,12,06,672 72.22",
+    "72 99.61\n1,12,06,672 72.22\n1,12,06,672 72.22",
+    "72\n99.61\n1,12,06,672\n72.22\n1,12,06,672\n72.22",
+])
+def test_wrapped_total_keeps_pre_and_both_post_columns(tail):
+    text = ("Pre-Offer shareholding Post-Offer shareholding as at Allotment\n"
+            "Promoters\nTotal (A) 1,12,06,6\n" + tail +
+            "\nPromoter Group\nTotal (B) 5,100 0.06 5,100 0.03 5,100 0.03")
+    out = _extract(text)
+    assert out["capital_structure.promoter_pre_pct"] == 99.67
+    assert out["capital_structure.promoter_post_pct"] == 72.25
+
+
+@pytest.mark.parametrize("boundary", ["Public", "Promoter Group", "Total (B)",
+                                      "1. Other shareholder", "1. 1000 20.00", "Footnote"])
+def test_wrapped_row_never_borrows_percentages_across_a_row_boundary(boundary):
+    lines = ["Total (A) 1,234 61.00", boundary, "1,234 45.00 1,234 45.00"]
+    assert SectionExtractor._row_percentages(lines, 0) == [61.0]
+
+
+def test_wrapped_pre_only_row_stays_unknown_after_offer():
+    out = _extract("Pre-Offer shareholding Post-Offer shareholding\n"
+                   "Total (A) 1,234\n61.00\n[●] [●]\n[●] [●]\nPublic\n"
+                   "Total (B) 2,345 39.00 3,456 55.00")
+    assert out["capital_structure.promoter_pre_pct"] == 61.0
+    assert out.get("capital_structure.promoter_post_pct") is None
+
+
+def test_wrapped_pre_only_table_cannot_supply_post_offer_cells():
+    out = _extract("Pre-Offer shareholding\nTotal (A) 1,234\n61.00\n1,234 60.00")
+    assert out.get("capital_structure.promoter_post_pct") is None
+
+
+@pytest.mark.parametrize("row", ["Total (A) 1,234 61.00\n1,234 45.00\n[●] [●]",
+                                  "Total (A) 1,234 [●]\n1,234 45.00\n1,234 45.00"])
+def test_undisclosed_wrapped_columns_are_not_collapsed(row):
+    out = _extract("Pre-Offer shareholding Post-Offer shareholding\n" + row)
+    assert out.get("capital_structure.promoter_post_pct") is None
+
+
+def test_wrapped_numeric_overflow_is_not_an_extra_post_scenario():
+    assert SectionExtractor._row_percentages([
+        "Total (A) 1,234 61.00", "1,234 45.00 1,234 45.00", "2,345 55.00"], 0) == []
+
+
+def test_unterminated_numeric_row_fails_closed():
+    assert SectionExtractor._row_percentages(["Total (A) 1,234 61.00"] + ["1234"] * 17, 0) == []
+
+
+def test_wrapping_retains_upper_band_column_order_not_maximum():
+    out = _extract("Pre-Offer shareholding Post-Offer shareholding\n"
+                   "Total (A) 1,234 61.00\n1,234 55.00\n1,234 45.00")
+    assert out["capital_structure.promoter_post_pct"] == 45.0
+
+
+def test_wrapped_group_with_undisclosed_post_value_stays_unknown():
+    out = _extract("Pre-Offer shareholding Post-Offer shareholding\n"
+                   "Promoters\nTotal (A) 1,234 61.00\n1,234 45.00\n1,234 45.00\n"
+                   "Promoter Group\nTotal (B) 123 1.00\n123 0.80\n[●] [●]")
+    assert out.get("capital_structure.promoter_post_pct") is None
+
+
+@pytest.mark.parametrize("marker", ["-", "—", "–", "[●]", "[•]", "[*]"])
+def test_wrapped_missing_upper_band_cell_is_unknown(marker):
+    out = _extract("Pre-Offer shareholding Post-Offer shareholding\n"
+                   "Total (A) 1,234 61.00\n1,234 45.00\n" + marker)
+    assert out.get("capital_structure.promoter_post_pct") is None

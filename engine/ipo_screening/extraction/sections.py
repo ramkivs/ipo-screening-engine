@@ -840,22 +840,43 @@ class SectionExtractor:
 
     @staticmethod
     def _row_percentages(lines: List[str], idx: int) -> List[float]:
-        """Decimal percentage cells in one total row.
+        """Read intact decimal cells from a labelled, possibly wrapped total.
 
-        A wrapped row continues on the next line only when that line is a
-        short numeric continuation; a following category heading or total
-        belongs to the next section and is never folded into this row.
+        PDF layout engines can split a share count and put the remaining cells
+        on several lines. Continue only through numeric/placeholder-only text;
+        category labels, named/numbered shareholders, totals and prose end the
+        row. Never search ahead across such a boundary for missing cells.
+        The bound also makes an unterminated/malformed row fail closed.
         """
-        window = lines[idx]
-        if idx + 1 < len(lines):
-            nxt = lines[idx + 1]
-            if (
-                len(nxt.split()) <= 5
-                and not re.search(r"total\s*\(|promoter|public", nxt, re.IGNORECASE)
-            ):
-                window = f"{window} {nxt}"
+        parts = [lines[idx]]
+        for nxt in lines[idx + 1:idx + 17]:
+            if (not nxt.strip()
+                    or re.match(r"^\s*\d+[.)]\s", nxt)
+                    or not re.fullmatch(r"[\d\s,.%\[\]●•*–—−-]+", nxt)):
+                break
+            parts.append(nxt)
+        else:
+            # More than sixteen continuation lines cannot be safely assigned
+            # to this row. Do not expose a partially collected post column.
+            if idx + 17 < len(lines) and re.fullmatch(
+                    r"[\d\s,.%\[\]●•*–—−-]+", lines[idx + 17]):
+                return []
+        window = " ".join(parts)
         values = [float(x) for x in re.findall(r"[0-9]+\.[0-9]+", window)]
-        return [v for v in values if 0.0 <= v <= 100.0]
+        percentages = [v for v in values if 0.0 <= v <= 100.0]
+        # Wrapped pre + lower/upper post tables have at most three percentage
+        # cells. Overflow cannot be assigned to that layout safely: it may be
+        # an unlabelled neighbouring numeric row, not another post scenario.
+        if len(parts) > 1 and len(percentages) > 3:
+            return []
+        # An undisclosed cell is not an absent column. Do not collapse a
+        # partial post-offer row and mistake a lower-band value for the upper
+        # band (or a pre-offer value for a post-offer one).
+        marker = re.search(r"\[[●•*]\]|(?<!\S)[–—−-](?!\S)", window)
+        if marker:
+            first = re.search(r"[0-9]+\.[0-9]+", window)
+            return percentages[:1] if first and first.start() < marker.start() else []
+        return percentages
 
     def extract_capital_structure(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract promoter pre/post holding %, pledge %, and lock-in."""
