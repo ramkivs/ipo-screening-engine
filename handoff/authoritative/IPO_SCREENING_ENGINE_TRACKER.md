@@ -2836,3 +2836,148 @@ CI (`regression`, workflow "A9 contract boundary regression") was **PASS** on `f
   41.0 → 43.0 SOLELY BECAUSE THAT SCHEDULE IS NOW READ; THE MODULE D NUMERATOR STAYS UNKNOWN WITH
   THE EVIDENCE AND A RECOMMENDATION RECORDED; NO CONFIG, WEIGHT, THRESHOLD, PENALTY, KNOCKOUT OR
   FROZEN-CORE FILE CHANGED; PR #12 OPEN AND UNMERGED.**
+
+## Revision 28 — printed rows rebuilt from their rules, and one vocabulary for transaction natures
+
+— 2026-10-26
+
+**Scope: the scanned related-party note reader now reconstructs the printed table instead of OCR
+line groups, and both related-party readers share one nature vocabulary. No scoring weight,
+threshold, band, penalty, knockout or criterion definition was changed, no configuration was
+touched, no issuer name appears in any engine path, `derived.py` (pin `7783dfeb…`) is untouched
+and the Vishal golden hash `e84f8bc0…` is unchanged.** Branch
+`arena/79aac867-ipo-screening-engine`, PR **#12** (base `main`), left **OPEN**. Full account: §34 of
+`docs/investigation/PARAS-INGESTION-FAILURE-2026-10-23.md`.
+
+### What was wrong, and where
+
+1. **A row was an OCR line group, not a printed row.** A party name printed once against four
+   financial years covered only the line the recogniser put its text on, so the other rows lost
+   their counterparty.
+2. **A value was placed by its own line.** These scans print a figure's baseline ~7 px below its
+   own row's rule, so a value could bind to the following year. Placement is now by box overlap
+   with the printed row.
+3. **Continuation was decided by page adjacency.** The reader walked off the note into the
+   profit-and-loss page (309) and the cash-flow page (310); page 310 is Note 9, property, plant and
+   equipment, with no table block. Continuation is now "the page produces mapped blocks".
+4. **A rule was "a dark row".** A densely set word in a narrow label column ("Investment", the third
+   line of a merged nature cell) reached the same darkness, was taken for a cell boundary, and
+   truncated the description to "Advances against". A rule is now required to be one continuous
+   stroke (`_rule_rows`, `RULE_CONTINUITY`).
+5. **Nothing recorded why a cell was unread.**
+6. **Each reader kept its own nature phrase list**, so one printed nature could be a sale in the
+   period-matrix reader and `unclassified` in the note reader.
+7. **The caller swallowed every reader exception**, so a broken reader and a document with no such
+   note produced the same output. A lost module constant in this revision raised `NameError` on
+   every block and the production path reported the aggregate-summary `PARTIAL` as if nothing were
+   wrong.
+
+### What was implemented (shared, issuer-neutral)
+
+- `extraction/rpt_image_note.py`: `horizontal_rules` / `_rule_rows` / `crosses` / `row_bands` /
+  `_spans` / `_overlap` / `_band_table` / `_band_text` / `_band_confidence`; `parse_page` rewritten
+  to emit only rows that state their own period, have a counterparty and close against their own
+  balances (printed dashes read as disclosed nils, negative balances accepted as balances and never
+  emitted as movements); `UNCERTAIN_CONFIDENCE` (0.80) admits a low-confidence cell **only** when
+  the row's control total proves it; every unread cell is counted with a reason and the coverage
+  note prints the breakdown; `read_related_party_note` returns `{found, transactions, state, note,
+  pages, reasons}`.
+- `extraction/rpt_categories.py` (**new**): the single nature vocabulary —
+  `REVENUE_CATEGORIES`, `CATEGORY_CLASS`, ordered `NATURE_CATEGORIES`, `classify_nature`,
+  `is_revenue_category`, `normalise`, `describe`. Classification requires the wording to establish
+  the economic meaning **and the direction**; direction is never inferred from a category name.
+- `extraction/sections.py`: the period-matrix reader's classification fallback calls
+  `classify_nature` instead of defaulting to `unclassified`; `_extract_related_party_image_note`
+  logs a failed OCR read (`exc_info`) before returning no extraction (output semantics unchanged).
+- `extraction/builder.py`: `_RPT_SALES_SERVICES_CATEGORIES` **is** `REVENUE_CATEGORIES` and
+  `_rpt_is_sales_services` delegates to `is_revenue_category`, so the numerator and the readers
+  cannot drift apart. Contents unchanged.
+
+Tests: `tests/test_rpt_nature_classification_and_row_bands_20261026.py` (**new**, 64 tests: positive
+and negative classification, the eligibility/class equivalence in both directions, geometry on a
+drawn table — merged label cells, drifted baselines, a dense word that is not a rule — and the R.K.
+Fashion OCR regression); registered in `tests/tier_inventory.py`.
+`tests/test_rpt_matrix_reader_20261026.py::test_paras_amounts_periods_and_disclosed_share` now
+asserts the classification Paras actually prints (`employee_benefits`) plus
+`is_revenue_category(...) is False`, instead of `unclassified`.
+
+### Result on R.K. Fashion Note 31 (same OCR, same fixture)
+
+| | Revision 27 | Revision 28 |
+|---|---|---|
+| Transaction values | 19 | **23** |
+| Unread cells | 55 | **47** |
+| Pages read | [308, 309, 310] | **[308, 309]** |
+| Coverage | `PARTIAL` | `PARTIAL` |
+
+Recovered and proved by the note's own arithmetic: Mohammed Usman `loan_taken` FY2024 **216.00**
+and `loan_repaid` **213.31** (47.21 + 216.00 − 213.31 = 49.90); M.K.Jewellers `purchase_of_goods`
+3M-2026-06-30 **9.13** and `payment_made` **16.02** (36.88 + 9.13 − 16.02 = 29.99, printed 29.98).
+All 19 earlier values are still reported. Unread by reason: block without opening and closing
+control **30**, row does not close against its balances **10**, row without period **7**. An
+increased row count is not offered as proof: every emitted row closes against the balances the
+filing prints beside it, and the four categories produced (`loan_taken`, `loan_repaid`,
+`purchase_of_goods`, `payment_made`) are all non-revenue, so `rpt_pct_revenue` stays null and the
+score stays **43.0**.
+
+### Classification safeguards (proved by tests, not asserted)
+
+- Eligible numerator is unchanged: `sale_of_goods`, `sale_of_services`, `revenue_from_operations`,
+  `job_work_charges_received` (+ the pre-existing `sale_of_*` prefix rule, excluding `sale_of_ppe`).
+- Employee benefits (short-term, post-employment, gratuity, leave encashment, provident fund),
+  share-based payment, remuneration, salary, sitting fees, retainers and professional fees,
+  purchases, repairs/power and fuel, hire/transport/job-work charges paid, reimbursements, interest,
+  rents, loans, advances, deemed capital contribution, merger consideration and share of profit
+  paid classify as `expense`/`income_other`/`asset`/`liability`/`settlement`/`capital`/`disposal`
+  and are never eligible.
+- "Rent and facility fees", "Loan to and from group companies" and "Reimbursements" state no
+  direction and stay `unclassified`.
+- Every `CATEGORY_CLASS` entry must satisfy
+  `is_revenue_category(c) == (CATEGORY_CLASS[c] == "revenue") == (c in REVENUE_CATEGORIES)`,
+  so neither the class map nor the eligible set can be widened alone. **Nothing in this revision
+  can add eligible related-party revenue or clear K6 for any issuer.**
+
+### Module D numerator — still UNKNOWN, disposition unchanged
+
+Paras Note 34 §III-A discloses "Revenue from sale of healthcare services (excluding applicable
+taxes)" 28.69 / 14.45 / 6.48 ₹ million under a heading stating the transactions are **eliminated in
+consolidation**, against *consolidated* revenue of 16,059.52 / 12,940.63 / 11,290.39 ₹ million.
+Counting them would divide gross intra-group revenue by post-elimination revenue (0.1788% /
+0.1116% / 0.0574%, D `rpt` 3/3, K6 CLEAR) and would also require assuming a direction for
+"Outsourced medical services (excluding applicable taxes)". The fields stay null; a standalone-basis
+metric is a definition change with its own numerator, denominator and field. Recommendation and the
+exact question for Ramki: §34.6.
+
+### Verification — focused suites only
+
+`test_rpt_nature_classification_and_row_bands_20261026.py` **64**;
+`test_glyph_geometry_and_ocr_note_20261026.py` + `test_rpt_matrix_reader_20261026.py` +
+`test_rpt_extraction.py` **40** (after the one expectation update above);
+`test_rk_fashion_reconciliation.py` **7** (43.0 / base 46.0 / completeness 66%);
+`test_paras_evidence_regression.py` + `test_jio_evidence_remediation.py` **19** (Jio
+`rpt_pct_revenue` 4.3094 unchanged); `test_ui7_ingestion.py` + `test_suite_tiers.py` **21**.
+Production path re-read on the R.K. filing: 23 transactions, `PARTIAL`,
+`{loan_taken 6, loan_repaid 10, purchase_of_goods 3, payment_made 4}`. Cross-issuer counts
+unchanged: Paras 70 `DISCLOSED`, Jio 23 `DISCLOSED`, Vishal 136 `DISCLOSED` (Vishal
+`rpt_pct_revenue` 11.8418 unchanged). The full backend, regression and frontend suites remain
+**DEFERRED**.
+
+### Status and next actions
+
+- Readiness: **NOT ESTABLISHED**. Required-term gate: **CLOSED**. PR **#12 OPEN**, not merged.
+- Remaining, in order: (1) **Ramki's decision** on the Module D numerator basis (§34.6); (2) 30
+  cells in blocks that print no control total stay unread by design; (3) 10 rows whose OCR digits do
+  not close and 7 rows with no period — a higher-resolution block render would raise confidence, not
+  relax the rule; (4) party names keep the filing's own spelling per block
+  (`MK.Jewellers` / `M.K.Jewellers`); (5) the comprehensive suites, deferred once.
+
+- **Disposition: THE SCANNED RELATED-PARTY NOTE IS NOW READ FROM ITS PRINTED RULES (PRINTED ROWS,
+  MERGED LABEL CELLS, VALUES BY BOX OVERLAP, EVERY ROW CLOSED AGAINST ITS OWN BALANCES, UNREAD
+  CELLS COUNTED WITH REASONS), R.K. FASHION NOTE 31 GOES 19 → 23 VALUES AND 55 → 47 UNREAD CELLS
+  WITH ALL 19 EARLIER VALUES KEPT AND THE PAGES LIMITED TO [308, 309]; ONE SHARED NATURE VOCABULARY
+  NOW SERVES BOTH RELATED-PARTY READERS AND THE BUILDER, WITH RENT/PURCHASE/EMPLOYEE-BENEFIT/LOAN
+  NATURES CLASSIFIED AS NON-REVENUE AND DIRECTION-UNSTATED WORDING LEFT UNCLASSIFIED, SO THE
+  MODULE D NUMERATOR AND K6 ARE UNCHANGED FOR EVERY ISSUER; A SWALLOWED READER EXCEPTION IS NOW
+  LOGGED RATHER THAN SILENT; THE MODULE D NUMERATOR STAYS UNKNOWN WITH THE QUESTION RECORDED FOR
+  RAMKI; NO CONFIG, WEIGHT, THRESHOLD, PENALTY, KNOCKOUT OR FROZEN-CORE FILE CHANGED; PR #12 OPEN
+  AND UNMERGED.**

@@ -19,6 +19,7 @@ import jsonschema
 
 from .directorate import count_exits
 from .interfaces import RawExtraction, SourceDocument
+from .rpt_categories import REVENUE_CATEGORIES, is_revenue_category
 
 
 class CanonicalInputBuilder:
@@ -648,9 +649,12 @@ class CanonicalInputBuilder:
     # balances are excluded (retained as evidence only).  Fail closed:
     # missing periods/revenue, non-positive revenue, unknown or
     # unconvertible units, or a missing numerator leave the fields null.
-    _RPT_SALES_SERVICES_CATEGORIES = frozenset(
-        {"sale_of_goods", "sale_of_services", "revenue_from_operations", "job_work_charges_received"}
-    )
+    # Imported from the shared nature vocabulary (extraction/rpt_categories.py)
+    # rather than restated here, so a reader that recognises a new revenue
+    # nature cannot silently disagree with the numerator about what may be
+    # counted.  The contents are unchanged: the four categories the approved
+    # definition names.
+    _RPT_SALES_SERVICES_CATEGORIES = REVENUE_CATEGORIES
     _ISSUE_UNIT_TO_RUPEES = {
         "INR_LAKHS": 1e5,
         "INR_CRORES": 1e7,
@@ -708,9 +712,7 @@ class CanonicalInputBuilder:
 
     @classmethod
     def _rpt_is_sales_services(cls, category: str) -> bool:
-        if category in cls._RPT_SALES_SERVICES_CATEGORIES:
-            return True
-        return category.startswith("sale_of_") and category != "sale_of_ppe"
+        return is_revenue_category(category)
 
     def _derive_rpt_metrics(self, gov: Dict[str, Any]) -> None:
         if gov.get("rpt_pct_revenue") is not None and gov.get("rpt_pct_of_revenue_growth") is not None:

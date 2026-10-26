@@ -2681,3 +2681,191 @@ failed with `assert 43.0 == 41.0`. No other expectation was changed.
 | 3 | Paras's summary rows keep their verbatim nature text and are `unclassified` (e.g. "Short term employee benefits and Other long term benefits") — the amounts are right, the category vocabulary does not cover those natures | add non-revenue natures to `_RPT_CATEGORY_PHRASES` only together with a metric review, so no eligible category appears by accident |
 | 4 | Wrapped label words stay as printed ("Dr. Dharminde r Kumar Nagar") — repairing them would be inventing text | leave as is; the quotation is verbatim |
 | 5 | OCR adds ~25 s to a fully scanned filing's extraction (bounded: 20 heading strips + 3 pages) | acceptable for single-filing runs; a cache keyed by (file, page, scale) would remove the repeat cost |
+
+## 34. Printed rows rebuilt from their rules, and one vocabulary for natures — 2026-10-26 (revision 28)
+
+Revision 27 read an image-only related-party note, but it read it as **OCR rows**: whatever lines
+the
+recogniser grouped together became a table row. That is enough for a simple block and wrong for
+every block where the filing merges cells vertically (one party name against four financial years),
+wraps a nature over three lines, or prints a figure a few pixels below its own row's rule. Revision
+28 rebuilds the table from the table itself — the printed rules — and places every value by the box
+overlap it has with its own printed row. It also gives both related-party readers one shared nature
+vocabulary, so the same printed nature cannot be classified two ways.
+
+### 34.1 What was still wrong after revision 27
+
+| # | Defect | Consequence on R.K. Fashion Note 31 |
+|---|---|---|
+| 1 | A row was an OCR line group, not a printed row | a merged label cell (party or nature) covered only the line OCR happened to put its text on; a second row of figures lost its counterparty |
+| 2 | A value was assigned by the OCR item's own line | these scans print a figure's baseline ~7 px **below its own row's rule**, so a value could land in the following year |
+| 3 | Continuation was decided by page adjacency | the reader walked into the profit-and-loss page (309) and the cash-flow page (310); page 310 is Note 9, property, plant and equipment, with no table block at all |
+| 4 | Nothing recorded *why* a cell was unread | coverage said "55 unread" and no more |
+| 5 | Each reader kept its own nature phrase list | the same nature could be a sale in the period-matrix reader and `unclassified` in the note reader; a phrase added for readability could make an expense eligible for the Module D numerator |
+| 6 | A rule was "a row that is dark across the window" | a **densely set word** in a narrow label column reaches the same darkness. "Investment", the third line of a merged nature cell, was read as a rule, splitting the cell and truncating the description to "Advances against" |
+| 7 | The reader's failures were swallowed by its caller | see §34.4 — a defect in the reader and a document with no such note were indistinguishable |
+
+### 34.2 The reconstruction
+
+* **Printed rows** come from `horizontal_rules` → `row_bands`: the y positions where the table is
+  ruled across the value columns. Fewer than three rules means the printed rows cannot be
+  separated and the block is left unread (`printed_rows_not_separable`) rather than guessed.
+* **A rule is a continuous stroke.** `_rule_rows` accepts a dark row only when one unbroken dark run
+  covers at least `RULE_CONTINUITY` (55%) of the scan window *and* the row's mean darkness exceeds
+  `RULE_DARK_FRACTION`. Text is a row of short strokes and never qualifies; a rule interrupted by a
+  merged label cell still does. This is what keeps a merged nature cell whole.
+* **A merged label cell** is the interval between the rules that cross *its own column* (`_spans`).
+  Its text — every printed line of it — is repeated into every printed row that interval covers, so
+  a party name printed once against four years governs all four without moving any value.
+* **A value** belongs to the printed row its box overlaps most (`_band_table`, `_overlap`), never to
+  the row its baseline is nearest.
+* **A row is emitted only when it states its own period**, has a counterparty, and closes against
+  its own balances: opening + additions − reductions = closing, with a printed dash accepted as an
+  explicit nil (`_reconciles`, `_NIL_CELL`). Negative balances are accepted as balances, so a row
+  whose closing is `(38.44)` is checkable, but a balance is never emitted as a transaction.
+* **An uncertain cell** (OCR confidence ≥ `UNCERTAIN_CONFIDENCE`, 0.80, below the 0.94 read floor)
+  is admitted only when the row's own control total proves it — arithmetic, not proximity.
+* **Every unread cell is counted with a reason** (`reasons`), and the coverage note prints the
+  breakdown.
+* **Continuation is decided by the table**: a following candidate page is part of the note only
+  when it produces mapped blocks. A page that prints prose only ends the note.
+
+### 34.3 Result on R.K. Fashion Note 31 (same OCR, same fixtures, measured in this revision)
+
+| | Revision 27 | Revision 28 |
+|---|---|---|
+| Transaction values reported | **19** | **23** |
+| Unread cells | **55** | **47** |
+| Pages read | **[308, 309, 310]** | **[308, 309]** |
+| Coverage state | `PARTIAL` | `PARTIAL` |
+
+Recovered (4 values, both rows verified by the filing's own arithmetic):
+
+| Counterparty | Category | Period | Amount (₹ lakh) | Proof printed in the note |
+|---|---|---|---|---|
+| Mohammed Usman | `loan_taken` | FY2024 | 216.00 | 47.21 + 216.00 − 213.31 = 49.90 |
+| Mohammed Usman | `loan_repaid` | FY2024 | 213.31 | ″ |
+| M.K.Jewellers | `purchase_of_goods` | 3M-2026-06-30 | 9.13 | 36.88 + 9.13 − 16.02 = 29.99 (printed 29.98) |
+| M.K.Jewellers | `payment_made` | 3M-2026-06-30 | 16.02 | ″ |
+
+All 19 revision-27 values are still reported, unchanged. Unread, by reason:
+`block_without_opening_and_closing_control` **30** (the remuneration block prints a closing balance
+and no control total; Note 34's balance block likewise), `row_does_not_close_against_its_balances`
+**10**, `row_without_period` **7**.
+
+The 38.44 row on page 309 is *not* new and is not a balance: the filing prints `38.44` in its
+"Amount Repaid" column against a closing balance of `(38.44)` for FY2025-26, and a nil opening. It
+is reported as a repayment with its verbatim nature, "Advances against Investment" — which this
+revision now recovers whole (defect 6 above); revision 27 reported the same value labelled
+"Advances against".
+
+All four categories produced for R.K. Fashion (`loan_taken`, `loan_repaid`, `purchase_of_goods`,
+`payment_made`) are non-revenue, so `governance.rpt_pct_revenue` stays **null** (Module D
+`UNKNOWN`, K6 `UNVERIFIED`) and the score is unchanged at **43.0**.
+
+### 34.4 A swallowed exception hid a broken reader
+
+While this revision was being written, the row-band rewrite lost a module constant
+(`_VALUE_ROLE_STEMS`), so `parse_page` raised `NameError` on every block. `SectionExtractor`
+caught it in `_extract_related_party_image_note` and returned `[]` — deliberately fail-closed, but
+silently: the production path then reported exactly what a document *without* such a note reports
+(the aggregate-summary `PARTIAL`), and the loss looked like a coverage limit, not a defect. The
+constant is restored (derived from `_COLUMN_WORDS`, so it cannot be deleted again without deleting
+its source), and the caller now logs the exception with `exc_info` before returning `[]`. Its
+output semantics are unchanged: a failed read still claims nothing.
+
+**Rule adopted:** a fail-closed path may discard a result, never the evidence that it failed.
+
+### 34.5 One vocabulary for transaction natures (shared, issuer-neutral)
+
+`engine/ipo_screening/extraction/rpt_categories.py` is now the only phrase list. It is called by
+the period-matrix reader (`sections._rpt_matrix_table_at`), the scanned-note reader
+(`rpt_image_note._category`) and *is* the set the builder counts
+(`CanonicalInputBuilder._RPT_SALES_SERVICES_CATEGORIES = REVENUE_CATEGORIES`,
+`_rpt_is_sales_services` → `is_revenue_category`). Two rules govern it:
+
+1. **A nature is classified only when the wording establishes the economic meaning *and the
+   direction*.** "Rental income" is `rent_received` (`income_other`); "Rent paid" is `rent_paid`
+   (`expense`); "Rent and facility fees" states no direction and stays **unclassified**.
+   "Loan to and from group companies" and "Reimbursements" likewise. Direction is never inferred
+   from a category name.
+2. **Classification never changes eligibility.** `REVENUE_CATEGORIES` is unchanged and remains
+   `sale_of_goods`, `sale_of_services`, `revenue_from_operations`, `job_work_charges_received`
+   (+ the existing `sale_of_*` prefix rule, excluding `sale_of_ppe`). Everything else recognised —
+   employee benefits (short-term, post-employment, gratuity, leave encashment, provident fund),
+   share-based payment, remuneration, salary, sitting fees, retainers and professional fees,
+   purchases, repairs and power and fuel, hire/transport/job-work charges paid, reimbursements,
+   interest paid/received, rent paid/received, loans taken/given/repaid, advances, deemed capital
+   contribution, merger consideration, share of profit paid, sale of PPE — is `expense`,
+   `income_other`, `asset`, `liability`, `settlement`, `capital` or `disposal`, and is recorded as
+   evidence only.
+
+Tests prove both directions: every `CATEGORY_CLASS` entry must have `is_revenue_category(category)
+== (CATEGORY_CLASS[category] == "revenue") == (category in REVENUE_CATEGORIES)`, so neither half of
+the mapping can be widened alone; and the negative set (employee benefits, retainers, sitting fees,
+rents, purchases, loans) must classify but never be eligible. **No test, and no code path, gains an
+eligible related-party revenue category from this revision, so nothing can clear K6 that did not
+already.**
+
+Effect on the other issuers, measured this revision (unchanged row counts and totals):
+
+| Issuer | Rows | Coverage | Classification change | Metric effect |
+|---|---|---|---|---|
+| Paras Healthcare | 70 | `DISCLOSED` | summary rows now classified (e.g. "Short term employee benefits and Other long term benefits" → `employee_benefits`, was `unclassified`) | none — non-revenue; numerator stays absent |
+| Jio Platforms | 23 | `DISCLOSED` | none | `rpt_pct_revenue` **4.3094** unchanged |
+| Vishal Nirmiti | 136 | `DISCLOSED` | none | `rpt_pct_revenue` **11.8418** unchanged |
+| R.K. Fashion | 23 | `PARTIAL` | all four categories non-revenue | `rpt_pct_revenue` null; score **43.0** unchanged |
+
+`tests/test_rpt_matrix_reader_20261026.py::test_paras_amounts_periods_and_disclosed_share` asserted
+`category == "unclassified"` for the Dharminder Kumar row; it now asserts `employee_benefits`, the
+verbatim `category_label`, and — the point of the test — that `is_revenue_category` is `False`.
+
+### 34.6 Module D numerator — disposition unchanged, and the question for Ramki
+
+Paras discloses "Revenue from sale of healthcare services (excluding applicable taxes)" of
+28.69 / 14.45 / 6.48 ₹ million (FY2026 / FY2025 / FY2024) in Note 34 §III-A, under a heading that
+states those transactions are **eliminated in consolidation**, while the denominator is
+*consolidated* revenue (16,059.52 / 12,940.63 / 11,290.39 ₹ million). The fields stay null.
+
+* Counting them would divide gross intra-group revenue by post-elimination revenue:
+  0.1788% / 0.1116% / 0.0574% — Module D `rpt` 3/3, K6 CLEAR.
+* It would also require assuming a direction for "Outsourced medical services (excluding applicable
+  taxes)", which states none.
+* A standalone-basis metric is a **metric definition change**, not an extraction workaround: it
+  needs its own numerator, its own standalone denominator and its own field.
+
+**Recommendation:** keep the consolidated basis (so UNKNOWN is the correct answer where the
+eligibility of the numerator is not established), or define a separate standalone-basis exposure
+metric with a standalone denominator.
+
+**The exact question for Ramki:** *For the Module D related-party revenue share, should the
+numerator be related-party revenue as reported in the consolidated statements (only revenue that is
+not eliminated in consolidation), or a standalone-basis exposure that would also require the
+issuer's standalone revenue as the denominator?* Until that is answered the fields stay null — no
+zero substitution, no inference, no change to weights or thresholds.
+
+### 34.7 Verification — focused suites only (exact commands, this revision)
+
+| Command | Result |
+|---|---|
+| `pytest tests/test_rpt_nature_classification_and_row_bands_20261026.py -q` | **64 passed** (`55` non-OCR + `9` R.K. OCR) |
+| `pytest tests/test_glyph_geometry_and_ocr_note_20261026.py tests/test_rpt_matrix_reader_20261026.py tests/test_rpt_extraction.py -q` | **40 passed** after one expectation update (§34.5) |
+| `pytest tests/test_glyph_geometry_and_ocr_note_20261026.py tests/test_coverage_nil_vs_unread_20261026.py -q` | **40 passed** (re-run after `_rule_rows`; the note's coverage wording is unchanged) |
+| `pytest tests/test_rk_fashion_reconciliation.py -q` | **7 passed** (score 43.0, base 46.0, completeness 66%) |
+| `pytest tests/test_paras_evidence_regression.py tests/test_jio_evidence_remediation.py -q` | **19 passed** (Jio `rpt_pct_revenue` 4.3094, growth −0.1141) |
+| `pytest tests/test_ui7_ingestion.py tests/test_suite_tiers.py -q` | **21 passed** (new real-file module registered in `tests/tier_inventory.py`) |
+| `python /tmp/rptprod.py <RK pdf>` (production `extract_related_party_transactions`) | 23 transactions, coverage `PARTIAL`, categories `{loan_taken 6, loan_repaid 10, purchase_of_goods 3, payment_made 4}`, annual totals 3M 25.15 / FY2024 753.96 / FY2025 126.51 / FY2026 434.94 ₹ lakh |
+
+The full backend, regression and frontend suites remain **DEFERRED** until every in-scope
+remediation item is dispositioned; nothing here required changing a weight, threshold, penalty,
+band or knockout, and `derived.py` (pin `7783dfeb…`) is untouched.
+
+### 34.8 Remaining limitations
+
+| # | Limitation | Next action |
+|---|---|---|
+| 1 | 30 cells in the remuneration/Note 34 balance blocks stay unread: those blocks print a closing balance and no control total | none by design — reading them would be position-only binding |
+| 2 | 10 rows do not close against their printed balances (OCR digits) and 7 rows state no period | a higher-resolution render per block would raise confidence, not the rule set |
+| 3 | The same party prints as `MK.Jewellers` and `M.K.Jewellers` in different blocks (one with a 3M column, one without) | normalising the name would be inventing text; the verbatim name is kept per block |
+| 4 | Module D numerator | Ramki's decision (§34.6) |
+| 5 | The scanned-note reader runs OCR (~15 s for 3 candidate pages on R.K. Fashion) | acceptable; a cache keyed by (file, page, scale) would remove the repeat cost |

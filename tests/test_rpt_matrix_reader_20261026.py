@@ -267,8 +267,17 @@ def test_paras_amounts_periods_and_disclosed_share(paras_extractions):
     # not recomputed, and never treated as the amount.
     assert dharminder["FY2026"]["pct_revenue"] == pytest.approx(0.33)
     assert dharminder["FY2024"]["pct_revenue"] == pytest.approx(0.48)
-    # No approved revenue-type category is disclosed for these rows.
-    assert dharminder["FY2026"]["category"] == "unclassified"
+    # The shared nature vocabulary (report s.34) now classifies this row as
+    # what the filing prints -- employee benefits -- but the classification
+    # changes nothing about eligibility: it is not a revenue-type category and
+    # cannot enter the Module D numerator.
+    assert dharminder["FY2026"]["category"] == "employee_benefits"
+    assert dharminder["FY2026"]["category_label"] == (
+        "Short term employee benefits and Other long term benefits"
+    )
+    from ipo_screening.extraction.rpt_categories import is_revenue_category
+
+    assert is_revenue_category(dharminder["FY2026"]["category"]) is False
 
 
 @pytest.mark.slow

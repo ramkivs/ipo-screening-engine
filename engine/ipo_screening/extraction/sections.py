@@ -11,6 +11,7 @@ Extracts non-table and hybrid sections according to ICDR layout:
 from __future__ import annotations
 
 import datetime
+import logging
 import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -20,6 +21,8 @@ from ..canonical import ExtractionMethod
 from .directorate import parse_changes_table
 from .interfaces import RawExtraction, SourceDocument
 from .numbers import is_undisclosed_marker, parse_indian_number
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -2238,7 +2241,14 @@ class SectionExtractor:
             result = read_related_party_note(str(path), candidates)
         except Exception:
             # A failed OCR attempt claims nothing: the located-but-unread
-            # state of the text-layer path stands.
+            # state of the text-layer path stands.  It is logged rather than
+            # swallowed silently, because a reader that raises on every page
+            # otherwise looks exactly like a document with no such note (a
+            # NameError in the band reader did exactly that, report s.34).
+            logger.warning(
+                "scanned related-party note not read; the text-layer state stands",
+                exc_info=True,
+            )
             return []
         if not result.get("found"):
             return []
@@ -2972,8 +2982,21 @@ class SectionExtractor:
                 aggregates += 1
                 continue
             match = self._rpt_category_match(self._rpt_norm(key_label))
-            category = match[0] if match else "unclassified"
-            category_label = match[1] if match else key_label
+            if match:
+                category, category_label = match[0], match[1]
+            else:
+                # The transaction-category vocabulary the legacy reader uses
+                # covers revenue and financing captions; a period-matrix
+                # disclosure also names employee benefits, sitting fees,
+                # retainers, rents and repairs.  The shared nature vocabulary
+                # classifies those where the wording establishes the economic
+                # meaning and direction, and leaves the rest unclassified --
+                # the verbatim nature text is preserved either way.
+                from .rpt_categories import classify_nature
+
+                nature_key = classify_nature(key_label)
+                category = nature_key or "unclassified"
+                category_label = key_label
             counterparty = party_text or full_label
             quote, verbatim = quote_for(page, [text for _, text in amounts], full_label)
             for i in amount_columns:

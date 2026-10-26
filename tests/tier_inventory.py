@@ -55,6 +55,7 @@ INTEGRATION_MODULES = frozenset({
     "test_rk_fashion_reconciliation.py",
     "test_rpt_extraction.py",
     "test_rpt_matrix_reader_20261026.py",
+    "test_rpt_nature_classification_and_row_bands_20261026.py",
     "test_step5_auditor_and_manual_terms.py",
     "test_ui2_frontend.py",
     "test_ui7_ingestion.py",
