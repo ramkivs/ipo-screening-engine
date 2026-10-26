@@ -1,3 +1,11 @@
+> **Integration closure, revision21 (2026-10-26):** PR #10 merged as`70c5b0facc20f718500bcddc1efaae778ebd78c5`,
+> accepted source head9333b1c. Windows gate accepted by user decision: focused
+> exit0; initial full1941passed/1CLI subprocess timeout; same test isolated pass
+>98.51s. NOT a clean Windows full pass, and no rerun required. Historical OPEN
+> statements below are superseded by tracker revision21 and the
+> [verified remote closure receipt](https://github.com/ramkivs/ipo-screening-engine/pull/10#issuecomment-6409140261). Closure updates are docs-only;
+> existing timing/validation receipts are preserved, not rewritten.
+
 # Test-suite performance investigation — 2026-10-25 (Arena)
 
 ## Environment and starting point
