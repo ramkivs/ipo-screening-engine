@@ -111,7 +111,10 @@ def test_ingest_document_success_and_coexistence(test_env):
     # 2026-10-23: -1 point. kmp_exits_2y no longer defaults to 0 when the filing
     # discloses no KMP-exit count, so board_kmp resolves UNKNOWN instead of a
     # fabricated "other" bucket. No weight or bucket boundary changed.
-    assert body["final_score"] == pytest.approx(18.0)
+    # 2026-10-26: -1 point. large_holders_unlocked_early no longer defaults to
+    # False; this filing states neither the lock-in nor an early unlock, so
+    # lockin_bucket is UNKNOWN. No weight or bucket boundary changed.
+    assert body["final_score"] == pytest.approx(17.0)
     assert body["verdict"] == "INSUFFICIENT_DATA"
     assert body["confidence"] == "Low"
     assert body["result_hash"] is not None
@@ -145,7 +148,7 @@ def test_ingest_document_success_and_coexistence(test_env):
     detail = detail_res.json()
     assert detail["evaluation_id"] == sample_eval_id
     assert detail["company_name"] == "AURORA SYSTEMS LIMITED"
-    assert detail["score"]["final_score"] == pytest.approx(18.0)  # D-5; kmp default removed
+    assert detail["score"]["final_score"] == pytest.approx(17.0)  # D-5; kmp/lockin defaults removed
 
     # Step 7: Verify golden hash for Vishal Nirmiti is strictly preserved
     vishal_detail = client.get(f"/api/v1/evaluations/{test_env['vishal_eval_id']}").json()
@@ -696,15 +699,20 @@ def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):
     # scan covers no page at all; "clean" on an empty scan was an unsupported
     # finding, and the criterion is now UNKNOWN (49.0 -> 45.0).
     # 2026-10-23: -1 point from removing the unsupported kmp_exits_2y = 0 default.
-    assert body["final_score"] == pytest.approx(44.0)
+    # 2026-10-26: -1 point from removing the unsupported
+    # large_holders_unlocked_early = False default.  RK states the promoter
+    # lock-in but says nothing about an early release for large pre-IPO
+    # holders, so `lockin_bucket` is UNKNOWN rather than "intact"; the point
+    # and the availability move together (44.0 -> 43.0, base 47.0 -> 46.0).
+    assert body["final_score"] == pytest.approx(43.0)
     assert body["confidence"] == "Low"
     assert body["verdict"] == "INSUFFICIENT_DATA"
 
     eval_data = body["evaluation"]
-    assert eval_data["score"]["final_score"] == pytest.approx(44.0)  # D-5; kmp default removed
-    assert eval_data["score"]["base_score"] == pytest.approx(47.0)  # D-5; kmp default removed
+    assert eval_data["score"]["final_score"] == pytest.approx(43.0)  # D-5; kmp/lockin defaults removed
+    assert eval_data["score"]["base_score"] == pytest.approx(46.0)  # D-5; kmp/lockin defaults removed
     assert eval_data["score"]["penalties_total"] == pytest.approx(-3.0)
-    assert eval_data["score"]["completeness_pct"] == pytest.approx(67.0)  # D-5; kmp criterion unknown
+    assert eval_data["score"]["completeness_pct"] == pytest.approx(66.0)  # D-5; kmp + lockin unknown
 
     # Prove absence of Vishal Nirmiti qualitative defaults
     modules = {m["id"]: m for m in eval_data["score"]["modules"]}

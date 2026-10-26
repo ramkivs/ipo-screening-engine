@@ -354,17 +354,37 @@ class CanonicalInputBuilder:
         cap_base = self.base.get("capital_structure", {})
         pre_pct = cap_base["promoter_pre_pct"] if "promoter_pre_pct" in cap_base else self._get_field("capital_structure.promoter_pre_pct", 73.42 if self.allow_fixture_fallbacks else None)
         post_pct = cap_base["promoter_post_pct"] if "promoter_post_pct" in cap_base else self._get_field("capital_structure.promoter_post_pct", None)
-        pledge_pct = cap_base["promoter_pledge_pct"] if "promoter_pledge_pct" in cap_base else self._get_field("capital_structure.promoter_pledge_pct", 0.0)
-        lockin = cap_base["promoter_lockin_in_place"] if "promoter_lockin_in_place" in cap_base else self._get_field("capital_structure.promoter_lockin_in_place", True)
+        # Evidence or UNKNOWN -- never a favourable constant.
+        #
+        # A pledge of 0.0%, a lock-in "in place", "no early unlock" and "no
+        # discounted allotments" were all *defaults*: when the filing was not
+        # read, the builder supplied the answer that scores best (K2's pledge
+        # limb, the C `lockin` criterion and the discounted-allotment penalty
+        # were all cleared without evidence).  The extracted value is used when
+        # it exists; otherwise the field stays absent and the dependent metric
+        # is UNKNOWN.  Where the filing does disclose the fact, the readers in
+        # ``sections.py`` now emit it with a verbatim quotation.
+        def _cap_value(key: str, fallback: Any = None) -> Any:
+            if key in cap_base:
+                return cap_base[key]
+            return self._get_field(f"capital_structure.{key}", fallback)
+
+        fixture = self.allow_fixture_fallbacks
+        pledge_pct = _cap_value("promoter_pledge_pct", 0.0 if fixture else None)
+        lockin = _cap_value("promoter_lockin_in_place", True if fixture else None)
 
         return {
             "promoter_pre_pct": pre_pct,
             "promoter_post_pct": post_pct,
             "promoter_pledge_pct": pledge_pct,
             "promoter_lockin_in_place": lockin,
-            "large_holders_unlocked_early": cap_base.get("large_holders_unlocked_early", False),
-            "pre_ipo_placements": cap_base.get("pre_ipo_placements", []),
-            "discounted_allotments_18m_before_drhp": cap_base.get("discounted_allotments_18m_before_drhp", False),
+            "large_holders_unlocked_early": _cap_value(
+                "large_holders_unlocked_early", False if fixture else None
+            ),
+            "pre_ipo_placements": _cap_value("pre_ipo_placements", []),
+            "discounted_allotments_18m_before_drhp": _cap_value(
+                "discounted_allotments_18m_before_drhp", False if fixture else None
+            ),
         }
 
     def _build_use_of_proceeds(self) -> List[Dict[str, Any]]:
@@ -431,7 +451,11 @@ class CanonicalInputBuilder:
             "sebi_ed_action_active": _pick_gov("sebi_ed_action_active", None),
             "rpt_pct_revenue": _pick_gov("rpt_pct_revenue", 6.67 if self.allow_fixture_fallbacks else None),
             "rpt_pct_of_revenue_growth": _pick_gov("rpt_pct_of_revenue_growth", None),
-            "board_independent_majority": _pick_gov("board_independent_majority", False),
+            # Evidence or UNKNOWN: a board composition that was never read is
+            # not a non-independent board.
+            "board_independent_majority": _pick_gov(
+                "board_independent_majority", False if self.allow_fixture_fallbacks else None
+            ),
             "kmp_exits_2y": _pick_gov("kmp_exits_2y", None),
         }
         # Schema-permitted governance inputs that a penalty/knockout consumes

@@ -80,8 +80,23 @@ class TOCRouter:
 
         if toc_text:
             # Parse lines like: "CAPITAL STRUCTURE .......... 86"
+            #
+            # The printed page number is not always one token.  Justified TOC
+            # layouts routinely extract as "OBJECTS OF THE OFFER ..... 12 4"
+            # (i.e. 124) or "INDUSTRY OVERVIEW ..... 1 84" (i.e. 184): the
+            # justification inserts a space *inside* the number.  The original
+            # `(\d+)$` group rejected those rows outright, so the section was
+            # silently unrouted -- no error, no diagnostic, and every reader
+            # that depends on the route fell back to a fixed page window that
+            # missed the section entirely (Paras Healthcare 2026: objects of
+            # the offer, industry overview and basis for offer price were all
+            # dropped this way).  A number split into two digit groups is
+            # joined; titles cannot end in a digit (the title class excludes
+            # digits), so this cannot swallow a title's trailing number.
             lines = toc_text.splitlines()
-            line_pattern = re.compile(r"^\s*([A-Za-z\s–—\-:,]+?)\s*[\.\s…_-]{3,}\s*(\d+)\s*$")
+            line_pattern = re.compile(
+                r"^\s*([A-Za-z\s–—\-:,]+?)\s*[\.\s…_-]{3,}\s*(\d{1,2}(?:\s\d{1,3})?|\d{3,4})\s*$"
+            )
 
             parsed_items: List[Tuple[str, int]] = []
             for line in lines:
@@ -89,7 +104,7 @@ class TOCRouter:
                 if match:
                     title, page_str = match.groups()
                     try:
-                        p_num = int(page_str)
+                        p_num = int(page_str.replace(" ", ""))
                         parsed_items.append((title.strip(), p_num))
                     except ValueError:
                         continue

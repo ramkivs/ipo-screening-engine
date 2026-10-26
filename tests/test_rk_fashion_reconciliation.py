@@ -167,12 +167,15 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     # 55.0 - 2 (supplier) - 2 (cagr) - 1 (cfo) - 1 (auditor opinion unknown, B(i))
     # - 4 (litigation unknown, D-5: the "clean" that earned these 4 points was a
     # default, and availability drops by the same 4 points, 73 -> 69).
-    assert outcome.record.score["final_score"] == 44.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
-    assert outcome.record.score["base_score"] == 47.0  # -1: kmp default removed
+    # 2026-10-26: -1 more: the unsupported large_holders_unlocked_early = False
+    # default is gone, so `lockin_bucket` is UNKNOWN (the filing states the
+    # promoter lock-in but never an early release for large pre-IPO holders).
+    assert outcome.record.score["final_score"] == 43.0
+    assert outcome.record.score["base_score"] == 46.0  # -1 kmp default, -1 lockin default
     assert outcome.record.score["penalties_total"] == -3.0
     assert outcome.record.confidence["level"] == "Low"
-    assert outcome.record.confidence["completeness_pct"] == 67.0  # -2: board_kmp leaves availability
-    assert outcome.record.score["lower_bound"] == 31.0
+    assert outcome.record.confidence["completeness_pct"] == 66.0  # -2 board_kmp, -1 lockin
+    assert outcome.record.score["lower_bound"] == 28.0
     assert outcome.record.score["upper_bound"] == 77.0
     assert outcome.record.verdict["verdict"] == "INSUFFICIENT_DATA"
 
@@ -192,8 +195,11 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     assert pe_crit["state"] == "SCORED"
     assert pe_crit["score"] == 8.0
 
-    # Module C: 10 / 11 of available points scored (OFS=0, 100% fresh, dilution 27.5% > 25% -> 0 pts)
-    assert modules["C"]["score"] == 10.0
+    # Module C: 9 / 15 of available points scored (OFS=0, 100% fresh, dilution
+    # 27.5% > 25% -> 0 pts; the lock-in point is gone with the removed
+    # large_holders_unlocked_early default, and use_of_proceeds is unknown
+    # because the GCP amount is undisclosed).
+    assert modules["C"]["score"] == 9.0
     fresh_crit = next(c for c in modules["C"]["criteria"] if c["criterion_id"] == "fresh_share")
     assert fresh_crit["state"] == "SCORED"
     assert fresh_crit["score"] == 3.0
@@ -346,12 +352,12 @@ def test_missing_promoter_post_holding_remains_unknown_not_four_earned_points():
     assert no[key]["state"] == "UNKNOWN"
     assert no[key].get("score") is None
     assert {k: v for k, v in yes.items() if k != key} == {k: v for k, v in no.items() if k != key}
-    assert supported.score["base_score"] == 47.0
-    assert missing.score["base_score"] == 43.0
+    assert supported.score["base_score"] == 46.0
+    assert missing.score["base_score"] == 42.0
     assert supported.score["penalties_total"] == missing.score["penalties_total"] == -3.0
     assert supported.penalties == missing.penalties
-    assert supported.score["final_score"] == 44.0
-    assert missing.score["final_score"] == 40.0
+    assert supported.score["final_score"] == 43.0
+    assert missing.score["final_score"] == 39.0
     assert canonical["capital_structure"]["promoter_post_pct"] == 72.25
 
 

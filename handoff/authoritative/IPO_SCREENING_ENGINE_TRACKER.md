@@ -2170,3 +2170,86 @@ All eight required Pass-9 paths existed in the tested final tree:
   suite with the same Windows interpreter, preserving local harness/evidence.
   No unprovided native pass is inferred from Linux CI. Updated commands and
   provenance/column details are in docs/RK_FASHION_WINDOWS_INVESTIGATION.md.
+
+## Revision 22 — the readers §20.4(a) asked for; and the defaults that were scoring
+
+**Scope: extractor readers, TOC routing, the builder's non-evidence defaults, one CLI
+formatter, four corrected test expectations and one new synthetic test module. No weight,
+threshold, penalty, criterion definition, knockout, config, schema, fixture, golden record
+or frozen-core module was changed.** Branch `arena/79aac867-ipo-screening-engine`.
+
+### What was built
+The readers the §20.4(a) table listed, plus three more the same pass found:
+
+| Reader | Filing evidence | Result on the retained RHP |
+|---|---|---|
+| TOC routing (justified page numbers) | `OBJECTS OF THE OFFER ..... 12 4` | 10 → **14** sections routed (objects, industry overview, basis for offer price, capital structure were all being lost) |
+| Objects schedule, row-oriented | p129 | `debt_repayment 3,209.00`, `other 541.00`, `gcp [●]` — previously unread, and the double-printed schedule had produced 8,185.95 by summing |
+| Top-five concentration | p61 "Top **five** suppliers … 21.94 %" | `top5_supplier_pct 21.94` (a literal `top 5` regex could never match) |
+| Industry forecast range | pp6/204 | `cagr 10.0` (lower bound of 10–12%), `FY2025-FY2030`, `CRISIL Report (…, dated September, 2026)` |
+| Promoter pre-Offer | p111 | `72.80` (prose: "equivalent to 72.80% of the issued, subscribed and paid-up") |
+| Pledge / lock-in | pp114/116 | `0.0` / `True`, both quoted verbatim, singular and plural, three lock-in spellings |
+| Auditor continuity | p99 | `auditor_changed_3y False` — the letter names no firm, so it previously established nothing |
+| Board composition in words | p337 | `board_independent_majority False` (3 of 7), only when the sentence is read |
+| Twelve-column peer table, streaming rows | p150 | **nine** listed peers with P/E, P/B, ROE, dated 5 Oct 2026; issuer's own row excluded; fail-closed without a "Listed Peers" label |
+
+### What was removed: defaults that scored
+`builder.py` supplied `promoter_pledge_pct 0.0`, `promoter_lockin_in_place True`,
+`large_holders_unlocked_early False`, `discounted_allotments_18m_before_drhp False` and
+`board_independent_majority False` when nothing had been read — each clearing a point
+without evidence (K2's pledge limb, C `lockin`, the discounted-allotment penalty, and D
+`board_kmp` from the other direction). On the strict path these now stay absent and the
+metric is UNKNOWN; the synthetic template path keeps its reference values.
+
+**Consequence, recorded and not smoothed over:** two real filings' pinned scores moved
+**down** by one point each (R.K. Fashion 44 → 43, the Aurora ingestion case 18 → 17;
+availability moved with the point, 67% → 66%). Four test expectations were corrected with
+the reason at the assertion — including one this pass had itself written last hour, which
+is the cost of a default removal done honestly.
+
+### The corrected Paras run
+```
+before (§20):  final  9.0  base 12.0  range  0-70  conf 35.79%  A6 B0 C6 D0 E0 F0
+now         :  final 13.0  base 16.0  range  1-69  conf 41.05%  A6 B0 C3 D1 E6 F0
+```
+K3 CLEAR and K5 TRIGGERED unchanged; `PEER_SET_NO_VALID_ENTRIES` is gone (nine VALID
+peers), `GCP_UNDISCLOSED` remains. Module C fell 6 → 3 (the unevidenced lock-in point) and
+D rose 0 → 1 (the auditor point, now quoted from p99); E rose 0 → 6 (concentration and
+the industry CAGR). **The number was not the target and did not guide the work.**
+
+**Module B is still 0/20 and the reason is now explicit rather than hidden:** every B
+criterion needs a post-issue EPS, which needs the post-issue share count. The filing prints
+the fresh issue as money only (`₹5,000.00 million`; shares `[●]`) and its own P/E table on
+p147 is `[●]` "to be computed after finalisation of the Price Band". Nine genuine peers
+behind one undisclosed divisor is the honest state of this filing. §20.4(d)'s claim that
+"the filing contains no peer table" was **wrong** and is corrected in the report.
+
+### Also fixed
+`ipo_screen run` crashed with `TypeError: unsupported format string passed to
+NoneType.__format__` whenever an UNKNOWN criterion appeared in "Top risks" — after the score
+printed, so the command exited 1 with no result path. It was found because this pass had to
+read every run out of the store.
+
+### Verification
+- New `tests/test_reading_defects_20261026.py` — **28 passed**, all synthetic and instant.
+- Affected suites (Paras evidence/gaps/issue-terms, acceptance matrix, v16 implementation,
+  frozen-core line endings) — **169 passed**, golden hash unchanged.
+- Full backend suite: **1,970 collected → 1,969 passed / 1 failed** on first run (the tier
+  inventory rejecting the new module, which mentions the PDF router but hands it a fake
+  reader); module listed as synthetic, both green on re-run.
+
+### Status (unchanged where it must be)
+- Frozen-core pin: **VERIFIED — READY FOR RAMKI RATIFICATION** (untouched).
+- Paras pricing terms: **UNRESOLVED at runtime**; the Paras run above uses the aggregator
+  override and is **non-authoritative evidence**, not an official determination.
+- Required-term gate: **CLOSED**. Readiness: **NOT ESTABLISHED**.
+- Still decision-gated, not reader-gated: `rpt`/K6 (metric definition), `moat`/`visibility`
+  (ratings), `board_kmp` (exit rule), K1/K2 negatives, and any use of a post-issue share
+  count the filing does not print.
+
+- **Disposition: §20.4(a)'s READERS IMPLEMENTED AND VERIFIED; THE OBJECTS DOUBLE-COUNT AND
+  THE TOC ROUTING DEFECT CORRECTED; FIVE FAVOURABLE DEFAULTS REMOVED FROM THE BUILDER (TWO
+  REAL FILINGS' SCORES MOVE DOWN BY ONE POINT EACH, EXPECTATIONS CORRECTED WITH REASONS);
+  PEER TABLE READ (NINE PEERS) BUT MODULE B STILL BLOCKED ON THE UNDISCLOSED POST-ISSUE
+  SHARE COUNT; CLI REPORT CRASH FIXED; NO SCORING/THRESHOLD/CONFIG/SCHEMA/FROZEN-CORE
+  CHANGE.**

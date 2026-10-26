@@ -9,6 +9,9 @@ SYNTHETIC_EXCEPTIONS = {
     "test_aggregator_issue_terms.py",
     "test_issue_terms_cli.py",
     "test_pdf_text_cache.py",  # tests the cache with tiny fake readers
+    # Mentions the PDF router only to hand it a fake reader: every page in the
+    # module is a literal string, so nothing is decoded.
+    "test_reading_defects_20261026.py",
     "test_suite_tiers.py",  # this inventory guard itself
 }
 

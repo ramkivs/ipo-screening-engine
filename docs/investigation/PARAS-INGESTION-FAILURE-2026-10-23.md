@@ -1477,3 +1477,188 @@ The file contains no `else`, no `elseif` and no `finally`: every decision is an 
 **1908 collected / 1908 passed / 0 failed / 0 skipped**, exit 0, 30 m 16 s (1,892 before this pass + 16 new). No assertion weakened, no test converted to a skip, no test removed, and no expectation relaxed: the only existing expectations touched in this pass were none — every changed module is covered by tests that were added, and the Vishal golden result hash still reproduces `e84f8bc0…`.
 
 The suite is evidence about the code, never about the network: **no test in this repository reached an official host**, and nothing above shows that Vishal's Prospectus URL will be retrievable on the operator's host. The one-shot command in §21.5 is what decides that.
+
+## 22. The readers §20.4(a) asked for — implemented, verified, and what they did *not* buy — 2026-10-26 (revision 13)
+
+§20.4(a) listed the facts the filing discloses and no reader could reach. This pass
+implemented those readers, plus two defects of the mirror kind that §20.4(e) had left as a
+policy question: fields that were never read and were nonetheless **defaulted to the
+favourable answer**. Every change is in `extraction/sections.py`, `extraction/toc.py`,
+`extraction/builder.py` (non-frozen) and one CLI formatter; no weight, threshold, penalty,
+criterion definition, knockout, config file, schema or frozen-core module was touched.
+
+### 22.1 The routing defect that came first
+
+The table of contents routes sections by matching `TITLE ..... 124`. Justified TOC layouts
+extract the page number with a space inside it (`OBJECTS OF THE OFFER ..... 12 4`), and the
+old `(\d+)$` group rejected those rows silently. On this filing that dropped **four**
+sections — objects of the offer, industry overview, basis for offer price, and capital
+structure — each of which then fell back to a fixed page window that missed the section.
+Nothing downstream could recover: the readers were pointed at the wrong pages.
+`toc.py` now accepts a number split into two groups and joins it. Routed sections went
+from 10 to 14 on the retained filing, and every reader below depends on that.
+
+### 22.2 The objects schedule is a table, not a caption
+
+The keyword scan looked for the caption phrases it had been written against
+("repayment and/ or pre", "prepayment, in full or in part"). This filing says
+"Prepayment or scheduled re-payment, in full or part, of certain outstanding borrowings",
+so the debt line was dropped while the GCP line — whose caption *was* in the list — was
+still read. The schedule is now read **row by row**: a numbered row plus its continuation
+lines, terminating at the first line that carries a money cell or an undisclosed marker
+(prose paragraphs follow the schedule and were previously absorbed into the row), and the
+row is classified from its own verb and party:
+
+| Row (p. 129) | Category | Amount |
+|---|---|---|
+| "Prepayment or scheduled re-payment … of certain outstanding borrowings availed by our Company" | `debt_repayment` | 3,209.00 |
+| "Investment in our wholly owned Subsidiary, PMHPL … for repayment/prepayment of borrowings" | `other` | 541.00 |
+| "General corporate purposes*#" | `gcp` | `[●]` (undisclosed) |
+
+Two rules fell out of the reading, both pinned by tests:
+
+* **An equity investment in a group company is `other`** — the issuer parts with cash and
+  retires none of its own debt. A *direct* prepayment of a subsidiary's borrowings is
+  still `debt_repayment` (Jio: "Prepayment … of certain outstanding borrowings availed by
+  the Material Subsidiary, RJIL"), because the object is the retirement of debt whichever
+  entity holds it.
+* **The first stated row for a category wins.** This filing prints the objects twice (the
+  requirement of funds, then the deployment schedule). Summing them double-counted: the
+  run reported 8,185.95 where the filing says 3,750.00 for the two disclosed objects.
+
+The top-level `use_of_proceeds` evidence quote was a processing summary
+("Use of proceeds categories: [...]"). It is now the schedule's own row text.
+
+### 22.3 Concentration, industry forecast, capital structure, governance
+
+| Fact | Where | Reader added |
+|---|---|---|
+| Top-five suppliers 21.94% of purchases, FY2026 | p. 61 | the row is spelled "Top **five** suppliers"; a literal `top 5` regex could not read it. Read by position inside the table, preferring the fiscal-column header, first amount/% pair = latest FY, and **fail-closed without a fiscal header** |
+| India healthcare delivery market CAGR 10–12%, FY2025–FY2030, CRISIL Report dated September 2026 | pp. 6, 204 | the range is recorded at its **lower bound** (the filing commits to no point estimate), with its period and its publisher read from the filing's own definition of the report. `industry_scope` stays a schema enum (`india`); the market name goes in the locator |
+| Promoter holds 72.80% pre-Offer | p. 111 | prose fallback ("equivalent to 72.80% of the issued, subscribed and paid-up") — the table route had missed it |
+| No promoter shares are pledged | p. 114 | the pattern required the plural ("our promoters are pledged"); this filing uses the singular. Both forms now read, quoted verbatim |
+| Promoter contribution locked in for three years | p. 116 | "locked in for a period of …", "locked in for …", 18 months / one year / three years, all read and quoted verbatim |
+| No auditor change in three years | p. 99 | the auditors' own letter. It names no firm, so it used to be read only inside the branch that had already captured the firm's name — it is now an independent observation |
+| 7 directors, 3 independent | p. 337 | counts are spelled in words ("we have seven Directors … of whom … three are Independent Directors"); both counts are required and the value is emitted **only when the composition sentence is read** |
+
+### 22.4 The mirror-image defects: a default is not evidence
+
+`builder.py` supplied `promoter_pledge_pct = 0.0`, `promoter_lockin_in_place = True`,
+`large_holders_unlocked_early = False`, `discounted_allotments_18m_before_drhp = False` and
+`board_independent_majority = False` when nothing had been read. Each one cleared a scored
+point without evidence: K2's pledge limb, the C `lockin` criterion, the
+discounted-allotment penalty, and (in the other direction) the D `board_kmp` criterion.
+They are now **absent on the strict path** — the dependent metric is UNKNOWN — and remain
+available only on the synthetic template path (`allow_fixture_fallbacks`), where a
+reference base is deliberate.
+
+Consequence, recorded rather than absorbed: two real filings' pinned scores moved **down**
+by one point each (RK Fashion 44 → 43, the Aurora ingestion case 18 → 17) because neither
+states an early unlock, so `lockin_bucket` is now UNKNOWN rather than "intact". The
+availability moved with the point, as it must. Four test expectations were corrected with
+the reason written next to them; no assertion was weakened and no test was skipped.
+
+### 22.5 The peer table (§20.4(d) — partly reachable after all)
+
+§20.4(d) said Module B needs "peer multiples from a dated peer snapshot … the filing
+contains no peer table". That was wrong: p. 150 **is** a peer table — twelve columns
+(face value, EV, closing price 5 Oct 2026, revenue FY26, EBITDA FY26, EPS basic/diluted,
+P/E, EV/EBITDA, net worth, RONW, NAV/share) — and it matches none of the three recognised
+column layouts, so `extract_peers` skipped the page. It also required a literal
+"PEER GROUP"/"PEER COMPANIES" line, which this table heads "Listed Peers".
+
+A fourth layout, read by a streaming row-parser (values wrap mid-number:
+`1,228,529.3` / `9`), now reads **nine** listed peers with their P/E, P/B (struck on the
+closing price and NAV) and ROE, dated 5 October 2026. The issuer's own row sits *above*
+the "Listed Peers" label and is never counted as a peer; a table with no such label yields
+nothing (fail-closed); `listed_years` stays `None`, because the table discloses no listing
+history.
+
+**This did not move the score.** Module B is still 0/20, and the reason is now explicit in
+the derived metrics rather than hidden: `pe_vs_peers`, `peg` and `sector_ipo_relative` need
+a **post-issue EPS**, and `second_multiple` needs an issuer P/B or EV/EBITDA, both of which
+need the post-issue share count. The filing prints the fresh issue as money only
+(`₹5,000.00 million`; share count `[●]`), and its own P/E table on p. 147 is `[●]`
+"to be computed after finalisation of the Price Band". Deriving shares from
+fresh amount ÷ cap price is arithmetic the policy forbids, so the fields stay UNKNOWN.
+Nine genuine peers sitting behind one undisclosed divisor is the honest state of this
+filing, and it is what the run now says.
+
+### 22.6 The run, after the readers
+
+`ipo_screen run build/paras/input.json --mode final --at 2026-10-26T09:15:00Z`:
+
+| | §20 (before) | now |
+|---|---|---|
+| Final / base | 9.0 / 12.0 | **13.0 / 16.0** |
+| Range | 0–70 | 1.0 – 69.0 |
+| Verdict | AVOID (K5 knockout) | AVOID (K5 knockout) |
+| Confidence | Low 35.79% | Low 41.05% |
+| Modules A · B · C · D · E · F | 6 · 0 · 6 · 0 · 0 · 0 | 6 · 0 · 3 · 1 · 6 · 0 |
+| Knockouts | K3 CLEAR, K5 TRIGGERED, K1/K2/K4/K6 UNVERIFIED | unchanged |
+| Warnings | `PEER_SET_NO_VALID_ENTRIES`, `MARKET_BLOCK_UNUSABLE` ×4 | `GCP_UNDISCLOSED`, `MARKET_BLOCK_UNUSABLE` ×4 (no peer-set warning: nine VALID peers) |
+
+Module C fell from 6 to 3 and Module D rose from 0 to 1 for the same reason: the removed
+defaults were C's lock-in point (gone) and D's auditor point (now evidenced — p. 99 gives
+continuity, so `auditor_changed_3y` is `False` from a quotation, and the bucket is
+`eom_only` because the examination report does carry Emphasis of Matter paragraphs for the
+interim periods). The apparent loss is the removal of two unevidenced points and the
+appearance of one evidenced point; the number is not the point.
+
+Also fixed: `print_run_report` crashed with `TypeError: unsupported format string passed
+to NoneType.__format__` on any UNKNOWN criterion in "Top risks" (`item['impact']` is
+`None` for those). The crash happened *after* the score printed, so `ipo_screen run`
+exited 1 with a traceback and no result path — which is why this run had to be read out of
+the store.
+
+### 22.7 What was deliberately *not* done
+
+* **`governance.auditor_opinion` stays `emphasis_of_matter`.** p. 366 states the report
+  "expresses an unmodified opinion", and p. 440 states there is no Emphasis of Matter for
+  FY2024–FY2026 — but p. 367 does carry Emphasis of Matter paragraphs for the two interim
+  periods covered by the same examination report. The schema distinguishes `unqualified`
+  from `emphasis_of_matter` for exactly this case, and the config scores the second as
+  `eom_only` (1/2). Changing it would add a point on a re-reading of the enum, not on new
+  evidence, so it is left as it is.
+* **`rpt` / K6 stay unfed** — the approved metric definition still does not exist
+  (§20.4(b)). Note for whoever writes it: p. 92 gives the percentages directly, per row,
+  for five periods, all well under 1%; the only large ratio in the filing is loans to a
+  wholly owned subsidiary (2.55% of total assets, p. 73).
+* **`going_concern_uncertainty` and `sebi_ed_action_active` stay UNKNOWN** — both need an
+  approved rule for explicit negatives (§20.4(e), A19/A25). "The Restated Consolidated
+  Financial Information have been prepared on accrual and going concern basis" is a basis
+  of preparation statement, not a going-concern uncertainty; the SEBI/ED nil statements on
+  pp. 493/500 are promoter-scoped, and "Enforcement Directorate" does not appear in this
+  document at all.
+* **`moat`, `visibility`, `board_kmp`** — qualitative ratings and a KMP-exit rule, still
+  decision-gated rather than reader-gated.
+* **The score was not steered.** Nothing here was tuned to move it; two of the changes
+  moved real filings' scores down, and the Paras number rose only because four criteria
+  that were previously unread (concentration, industry growth, auditor, and the object
+  schedule's two amounts) became evidenced — while two unevidenced points went away.
+
+### 22.8 Verification
+
+* `tests/test_reading_defects_20261026.py` — **28 new cases**, all synthetic and instant:
+  justified TOC page numbers; the objects schedule read by row, printed twice, with prose
+  after it; the subsidiary-investment vs subsidiary-debt distinction; the word-form
+  supplier row and its fail-closed twin; the forecast range with and without a defined
+  report; pledge and lock-in grammar variants; the auditors' letter; word-counted board
+  composition and the unread-board case; the twelve-column wrapping peer table, the
+  excluded issuer row, the rejoined split number, and the missing-label fail-closed case;
+  and the builder's absent-vs-default behaviour on both paths. The suite-tier inventory
+  lists the module as synthetic (it hands the router a fake reader).
+* Affected suites: `test_paras_evidence_regression` (18), `test_paras_extraction_gaps_20261024`
+  (23), `test_paras_official_issue_page_terms` (25), `test_acceptance_matrix` (55),
+  `test_v16_implementation` (45), `test_frozen_core_line_endings` (3) — **169 passed**,
+  including the golden result hash.
+* **Full backend suite: 1970 collected / 1969 passed / 1 failed** on the first run; the one
+  failure was the tier inventory rejecting the new module (it mentions `from_pdf`), fixed
+  by listing it with the other fake-reader module. Both are green on re-run.
+* Frozen core: untouched, and `test_frozen_core_line_endings` / `test_v16_implementation`
+  pass; the Vishal golden hash still reproduces.
+
+**Not claimed:** the Paras evaluation is a run over **non-authoritative** evidence with
+third-party (aggregator) issue terms; it is not an official determination about the issuer,
+and no store outside `build/` was written. The remaining unknowns are classified in §20.4
+and §22.5–22.7, and none of them is now waiting on a reader.
