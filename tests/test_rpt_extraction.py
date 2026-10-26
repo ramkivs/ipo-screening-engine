@@ -286,7 +286,7 @@ def test_derivation_sales_services_only_latest_and_change():
     assert gov["rpt_pct_of_revenue_growth"] == pytest.approx(7.0)
 
 
-def test_derivation_unit_conversion_and_zero_prior():
+def test_derivation_unit_conversion_and_no_zero_prior():
     periods = [
         {"fy": "FY2025", "revenue": 500.0},
         {"fy": "FY2026", "revenue": 1000.0},
@@ -295,9 +295,10 @@ def test_derivation_unit_conversion_and_zero_prior():
     txns = [_txn("sale_of_goods", "Example Industries", "FY2026", 2500.0, "INR_LAKHS", 0)]
     gov = _builder_gov(periods, txns, reporting_unit="INR_CRORES")
     assert gov["rpt_pct_revenue"] == pytest.approx(2.5)
-    # Prior year: eligible category disclosed, no amounts -> share 0,
-    # so the change equals the latest share (no division by zero).
-    assert gov["rpt_pct_of_revenue_growth"] == pytest.approx(2.5)
+    # The prior year states no eligible amount, so its share is *not
+    # established*: it is left out rather than filled with zero (owner
+    # decision 2026-10-27, report s.35), and the change is therefore unknown.
+    assert gov["rpt_pct_of_revenue_growth"] is None
 
 
 def test_derivation_fail_closed_cases():

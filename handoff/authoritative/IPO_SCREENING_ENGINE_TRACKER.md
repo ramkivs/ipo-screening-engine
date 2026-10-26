@@ -2986,3 +2986,73 @@ test/*.test.js` → **93 passed, 0 failed**. CI (`regression`, "A9 contract boun
   LOGGED RATHER THAN SILENT; THE MODULE D NUMERATOR STAYS UNKNOWN WITH THE QUESTION RECORDED FOR
   RAMKI; NO CONFIG, WEIGHT, THRESHOLD, PENALTY, KNOCKOUT OR FROZEN-CORE FILE CHANGED; PR #12 OPEN
   AND UNMERGED.**
+
+## Revision 29 — Module D numerator: the consolidated basis is retained (owner decision)
+
+— 2026-10-27
+
+**Scope: the owner has decided the question left open since Revision 27/28. The approved definition
+is retained; the numerator never mixes bases and never fills missing evidence with zero. No weight,
+threshold, band, penalty, knockout or criterion changed, no configuration touched, no schema field
+added, `derived.py` (pin `7783dfeb…`) untouched.** Branch `arena/79aac867-ipo-screening-engine`, PR
+**#12** (base `main`), left **OPEN**. Full account: §35 of
+`docs/investigation/PARAS-INGESTION-FAILURE-2026-10-23.md`.
+
+### The decision
+
+> Retain the existing consolidated-basis definition for Module D's related-party revenue metric.
+> Do not include transactions eliminated in consolidation in the numerator unless the existing
+> definition and accounting evidence explicitly support their inclusion. Keep the metric UNKNOWN
+> when qualifying consolidated-basis revenue cannot be established. Do not substitute zero for
+> missing evidence. Any standalone-basis exposure metric must be separately defined and use a
+> matching standalone revenue denominator.
+
+Consequently the Paras Note 34 §III-A revenue (28.69 / 14.45 / 6.48 ₹ million, disclosed under a
+heading stating those transactions are **eliminated in consolidation**) is **not** counted against
+consolidated revenue. The 0.1788 / 0.1116 / 0.0574 % alternative, which would give D `rpt` 3/3 and
+clear K6, is recorded as rejected-by-definition, not as a coverage gap. A standalone-basis measure
+remains unadopted: it would be a separate metric with its own numerator, its own standalone
+denominator and its own field.
+
+### What was implemented (shared, issuer-neutral)
+
+| # | Rule now enforced in the shared path | Where |
+|---|---|---|
+| 1 | A revenue-type related-party row the disclosure itself marks as eliminated in consolidation is excluded from the numerator (per row, so a supported row beside it still counts) | `rpt_categories.is_consolidation_eliminated`, applied to the row's verbatim text in `CanonicalInputBuilder._derive_rpt_metrics` |
+| 2 | A year the note states no qualifying amount for has **no** share — the former `0.0` numerator is gone | `_derive_rpt_metrics` |
+| 3 | The metric is UNKNOWN when the latest audited FY's qualifying revenue is not established; an older year can no longer become "latest" | `latest = max(periods)` |
+| 4 | The change is UNKNOWN when the comparable prior FY's share is not established; no zero prior | `_derive_rpt_metrics` |
+| 5 | Absent evidence stays absent — null in, UNKNOWN out, never zero | builder + unchanged `derived.py` |
+
+### Effect on the issuers on record — none
+
+Vishal Nirmiti **11.8418 % / −0.3708 pp**; Jio Platforms **4.3094 % / −0.1141 pp**; Paras **null /
+null**; R.K. Fashion **null / null**, score **43.0** (base 46.0, completeness 66 %).
+
+### Verification — focused suites
+
+`tests/test_module_d_consolidated_basis_20261027.py` **7 passed** (new; registered in
+`tests/tier_inventory.py`); `tests/test_rpt_extraction.py` **11 passed** — the former
+`test_derivation_unit_conversion_and_zero_prior` became `…_and_no_zero_prior`, asserting the change
+is null where the prior year states no amount, because that zero substitution is exactly what the
+decision forbids; `test_jio_evidence_remediation.py` + `test_rk_fashion_reconciliation.py` +
+`test_paras_evidence_regression.py` **26 passed**; `test_ui7_ingestion.py` + `test_suite_tiers.py` +
+the new module **28 passed**. The full backend suite is confirmed once through CI on the pushed
+commit (2,138 tests), not re-run locally for a metric-derivation-only change.
+
+### Status and next actions
+
+- Readiness: **NOT ESTABLISHED**. Required-term gate: **CLOSED**. PR **#12 OPEN**, not merged.
+- The Module D numerator question is **closed by owner decision**; nothing else moves.
+- Remaining: the reading limitations listed in §34.8 (30 cells in control-total-free blocks, 10
+  rows whose OCR digits do not close, 7 rows without a period, per-block party spellings), all of
+  which stay unread rather than guessed.
+
+- **Disposition: THE MODULE D RELATED-PARTY REVENUE METRIC KEEPS ITS CONSOLIDATED BASIS BY OWNER
+  DECISION (2026-10-27); FIGURES THE DISCLOSURE MARKS AS ELIMINATED IN CONSOLIDATION ARE EXCLUDED
+  FROM THE NUMERATOR PER ROW, A YEAR WITHOUT A STATED QUALIFYING AMOUNT HAS NO SHARE, THE LATEST
+  AUDITED FY MUST BE ESTABLISHED BEFORE ANY SHARE IS REPORTED, NOTHING IS FILLED WITH ZERO, AND NO
+  STANDALONE-BASIS MEASURE IS ADOPTED WITHOUT ITS OWN SEPARATE DEFINITION AND MATCHING STANDALONE
+  DENOMINATOR; VISHAL 11.8418 %/−0.3708 pp, JIO 4.3094 %/−0.1141 pp, PARAS AND R.K. FASHION NULL,
+  R.K. SCORE 43.0 — ALL UNCHANGED; NO CONFIG, WEIGHT, THRESHOLD, PENALTY, KNOCKOUT, SCHEMA OR
+  FROZEN-CORE FILE CHANGED; PR #12 OPEN AND UNMERGED.**

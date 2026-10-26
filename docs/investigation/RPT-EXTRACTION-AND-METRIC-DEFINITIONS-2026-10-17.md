@@ -146,3 +146,43 @@ choice is recorded for Ramki in §33.8: keep the consolidated basis (no eligible
 Paras, UNKNOWN correct), or adopt a separate standalone-basis exposure metric with its own
 standalone revenue denominator — never a consolidated denominator divided into intra-group
 revenue.
+
+## Numerator basis — owner decision 2026-10-27: the consolidated basis is retained
+
+Ramki's decision (recorded verbatim in effect, not paraphrased into a new definition):
+
+- **Retain the existing consolidated-basis definition** for Module D's related-party revenue
+  metric (`governance.rpt_pct_revenue` = revenue-type related-party transactions / revenue from
+  operations, latest audited FY, %; `governance.rpt_pct_of_revenue_growth` = change in that share
+  between the latest two comparable audited FYs, in percentage points).
+- **Do not include transactions eliminated in consolidation in the numerator** unless the existing
+  definition and the accounting evidence explicitly support their inclusion. The metric is
+  divided by *consolidated* revenue, which by construction cannot contain eliminated intra-group
+  revenue, so the two bases are never mixed.
+- **Keep the metric UNKNOWN where qualifying consolidated-basis revenue cannot be established.**
+- **Do not substitute zero for missing evidence.**
+- Any **standalone-basis exposure metric must be separately defined** and must use a **matching
+  standalone revenue denominator**. It is not implemented, and no field, weight or threshold is
+  changed by this decision.
+
+What this changed in the shared path (no definition change, one fail-closed tightening):
+
+| Behaviour | Before | Now |
+|---|---|---|
+| A revenue-type row whose disclosure says it is eliminated in consolidation | would have been counted if a reader ever emitted it | excluded — `rpt_categories.is_consolidation_eliminated` reads the row's own verbatim text (nature, printed label, captured heading); no category name and no issuer name is involved |
+| A year for which the note states no eligible amount | numerator filled with `0.0` and a share computed | that year has **no** share; absence of a disclosed amount is missing evidence, not a disclosed nil |
+| The latest audited FY has no established qualifying amount | older year's share could become "latest" | `rpt_pct_revenue` **and** `rpt_pct_of_revenue_growth` stay null (UNKNOWN) |
+| The preceding comparable FY has no established share | change computed against a zero prior | growth stays null; the latest share is still reported when it is established |
+
+Effect on the issuers on record: **none.** Vishal Nirmiti keeps 11.8418% and −0.3708 pp (both years
+state their amounts), Jio Platforms keeps 4.3094% and −0.1141 pp, Paras keeps null/null (its
+summary discloses no revenue-type related-party row, and Note 34 §III-A is marked as eliminated in
+consolidation — the case this decision is about), R.K. Fashion keeps null/null and 43.0.
+
+Tests: `tests/test_module_d_consolidated_basis_20261027.py` (7 tests: the wording test, the
+per-row exclusion, the exclusion not hiding a supported row, missing amount → unknown, latest year
+must be established, a properly disclosed year still counted in full, and the Paras filing keeping
+both fields null). `tests/test_rpt_extraction.py::test_derivation_unit_conversion_and_zero_prior`
+became `…_and_no_zero_prior`: it used to assert that a prior year with no stated amount contributes
+a zero share, which is the substitution this decision forbids; it now asserts the change is null
+while the latest share is still computed.

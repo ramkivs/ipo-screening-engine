@@ -19,7 +19,11 @@ import jsonschema
 
 from .directorate import count_exits
 from .interfaces import RawExtraction, SourceDocument
-from .rpt_categories import REVENUE_CATEGORIES, is_revenue_category
+from .rpt_categories import (
+    REVENUE_CATEGORIES,
+    is_consolidation_eliminated,
+    is_revenue_category,
+)
 
 
 class CanonicalInputBuilder:
@@ -649,6 +653,17 @@ class CanonicalInputBuilder:
     # balances are excluded (retained as evidence only).  Fail closed:
     # missing periods/revenue, non-positive revenue, unknown or
     # unconvertible units, or a missing numerator leave the fields null.
+    #
+    # Numerator basis — owner decision, 2026-10-27 (report s.35): the
+    # metric is a *consolidated-basis* share.  A related-party figure the
+    # disclosure states is eliminated in consolidation is therefore never
+    # part of the numerator, because consolidated revenue cannot contain
+    # it; a year whose qualifying amount the note does not state has no
+    # share (no zero substitution); and where the latest year's qualifying
+    # consolidated-basis revenue cannot be established the fields stay null
+    # (UNKNOWN).  A standalone-basis exposure measure is a separate metric
+    # with its own standalone revenue denominator and is not implemented
+    # here.
     # Imported from the shared nature vocabulary (extraction/rpt_categories.py)
     # rather than restated here, so a reader that recognises a new revenue
     # nature cannot silently disagree with the numerator about what may be
@@ -710,6 +725,17 @@ class CanonicalInputBuilder:
         "INR_BILLIONS": 1e9,
     }
 
+    # The verbatim text a related-party row may carry, in the order the
+    # readers set them.  Used only to recognise a disclosure that says the
+    # figure is eliminated in consolidation.
+    _RPT_EVIDENCE_TEXT_KEYS = (
+        "category_label",
+        "nature",
+        "description",
+        "heading",
+        "block_label",
+    )
+
     @classmethod
     def _rpt_is_sales_services(cls, category: str) -> bool:
         return is_revenue_category(category)
@@ -739,7 +765,20 @@ class CanonicalInputBuilder:
                 periods[int(m.group(1))] = float(revenue)
         if not periods:
             return
-        eligible = [t for t in txns if self._rpt_is_sales_services(str(t.get("category") or ""))]
+        # A revenue-type row is still not eligible when the disclosure says the
+        # figure is eliminated in consolidation: this metric is divided by
+        # *consolidated* revenue, which by construction cannot contain
+        # eliminated intra-group revenue (owner decision 2026-10-27, report
+        # s.35).  The exclusion reads the row's own verbatim text, never a
+        # category name, and an issuer name appears nowhere.
+        eligible = [
+            t
+            for t in txns
+            if self._rpt_is_sales_services(str(t.get("category") or ""))
+            and not is_consolidation_eliminated(
+                *(t.get(key) for key in self._RPT_EVIDENCE_TEXT_KEYS)
+            )
+        ]
         if not eligible:
             return
         sums: Dict[int, float] = {}
@@ -760,24 +799,25 @@ class CanonicalInputBuilder:
             year = int(m.group(1))
             converted = amount * self._RPT_UNIT_TO_RUPEES[unit] / self._RPT_UNIT_TO_RUPEES[reporting_unit]
             sums[year] = sums.get(year, 0.0) + converted
+        # Only years for which the note discloses an eligible amount have a
+        # numerator.  Absence of a disclosed amount is *missing evidence*, not a
+        # disclosed nil, so no year is filled in with zero (owner decision
+        # 2026-10-27, report s.35): a share is computed only where the note
+        # states the amount, and the metric is left null where the latest year's
+        # qualifying revenue cannot be established.
         shares: Dict[int, float] = {}
         for year, revenue in periods.items():
             if year in sums:
-                numerator = sums[year]
-            else:
-                # Eligible categories are disclosed in the note but no
-                # amount was disclosed for this year ("-" cells): the
-                # disclosed numerator is zero, not missing.
-                numerator = 0.0
-            shares[year] = numerator / revenue * 100.0
-        latest = max(shares)
+                shares[year] = sums[year] / revenue * 100.0
+        latest = max(periods)
+        if latest not in shares:
+            return
+        prior_years = [y for y in periods if y < latest]
+        prior = max(prior_years) if prior_years else None
         if gov.get("rpt_pct_revenue") is None:
             gov["rpt_pct_revenue"] = round(shares[latest], 4)
-        if gov.get("rpt_pct_of_revenue_growth") is None:
-            prior_years = [y for y in shares if y < latest]
-            if prior_years:
-                prior = max(prior_years)
-                gov["rpt_pct_of_revenue_growth"] = round(shares[latest] - shares[prior], 4)
+        if gov.get("rpt_pct_of_revenue_growth") is None and prior is not None and prior in shares:
+            gov["rpt_pct_of_revenue_growth"] = round(shares[latest] - shares[prior], 4)
 
     def _build_business(self) -> Dict[str, Any]:
         biz_base = self.base.get("business", {})

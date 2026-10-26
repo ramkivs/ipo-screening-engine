@@ -2877,3 +2877,48 @@ it blocks no code path.)
 | 3 | The same party prints as `MK.Jewellers` and `M.K.Jewellers` in different blocks (one with a 3M column, one without) | normalising the name would be inventing text; the verbatim name is kept per block |
 | 4 | Module D numerator | Ramki's decision (§34.6) |
 | 5 | The scanned-note reader runs OCR (~15 s for 3 candidate pages on R.K. Fashion) | acceptable; a cache keyed by (file, page, scale) would remove the repeat cost |
+
+## 35. Module D numerator — the consolidated basis is retained (owner decision, 2026-10-27)
+
+Ramki decided the question left open in §33.8 and §34.6:
+
+> Retain the existing consolidated-basis definition for Module D's related-party revenue metric.
+> Do not include transactions eliminated in consolidation in the numerator unless the existing
+> definition and accounting evidence explicitly support their inclusion. Keep the metric UNKNOWN
+> when qualifying consolidated-basis revenue cannot be established. Do not substitute zero for
+> missing evidence. Any standalone-basis exposure metric must be separately defined and use a
+> matching standalone revenue denominator.
+
+The decision **confirms** the definition in
+`RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md`; it does not change a weight, threshold,
+band, penalty, knockout or criterion, and no schema field is added. What changed is that two
+fail-closed rules which were previously implicit in the data now hold in the shared path:
+
+| # | Rule | Implementation |
+|---|---|---|
+| 1 | A revenue-type row the disclosure marks as eliminated in consolidation is never in the numerator | `rpt_categories.is_consolidation_eliminated(...)`, applied to the row's own verbatim text (`category_label`, `nature`, `description`, `heading`, `block_label`) in `CanonicalInputBuilder._derive_rpt_metrics`. No category name and no issuer name is involved; the exclusion is per row, so a supported row beside an eliminated one still counts |
+| 2 | A year whose qualifying amount the note does not state has **no** share (previously a zero numerator was assumed) | `shares` is built only from years the note states an amount for |
+| 3 | The metric is UNKNOWN when the latest audited FY's qualifying revenue is not established | `latest = max(periods)`; if that year has no share, both fields stay null. An older year can no longer become "latest" |
+| 4 | The change is UNKNOWN when the comparable prior FY's share is not established | growth computed only when the immediately preceding period in the financials has a share; no zero prior |
+| 5 | No zero substitution anywhere in the path | a null field stays null; `derived.py` maps absent → `UNKNOWN` (frozen pin `7783dfeb…` untouched) |
+
+**Effect on the issuers on record — none.** Vishal Nirmiti 11.8418 % / −0.3708 pp, Jio Platforms
+4.3094 % / −0.1141 pp, Paras null/null, R.K. Fashion null/null with the score still **43.0**; the
+consolidated-basis share of Paras's Note 34 evidence (0.1788 / 0.1116 / 0.0574 %, which would give
+D `rpt` 3/3 and clear K6) is **not** used, because that evidence is eliminated in consolidation and
+the denominator is consolidated revenue. If a standalone-basis exposure measure is ever wanted it
+needs its own numerator, its own standalone denominator and its own field — a separate definition,
+not an extraction workaround.
+
+### 35.1 Verification (exact commands, this revision)
+
+| Command | Result |
+|---|---|
+| `pytest tests/test_module_d_consolidated_basis_20261027.py -q` | **7 passed** (new module; registered in `tests/tier_inventory.py`) |
+| `pytest tests/test_rpt_extraction.py -q` | **11 passed** (Vishal 11.8418 % / −0.3708 pp unchanged; the former zero-prior test now asserts UNKNOWN) |
+| `pytest tests/test_jio_evidence_remediation.py tests/test_rk_fashion_reconciliation.py tests/test_paras_evidence_regression.py -q` | **26 passed** (Jio 4.3094 % / −0.1141 pp; R.K. 43.0 / base 46.0 / completeness 66 %) |
+| `pytest tests/test_ui7_ingestion.py tests/test_suite_tiers.py tests/test_module_d_consolidated_basis_20261027.py -q` | **28 passed** |
+
+Comprehensive backend + frontend runs from §34.7 remain valid for everything they covered; this
+revision changes the metric derivation and its tests only, so the full backend suite is re-run once
+through CI on the pushed commit (2,138 tests) rather than locally a second time.

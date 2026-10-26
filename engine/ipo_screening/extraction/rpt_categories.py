@@ -205,6 +205,29 @@ def classify_nature(text: str) -> Optional[str]:
     return best[1] if best else None
 
 
+# A disclosure can say, in its own words, that a figure is eliminated in
+# consolidation.  Such a figure is not revenue of the consolidated entity and
+# cannot be a numerator against consolidated revenue (owner decision
+# 2026-10-27, report s.35).  The test is deliberately narrow -- the word
+# "eliminated"/"elimination" next to nothing else -- so ordinary natures never
+# match it.
+_ELIMINATED = re.compile(r"\beliminat(?:ed|ion|ions|ing)\b", re.IGNORECASE)
+
+
+def is_consolidation_eliminated(*texts: Optional[str]) -> bool:
+    """True when the disclosure itself marks the figure as eliminated.
+
+    Checked against whatever verbatim text the reader kept for the row (its
+    nature, its printed label, a captured heading).  A row is excluded from the
+    numerator when any of them says the amount is eliminated in consolidation;
+    nothing is inferred from a category name or from the filing's structure.
+    """
+    for text in texts:
+        if text and _ELIMINATED.search(str(text)):
+            return True
+    return False
+
+
 def is_revenue_category(category: str) -> bool:
     """True only for the categories the approved numerator may count."""
     if category in REVENUE_CATEGORIES:
