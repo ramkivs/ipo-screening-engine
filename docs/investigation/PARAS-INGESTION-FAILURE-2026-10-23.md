@@ -1662,3 +1662,211 @@ the store.
 third-party (aggregator) issue terms; it is not an official determination about the issuer,
 and no store outside `build/` was written. The remaining unknowns are classified in §20.4
 and §22.5–22.7, and none of them is now waiting on a reader.
+
+## 23. Reconciliation, the K5 trigger, and the boundary the evidence stops at — 2026-10-26 (revision 14)
+
+This section closes workstreams B and C of the PR #12 pass and records them for workstream D.
+**No code was changed in this pass.** Nothing in `engine/`, `config/`, `tests/`, the schema or
+the frozen core was touched, so no test was run: §23.9 says exactly what was executed instead.
+
+### 23.1 The report, the stored evaluation and the hash are one run
+
+The run cited in §22.6 is a single run. Read back from
+`build/paras/store/PARAS-HEALTHCARE-LIMITED-20261026-091500Z-final-c123e138`:
+
+| Artifact | Value |
+|---|---|
+| `result.json` `result_hash` | `c123e13848def545eef07eb16e6f5cee7f3cf71f72dca34b706613523d6edf35` |
+| `manifest.json` `result_hash` | the same value |
+| `evaluation-record.v1.json` `evaluation_id` | `…-c123e138`, i.e. the hash is the record's identity |
+| input snapshot | `0c32701c…`; market block `8844b2a8…`; peers `c96ff9f3…`; source manifest `60c60c81…` |
+| config hash | `4a5d92e8…` (v1.5.0) |
+
+Re-running the **CLI** against the stored input snapshot with the same `--at` reproduced
+`c123e138…` **bit-for-bit** (written to `build/paras/store_verify/`). The hash is therefore a
+statement about the stored evidence, not about the machine that first computed it.
+
+Two caveats, both recorded because they bound what a hash may be used to claim:
+
+* **The hash covers the run timestamp.** The same inputs re-run at the baseline timestamp
+  (`2026-10-26T06:24:47Z`) produce the *identical scores* — 13.0 final, 16.0 base, 39.0
+  available — under a *different* hash, `413682ae…`. So the score is clock-independent; the
+  hash is not. In particular, replaying today's inputs at yesterday's clock does **not**
+  reproduce the 9.0 baseline (§23.2); only the `96379ab` tree plus its own input does.
+* **`pipeline.evaluate()` is not hash-equivalent to the CLI.** Called directly on
+  `json.load(input)["snapshot"]["input"]` it returns the same scores but `2bf73f02…`. The CLI
+  run profile is the only hash-authoritative path (`§20.4(c)` line 615; line 1372).
+
+### 23.2 The 9.0 baseline, and the complete list of what differs
+
+The baseline was rebuilt by extracting the retained RHP and building the input with
+**commit `96379ab`** in a throwaway worktree (`/tmp/base`, not persisted): 06:24:47Z, final
+**9.0**, base 12.0, penalty −3, completeness **35.7895%**, hash `dc3d136e…`, modules
+A 6/25 · B 0/20 · C 6/15 · D 0/15 · E 0/15 · F 0/10.
+
+The input diff between that baseline and the current input is **exhaustive** and small — 13
+leaf changes, and none of them is a financial, issue-term, clause or config change. Price band
+(660/693), lot (21), fresh (₹5,000 m), OFS (₹9,500 m), pre-issue shares (100,986,187), dates
+(2026-10-21/23), quota, and every financial line are identical in both:
+
+| # | Field | Baseline | Current | Cause |
+|---|---|---|---|---|
+| 1 | `business.top5_supplier_pct` | `None` | `21.94` (p61) | new reader (§22.3) |
+| 2 | `business.industry_cagr_pct` | `None` | `10.0` (p204) | new reader |
+| 3 | `business.industry_forecast_period` | `None` | `FY2025-FY2030` | new reader |
+| 4 | `business.industry_scope` | `None` | `india` | new reader |
+| 5 | `business.industry_source` | `None` | CRISIL, Sept 2026 | new reader |
+| 6 | `capital_structure.pre_ipo_placements` | `[]` | 3 issues (2006–2008, ₹60) | new reader |
+| 7 | `capital_structure.promoter_pre_pct` | `None` | `72.8` (p111) | new reader |
+| 8 | `governance.auditor_changed_3y` | `None` | `False` (p99) | new reader |
+| 9 | `use_of_proceeds` | `[]` | 3,209.00 + 541.00 + `gcp [●]` | new reader |
+| 10 | `peers` | `[]` | 9 peers (p150) | new reader |
+| 11 | `capital_structure.large_holders_unlocked_early` | `False` | `None` | **builder default removed** |
+| 12 | `capital_structure.discounted_allotments_18m_before_drhp` | `False` | `None` | **builder default removed** |
+| 13 | `_sources[0].retrieval_timestamp` | 09:24:36Z | 08:34:06Z | re-extraction clock (no content change; `content_hash` identical) |
+
+`promoter_pledge_pct 0.0` and `promoter_lockin_in_place True` take the same values on both
+sides, but they are now evidence-backed (pp. 114/115) rather than builder-supplied — a
+provenance change with no score effect. Field 13 touches the source manifest only.
+
+### 23.3 The score ledger, criterion by criterion
+
+Five criteria changed state. Everything else — including all of Module A and all of Module B —
+is identical:
+
+| Module/criterion | Baseline | Current | Evidence for the change |
+|---|---|---|---|
+| C `use_of_proceeds` | SCORED **2/4** (`mixed_ok`) | **UNKNOWN** (0 of 4) | the schedule is now read: 3,209.00 + 541.00 = 3,750.00 = 75% of the ₹5,000 m fresh issue, and GCP is `[●]`. The 20% blind test cannot be evaluated because the GCP amount is undisclosed; the engine will not read `[●]` as zero nor substitute the legal maximum |
+| C `lockin` | SCORED **1/1** (`intact`) | **UNKNOWN** | the point rested on the builder's `large_holders_unlocked_early False`; nothing in the filing establishes it, so it is removed rather than kept |
+| D `auditor` | UNKNOWN | SCORED **1/2** (`eom_only`) | p99 "no change in our statutory auditors in the last three years"; EOM stays as §22.7 explains |
+| E `industry_growth` | UNKNOWN | SCORED **3/5** | `industry_cagr_pct 10.0 ≥ 8` (p204; lower bound of the 10–12% range) |
+| E `concentration` | UNKNOWN | SCORED **3/3** | `top5_supplier_pct 21.94 < 30` (p61) |
+
+Ledger: base **12 → 16** (+4: −2 −1 +1 +3 +3), final **9 → 13**, penalty total **−3
+unchanged**, available points **34 → 39**, unknown points **61 → 56**, total evaluable **95
+unchanged**, N/A **5 unchanged**, completeness **35.7895% → 41.0526%** (still `Low`; the
+Medium band starts at 80%).
+
+The confidence interval moves in both directions, and the *downward* movement is the
+interesting one:
+
+* **Upper bound 70 → 69** = `base + unknown + penalties` = 16 + 56 − 3. It falls even though
+  the point score rose, because five previously-open points are now closed *against* the
+  issuer (the two C points) or *earned* (the three E points) while four points of peer
+  valuation and five of market demand remain genuinely unknowable from this filing.
+* **Lower bound 0 → 1** = `base + penalties − unresolved penalty envelope` = 16 − 3 − **12**.
+  The envelope grew 10 → 12 because `discounted_allotments` (−2) used to be *cleared* by the
+  builder's `False` default and is now carried as unresolved: removing a favourable default
+  makes the worst case worse even as the central estimate improves. That is the intended
+  direction of the change.
+
+### 23.4 K5 — "contingent liabilities >50% of net worth" — investigated to the source and retained
+
+Rule (`config/ipo-config.v1.5.0.json`, K5):
+`when: any[contingent_liab_pct_networth > 50, contingent_liab_unquantified]`.
+`derived.py::_contingent_liab_pct_networth` computes `contingent / net_worth × 100`, returns
+UNKNOWN if either input is missing and N/A if net worth ≤ 0.
+
+* **Numerator.** `financials.contingent_liabilities = 3,905.01` INR millions, evidence p91,
+  quote `"Total | 3,905.01 as at 31 March 2026"`, locator "Contingent Liabilities and
+  Commitments (claims not acknowledged as debts, latest fiscal year)". Composition on the same
+  page, and it adds exactly: liquidated damages **27.50** + bank guarantee to HEC **75.00** +
+  corporate guarantees **3,694.21** + claims not acknowledged as debts **108.30** = **3,905.01**.
+* **Denominator.** FY2026 net worth **3,949.41** INR millions (the same figure the restated
+  statements carry; the report's lakh-denominated `394.941` is the same number in other units).
+* **Arithmetic.** 3,905.01 / 3,949.41 × 100 = **98.8758%** > 50 → **TRIGGERED**. The engine's
+  leaf records `contingent_liab_pct_networth = 98.87578144583622 > 50 -> True`; the second
+  limb (`contingent_liab_unquantified`) is UNKNOWN, which does not affect the result.
+* **Independent corroboration from the issuer itself.** p36 states that "contingent
+  liabilities, as of June 30, 2026, constituted **89.55%** of our net worth", and the coverage
+  table on the same page prints "Total Contingent Liabilities 3,905.01 **98.88%** … as at
+  March 31, 2026". The engine's 98.8758% and the filing's 98.88% agree to two decimals on the
+  same date and the same denominator.
+
+**Material nuance, recorded rather than "fixed".** 3,694.21 of the 3,905.01 (93.54% of the
+numerator) is corporate guarantees; excluding them the remainder is **210.80**, i.e. **5.34%**
+of net worth, which would *not* trigger K5. The trigger therefore rests on the issuer's own
+classification of corporate guarantees as contingent liabilities inside the "Total" it
+discloses — a classification the risk factor and the coverage table both repeat. Excluding
+them would be the engine second-guessing the issuer's accounting presentation in order to
+clear a knockout, which is exactly the kind of adjustment §22.7 forbids. **K5 stands as
+TRIGGERED.** (Cash-flow corroboration for the reading: FY2026 CFO 1,635.12 against PAT
+438.34 — nothing in the accounts is being misread.)
+
+### 23.5 The other five knockouts, verified
+
+| Rule | State | Why, from the leaves |
+|---|---|---|
+| K1 going concern / opinion | UNVERIFIED | `auditor_opinion = emphasis_of_matter` is not in `[qualified, adverse, disclaimer]` → False; `net_worth_latest 394.941 < 0` → False; only `going_concern_uncertainty` is missing (A19: "prepared on a going concern basis" is a basis of preparation, not an uncertainty) |
+| K2 pledge / SEBI-ED | UNVERIFIED | `promoter_pledge_pct 0.0 > 25` → False; `sebi_ed_action_active` missing — the nil statements on pp. 493/500 are promoter-scoped and "Enforcement Directorate" does not appear in the document |
+| K3 OFS / declining profit | **CLEAR** | `ofs_share_pct 65.517 > 80` → False (OFS ₹9,500 m of ₹14,500 m); `profit_declining False` — FY2026 PAT 438.34 against FY2025 −579.83, and PAT CAGR is not negative |
+| K4 promoter exit / CFO-PAT | UNVERIFIED | `roce_latest 13.54 < 10` → False and `profit_declining False`; `cfo_pat_cumulative` is UNKNOWN because cumulative PAT is non-positive, so the ratio is **not meaningful and is not forced to zero**; `pe_promoter_sold_pct_combined`, `promoter_full_exit`, `promoter_post_pct` are UNKNOWN because the seller list and the post-issue holding are not disclosed |
+| K6 RPT growth | UNVERIFIED | `rpt_pct_of_revenue_growth` is not disclosed and has no approved metric definition (§20.4(b)); note the raw disclosure exists — RPT are 0.47% of revenue across pp. 92–95 — so this is decision-gated, not reader-gated |
+
+### 23.6 Module B: all nine peers are real and the module is still 0/20
+
+The peer table on p150 is now read in full — nine listed peers, priced 5 October 2026, with
+P/E, P/B and ROE, the issuer's own row excluded (Aster 91.89, Apollo 59.36, Fortis 55.43,
+Global Health 64.46, Jupiter 42.92, KIMS 116.41, Manipal 87.00, Max 62.10, Narayana 43.41;
+median P/E **62.10**, median P/B **8.37**, median ROE **13.41%**). All nine are `VALID`; none
+is rejected.
+
+Every B criterion nevertheless stays UNKNOWN, and for one unchanged reason: they need the
+issuer's own P/E, which needs the post-issue share count, which the filing prints as `[●]`
+(its own P/E table on p147 is `[●]` "to be computed after finalisation of the Price Band").
+Deriving shares as `fresh issue ÷ price band` is the arithmetic §20.4(c) forbids (lines 615
+and 1372). So `dilution`, `promoter_ofs_pct` and all of B remain blocked on a **disclosure**,
+not on a reader — and the 20 unknown points in B are the single largest reason completeness
+sits at 41%.
+
+### 23.7 One frozen-core behaviour recorded, not changed
+
+Rebuilding the baseline surfaced a second instance of the §22.4 class of defect, this time
+inside the frozen core: with `use_of_proceeds: []` — no schedule read at all — the baseline
+scored C `use_of_proceeds` as `mixed_ok` **2/4**. An empty allocation list is not evidence of a
+mixed-use offer, and awarding the midpoint for it is a favourable default, not a reading. It
+is **not** fixed here: `derived.py` is in the frozen core, the fix is a behaviour change that
+would move other issuers' scores, and no governance decision authorises it. It disappears
+from Paras only because the schedule is now read and the `[●]` GCP makes the bucket genuinely
+undecidable. Recorded as an open item for the next governance decision; do not treat it as
+resolved.
+
+### 23.8 The governance boundary, read back — and left exactly where it was
+
+* **A22** — RAMKI-APPROVED POLICY: evidence-or-UNKNOWN, with cross-year EOM deferred. Every
+  choice in §23.3/§23.5 follows it: an unread value is UNKNOWN, never a negative, never a
+  favourable default.
+* **A23** — defaults removal executed under the existing contract; two coverage standards are
+  still marked "RAMKI DECISION REQUIRED" and remain open.
+* **A21** — reads: post-issue holding must be the disclosed number, and the `SRC-DERIVED`
+  enrichment path is a provenance-marked derivation, not a substitution of a disclosed value.
+  It is unchanged, and it is why `promoter_post_pct` stays UNKNOWN rather than derived here.
+* **A32** — header unchanged and quoted verbatim from the record: "IMPLEMENTED 2026-10-26;
+  FULL BACKEND SUITE EXECUTED; READY FOR RAMKI RATIFICATION (NOT RATIFIED)". Nothing in this
+  pass ratifies, amends or re-implements it.
+* Still decision-gated, with the exact dependency for each: `rpt`/K6 → an approved metric
+  definition for the related-party share of revenue *growth*; `moat`/`visibility` → approved
+  ratings definitions; `board_kmp` → an approved KMP-exit rule; K1 `going_concern_uncertainty`
+  and K2 `sebi_ed_action_active` → an approved explicit-negative rule (A19/A25); post-issue
+  share count → an approved derivation or the disclosed number (A21/§20.4(c)).
+
+### 23.9 Verification and non-claims
+
+Executed in this pass, and nothing else:
+
+* two CLI runs — the reproduction into `build/paras/store_verify/` and the clock control into
+  `build/paras/store_clockctrl/` (§23.1);
+* one baseline reconstruction and its run in `/tmp/base` (§23.2);
+* readbacks of `result.json`, `manifest.json`, `evaluation-record.v1.json`, `input.json`,
+  `peers.json`, the K leaves and the pens, the config clauses, `derived.py`'s two helpers, and
+  the RHP pages 30/36/39/40/44/45/61/91/99/111/114/115/129/145/150/152/155/156/162/165/167/204/
+  228/233/235–238/258/259/263/266/275/277/337/346/366/367/440/445/493/494.
+
+**No tests were run** — correctly, because no file under `engine/`, `config/` or `tests/`
+changed. The last test evidence for this code is the focused run recorded in §22.8 and
+Revision 22.
+
+**Not claimed:** this is a run over **non-authoritative** evidence with third-party
+(aggregator) issue terms; it is not an official determination about the issuer. K5 being
+TRIGGERED is a statement about the numbers in the filing, not a recommendation. Nothing was
+merged, closed, ratified or published beyond documentation.

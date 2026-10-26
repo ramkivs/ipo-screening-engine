@@ -2253,3 +2253,122 @@ read every run out of the store.
   PEER TABLE READ (NINE PEERS) BUT MODULE B STILL BLOCKED ON THE UNDISCLOSED POST-ISSUE
   SHARE COUNT; CLI REPORT CRASH FIXED; NO SCORING/THRESHOLD/CONFIG/SCHEMA/FROZEN-CORE
   CHANGE.**
+
+## Revision 23 — the 9 → 13 reconciliation, K5 traced to its source, and what remains decision-gated
+
+**Scope: documentation only. No file under `engine/`, `config/`, `tests/` or the schema was
+changed in this pass; no weight, threshold, penalty, criterion, knockout, config value or
+frozen-core module was touched; no test was run, because nothing executable changed.** Branch
+`arena/79aac867-ipo-screening-engine`, PR **#12** (base `main`), head and remote verified at
+publication. Recorded here as workstreams **B**, **C** and **D** of that PR's pass. The full
+account is §23 of `docs/investigation/PARAS-INGESTION-FAILURE-2026-10-23.md`; this entry is
+the status register, not a second narrative.
+
+### The reconciliation, from beneath the numbers
+
+The two Paras scores reported across Revision 22 are **9.0 and 13.0**, and the difference is
+now fully accounted for rather than asserted. Artifacts:
+
+| | Baseline | Current |
+|---|---|---|
+| Tree | commit `96379ab` (throwaway worktree) | branch head |
+| Run | `…-20261026-062447Z-final-dc3d136e` | `…-20261026-091500Z-final-c123e138` |
+| Final / base / penalty | 9.0 / 12.0 / −3.0 | 13.0 / 16.0 / −3.0 |
+| Range | 0.0 – 70.0 | 1.0 – 69.0 |
+| Completeness | 35.7895% (Low) | 41.0526% (Low) |
+| Available / unknown / evaluable | 34 / 61 / 95 | 39 / 56 / 95 |
+| Modules | A 6 · B 0 · C 6 · D 0 · E 0 · F 0 | A 6 · B 0 · C 3 · D 1 · E 6 · F 0 |
+
+The input delta between the two runs is exhaustive at **13 leaves**: ten fields that are now
+evidenced (top-five supplier 21.94 p61, industry CAGR 10.0 pp204/FY2025-FY2030/INDIA/CRISIL,
+three 2006–2008 pre-IPO placements, promoter pre-Offer 72.80 p111, auditor unchanged p99, the
+object schedule 3,209.00 + 541.00 + `gcp [●]` p129, nine peers p150), **two builder defaults
+removed** (`large_holders_unlocked_early`, `discounted_allotments_18m_before_drhp`: `False` →
+`None`), and one source retrieval timestamp. No financial line, issue term, date, price band,
+share count, quota or config value differs.
+
+Five criteria moved and nothing else did: C `use_of_proceeds` 2/4 → UNKNOWN (−2, the
+`[●]` GCP makes the blind-heavy test undecidable), C `lockin` 1/1 → UNKNOWN (−1, the point was
+the removed default), D `auditor` → 1/2 `eom_only`, E `industry_growth` → 3/5, E
+`concentration` → 3/3. Both bounds moved in opposite directions for honest reasons: the upper
+bound fell 70 → 69 because five open points became closed or earned while B and F stayed
+unknowable; the lower bound rose only 0 → 1 because the unresolved-penalty envelope grew
+10 → 12 when `discounted_allotments` stopped being cleared by a default.
+
+### Reproducibility — what the hash does and does not prove
+
+Re-running the CLI against the stored input snapshot reproduced `c123e138…` bit-for-bit in a
+fresh store. Two limits recorded: the hash covers the run timestamp (the same inputs at the
+baseline clock give identical scores under hash `413682ae…`, so a clock change cannot
+manufacture the old 9.0 — only the `96379ab` tree does), and `pipeline.evaluate()` is not
+hash-equivalent to the CLI (`2bf73f02…`), so scores may be quoted from either path but **only
+the CLI may be used for a hash claim**.
+
+### K5 "contingent liabilities >50% of net worth" — TRIGGERED, traced, and retained
+
+3,905.01 ÷ 3,949.41 × 100 = **98.8758%** > 50. Numerator is the p91 "Total" (27.50 liquidated
+damages + 75.00 bank guarantee + 3,694.21 corporate guarantees + 108.30 claims = 3,905.01);
+denominator is FY2026 net worth 3,949.41. The issuer corroborates it in its own risk factors
+(p36: contingent liabilities "constituted 89.55% of our net worth" for a later quarter, and a
+coverage row printing "3,905.01 **98.88%** … as at March 31, 2026"). **No correction was made,
+and none is due.** The one nuance worth carrying: guarantees are 93.54% of the numerator, and
+excluding them would leave 210.80 (5.34%) and no trigger — but the issuer itself includes the
+guarantees in the contingent-liability total it discloses, so excluding them would be the
+engine clearing a knockout by overruling the issuer's accounting. That is not done.
+
+The remaining knockouts read cleanly and were re-verified leaf by leaf: **K3 CLEAR** (OFS
+65.517% not > 80; profit not declining, FY2026 PAT 438.34 vs FY2025 −579.83); K1, K2, K4, K6
+UNVERIFIED for the reasons already registered (basis-of-preparation ≠ going concern; nil
+SEBI/ED statements are promoter-scoped; cumulative PAT non-positive so CFO/PAT is meaningless
+and is *not* zeroed; seller list and post-issue holding undisclosed; RPT-growth metric
+undefined even though RPT are 0.47% of revenue on pp. 92–95).
+
+### Module B — nine real peers, still 0/20
+
+The p150 table is fully read (nine `VALID` peers, priced 5 October 2026; median P/E 62.10,
+P/B 8.37, ROE 13.41%) and it buys nothing, because every B criterion needs the *issuer's*
+P/E, which needs the post-issue share count, which is printed as `[●]` — the filing's own P/E
+table on p147 is `[●]` "to be computed after finalisation of the Price Band". `fresh ÷ price
+band` remains the forbidden arithmetic (§20.4(c)). B, `dilution` and `promoter_ofs_pct` are
+blocked on a **disclosure**, and B's 20 points are the single largest share of the 56 unknown
+points.
+
+### One new open defect, found in the frozen core — recorded, not fixed
+
+Rebuilding the baseline exposed a second instance of the Revision 22 defect class inside
+`derived.py`: with **no** use-of-proceeds schedule read (`[]`), C `use_of_proceeds` scored
+`mixed_ok` **2/4**. An empty list is not evidence of mixed use, and the midpoint is a
+favourable default. It is **not** fixed in this pass — `derived.py` is frozen, the change would
+move other issuers' scores, and A22/A32 do not authorise it. **Open item: governance decision
+required**; it should not be described as resolved.
+
+### Governance boundary — unchanged
+
+A22 (evidence-or-UNKNOWN) and A21 (disclosed post-issue holding; `SRC-DERIVED` is a
+provenance-marked derivation, not a substituted disclosed value) are followed, not amended.
+A23's two "RAMKI DECISION REQUIRED" coverage standards remain open. **A32's header is
+untouched and reads verbatim: "IMPLEMENTED 2026-10-26; FULL BACKEND SUITE EXECUTED; READY FOR
+RAMKI RATIFICATION (NOT RATIFIED)".** Nothing here ratifies it. Decision-gated and not
+reader-gated, each with its exact dependency: `rpt`/K6 (metric definition), `moat`/`visibility`
+(ratings), `board_kmp` (exit rule), K1 `going_concern_uncertainty` and K2
+`sebi_ed_action_active` (explicit-negative rule), post-issue share count (approved derivation
+or disclosure).
+
+### Publication and status
+
+- PR **#12** — base `main`, **OPEN**, **MERGEABLE**, not merged, closure not claimed.
+- Paras evaluation remains **non-authoritative evidence** (aggregator issue terms, retained
+  RHP under `evidence/non-authoritative/`); it is not an official determination about the
+  issuer.
+- Readiness: **NOT ESTABLISHED**. Required-term gate: **CLOSED**. Frozen-core pin: **VERIFIED —
+  READY FOR RAMKI RATIFICATION** (untouched).
+- Remaining blockers are one disclosure (post-issue share count), four governance decisions
+  (RPT metric, moat/visibility ratings, KMP-exit rule, explicit-negative rule), two coverage
+  standards (A23), one ratification (A32), and the empty-schedule default above.
+
+- **Disposition: THE 9 → 13 DELTA IS FULLY RECONCILED FROM UNDERLYING RECORDS (13-LEAF INPUT
+  DIFF, FIVE CRITERIA, BOTH BOUNDS); THE RUN, ITS PERSISTED EVALUATION AND ITS HASH ARE ONE RUN
+  AND REPRODUCE BIT-FOR-BIT; K5 IS TRIGGERED ON THE ISSUER'S OWN DISCLOSED TOTAL AND IS
+  RETAINED; MODULE B REMAINS BLOCKED ON AN UNDISCLOSED POST-ISSUE SHARE COUNT; ONE FROZEN-CORE
+  EMPTY-SCHEDULE DEFAULT FOUND AND LEFT OPEN FOR GOVERNANCE; NO CODE, CONFIG, SCORING,
+  THRESHOLD, PENALTY OR FROZEN-CORE CHANGE; PR #12 OPEN AND UNMERGED.**
