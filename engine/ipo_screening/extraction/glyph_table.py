@@ -35,7 +35,7 @@ value to the wrong period.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 # A gap wider than this many points separates two cells.  Body text in these
 # filings is set at 7-9 pt; within a word the glyphs are all but touching, and
@@ -243,48 +243,3 @@ def page_cells(
     if not rows:
         return None
     return rows
-
-
-def as_fragments(
-    rows: Sequence[Tuple[float, List[GlyphCell]]]
-) -> List[Tuple[float, float, str]]:
-    """Flatten reconstructed cells into ``(y, x, text)`` fragments."""
-    fragments: List[Tuple[float, float, str]] = []
-    for baseline, cells in rows:
-        for cell in cells:
-            fragments.append((baseline, cell.x0, cell.text))
-    return fragments
-
-
-def numeric_columns(
-    rows: Sequence[Tuple[float, List[GlyphCell]]],
-    matcher,
-    tolerance: float = 8.0,
-) -> List[Tuple[float, float]]:
-    """Cluster numeric cells of a page into column bands, left to right.
-
-    ``matcher`` decides which cell texts count as a value.  Bands are built
-    from the positions of the cells themselves, so they describe where the
-    amounts actually sit rather than where a header says they should.
-    """
-    starts = sorted(
-        cell.x0
-        for _baseline, cells in rows
-        for cell in cells
-        if matcher(cell.text)
-    )
-    bands: List[List[float]] = []
-    for start in starts:
-        if bands and start - bands[-1][-1] <= tolerance:
-            bands[-1].append(start)
-        else:
-            bands.append([start])
-    return [(band[0], band[-1]) for band in bands]
-
-
-def column_index(bands: Sequence[Tuple[float, float]], x: float) -> Optional[int]:
-    """Index of the band a cell starting at ``x`` belongs to, if any."""
-    for index, (start, end) in enumerate(bands):
-        if start - 2.0 <= x <= end + 2.0:
-            return index
-    return None

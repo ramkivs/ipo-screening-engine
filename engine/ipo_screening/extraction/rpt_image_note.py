@@ -60,8 +60,6 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-MIN_CONFIDENCE = 0.85
-
 # A value is only read when OCR is near-certain about the cell: a misread digit
 # in an amount is indistinguishable from a correctly read one once bound to a
 # column, so uncertain amounts are left unread (and counted) instead.
