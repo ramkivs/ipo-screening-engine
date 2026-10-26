@@ -2844,7 +2844,7 @@ not eliminated in consolidation), or a standalone-basis exposure that would also
 issuer's standalone revenue as the denominator?* Until that is answered the fields stay null — no
 zero substitution, no inference, no change to weights or thresholds.
 
-### 34.7 Verification — focused suites only (exact commands, this revision)
+### 34.7 Verification — focused suites during the work, the comprehensive run once at the end
 
 | Command | Result |
 |---|---|
@@ -2856,9 +2856,17 @@ zero substitution, no inference, no change to weights or thresholds.
 | `pytest tests/test_ui7_ingestion.py tests/test_suite_tiers.py -q` | **21 passed** (new real-file module registered in `tests/tier_inventory.py`) |
 | `python /tmp/rptprod.py <RK pdf>` (production `extract_related_party_transactions`) | 23 transactions, coverage `PARTIAL`, categories `{loan_taken 6, loan_repaid 10, purchase_of_goods 3, payment_made 4}`, annual totals 3M 25.15 / FY2024 753.96 / FY2025 126.51 / FY2026 434.94 ₹ lakh |
 
-The full backend, regression and frontend suites remain **DEFERRED** until every in-scope
-remediation item is dispositioned; nothing here required changing a weight, threshold, penalty,
-band or knockout, and `derived.py` (pin `7783dfeb…`) is untouched.
+**Final comprehensive validation — executed once, after every in-scope item was dispositioned:**
+
+| Command | Result |
+|---|---|
+| `PYTHONPATH=engine .venv/bin/python -m pytest tests/ -q --durations=30` | **2,138 passed, 0 failed**, 25 warnings, **1191.93 s (19 m 51 s)**, exit 0 |
+| `cd frontend && node --test test/*.test.js` | **93 passed, 0 failed** (1.03 s) |
+
+That run includes `tests/test_rpt_nature_classification_and_row_bands_20261026.py`. Nothing here
+required changing a weight, threshold, penalty, band or knockout, and `derived.py` (pin
+`7783dfeb…`) is untouched. (The Module D numerator remains Ramki's decision; §34.6 records it and
+it blocks no code path.)
 
 ### 34.8 Remaining limitations
 

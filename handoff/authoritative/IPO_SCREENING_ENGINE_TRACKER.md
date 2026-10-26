@@ -2793,7 +2793,7 @@ a direction for "Outsourced medical services". **Disposition: UNKNOWN stands, ev
 recommendation to Ramki recorded in §33.8** (keep the consolidated basis, or define a separate
 standalone-basis metric with its own denominator).
 
-### Verification — focused suites only
+### Verification — focused suites during the work, the comprehensive run once at the end
 
 `test_glyph_geometry_and_ocr_note_20261026.py` **15**; `test_rpt_matrix_reader_20261026.py`
 + `test_vishal_historical_reconciliation.py` + `test_paras_official_issue_page_terms.py` **43**;
@@ -2959,8 +2959,13 @@ exact question for Ramki: §34.6.
 Production path re-read on the R.K. filing: 23 transactions, `PARTIAL`,
 `{loan_taken 6, loan_repaid 10, purchase_of_goods 3, payment_made 4}`. Cross-issuer counts
 unchanged: Paras 70 `DISCLOSED`, Jio 23 `DISCLOSED`, Vishal 136 `DISCLOSED` (Vishal
-`rpt_pct_revenue` 11.8418 unchanged). The full backend, regression and frontend suites remain
-**DEFERRED**.
+`rpt_pct_revenue` 11.8418 unchanged).
+
+**Final comprehensive validation — executed once, after every in-scope item was dispositioned:**
+`PYTHONPATH=engine .venv/bin/python -m pytest tests/ -q --durations=30` → **2,138 passed, 0
+failed**, 25 warnings, **1191.93 s (19 m 51 s)**, exit 0; `cd frontend && node --test
+test/*.test.js` → **93 passed, 0 failed**. CI (`regression`, "A9 contract boundary regression") on
+`f8eb3bb` (run `40373327494`) → **PASS**, 27 m 10 s, 2,138 tests, 0 failures.
 
 ### Status and next actions
 
@@ -2969,7 +2974,7 @@ unchanged: Paras 70 `DISCLOSED`, Jio 23 `DISCLOSED`, Vishal 136 `DISCLOSED` (Vis
   cells in blocks that print no control total stay unread by design; (3) 10 rows whose OCR digits do
   not close and 7 rows with no period — a higher-resolution block render would raise confidence, not
   relax the rule; (4) party names keep the filing's own spelling per block
-  (`MK.Jewellers` / `M.K.Jewellers`); (5) the comprehensive suites, deferred once.
+  (`MK.Jewellers` / `M.K.Jewellers`); (5) the comprehensive suites are done (2,138 + 93, above) and need no rerun unless code changes.
 
 - **Disposition: THE SCANNED RELATED-PARTY NOTE IS NOW READ FROM ITS PRINTED RULES (PRINTED ROWS,
   MERGED LABEL CELLS, VALUES BY BOX OVERLAP, EVERY ROW CLOSED AGAINST ITS OWN BALANCES, UNREAD
