@@ -48,9 +48,13 @@ def _extractor(pages: dict[int, str], page_count: int | None = None):
 
 
 def _by_key(extractions):
+    # Coverage records (`coverage.*`) carry a state string, not a transaction;
+    # they are asserted separately by the matrix-reader tests.
     out = {}
     for ex in extractions:
         v = ex.candidate_value
+        if not isinstance(v, dict):
+            continue
         out[(v["category"], v["counterparty"].lower(), v["period"])] = v
     return out
 
@@ -172,6 +176,8 @@ def test_vishal_note47_real_filing_extraction():
     assert total("purchase_of_goods", "FY2026") == 2427.54
     # Evidence quotes are verbatim substrings of the source pages.
     for ex in extractions:
+        if not isinstance(ex.candidate_value, dict):
+            continue  # coverage record
         assert ex.quote in extractor.extract_page_text(ex.candidate_value["page"])
 
 

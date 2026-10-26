@@ -2308,3 +2308,181 @@ instruction.
 | 3 | Paras Note 34 (pp. 416-420) remains unreadable; the RPT summary pp. 92-93 is the evidence in use (§23) | unchanged from the previous pass |
 | 4 | The 24-month window is anchored to the offer open date; filings whose open date is `[●]` at extraction time yield `PARTIAL` | accept the RHP date as an alternative anchor once it is captured as a canonical field |
 | 5 | Sector overlays, penalties and knockouts were not re-examined this pass | no defect observed; no change made |
+
+## 30. The related-party disclosure that was there all along — a period-matrix reader — 2026-10-26 (revision 17)
+
+### 30.1 The defect, stated exactly
+
+`SectionExtractor.extract_related_party_transactions` returned **zero extractions** on the
+Paras Healthcare RHP, so `governance.rpt_pct_revenue` was null, Module D `rpt` was UNKNOWN
+and knockout K6 was UNVERIFIED — on a filing that discloses related-party transactions in
+full, with amounts, on two adjacent pages.
+
+The earlier reading of this ("no anchor") was half right. Verified against the PDF:
+
+| Page | `_RPT_TRANSACTIONS_HEADER` finds the anchor? | What the reader then did |
+|---|---|---|
+| 92 (printed 87) | **yes** — the preamble reads "…the summary of transactions **with related parties** for three months ended June 30, 2026…" | collected the note, found **no** column header of the form "year ended 31 March YYYY", so `len(years) < 2` → returned `[]` |
+| 93 (printed 88) | no — continuation page, header repeated but no anchor phrase | never reached |
+| 419 (printed 414) | no — "Transactions **and balances** with related parties eliminated on consolidation" is not the anchor phrase | never reached |
+
+So the failure is the **column model**, not the search: the reader assumed three annual
+"31 March" amount columns under transaction-category headings. The filing discloses a
+**matrix**.
+
+### 30.2 The actual layout (read from the text layer, not assumed from the title)
+
+`SUMMARY OF RELATED PARTY TRANSACTIONS`, PDF pp. 92-93, unit line `(₹ in million)`,
+preamble naming the periods: *"for three months ended June 30, 2026 and June 30, 2025 along
+with Fiscals 2026, 2025 and 2024, as per the requirements under Ind AS 24"*.
+
+* **Ten numeric columns = five periods × (amount, "% revenue from operations")**:
+  3M Jun-2026, 3M Jun-2025, FY2026, FY2025, FY2024.
+* **Row = counterparty → nature of transaction → ten cells.** e.g.
+  `Dr. Dharminder Kumar Nagar | Short term employee benefits and Other long term benefits |
+  21.97 0.47% 13.44 0.36% 53.77 0.33% 53.77 0.42% 53.77 0.48%`.
+* The header is **wrapped vertically**, mid-word (`transactio`/`ns`, `Particular`/`s`,
+  `%-revenue` cells identical to the amount columns' width).
+* **17 transaction rows** (12 counterparties, 8 natures), and the note **continues onto
+  p. 93 with the whole header repeated**.
+* `-` cells are undisclosed (e.g. `Advance to key managerial person` is FY2026-only;
+  `Share based payment expenses` has 3M-Jun-2026 and FY2026 only).
+* **p. 94 is a different disclosure** — *"Please see below the balances as at end of the
+  period/year"*, with columns `% of total assets` — a balance is not a transaction.
+* Note 34 (pp. 416-420) repeats the transactions in a `Reporting entity | Nature |
+  Transacting party` layout whose numerals are glued in the text layer
+  (`57.94108.63`), so it is not a usable source.
+
+### 30.3 What was implemented (issuer-neutral, layout-driven)
+
+New reader in `engine/ipo_screening/extraction/sections.py`, tried **only when the
+category-header reader yields nothing**, so every issuer it already read is bit-for-bit
+unaffected:
+
+1. `extract_page_fragments` — the positioned text layer (`y`, `x`, text) per page, cached;
+   `None` when a page has no layer (distinct from blank).
+2. `_rpt_visual_lines` — fragments sharing a baseline (±2.5 pt) are one visual line,
+   ordered left to right.
+3. `_rpt_split_row` — the trailing numeric fragments are the amount cells. A number the text
+   layer splits at a kerning point (`0.` + `12`, `0.0` + `7` + `%`) is **one** cell: cell
+   tokens starting within 12 pt of each other are joined. Two columns are a column width
+   apart and never merge.
+4. **Column count from the anchor page only** — the width every amount row of *this* table
+   shares (a later table on a following page cannot redefine it; without this, R.K.
+   Fashion's revenue-bifurcation table on p. 63 hijacked p. 62's four-column summary).
+5. **Period columns from the table header** — the page lines above the first data row,
+   matched in disclosure order: `three|six|nine|twelve months (period) ended <date>`,
+   `stub period ended <date>`, `fiscal|financial year <year>`, `year ended <date>`
+   (day-first or month-first). Annual → `FY2026`; interim → `3M-2026-06-30` /
+   `INTERIM-2026-06-30`, so an interim column can never be mistaken for a financial year.
+   Repeated labels (each period is printed twice — once for the amount column, once inside
+   its "% revenue" column) collapse, and the trailing run that matches the amount columns is
+   used.
+6. **Label columns by position, roles by header word.** The counterparty and the nature sit
+   left of the first amount column; their x centres come from the rows themselves
+   (left-aligned cell text), and the header words (`parties`, `transacting`,
+   `nature`/`particulars`, `entity`/`reporting`) map roles to those centres — by each word's
+   x, or by its order when the whole header row is one fragment. The page heading is
+   excluded by distance, so it cannot claim a column.
+7. **Undisclosed is not zero** — `-` cells emit nothing.
+8. **The table ends where the balances begin** (`balances as at`, `outstanding balances`).
+9. **Control totals are not transactions** (`Sum of all related party transactions`,
+   `Revenue from Operations`, `% of revenue`) — R.K. Fashion's summary is exactly that, and
+   is reported as `PARTIAL`, not as data.
+10. **A nil statement is a verified nil** — "no related-party transactions were entered
+    into" → `VERIFIED_NIL`.
+11. Every value keeps its page, a **verbatim page line** as its quote (the positioned reading
+    is only used when no plain-text line matches), the disclosed unit, the disclosed revenue
+    share (`pct_revenue`) and the counterparty/nature as disclosed.
+
+A cell the *source* wraps mid-word is preserved with the wrap as a space
+(`Paras RE Facilities Manageme nt Private Limited`, `Dr. Dharminde r Kumar Nagar`). That is
+the filing's own line breaking; no speculative dictionary repair is applied to source text.
+
+### 30.4 Coverage, and how it is reported
+
+`coverage.governance.rpt_pct_revenue` is now emitted by the reader:
+
+| State | Meaning | Producers |
+|---|---|---|
+| `DISCLOSED` | the disclosure was read and its amount rows parsed | matrix reader (all rows mapped), category-header reader (its existing output, unchanged) |
+| `VERIFIED_NIL` | the filing states there were no related-party transactions | matrix reader, nil statement |
+| `PARTIAL` | located, not fully readable — rows of another width, an unmappable period header, aggregate-only totals | matrix reader |
+| *(absent)* | never seen — read as UNREAD by the contract (§25) | when no candidate page carries the disclosure |
+
+### 30.5 The metric boundary — why Paras still has no share, deliberately
+
+Paras's disclosure contains **no revenue-type category** under the approved numerator
+definition (Ramki, 2026-10-17: `sale_of_*` except `sale_of_ppe`, and job-work charges
+received). Its rows are employee benefits, post-employment benefits, share-based payment,
+retainers, directors' sitting fees, **rental income**, repairs/maintenance/power & fuel, and
+an advance to a KMP. Note 34 also prints "Revenue from sale of healthcare services (excluding
+applicable taxes)" against the subsidiaries, but as a related-party transaction without a
+debit/credit indicator, and the RHP's own summary does not carry it.
+
+Consequences, implemented and visible in the live canonical:
+
+* every row is extracted with its category slugged `unclassified` and retained as evidence
+  (70 values registered under `governance.related_party_transactions[i]`);
+* `rpt_pct_revenue` / `rpt_pct_of_revenue_growth` stay **null** — a **decision point, not a
+  defect**: treating "no revenue-type row disclosed" as a measured 0.0% would hand Module D
+  the full `<5%` band (3 points) and clear K6, on a document that calls itself a *summary*.
+  Per the standing instruction — never award points to a missing value without a documented,
+  defensible rule — the unknown is left unknown, and the coverage record now proves the
+  section *was* read, which is what was missing before. If Ramki decides that rental income,
+  or the note's "revenue from sale of healthcare services" row, belongs in the numerator, the
+  rule change is one definition (not a reader change), and the evidence to apply it is now
+  captured.
+
+One shared derivation change was required so that a matrix disclosure can feed the metric at
+all: `CanonicalInputBuilder._derive_rpt_metrics` now **skips** a non-financial-year period
+column (an interim `3M-…` column carries no annual share) instead of failing the whole
+derivation closed on it. An unconvertible **unit** or a non-numeric **amount** still fails
+closed, exactly as before.
+
+### 30.6 Cross-issuer validation (real filings, live extraction)
+
+| Issuer | RPT values | Coverage | Pages | Effect |
+|---|---|---|---|---|
+| Paras Healthcare | **70** (17 rows × disclosed cells) | `DISCLOSED` | 92-93 | section now read; metric unchanged (null — §30.5) |
+| Vishal Nirmiti | **136** (unchanged) | `DISCLOSED` | 387 | `rpt_pct_revenue` still `11.8418`, growth `-0.3703` — unchanged |
+| Jio Platforms | **23** (unchanged) | `DISCLOSED` | 376 | unchanged |
+| R.K. Fashion Accessories | 0 | `PARTIAL` | — | its summary prints **aggregate totals only**; reported as unread per-transaction, not as data |
+
+### 30.7 Score effects
+
+**None.** Paras: D `rpt` stays UNKNOWN and K6 UNVERIFIED (§30.5). Vishal and Jio keep their
+existing metric values; R.K. Fashion was already UNKNOWN on this criterion. No configuration,
+weight, threshold, band, penalty, knockout or criterion definition was touched, and no frozen
+core file was edited in this revision (pin unchanged at `7783dfeb…`).
+
+### 30.8 Verification — exact commands and results
+
+| Command | Result |
+|---|---|
+| `pytest tests/test_rpt_matrix_reader_20261026.py -q` | **14 passed** |
+| `pytest tests/test_rpt_extraction.py tests/test_rpt_matrix_reader_20261026.py tests/test_coverage_nil_vs_unread_20261026.py tests/test_directorate_events_20261026.py tests/test_post_issue_eps_provenance_20261026.py tests/test_suite_tiers.py -q` | **83 passed** |
+| `pytest tests/test_acceptance_matrix.py tests/test_vishal_golden.py tests/test_vishal_historical_reconciliation.py tests/test_rk_fashion_reconciliation.py -q` | **85 passed** |
+| `pytest tests/test_paras_evidence_regression.py tests/test_paras_extraction_gaps_20261024.py tests/test_paras_official_issue_page_terms.py tests/test_coverage_nil_vs_unread_20261026.py -q` | **91 passed** |
+| `pytest tests/test_rpt_extraction.py tests/test_coverage_nil_vs_unread_20261026.py -q` | **36 passed** |
+
+`tests/test_rpt_matrix_reader_20261026.py` covers: interim vs annual period labels; the
+kerning-split cell; a bare `%` fragment; header rows are not amount rows; aggregate labels
+are not transactions; an interim column cannot suppress the annual share; a disclosure with
+no revenue-type row leaves the share unknown (not zero); the real Paras rows (amounts,
+periods, counterparty/nature separation, disclosed shares, `-` cells, page bounds, verbatim
+quotes); and R.K. Fashion's aggregate-only summary → `PARTIAL`.
+
+`tests/test_rpt_extraction.py` was adjusted only to skip the new coverage record in its
+helpers (it carries a state string, not a transaction dict) — no expectation on the legacy
+reader changed.
+
+### 30.9 What is still open (supersedes §29 item 3)
+
+| # | Item | Next action |
+|---|---|---|
+| 1 | Paras Note 34 (pp. 416-420) remains unread: its numerals are glued in the text layer (`57.94108.63`) and its heading is "Related parties disclosures" | the RHP summary (pp. 92-93) is now read in full and is the evidence in use; reading Note 34 needs glyph-level position recovery, not a new rule |
+| 2 | R.K. Fashion's per-counterparty note (Note 31, printed p. 305) is read by neither reader; only its aggregate summary is located (`PARTIAL`) | next reader candidate: Note 31's layout on PDF pp. ~350+ |
+| 3 | R.K. Fashion and Jio share-history schedules still `PARTIAL` (§29 items 1-2) | unchanged from the previous pass |
+| 4 | The 24-month window still needs an RHP-date anchor when the offer open date is `[●]` (§29 item 4) | unchanged |
+| 5 | Whether rental income / related-party "revenue from sale of healthcare services" enters the Module D numerator | **decision for Ramki**; evidence is now extracted (§30.5) |

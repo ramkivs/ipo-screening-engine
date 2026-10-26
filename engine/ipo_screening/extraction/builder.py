@@ -731,10 +731,18 @@ class CanonicalInputBuilder:
         sums: Dict[int, float] = {}
         for txn in eligible:
             unit = txn.get("unit")
-            m = re.match(r"FY(20\d{2})$", str(txn.get("period") or ""))
             amount = txn.get("amount")
-            if unit not in self._RPT_UNIT_TO_RUPEES or not m or not isinstance(amount, (int, float)):
+            if unit not in self._RPT_UNIT_TO_RUPEES or not isinstance(amount, (int, float)):
                 return  # unconvertible/insufficient evidence: fail closed
+            m = re.match(r"FY(20\d{2})$", str(txn.get("period") or ""))
+            if m is None:
+                # A column that is not a financial year -- the interim "three
+                # months ended 30 June 2026" column of a period-matrix
+                # disclosure (report section 30) -- is a known period that
+                # carries no annual share.  It is skipped, not treated as an
+                # unknown period, so an interim column cannot suppress the
+                # annual share the note does disclose.
+                continue
             year = int(m.group(1))
             converted = amount * self._RPT_UNIT_TO_RUPEES[unit] / self._RPT_UNIT_TO_RUPEES[reporting_unit]
             sums[year] = sums.get(year, 0.0) + converted

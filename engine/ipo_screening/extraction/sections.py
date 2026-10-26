@@ -179,6 +179,9 @@ class SectionExtractor:
         # Nothing else changes -- the returned text and the shared cache behave
         # exactly as before, so no existing extraction result can move.
         self._page_status: Dict[int, str] = {}
+        # Positioned text layer per page, for the layout-driven readers
+        # (report section 30).  None == the page has no positioned text.
+        self._frag_cache: Dict[int, Optional[List[Tuple[float, float, str]]]] = {}
 
     def extract_page_text(self, page_1_indexed: int) -> str:
         """Extract text from a 1-indexed page with caching."""
@@ -1638,6 +1641,771 @@ class SectionExtractor:
     def extract_related_party_transactions(
         self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None
     ) -> List[RawExtraction]:
+        """Extract the related-party *transactions* disclosure.
+
+        Two layouts are read, in this order:
+
+        1. the category-header layout (transaction class as a heading, one row
+           per counterparty, three annual amount columns) -- the original
+           reader, unchanged, so every issuer it already read is unaffected;
+        2. the period-matrix layout (one row per counterparty *and* nature of
+           transaction, one column group per disclosed period, usually with a
+           paired "% of revenue" column) -- added in report section 30.
+
+        A failed search is never a zero.  The reader reports what it
+        established about the disclosure on
+        ``coverage.governance.rpt_pct_revenue``: DISCLOSED (read, values
+        supplied), VERIFIED_NIL (read: the disclosure is present with period
+        columns and carries no transaction row), PARTIAL (located but not
+        fully readable).  When no disclosure is found at all nothing is
+        claimed, and the coverage contract reads an unmentioned field as
+        UNREAD.
+
+        The scoring fields ``rpt_pct_revenue`` (Module D) and
+        ``rpt_pct_of_revenue_growth`` (K6) are still derived only in
+        ``CanonicalInputBuilder._derive_rpt_metrics``, under the approved
+        definitions (Ramki, 2026-10-17; see
+        docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md).
+        """
+        extractions = self._extract_related_party_category_table(page_ranges)
+        if extractions:
+            extractions.append(
+                self._rpt_coverage_extraction(
+                    extractions[0].page,
+                    "DISCLOSED",
+                    "the related-party transactions note was read as transaction-category "
+                    "headers; %d value(s) extracted" % len(extractions),
+                )
+            )
+            return extractions
+        matrix, state, note = self._extract_related_party_matrix_table(page_ranges)
+        if state is None:
+            return []
+        return matrix + [
+            self._rpt_coverage_extraction(
+                matrix[0].page if matrix else None, state, note
+            )
+        ]
+
+    def _rpt_coverage_extraction(
+        self, page: Optional[int], state: str, note: str
+    ) -> RawExtraction:
+        """Coverage record for the related-party transactions disclosure."""
+        return RawExtraction(
+            field_path="coverage.governance.rpt_pct_revenue",
+            candidate_value=state,
+            raw_text=note or state,
+            page=page,
+            section="Restated Financial Information",
+            locator="Related-party transactions coverage",
+            quote=note or None,
+            quote_is_processing=True,
+            extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+            extraction_confidence=0.9,
+        )
+
+    # ------------------------------------------------------------------
+    # Related-party transactions: period-matrix layout (report section 30)
+    # ------------------------------------------------------------------
+    #
+    # Some filings disclose related-party transactions as a matrix instead of
+    # as transaction-category headers over three annual columns: one row per
+    # (counterparty, nature of transaction), one column group per disclosed
+    # period -- including interim periods -- and, usually, a second column
+    # group per period carrying the amount as a share of revenue.  Paras
+    # Healthcare (RHP printed pp. 87-88 / PDF pp. 92-93) is such a filing:
+    # "SUMMARY OF RELATED PARTY TRANSACTIONS" over five periods (3M Jun-2026,
+    # 3M Jun-2025, FY2026, FY2025, FY2024), each period with an amount column
+    # and a "% revenue from operations" column.
+    #
+    # The category-header reader above finds no anchor there (its heading
+    # regex needs "transactions with related parties"), so a fully disclosed
+    # note looked unread.  The reader below is *layout*-driven, not
+    # title-driven: it reads the positioned text layer, groups fragments into
+    # visual lines, identifies the amount cells by the numeric shape of their
+    # text, derives the period columns from the table header, and takes the
+    # counterparty and the nature from the label columns to the left of the
+    # first amount column.  A cell the text layer wraps mid-word is preserved
+    # with the wrap as a space: no speculative repair is applied to source
+    # text.
+
+    _RPT_SUMMARY_HEADER = re.compile(
+        r"summary\s+of\s+related\s+part(?:y|ies)['’]?\s+transactions"
+        r"|related\s+part(?:y|ies)['’]?\s+disclosures"
+        r"|related\s+part(?:y|ies)\s+transactions",
+        re.IGNORECASE,
+    )
+
+    # One period column.  Interim periods are disclosed as "three months ended
+    # 30 June 2026" or "stub period ended June 30, 2026"; annual columns as
+    # "Fiscal 2026" or "year ended 31 March 2026" (day first or month first).
+    _RPT_PERIOD_LABEL = re.compile(
+        r"(?P<kind>three\s+months?|six\s+months?|nine\s+months?|twelve\s+months?|"
+        r"stub\s+period|period|fiscal\s+year|financial\s+year|fiscal|year)"
+        r"\s+(?:period\s+)?ended\s+"
+        r"(?:(?P<day>\d{1,2})\s+(?P<month>[A-Za-z]+)"
+        r"|(?P<month2>[A-Za-z]+)\s+(?P<day2>\d{1,2})),?\s*(?P<year>20\d{2})"
+        r"|(?:fiscal|financial\s+year)\s*,?\s*(?P<bareyear>20\d{2})",
+        re.IGNORECASE,
+    )
+
+    # A summary table can print aggregate control totals instead of rows per
+    # counterparty ("Sum of all related party transactions", "Revenue from
+    # Operations", "% of revenue").  Such a total is not a transaction and is
+    # never emitted as one.
+    # A positive statement that there are no related-party transactions is a
+    # verified nil, not a failed search.
+    _RPT_NIL_STATEMENT = re.compile(
+        r"no\s+(?:related[- ]party\s+)?transactions\s+(?:were\s+)?(?:entered\s+into\s+)?"
+        r"(?:with|undertaken|carried)",
+        re.IGNORECASE,
+    )
+
+    _RPT_AGGREGATE_LABEL = re.compile(
+        r"^(?:sum\s+of\s+all|total\b|grand\s+total|revenue\s+from\s+operations"
+        r"|turnover|%+\s*(?:of\s+)?revenue|net\s+revenue)",
+        re.IGNORECASE,
+    )
+
+    _RPT_BALANCES_HEADING = re.compile(
+        r"balances?\s+as\s+at|balances?\s+outstanding|outstanding\s+balances?",
+        re.IGNORECASE,
+    )
+
+    _RPT_MONTH_NUMBERS = {
+        "january": 1, "february": 2, "march": 3, "april": 4, "may": 5,
+        "june": 6, "july": 7, "august": 8, "september": 9, "october": 10,
+        "november": 11, "december": 12,
+    }
+
+    _RPT_UNIT_PATTERNS: Tuple[Tuple[str, str], ...] = (
+        (r"in\s+lakhs?\b", "INR_LAKHS"),
+        (r"in\s+crores?\b", "INR_CRORES"),
+        (r"in\s+millions?\b", "INR_MILLIONS"),
+        (r"in\s+billions?\b", "INR_BILLIONS"),
+    )
+
+    # A table cell holding an amount, a share or an undisclosed marker.  The
+    # text layer can split a number at a kerning point ("0." + "12"), and a
+    # bare "%" can be its own fragment, so a trailing dot and a lone percent
+    # are cell tokens too: they are only ever used to join neighbouring cells.
+    _RPT_CELL_TOKEN = re.compile(r"^(?:-|%|\d[\d,]*(?:\.\d*)?%?)$")
+
+    # Header words that name the label columns, in left-to-right order.
+    _RPT_PARTY_COLUMN_WORDS = re.compile(
+        r"\b(?:part(?:y|ies)|transacting|counterpart(?:y|ies))\b", re.IGNORECASE
+    )
+    _RPT_ENTITY_COLUMN_WORDS = re.compile(r"\b(?:entity|entities|reporting)\b", re.IGNORECASE)
+    _RPT_NATURE_COLUMN_WORDS = re.compile(
+        r"\b(?:nature|particulars?|description)\b", re.IGNORECASE
+    )
+
+    @classmethod
+    def _rpt_unit_from_text(cls, text: str) -> Optional[str]:
+        """The earliest unit declaration in ``text`` ("(₹ in million)")."""
+        best: Optional[Tuple[int, str]] = None
+        for pattern, unit in cls._RPT_UNIT_PATTERNS:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match and (best is None or match.start() < best[0]):
+                best = (match.start(), unit)
+        return best[1] if best else None
+
+    @classmethod
+    def _rpt_visual_lines(
+        cls, frags: Sequence[Tuple[float, float, str]]
+    ) -> List[Tuple[float, List[Tuple[float, str]]]]:
+        """Group positioned fragments into visual lines, top to bottom.
+
+        Fragments whose baseline is within 2.5 points share a line (a table
+        row's cells share a baseline); each line is ordered left to right.
+        """
+        lines: List[Tuple[float, List[Tuple[float, str]]]] = []
+        for y, x, text in sorted(frags, key=lambda f: (-f[0], f[1])):
+            if lines and abs(lines[-1][0] - y) <= 2.5:
+                lines[-1][1].append((x, text))
+            else:
+                lines.append((y, [(x, text)]))
+        for _, cells in lines:
+            cells.sort()
+        return lines
+
+    @classmethod
+    def _rpt_split_row(
+        cls, cells: Sequence[Tuple[float, str]]
+    ) -> Tuple[List[Tuple[float, str]], List[Tuple[float, str]]]:
+        """Split one visual line into (label fragments, amount cells).
+
+        The amount cells are the trailing numeric fragments.  A number the
+        text layer splits at a kerning point ("0." + "12") is one cell: the
+        two fragments start within a few points of each other, while two
+        amount columns are a column width apart.
+        """
+        merged: List[List[Any]] = []  # [cell start x, cell text, last fragment x]
+        for x, text in cells:
+            if (
+                merged
+                and cls._RPT_CELL_TOKEN.match(text)
+                and cls._RPT_CELL_TOKEN.match(merged[-1][1])
+                and x - merged[-1][2] < 12.0
+            ):
+                merged[-1][1] = merged[-1][1] + text
+                merged[-1][2] = x
+            else:
+                merged.append([x, text, x])
+        cut = len(merged)
+        while cut and cls._RPT_CELL_TOKEN.match(merged[cut - 1][1]):
+            cut -= 1
+        returning = [(cell[0], cell[1]) for cell in merged]
+        return returning[:cut], returning[cut:]
+
+    @staticmethod
+    def _rpt_is_amount_row(tokens: Sequence[str]) -> bool:
+        """True for a row of amounts, false for a header row of dates/years.
+
+        A header row carries bare years ("2026") and the odd "%" fragment; an
+        amount row carries a decimal figure or a share of revenue.
+        """
+        return any(
+            ("." in token or token.endswith("%")) and any(ch.isdigit() for ch in token)
+            for token in tokens
+        )
+
+    def extract_page_fragments(
+        self, page_1_indexed: int
+    ) -> Optional[List[Tuple[float, float, str]]]:
+        """Positioned text fragments ``(y, x, text)`` for one page.
+
+        ``None`` means the page has no usable positioned text layer, which is
+        distinct from a page that was read and is blank.  A page whose text
+        extraction raises is treated as having no layer rather than crashing
+        the reader.
+        """
+        cache = getattr(self, "_frag_cache", None)
+        if cache is None:
+            cache = {}
+            self._frag_cache = cache
+        if page_1_indexed in cache:
+            return cache[page_1_indexed]
+        frags: Optional[List[Tuple[float, float, str]]] = None
+        reader = getattr(self, "reader", None)
+        if reader is not None and 1 <= page_1_indexed <= self.page_count:
+            collected: List[Tuple[float, float, str]] = []
+
+            def visit(text, cm, tm, font_dict, font_size):
+                chunk = (text or "").strip()
+                if not chunk:
+                    return
+                try:
+                    x = tm[4] * cm[0] + tm[5] * cm[2] + cm[4]
+                    y = tm[4] * cm[1] + tm[5] * cm[3] + cm[5]
+                except (IndexError, TypeError):
+                    return
+                collected.append((float(y), float(x), chunk))
+
+            try:
+                reader.pages[page_1_indexed - 1].extract_text(visitor_text=visit)
+            except Exception:
+                collected = []
+            frags = collected or None
+        cache[page_1_indexed] = frags
+        return frags
+
+    @classmethod
+    def _rpt_period_label(cls, match: "re.Match") -> Optional[str]:
+        """Canonical period label for one header match.
+
+        Annual columns keep the ``FY<year>`` form the metric definitions use;
+        an interim column is labelled with its length and end date
+        (``3M-2026-06-30``) so it can never be mistaken for a financial year.
+        """
+        if match.group("bareyear"):
+            return "FY%d" % int(match.group("bareyear"))
+        kind = (match.group("kind") or "").lower()
+        try:
+            year = int(match.group("year"))
+            day = int(match.group("day") or match.group("day2"))
+        except (TypeError, ValueError):
+            return None
+        month = cls._RPT_MONTH_NUMBERS.get(
+            (match.group("month") or match.group("month2") or "").lower()
+        )
+        if month is None:
+            return None
+        months = {"three": 3, "six": 6, "nine": 9, "twelve": 12}.get(kind.split()[0])
+        if months is not None:
+            return "%dM-%04d-%02d-%02d" % (months, year, month, day)
+        if "year" in kind or kind == "fiscal":
+            return "FY%d" % year
+        # "period ended <date>" / "stub period ended <date>": an interim column
+        # whose length the header does not state.
+        return "INTERIM-%04d-%02d-%02d" % (year, month, day)
+
+    def _rpt_header_band(
+        self, anchor_page: int, first_amount_cells: Sequence[Tuple[float, str]]
+    ) -> str:
+        """Text of the page lines above the table's first data row.
+
+        The data row is located by its own amount tokens, so the band is the
+        header of *this* table and not of some other table on the page.
+        """
+        tokens = [text for _, text in first_amount_cells]
+        lines = self.extract_page_text(anchor_page).splitlines()
+        for idx, line in enumerate(lines):
+            parts = line.split()
+            if not parts:
+                continue
+            if parts[-len(tokens):] == tokens:
+                return "\n".join(lines[:idx])
+        return ""
+
+    def _rpt_periods_from_text(self, text: str) -> List[str]:
+        """Period labels in disclosure order, repeated labels collapsed.
+
+        A summary table prints each period twice -- once as the amount column,
+        once inside its "% revenue" column -- and the preamble can name the
+        same periods again, so adjacent duplicates are collapsed and callers
+        take the trailing run that matches the amount columns.
+        """
+        periods: List[str] = []
+        for match in self._RPT_PERIOD_LABEL.finditer(text):
+            label = self._rpt_period_label(match)
+            if label and (not periods or periods[-1] != label):
+                periods.append(label)
+        return periods
+
+    _RPT_ROLE_WORDS = re.compile(
+        r"nature|particulars?|description|part(?:y|ies)|transacting|"
+        r"counterpart(?:y|ies)|entit(?:y|ies)|reporting",
+        re.IGNORECASE,
+    )
+
+    def _rpt_role_occurrences(
+        self, header_lines: Sequence[Tuple[float, List[Tuple[float, str]]]]
+    ) -> List[Tuple[float, str]]:
+        """``(x, role)`` for every label-column word in the table header.
+
+        Only short header fragments are considered: a wrapped paragraph (the
+        preamble above the table) can name "related parties" without naming a
+        column.  Roles inside one fragment keep their text order, which is
+        left-to-right when a whole header row is a single fragment.
+        """
+        found: List[Tuple[float, str]] = []
+        for _, cells in header_lines:
+            for x, text in cells:
+                if len(text) > 40:
+                    continue
+                for match in self._RPT_ROLE_WORDS.finditer(text):
+                    word = match.group(0).lower()
+                    if word.startswith(("nature", "particular", "description")):
+                        role = "nature"
+                    elif word.startswith(("entit", "reporting")):
+                        role = "entity"
+                    else:
+                        role = "party"
+                    found.append((x, role))
+        return found
+
+    def _rpt_role_columns(
+        self,
+        header_lines: Sequence[Tuple[float, List[Tuple[float, str]]]],
+        centre_values: Sequence[float],
+    ) -> Dict[str, float]:
+        """Map label-column roles ("party", "nature", "entity") to x centres.
+
+        Two header shapes occur: each column header is its own fragment (the
+        role sits at the column's x), or the whole header row is one fragment
+        ("Reporting entity  Nature  Transacting party") and the roles are
+        ordered by their position in the text.  Both reduce to the same
+        left-to-right order; nothing is mapped when the counts disagree.
+        """
+        occurrences = self._rpt_role_occurrences(header_lines)
+        if not occurrences or not centre_values:
+            return {}
+        # A heading ("SUMMARY OF RELATED PARTY TRANSACTIONS") also names a
+        # role, but it sits away from every label column: keep only header
+        # words that fall inside the label zone the rows establish.
+        spacing = (
+            min(b - a for a, b in zip(centre_values, centre_values[1:]))
+            if len(centre_values) > 1
+            else 40.0
+        )
+        tolerance = max(20.0, spacing / 2.0)
+        occurrences = [
+            (x, role)
+            for x, role in occurrences
+            if min(abs(x - centre) for centre in centre_values) <= tolerance
+        ]
+        if not occurrences:
+            return {}
+        distinct_x = sorted({round(x) for x, _ in occurrences})
+        role_centres: Dict[str, float] = {}
+        if len(distinct_x) == len(centre_values):
+            for x, role in occurrences:
+                nearest = min(
+                    range(len(centre_values)),
+                    key=lambda i: abs(centre_values[i] - x),
+                )
+                role_centres.setdefault(role, centre_values[nearest])
+            return role_centres
+        ordered: List[str] = []
+        for _, role in occurrences:
+            if not ordered or ordered[-1] != role:
+                ordered.append(role)
+        if len(ordered) == len(centre_values):
+            for role, centre in zip(ordered, centre_values):
+                role_centres.setdefault(role, centre)
+        return role_centres
+
+    def _extract_related_party_matrix_table(
+        self, page_ranges: Optional[Dict[str, Tuple[int, int]]]
+    ) -> Tuple[List[RawExtraction], Optional[str], str]:
+        """Read a period-matrix related-party transactions table.
+
+        Returns ``(extractions, coverage_state, note)``.  ``coverage_state`` is
+        ``None`` when no such table was found -- nothing is claimed about a
+        section that was never seen -- and otherwise ``DISCLOSED`` (every
+        amount row read), ``PARTIAL`` (a row or a column could not be mapped)
+        or ``VERIFIED_NIL`` (the disclosure is present with period columns and
+        carries no transaction row).
+        """
+        ordered: List[int] = []
+        summary_range = (page_ranges or {}).get("related_party")
+        if summary_range:
+            ordered.extend(
+                range(summary_range[0], min(summary_range[1], self.page_count) + 1)
+            )
+        ordered.extend(p for p in range(1, self.page_count + 1) if p not in ordered)
+
+        candidates: List[int] = []
+        for p in ordered:
+            if len(candidates) >= 12:
+                break
+            text = self.extract_page_text(p)
+            if not self._RPT_SUMMARY_HEADER.search(text):
+                continue
+            # A contents line or a risk-factor paragraph names the section
+            # without carrying its table; a table page declares its period
+            # columns.  Requiring both keeps prose out of the candidate set.
+            if len(self._rpt_periods_from_text(text)) < 2:
+                continue
+            if p not in candidates:
+                candidates.append(p)
+        if not candidates:
+            return [], None, ""
+
+        best: Tuple[int, List[RawExtraction], Optional[str], str] = (0, [], None, "")
+        fallback: Optional[Tuple[List[RawExtraction], str, str]] = None
+        for p in candidates:
+            extractions, state, note = self._rpt_matrix_table_at(p)
+            if state is None:
+                continue
+            if fallback is None:
+                fallback = (extractions, state, note)
+            if extractions and state == "DISCLOSED":
+                return extractions, state, note
+            if len(extractions) > best[0]:
+                best = (len(extractions), extractions, state, note)
+        if best[0]:
+            return best[1], best[2], best[3]
+        if fallback is not None:
+            return fallback
+        return [], None, ""
+
+    def _rpt_matrix_table_at(
+        self, anchor_page: int
+    ) -> Tuple[List[RawExtraction], Optional[str], str]:
+        """Read one period-matrix table starting at ``anchor_page``."""
+        layouts: List[Tuple[int, List[Tuple[float, List[Tuple[float, str]], List[Tuple[float, str]]]]]] = []
+        n_cols: Optional[int] = None
+        for p in range(anchor_page, min(anchor_page + 2, self.page_count) + 1):
+            if p > anchor_page and self._RPT_BALANCES_HEADING.search(
+                self.extract_page_text(p)[:600]
+            ):
+                # The transactions disclosure and the outstanding-balances
+                # disclosure are different tables: a balance is not a
+                # transaction, so the table ends where the balances begin.
+                break
+            frags = self.extract_page_fragments(p)
+            if not frags:
+                break
+            parsed = []
+            for y, cells in self._rpt_visual_lines(frags):
+                label, amounts = self._rpt_split_row(cells)
+                parsed.append((y, label, amounts))
+            if p == anchor_page:
+                # The table's column count is the width of its own amount rows,
+                # taken on the page it starts on so a different table further
+                # down the note cannot redefine it.
+                widths: Dict[int, int] = {}
+                for _, _, amounts in parsed:
+                    tokens = [text for _, text in amounts]
+                    if len(tokens) >= 2 and self._rpt_is_amount_row(tokens):
+                        widths[len(tokens)] = widths.get(len(tokens), 0) + 1
+                if not widths:
+                    page_text = self.extract_page_text(anchor_page)
+                    if self._RPT_NIL_STATEMENT.search(page_text):
+                        return [], "VERIFIED_NIL", (
+                            "the filing states that no related-party transactions were "
+                            "entered into"
+                        )
+                    # A heading without a table is not evidence about the
+                    # disclosure: claim nothing.
+                    return [], None, ""
+                n_cols = max(widths.items(), key=lambda item: (item[1], item[0]))[0]
+                if widths[n_cols] < 2:
+                    return [], "PARTIAL", (
+                        "a related-party transactions table was located but its rows do "
+                        "not share a column layout, so no amount can be attributed to a "
+                        "period"
+                    )
+            elif not any(len(amounts) == n_cols for _, _, amounts in parsed):
+                # No row of this table's shape on the page: the table ended.
+                break
+            layouts.append((p, parsed))
+        if not layouts or n_cols is None:
+            return [], "PARTIAL", (
+                "the related-party transactions page has no positioned text layer"
+            )
+
+        data_rows: List[Tuple[int, int, float, List[Tuple[float, str]], List[Tuple[float, str]]]] = []
+        skipped = 0
+        for p, parsed in layouts:
+            for idx, (y, label, amounts) in enumerate(parsed):
+                tokens = [text for _, text in amounts]
+                if len(tokens) < 2 or not self._rpt_is_amount_row(tokens):
+                    continue
+                if len(tokens) != n_cols:
+                    skipped += 1
+                    continue
+                data_rows.append((p, idx, y, label, amounts))
+        if not data_rows:
+            return [], "PARTIAL", (
+                "a related-party transactions table was located but no complete amount "
+                "row could be read from it"
+            )
+
+        # Which columns are shares of revenue, which are amounts.
+        pct_columns: List[bool] = []
+        for i in range(n_cols):
+            values = [row[4][i][1] for row in data_rows]
+            has_pct = any(value.endswith("%") for value in values)
+            has_amount = any(not value.endswith("%") and value != "-" for value in values)
+            pct_columns.append(has_pct and not has_amount)
+            if has_pct and has_amount:
+                return [], "PARTIAL", (
+                    "a related-party transactions column mixes amounts and revenue "
+                    "shares, so its values cannot be attributed to a period"
+                )
+        amount_columns = [i for i in range(n_cols) if not pct_columns[i]]
+        if len(amount_columns) < 2:
+            return [], "PARTIAL", (
+                "the related-party transactions table discloses fewer than two amount "
+                "columns, so no share of revenue can be computed from it"
+            )
+
+        header_text = self._rpt_header_band(anchor_page, data_rows[0][4])
+        periods = self._rpt_periods_from_text(header_text)
+        if len(periods) < len(amount_columns):
+            return [], "PARTIAL", (
+                "the period columns of the related-party transactions table could not be "
+                "mapped to the periods the header discloses"
+            )
+        periods = periods[-len(amount_columns):]
+        period_by_column: Dict[int, Optional[str]] = {}
+        last_period: Optional[str] = None
+        next_period = 0
+        for i in range(n_cols):
+            if pct_columns[i]:
+                period_by_column[i] = last_period
+            else:
+                last_period = periods[next_period]
+                next_period += 1
+                period_by_column[i] = last_period
+
+        unit = self._rpt_unit_from_text(header_text)
+        if unit is None:
+            unit = self._rpt_unit_from_text(self.extract_page_text(anchor_page)[:600])
+        if unit is None:
+            for p in range(max(1, anchor_page - 60), anchor_page):
+                unit = self._rpt_unit_from_text(self.extract_page_text(p)[:400])
+                if unit:
+                    break
+
+        # Label columns: the counterparty and the nature of the transaction sit
+        # left of the first amount column.  Their x positions come from the
+        # rows themselves (left-aligned cell text), their roles from the header.
+        left_bound = min(x for row in data_rows for x, _ in row[4])
+        blocks: Dict[Tuple[int, float], List[Tuple[float, str]]] = {}
+        positions: Dict[int, int] = {}
+        for p, parsed in layouts:
+            row_indices = [
+                idx for idx, (_, _, amounts) in enumerate(parsed) if len(amounts) == n_cols
+            ]
+            for k, idx in enumerate(row_indices):
+                end = row_indices[k + 1] if k + 1 < len(row_indices) else len(parsed)
+                frags = [
+                    (x, text)
+                    for _, label, _ in parsed[idx:end]
+                    for x, text in label
+                    if x < left_bound
+                ]
+                blocks[(p, parsed[idx][0])] = frags
+                for x, _ in frags:
+                    positions[round(x)] = positions.get(round(x), 0) + 1
+        centres: List[List[float]] = []
+        for x in sorted(x for x, count in positions.items() if count >= 2):
+            if centres and x - centres[-1][-1] <= 8:
+                centres[-1].append(x)
+            else:
+                centres.append([x])
+        centre_values = [sum(group) / len(group) for group in centres]
+
+        header_lines = [
+            (y, cells)
+            for y, cells in self._rpt_visual_lines(self.extract_page_fragments(anchor_page) or [])
+            if y > data_rows[0][2]
+        ]
+        role_centres = self._rpt_role_columns(header_lines, centre_values)
+
+        def role_of(x: float) -> Optional[str]:
+            if not role_centres:
+                return None
+            return min(role_centres, key=lambda role: abs(role_centres[role] - x))
+
+        # The plain-text page line for a row is its verbatim source quotation;
+        # the positioned reading is a reconstruction and is used only when no
+        # line matches the row's tokens exactly.
+        plain_lines = {
+            p: self.extract_page_text(p).splitlines() for p in {row[0] for row in data_rows}
+        }
+
+        def quote_for(page: int, tokens: Sequence[str], fallback: str) -> Tuple[str, bool]:
+            for line in plain_lines.get(page, []):
+                if line.split()[-len(tokens):] == list(tokens):
+                    return line, True
+            return fallback, False
+
+        transactions: List[Dict[str, Any]] = []
+        seen = set()
+        malformed = False
+        aggregates = 0
+        for page, _, y, label, amounts in data_rows:
+            frags = blocks.get((page, y), [])
+            party_parts: List[str] = []
+            nature_parts: List[str] = []
+            for x, text in frags:
+                cleaned = re.sub(r"(?:\s+-?\d[\d,]*(?:\.\d+)?%?)+$", "", text).strip()
+                if not cleaned:
+                    continue
+                role = role_of(x)
+                if role == "nature":
+                    nature_parts.append(cleaned)
+                elif role in (None, "party"):
+                    party_parts.append(cleaned)
+                # A "Reporting entity" column names the group entity whose
+                # books carry the transaction, not the counterparty; it is
+                # kept out of the counterparty field rather than mixed into it.
+            party_text = " ".join(" ".join(party_parts).split()).strip(" .")
+            nature_text = " ".join(" ".join(nature_parts).split()).strip(" .")
+            full_label = " ".join(
+                " ".join(text for _, text in frags).split()
+            ).strip(" .")
+            key_label = nature_text or full_label
+            if not key_label:
+                continue
+            if self._RPT_AGGREGATE_LABEL.match(key_label):
+                # A control total is not a transaction.
+                aggregates += 1
+                continue
+            match = self._rpt_category_match(self._rpt_norm(key_label))
+            category = match[0] if match else "unclassified"
+            category_label = match[1] if match else key_label
+            counterparty = party_text or full_label
+            quote, verbatim = quote_for(page, [text for _, text in amounts], full_label)
+            for i in amount_columns:
+                token = amounts[i][1]
+                if token == "-" or token.endswith("%"):
+                    continue  # undisclosed cell: not zero, and not emitted
+                try:
+                    amount = float(token.replace(",", ""))
+                except ValueError:
+                    malformed = True
+                    continue
+                period = period_by_column.get(i)
+                if period is None:
+                    malformed = True
+                    continue
+                pct_value: Optional[float] = None
+                for j in range(n_cols):
+                    if pct_columns[j] and period_by_column.get(j) == period:
+                        cell = amounts[j][1]
+                        if cell.endswith("%"):
+                            try:
+                                pct_value = float(cell.rstrip("%").replace(",", ""))
+                            except ValueError:
+                                pct_value = None
+                        break
+                dedupe = (counterparty.lower(), key_label.lower(), period)
+                if dedupe in seen:
+                    continue
+                seen.add(dedupe)
+                value: Dict[str, Any] = {
+                    "category": category,
+                    "category_label": category_label,
+                    "counterparty": counterparty,
+                    "period": period,
+                    "amount": amount,
+                    "unit": unit,
+                    "page": page,
+                }
+                if pct_value is not None:
+                    value["pct_revenue"] = pct_value
+                value["_quote"] = quote
+                value["_quote_is_source"] = verbatim
+                transactions.append(value)
+
+        extractions: List[RawExtraction] = []
+        for idx, txn in enumerate(transactions):
+            value = dict(txn)
+            page = value["page"]
+            quote = value.pop("_quote", None)
+            verbatim = value.pop("_quote_is_source", False)
+            extractions.append(
+                RawExtraction(
+                    field_path="governance.related_party_transactions[%d]" % idx,
+                    candidate_value=value,
+                    raw_text=quote,
+                    page=page,
+                    section="Our Business" if page < 200 else "Restated Financial Information",
+                    locator="Related Party Transactions — %s — %s — %s"
+                    % (value["category_label"], value["counterparty"], value["period"]),
+                    quote=quote,
+                    quote_is_processing=not verbatim,
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.85,
+                )
+            )
+        if not transactions and aggregates:
+            return [], "PARTIAL", (
+                "the related-party summary discloses aggregate control totals "
+                "(%d row(s)) and no per-counterparty transaction row" % aggregates
+            )
+        if not transactions:
+            return [], "PARTIAL", (
+                "the related-party transactions table was located but discloses no "
+                "amount that could be attributed to a counterparty and a period"
+            )
+        state = "DISCLOSED" if not (skipped or malformed) else "PARTIAL"
+        note = (
+            "%d related-party transaction value(s) read from a period-matrix disclosure "
+            "(%s); %d row(s) could not be mapped"
+            % (len(transactions), unit or "unit undisclosed", skipped)
+        )
+        return extractions, state, note
+
+    def _extract_related_party_category_table(
+        self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None
+    ) -> List[RawExtraction]:
         """Extract the related-party *transactions* table from the filing.
 
         Generic and deterministic: locates the "Transactions with related
@@ -1666,11 +2434,11 @@ class SectionExtractor:
         two audited years.  This docstring previously said those definitions
         did not exist; they do, and the note is corrected here (report §24).
 
-        A filing whose note is headed only "Related parties disclosures" /
-        "Summary of related party transactions and balances" (Paras
-        Healthcare, pp. 416-420) still yields nothing: no anchor is found, so
-        ``rpt_pct_revenue`` stays null.  That is a reader gap, not a missing
-        metric definition.
+        This reader only handles the category-header layout.  A filing whose
+        disclosure is a period matrix ("Summary of related party
+        transactions", Paras Healthcare pp. 92-93) yields nothing here; the
+        public ``extract_related_party_transactions`` then falls through to the
+        period-matrix reader added in report section 30.
         """
         fin_range = page_ranges.get("restated_financials") if page_ranges else None
         scan = range(fin_range[0], fin_range[1] + 1) if fin_range else range(1, self.page_count + 1)

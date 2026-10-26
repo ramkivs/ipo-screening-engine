@@ -2600,3 +2600,119 @@ frontend suites were deliberately not run.
   LAKH-ASSUMPTION FORM OF 32.63 AND FLAGGED UNRESOLVED WITHOUT BEING OVERWRITTEN; VISHAL
   GOLDEN HASH UNCHANGED, FROZEN-CORE PIN RE-SET WITH A REASON; NO CONFIG, WEIGHT, THRESHOLD,
   PENALTY OR KNOCKOUT CHANGE; PR #12 OPEN AND UNMERGED.**
+
+## Revision 26 — the related-party disclosure that was there all along (period-matrix reader)
+
+— 2026-10-26
+
+**Scope: one shared reader gap closed — the related-party transactions disclosure that is
+laid out as a period matrix rather than as transaction-category headings. No scoring weight,
+threshold, penalty, knockout, bucket boundary or criterion definition was changed, no
+configuration was touched, no frozen-core file was edited, and no issuer name appears in any
+engine path.** Branch `arena/79aac867-ipo-screening-engine`, PR **#12** (base `main`), left
+**OPEN**. Full account: §30 of `docs/investigation/PARAS-INGESTION-FAILURE-2026-10-23.md`.
+
+### What was wrong, and where
+
+`SectionExtractor.extract_related_party_transactions` returned **zero extractions** on the
+Paras Healthcare RHP. Re-verified against the PDF, the root cause is the **column model**,
+not the search: the reader *did* anchor on the summary page (the preamble reads
+"…transactions **with related parties**…"), then required at least two column headers of the
+form "year ended 31 March YYYY" and found none — the table's columns are
+*three months ended 30 June 2026 / 30 June 2025* and *Fiscal 2026 / 2025 / 2024* — so it
+returned nothing. The disclosure was therefore indistinguishable from an unread section:
+`rpt_pct_revenue` null, Module D `rpt` UNKNOWN, K6 UNVERIFIED.
+
+### The layout actually disclosed (read, not assumed from the title)
+
+`SUMMARY OF RELATED PARTY TRANSACTIONS`, PDF pp. 92-93 (printed 87-88), `(₹ in million)`:
+**ten numeric columns = five periods × (amount, "% revenue from operations")**, one row per
+(counterparty, nature of transaction), 17 transaction rows, header repeated on the
+continuation page, `-` for undisclosed cells. PDF p. 94 is the separate
+*outstanding balances* disclosure (`% of total assets`), and Note 34 (pp. 416-420) repeats
+the transactions in a three-label-column layout whose numerals are glued in the text layer.
+
+### What was implemented
+
+A layout-driven reader, tried **only when the category-header reader yields nothing** (so
+every issuer it already read is unaffected): positioned text fragments → visual lines →
+trailing numeric cells (with kerning-split numbers re-joined) → **column count taken from the
+anchor page only** → **period columns from the table header** (`three months ended …`,
+`stub period ended …`, `Fiscal 2026`, `year ended 31 March …`, day- or month-first; annual →
+`FY2026`, interim → `3M-2026-06-30`) → **label columns by position, roles by header word**
+(counterparty / nature / reporting entity) → verbatim page-line quotes, disclosed unit and
+disclosed revenue share per value. Undisclosed cells emit nothing; the table stops where the
+**balances** disclosure begins; **aggregate control totals** ("Sum of all related party
+transactions", "Revenue from Operations", "% of revenue") are never emitted as transactions;
+a **nil statement** is a verified nil.
+
+**Coverage** is now recorded for this section on
+`coverage.governance.rpt_pct_revenue`: `DISCLOSED` (read, values supplied — both readers),
+`VERIFIED_NIL` (the filing states there were none), `PARTIAL` (located but not fully
+readable — rows of another width, unmappable period header, aggregate-only summary), and
+absent = `UNREAD` per the §25 contract.
+
+**One shared derivation change** was required for a matrix disclosure to reach the metric at
+all: `_derive_rpt_metrics` now **skips** a period column that is not a financial year (an
+interim `3M-…` column carries no annual share) instead of failing the whole derivation
+closed. An unconvertible unit or a non-numeric amount still fails closed.
+
+### Cross-issuer validation (real filings, live extraction)
+
+| Issuer | RPT values | `coverage.governance.rpt_pct_revenue` | Effect |
+|---|---|---|---|
+| Paras Healthcare | **70** (17 rows × disclosed cells) | `DISCLOSED` (pp. 92-93) | section now read; metric unchanged (null — see below) |
+| Vishal Nirmiti | **136** (unchanged) | `DISCLOSED` (p. 387) | `rpt_pct_revenue` `11.8418`, growth `-0.3703` — unchanged |
+| Jio Platforms | **23** (unchanged) | `DISCLOSED` (p. 376) | unchanged |
+| R.K. Fashion Accessories | 0 | `PARTIAL` | its summary prints aggregate totals only; reported as unread per-transaction, not as data |
+
+### Score effects
+
+**None.** No artifact's score moved. Paras keeps D `rpt` UNKNOWN and K6 UNVERIFIED, because
+its disclosure contains **no revenue-type category** under the approved numerator definition
+(sales/services, job-work received): its rows are employee benefits, post-employment
+benefits, share-based payment, retainers, directors' sitting fees, rental income,
+repairs/maintenance/power & fuel and an advance to a KMP. Treating "no revenue-type row
+disclosed" as a measured 0.0% would award the full `<5%` band (3 points) and clear K6 on a
+document that calls itself a *summary*; per the standing rule that points are never awarded to
+a missing value without a documented defensible rule, the share stays **unknown while the
+coverage record proves the section was read**. The 70 values are retained as evidence, so the
+alternative (if Ramki decides rental income or the note's "revenue from sale of healthcare
+services" belongs in the numerator) is a one-line definition change, not a reader change.
+
+### Verification (focused suites only; exact commands in §30.8 of the investigation)
+
+`pytest tests/test_rpt_matrix_reader_20261026.py -q` → **14 passed** (new module);
+`… test_rpt_extraction.py … test_coverage_nil_vs_unread_20261026.py …
+test_directorate_events_20261026.py … test_post_issue_eps_provenance_20261026.py …
+test_suite_tiers.py -q` → **83 passed**; `test_acceptance_matrix.py test_vishal_golden.py
+test_vishal_historical_reconciliation.py test_rk_fashion_reconciliation.py -q` → **85
+passed**; `test_paras_evidence_regression.py test_paras_extraction_gaps_20261024.py
+test_paras_official_issue_page_terms.py test_coverage_nil_vs_unread_20261026.py -q` → **91
+passed**. `tests/test_rpt_extraction.py` was adjusted only so its helpers skip the new
+coverage record; no expectation on the legacy reader changed. The full backend, regression
+and frontend suites were deliberately not run.
+
+### Status and next actions
+
+- Readiness: **NOT ESTABLISHED**. Required-term gate: **CLOSED**. PR **#12 OPEN**, not
+  merged, not claimed closed.
+- Remaining, in order: (1) **R.K. Fashion Note 31** (printed p. 305) — its per-counterparty
+  transactions are read by neither reader, only its aggregate summary is located
+  (`PARTIAL`); (2) Paras Note 34 (pp. 416-420) needs glyph-level position recovery — the
+  summary pp. 92-93 is now read in full and is the evidence in use; (3) R.K. Fashion's and
+  Jio's share-history schedules are still `PARTIAL`; (4) the 24-month window still needs an
+  RHP-date anchor when the offer open date is `[●]`; (5) **decision for Ramki**: whether
+  rental income / related-party "revenue from sale of healthcare services" enters the
+  Module D numerator.
+- A32 remains **"IMPLEMENTED 2026-10-26; FULL BACKEND SUITE EXECUTED; READY FOR RAMKI
+  RATIFICATION (NOT RATIFIED)"**; nothing in this revision ratifies it.
+
+- **Disposition: A FULLY DISCLOSED RELATED-PARTY TRANSACTIONS NOTE IS NO LONGER REPORTED AS
+  AN UNREAD ONE — THE PERIOD-MATRIX LAYOUT IS READ (COUNTERPARTY, NATURE, DISCLOSED PERIOD,
+  AMOUNT, DISCLOSED REVENUE SHARE, VERBATIM QUOTE), THE BALANCES TABLE AND CONTROL TOTALS ARE
+  NEVER READ AS TRANSACTIONS, A `-` CELL IS NEVER ZERO, AND COVERAGE RECORDS
+  `DISCLOSED | VERIFIED_NIL | PARTIAL` (ABSENT = `UNREAD`) FOR THE SECTION; THE MODULE D / K6
+  SHARE REMAINS UNKNOWN WHERE THE DISCLOSURE CARRIES NO REVENUE-TYPE CATEGORY, AS A RECORDED
+  DECISION RATHER THAN A FABRICATED ZERO; NO CONFIG, WEIGHT, THRESHOLD, PENALTY, KNOCKOUT OR
+  FROZEN-CORE FILE CHANGED; PR #12 OPEN AND UNMERGED.**
