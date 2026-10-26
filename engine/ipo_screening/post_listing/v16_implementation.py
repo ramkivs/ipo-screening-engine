@@ -67,7 +67,13 @@ FROZEN_CORE_HASHES: Dict[str, str] = {
     # price_band_notice.py.  verify_golden_result() is unchanged and still
     # reproduces e84f8bc0... exactly, so scoring output is independently
     # protected.
-    "engine/ipo_screening/derived.py": "a9e4e5da884f8228f79be9d7ff3f3c3def11dc97327e7d778103cf5f9e05d359",
+    # Report section 25 (2026-10-26): `pre_ipo_placement_bucket` no longer
+    # awards `none_or_near_ipo` to a section the extractor never read.  When the
+    # canonical record carries a coverage map and it does not establish the
+    # share-capital history, the bucket is UNKNOWN; a legacy record with no
+    # coverage map keeps the previous behaviour, so published results and the
+    # golden hash are unchanged.
+    "engine/ipo_screening/derived.py": "7783dfeb2cae2d68083fef5ebd6dde8567ad110b53253a4c8fe5516a70ce1f2c",
     "engine/ipo_screening/scoring.py": "3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a",
     "engine/ipo_screening/knockouts.py": "8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f",
     "engine/ipo_screening/snapshots.py": "9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27",

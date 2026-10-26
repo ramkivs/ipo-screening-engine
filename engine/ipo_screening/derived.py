@@ -1536,13 +1536,47 @@ def _pre_ipo_placement_bucket(ctx: DerivationContext) -> MetricValue:
     inputs = ["capital_structure.pre_ipo_placements", "issue.price_band_high", "issue.open_date"]
     placements = ctx.canonical.capital_structure().get("pre_ipo_placements") or []
     if not placements:
+        # An empty list is only evidence of "no discounted allotments" if the
+        # source actually says so.  Report section 25: the reader records what
+        # it established about the share-history schedule; when it never read
+        # it, nil is not verified and the bucket is UNKNOWN rather than a
+        # free 2/2.  Legacy inputs (no coverage map at all) keep the old
+        # behaviour so published results stay reproducible.
+        state = ctx.canonical.coverage_state("capital_structure.pre_ipo_placements")
+        # DISCLOSED means the history schedule was read; an empty list is then a
+        # read-and-nothing-qualifies nil, exactly like VERIFIED_NIL.  Only an
+        # unread or partly-read section is UNKNOWN.
+        if state is not None and state not in ("VERIFIED_NIL", "DISCLOSED"):
+            if state == "PARTIAL":
+                reason = (
+                    "a share-capital history schedule was located but no allotment row could be "
+                    "read from it, so it is not established whether any pre-IPO placement was "
+                    "made below the issue price"
+                )
+            else:
+                reason = (
+                    "no share-capital history schedule was read, so the absence of pre-IPO "
+                    "placements was never verified"
+                )
+            return _u(
+                "pre_ipo_placement_bucket",
+                reason,
+                kind="categorical",
+                formula=formula,
+                inputs=inputs,
+            )
         return _v(
             "pre_ipo_placement_bucket",
             "none_or_near_ipo",
             kind="categorical",
             formula=formula,
             inputs=inputs,
-            reason="no pre-IPO placements are disclosed",
+            reason=(
+                "the filing states that no equity shares were issued below the offer price in "
+                "the last year, and no placement is disclosed"
+                if state == "VERIFIED_NIL"
+                else "no pre-IPO placements are disclosed"
+            ),
         )
     price = _issue_price(ctx.canonical)
     open_date = parse_date(ctx.canonical.issue().get("open_date"))

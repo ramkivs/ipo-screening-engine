@@ -2482,3 +2482,121 @@ disclosures.
   43.0 UNCHANGED, PARAS 13.0 UNCHANGED BY CONSTRUCTION; FROZEN-CORE PIN RE-SET WITH A RECORDED
   REASON; RPT/K6 RECLASSIFIED FROM DECISION-GATED TO READER-GATED; NO WEIGHT, THRESHOLD,
   PENALTY, KNOCKOUT OR CONFIG CHANGE; PR #12 OPEN AND UNMERGED.**
+
+---
+
+## Revision 25 — the directorate reader, the coverage contract, and Jio's EPS attribution
+— 2026-10-26
+
+**Scope: three shared gaps closed in one pass — a reader for the changes-in-directorate
+table, a per-field coverage contract that separates a verified nil from an unread section,
+and provenance/precedence for the post-issue EPS. No scoring weight, threshold, penalty,
+knockout, bucket boundary or criterion definition was changed, and no issuer name appears in
+any engine path.** Branch `arena/79aac867-ipo-screening-engine`, PR **#12** (base `main`),
+left **OPEN**. Full account: §25-§29 of
+`docs/investigation/PARAS-INGESTION-FAILURE-2026-10-23.md`.
+
+### What was wrong, and where
+
+| # | Gap | Root cause | Affected |
+|---|---|---|---|
+| 1 | `governance.kmp_exits_2y` had **no reader** | the field was only ever copied from the input; the table's column order differs across four real layouts, and nothing parsed it. Historical records carried an unsupported `0` | D `board_kmp` (UNKNOWN for every extraction-based run; `0` unevidenced in retained records) |
+| 2 | `capital_structure.pre_ipo_placements: []` was **ambiguous** | an empty list is produced by a filing with no discounted allotments *and* by one whose share-history schedule the reader never opened; the bucket awarded the favourable 2/2 in both cases | C `pre_ipo_placement` |
+| 3 | The post-issue EPS was **unattributed** | a derived figure entered the canonical exactly like a disclosed one; there was no precedence rule for a filing that prints a post-issue figure; the crore factor lived in two components with nothing tying them together. `3.26` is the **lakh-assumption form** of the same derivation (`300,527 × 1e5 ÷ 9,209,030,830 = 3.2634`) | B `pe_vs_peers`, `second_multiple`, `peg`, `sector_ipo_relative`; `market_cap` |
+
+### Implementation (shared components only)
+
+* **`extraction/directorate.py` (new).** Rows are anchored on the **date token** — every real
+  layout prints it between the person and the reason — so column count and column order are
+  not assumed. The name is the honorific-anchored capitalised run before the date; the
+  designation is the title-vocabulary suffix before it (or, where the filing has no
+  designation column, the title named in the reason); the reason is everything after the date
+  up to the start of the next name, which re-joins cells wrapped across lines and pages
+  (Vishal p. 306, p. 319). Captions must start a line, so a cross-reference sentence cannot
+  open a table; notes and numbering footnotes close it and their dates are not rows. Undated
+  exit rows are **reported**, never guessed at.
+* **`governance.board_changes`** (schema, new): `{name, role, event, date, reason}` with
+  `event` ∈ `resignation | cessation | retirement | term_expiry | appointment | other`.
+  Classification follows the source: a bare "Cessation … for pre-occupation and personal
+  reasons" is **not** promoted to a resignation.
+* **`kmp_exits_2y` derived**, not copied: exits inside the 24 calendar months before the
+  **offer open date** (close date, then listing date as fallbacks; never `date.today()`, so a
+  stored record re-derives identically), inclusive at both ends. Read table with no exit →
+  a **verified 0**; unread/partial/unanchorable → **null**, never 0. A curated value is
+  preserved when the reader established nothing and superseded when it did.
+* **`coverage`** (schema, new): field path → `DISCLOSED | VERIFIED_NIL | PARTIAL | UNREAD`,
+  with the migration rule in the schema description (*a record without the map is a legacy
+  v1.5 input and keeps v1.5 behaviour; once present, an unmentioned field is UNREAD*). Only
+  `DISCLOSED` and `VERIFIED_NIL` produce a placement bucket; `PARTIAL`/`UNREAD` are UNKNOWN.
+  The producer quotes the evidence: an allotment row → `DISCLOSED`; the standard Capital
+  Structure sentence *"…has not issued any Equity Shares at a price lower than the Offer
+  Price during the last one year"* (quoted with its "Except for the bonus issuance" clause,
+  Vishal p. 105) → `VERIFIED_NIL`; schedule vocabulary with no readable row → `PARTIAL`.
+* **EPS provenance and precedence.** A reader captures a figure only when the filing labels
+  it *post-issue*; historical weighted-average rows are deliberately refused (Jio's
+  "Earnings per share (Basic) 33.63" is a different quantity), and `[●]` is never a value.
+  `issue.post_issue_eps_basis` ∈ {`disclosed`, `derived`}; a derived value carries an
+  `_evidence` entry (`extraction_method: DERIVED`, locator "Derived by the engine (not
+  printed in the filing)") naming PAT, the filing's unit, the factor, the share count and the
+  period, so it can be recomputed from the record. `semantic_validation._CRORE_TO_RUPEES` is
+  the single named factor for the crore↔rupee step. A stored value that contradicts the
+  arithmetic by >10% is reported as **unresolved**, with the stored value, the implied value,
+  the basis and whether it carries evidence — plus the evidence that would settle it. The
+  captured value is **not** overwritten.
+
+### Cross-issuer validation (real filings, live extraction)
+
+| Issuer | Directorate rows | `kmp_exits_2y` | Placement coverage |
+|---|---|---|---|
+| Vishal Nirmiti | 18 (9 board + 9 KMP) | **0**, `VERIFIED_NIL` (nearest cessation 2024-04-16, outside the window) | `VERIFIED_NIL` (p. 105) |
+| R.K. Fashion Accessories | 1 | **0**, `VERIFIED_NIL` | `PARTIAL` (schedule located, no row readable) |
+| Paras Healthcare | 14 (7 board + 7 KMP) | **4**, `DISCLOSED` → `high_churn` | `DISCLOSED` (3 allotments, 2006-2008) |
+| Jio Platforms | 17 | **6**, `DISCLOSED` → `high_churn` | `PARTIAL` |
+
+Both adverse moves are evidence-driven (the engine had been giving a neutral treatment to
+filings that disclose churn); no threshold was touched.
+
+### Score effects
+
+| Artifact | Before | After | Why |
+|---|---|---|---|
+| Vishal Nirmiti (golden) | 35.0 / hash `e84f8bc0…` | **identical** | fixture carries no coverage map → legacy behaviour; live extraction is a verified nil and keeps its 2 points |
+| Aurora `complete_sample_rhp` | 17.0 | **13.0** | synthetic sample has no share history and no directorate table → placements −2, board_kmp −2, both UNKNOWN |
+| R.K. Fashion Accessories | 43.0 | **41.0** | schedule located but no row readable → placements UNKNOWN (−2); its directorate table *was* read |
+| class_b / class_c / class_e synthetic fixtures | 36 / 36 / 38 | **34 / 34 / 36** | no share history at all → placements UNKNOWN (−2), reasons recorded inline |
+
+Expectations were updated only where the engine stopped awarding points for an unexamined
+section; no expectation was relaxed to protect a score.
+
+### Frozen core and verification
+
+`derived.py` re-pinned to
+`7783dfeb2cae2d68083fef5ebd6dde8567ad110b53253a4c8fe5516a70ce1f2c` with the reason in the
+pin's comment (the placement bucket is the only edit). `verify_frozen_core()` → all six
+**True**; `verify_golden_result()` → **True**, `e84f8bc0…` unchanged.
+
+Focused suites only, all green: **57** (three new modules), **55**, **185**, **76**, **36**
+— exact commands and results in §28 of the investigation. The full backend, regression and
+frontend suites were deliberately not run.
+
+### Status and next actions
+
+- Readiness: **NOT ESTABLISHED**. Required-term gate: **CLOSED**. PR **#12 OPEN**, not
+  merged, not claimed closed.
+- The three next-actions named in Revision 25's predecessor are now done (RPT anchors were
+  done in Revision 23; the directorate reader and the coverage contract are done here).
+- Remaining, in order: (1) read R.K. Fashion's and Jio's share-history schedule layouts so
+  `pre_ipo_placements` stops being `PARTIAL` on real filings; (2) Paras Note 34 (pp. 416-420)
+  stays unread — the RPT summary pp. 92-93 remains the evidence in use; (3) accept the RHP
+  date as a window anchor for filings whose offer open date is `[●]` at extraction time.
+- A32 remains **"IMPLEMENTED 2026-10-26; FULL BACKEND SUITE EXECUTED; READY FOR RAMKI
+  RATIFICATION (NOT RATIFIED)"**; nothing in this revision ratifies it.
+
+- **Disposition: THE CHANGES-IN-DIRECTORATE TABLE IS READ FROM FOUR REAL LAYOUTS AND
+  `kmp_exits_2y` IS DERIVED AGAINST A DATED WINDOW; AN EMPTY `pre_ipo_placements` NO LONGER
+  SCORES UNLESS THE FILING ESTABLISHES THE NIL (FOUR-STATE COVERAGE CONTRACT, BACKWARD
+  COMPATIBLE WITH EVERY EXISTING FIXTURE AND RECORD); A DERIVED POST-ISSUE EPS IS LABELLED,
+  RECOMPUTABLE AND SUPERSEDED BY A DISCLOSED ONE, AND THE HISTORICAL 3.26 IS RECORDED AS THE
+  LAKH-ASSUMPTION FORM OF 32.63 AND FLAGGED UNRESOLVED WITHOUT BEING OVERWRITTEN; VISHAL
+  GOLDEN HASH UNCHANGED, FROZEN-CORE PIN RE-SET WITH A REASON; NO CONFIG, WEIGHT, THRESHOLD,
+  PENALTY OR KNOCKOUT CHANGE; PR #12 OPEN AND UNMERGED.**

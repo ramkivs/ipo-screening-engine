@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import pypdf
 
 from ..canonical import ExtractionMethod
+from .directorate import parse_changes_table
 from .interfaces import RawExtraction, SourceDocument
 from .numbers import is_undisclosed_marker, parse_indian_number
 
@@ -1211,6 +1212,73 @@ class SectionExtractor:
                     extraction_confidence=0.95,
                 )
             )
+
+        # Coverage for the placements field (report section 25).  An empty list
+        # is ambiguous on its own: it can mean "the history schedule was read
+        # and it contains nothing that qualifies" or "the schedule was never
+        # read".  The bucket rule -- which awards 2/2 for `none_or_near_ipo` --
+        # could not tell those apart, so silence scored.  The readers now say
+        # which case applies:
+        #
+        #   DISCLOSED    allotment rows were read from the history schedule;
+        #   VERIFIED_NIL the filing *positively* states that no Equity Shares
+        #                were issued below the Offer Price in the last year
+        #                (the standard Capital Structure paragraph), which is
+        #                exactly the deep-discount limb the criterion tests;
+        #   PARTIAL      the schedule was located but no row could be read;
+        #   UNREAD       no trace of the schedule was found.
+        #
+        # Only DISCLOSED and VERIFIED_NIL may produce a bucket.  The other two
+        # leave the criterion UNKNOWN rather than awarding points for a section
+        # the engine never saw.
+        coverage_state = "DISCLOSED" if placements else "UNREAD"
+        coverage_quote = placement_quote or ""
+        coverage_page = placement_page or found_page
+        if not placements:
+            no_discount_re = re.compile(
+                r"\bhas not issued any [Ee]quity [Ss]hares at a price (?:that may be )?"
+                r"(?:lower|less) than the Offer Price[^.]{0,80}",
+                re.IGNORECASE,
+            )
+            schedule_re = re.compile(
+                r"Date of Allotment|History of (?:the )?(?:Equity )?Share Capital|"
+                r"Further Issue|Nature of Allotment",
+                re.IGNORECASE,
+            )
+            for p in range(p_start, min(p_end + 1, self.page_count + 1)):
+                flat = " ".join(self.extract_page_text(p).split())
+                m = no_discount_re.search(flat)
+                if m:
+                    coverage_state = "VERIFIED_NIL"
+                    # Quote the whole sentence: the standard clause carries an
+                    # exception ("Except for the bonus issuance ...") that
+                    # belongs to the evidence.
+                    window = flat[max(0, m.start() - 160):m.end()]
+                    cut = window.rfind(". ")
+                    if cut != -1:
+                        window = window[cut + 2:]
+                    coverage_quote = window.strip().rstrip(".")
+                    coverage_page = p
+                    break
+                if schedule_re.search(flat):
+                    # Seen the schedule's own vocabulary but could not read a
+                    # row from it: partially examined, not nil.
+                    coverage_state = "PARTIAL"
+                    coverage_page = p
+        extractions.append(
+            RawExtraction(
+                field_path="coverage.capital_structure.pre_ipo_placements",
+                candidate_value=coverage_state,
+                raw_text=coverage_quote or coverage_state,
+                page=coverage_page,
+                section="Capital Structure",
+                locator="Pre-IPO placement coverage",
+                quote=coverage_quote,
+                quote_is_processing=not coverage_quote,
+                extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                extraction_confidence=0.9,
+            )
+        )
 
         if pre_pct is None and sentence_pre_pct is not None:
             # "our Promoter holds 73,519,238 Equity Shares, equivalent to
@@ -3736,6 +3804,69 @@ class SectionExtractor:
                 )
             )
 
+        # 3b. Changes in the board / key managerial personnel (report section
+        #     26).  The table's column order differs between filings, so the
+        #     shared reader in ``directorate.py`` anchors rows on the date.
+        #     Nothing is emitted when no such table is found: an unread
+        #     directorate section is UNREAD, never "no exits" (=0).
+        board_events: List[Dict[str, Any]] = []
+        board_pages: List[int] = []
+        board_quote = ""
+        board_state = "UNREAD"
+        heading_seen = False
+        undated_exit_rows = 0
+        for block, page, saw_heading, positive_nil in self._board_change_blocks(
+            range(max(1, p_mstart - 2), min(p_mend + 2, self.page_count) + 1)
+        ):
+            heading_seen = heading_seen or saw_heading
+            parsed = parse_changes_table(block)
+            if parsed["events"]:
+                board_events.extend(parsed["events"])
+                board_pages.append(page)
+                if not board_quote:
+                    board_quote = " ".join(block.split())[:400]
+            undated_exit_rows += int(parsed.get("undated_exit_rows") or 0)
+            if parsed["events"]:
+                board_state = "DISCLOSED"
+            elif positive_nil and board_state == "UNREAD":
+                board_state = "VERIFIED_NIL"
+        if heading_seen and not board_events and board_state == "UNREAD":
+            board_state = "PARTIAL"
+        if undated_exit_rows:
+            # An exit row without a date cannot be placed in the 24-month
+            # window, so the count would be an understatement.
+            board_state = "PARTIAL"
+
+        if board_events:
+            extractions.append(
+                RawExtraction(
+                    field_path="governance.board_changes",
+                    candidate_value=board_events,
+                    raw_text=board_quote,
+                    page=board_pages[0] if board_pages else p_mstart,
+                    section="Our Management",
+                    locator="Changes in our Board of Directors",
+                    quote=board_quote,
+                    quote_is_processing=not board_quote,
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=0.9,
+                )
+            )
+        extractions.append(
+            RawExtraction(
+                field_path="coverage.governance.board_changes",
+                candidate_value=board_state,
+                raw_text=board_quote or board_state,
+                page=board_pages[0] if board_pages else p_mstart,
+                section="Our Management",
+                locator="Changes in our Board of Directors (coverage)",
+                quote=board_quote,
+                quote_is_processing=not board_quote,
+                extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                extraction_confidence=0.9,
+            )
+        )
+
         # 4. Related Party Transactions (% of revenue)
         rpt_pct = None
         rpt_page = p_start
@@ -3796,6 +3927,185 @@ class SectionExtractor:
     _CONCENTRATION_FISCAL_HEADER = re.compile(
         r"fiscal\s*20\d\d(?:[\s\S]{0,60}fiscal\s*20\d\d)", re.IGNORECASE
     )
+
+    # ------------------------------------------------------------------
+    # A disclosed post-issue earnings figure (report section 27)
+    # ------------------------------------------------------------------
+    # Only a *post-issue* label counts.  The basis-for-issue-price table also
+    # prints plain historical "Earnings per share (Basic) 33.63" rows, which are
+    # computed on the weighted-average count of the year and are a different
+    # quantity from EPS on the enlarged post-issue capital.  Reading those as
+    # post-issue EPS would relabel the filing's own figure (Jio: 33.63 vs the
+    # 32.63 the engine derives from FY2026 PAT and 9,209,030,830 shares).
+    _POST_ISSUE_EPS = re.compile(
+        r"(?:post[\s-]*issue\s+(?:basic\s+|diluted\s+)?(?:earnings?\s+per\s+share|EPS)"
+        r"|(?:earnings?\s+per\s+share|EPS)\s*\(?\s*(?:on\s+)?post[\s-]*issue"
+        r"(?:\s+capital)?\s*\)?)"
+        r"[^0-9\[]{0,40}(?P<value>\d{1,5}(?:\.\d{1,4})?)",
+        re.IGNORECASE,
+    )
+    _UNDISCLOSED_MARKERS = ("[\u25cf]", "[●]", "**", "\u2014")
+
+    def extract_post_issue_eps_disclosure(
+        self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None
+    ) -> List[RawExtraction]:
+        """The filing's own post-issue EPS, when it prints one.
+
+        Returns nothing when the filing does not disclose a post-issue figure:
+        the builder then derives it and records the derivation.  An undisclosed
+        marker is not a value.
+        """
+        fin_range = page_ranges.get("restated_financials") if page_ranges else None
+        cap_range = page_ranges.get("capital_structure") if page_ranges else None
+        pages: List[int] = []
+        if fin_range:
+            pages.extend(range(max(1, fin_range[0] - 45), fin_range[0] + 1))
+        else:
+            pages.extend(range(90, min(160, self.page_count) + 1))
+        if cap_range:
+            pages.extend(range(cap_range[0], min(cap_range[1], self.page_count) + 1))
+
+        for p in dict.fromkeys(pages):
+            if p < 1 or p > self.page_count:
+                continue
+            text = self.extract_page_text(p)
+            if not text or "per share" not in text.lower() and "eps" not in text.lower():
+                continue
+            flat = " ".join(text.split())
+            for match in self._POST_ISSUE_EPS.finditer(flat):
+                value = float(match.group("value"))
+                if not (0.01 <= value <= 100000):
+                    continue
+                start = max(0, match.start() - 120)
+                quote = flat[start:match.end()].strip()
+                # The figure must not be an undisclosed marker such as [●].
+                if any(marker in quote for marker in ("\u25cf", "[●]")):
+                    continue
+                if re.search(r"\[\s*\u25cf\s*\]", quote):
+                    continue
+                return [
+                    RawExtraction(
+                        field_path="issue.post_issue_eps",
+                        candidate_value=round(value, 4),
+                        raw_text=quote,
+                        page=p,
+                        section="Basis for Issue Price",
+                        locator="Post-issue earnings per share",
+                        quote=quote,
+                        extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                        extraction_confidence=0.9,
+                        notes=(
+                            "Disclosed post-issue earnings figure; the period and the "
+                            "basic/diluted basis are those of the quoted row."
+                        ),
+                    )
+                ]
+        return []
+
+    # Heading and stop vocabulary for the changes-in-directorate table.
+    # A heading, not a cross-reference: the caption starts its own line (a
+    # running page number may precede it).  A sentence such as "For details on
+    # changes in our Key Managerial Personnel ... see page 357" matches the
+    # same words and must not open a table block.
+    _DIRECTORATE_HEADING = re.compile(
+        r"^\s*(?:\d{1,3}\s+)?changes\s+(?:in|to)\s+(?:our\s+|the\s+)?(?:board\s+of\s+directors|board\b|"
+        r"key\s+managerial\s+personnel|kmp)\b"
+        r"(?:\s+during\s+(?:the\s+)?(?:last\s+)?(?:three|3|two|2|one|1)\s+years?)?",
+        re.IGNORECASE,
+    )
+    _DIRECTORATE_STOP = re.compile(
+        r"^(?:shareholding\s+of\s+our\s+directors|other\s+confirmations|corporate\s+governance|"
+        r"committees?\s+of\s+our\s+board|our\s+promoters|interests?\s+of\s+our\s+directors|"
+        r"compensation\s+(?:of|payable|to)|payments?\s+(?:or|and)\s+benefits|"
+        r"equity\s+shareholding\s+of\s+our\s+directors|interest\s+of\s+directors)",
+        re.IGNORECASE,
+    )
+    _POSITIVE_NIL_CHANGES = re.compile(
+        r"\b(?:there\s+(?:have|has)\s+been\s+no\s+(?:such\s+)?changes?"
+        r"|no\s+(?:change|changes)\s+(?:in|to)\s+(?:the\s+|our\s+)?board"
+        r"|none\s+of\s+(?:our\s+)?directors\s+(?:has|have)\s+resigned)",
+        re.IGNORECASE,
+    )
+
+    def _board_change_blocks(
+        self, pages: Sequence[int]
+    ) -> List[Tuple[str, int, bool, bool]]:
+        """Blocks of text belonging to a changes-in-directorate table.
+
+        Returns ``(block, page, heading_seen, positive_nil_statement)``.  A
+        block runs from its heading to the next section heading (or at most
+        three pages, since the table repeats its header when it spans pages).
+        """
+        blocks: List[Tuple[str, int, bool, bool]] = []
+        seen: set = set()
+        for p in pages:
+            if p in seen:
+                continue
+            text = self.extract_page_text(p)
+            if not text:
+                continue
+            lines = text.splitlines()
+            starts = [
+                idx
+                for idx, line in enumerate(lines)
+                if self._DIRECTORATE_HEADING.match(line)
+            ]
+            for start in starts:
+                chunk: List[str] = []
+                nil = False
+                ended = False
+                for offset in range(start, min(start + 120, len(lines))):
+                    line = lines[offset]
+                    flat = " ".join(line.split())
+                    if offset > start and self._DIRECTORATE_STOP.match(flat):
+                        ended = True
+                        break
+                    if offset > start and self._DIRECTORATE_HEADING.match(flat):
+                        ended = True
+                        break
+                    if offset == start:
+                        continue
+                    chunk.append(line)
+                    if self._POSITIVE_NIL_CHANGES.search(flat) and not re.search(
+                        r"except\s+as\s+(?:mentioned|disclosed|stated)", flat, re.IGNORECASE
+                    ):
+                        nil = True
+                if ended:
+                    # The table closed on this page; the next page starts a new
+                    # section and must not be read as more rows.
+                    page_cursor = None
+                else:
+                    page_cursor = p + 1
+                # continue onto following pages while the table runs on
+                while page_cursor is not None and page_cursor <= self.page_count and page_cursor <= p + 2:
+                    if chunk and self._DIRECTORATE_STOP.match(" ".join(chunk[-1].split())):
+                        break
+                    follow = self.extract_page_text(page_cursor)
+                    if not follow:
+                        page_cursor += 1
+                        continue
+                    seen.add(page_cursor)
+                    stopped = False
+                    for line in follow.splitlines():
+                        flat = " ".join(line.split())
+                        if self._DIRECTORATE_STOP.match(flat):
+                            stopped = True
+                            break
+                        if self._DIRECTORATE_HEADING.match(flat):
+                            stopped = True
+                            break
+                        chunk.append(line)
+                        if self._POSITIVE_NIL_CHANGES.search(flat) and not re.search(
+                            r"except\s+as\s+(?:mentioned|disclosed|stated)", flat, re.IGNORECASE
+                        ):
+                            nil = True
+                    if stopped:
+                        break
+                    page_cursor += 1
+                block = "\n".join(chunk).strip()
+                if block:
+                    blocks.append((block, p, True, nil))
+        return blocks
 
     def _top_five_concentration(
         self, pages: Sequence[int]

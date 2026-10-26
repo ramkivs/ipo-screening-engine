@@ -2056,3 +2056,255 @@ except the new module.
 * **Paras Module B** remains blocked on the filing's `[●]` post-issue share count. That is a
   genuine missing disclosure, not a software defect, and the fix in §24.2 does not and should
   not invent it.
+
+## 25. `pre_ipo_placements: []` — verified nil is not the same as never looked — 2026-10-26 (revision 16)
+
+§24.1 left one residual risk explicitly recorded rather than papered over: an empty
+`capital_structure.pre_ipo_placements` was still read as the favourable
+`none_or_near_ipo` bucket (2/2), even though the same empty list is produced by a filing
+with no discounted allotments **and** by a filing whose share-history schedule the reader
+never opened. This pass closes it at the smallest shared boundary that can carry the
+distinction — the canonical input.
+
+### 25.1 The ambiguity was live on two issuers
+
+| Issuer | `pre_ipo_placements` | Placement evidence | Share-history schedule in the filing |
+|---|---|---|---|
+| Vishal Nirmiti (real filing) | `[]` | none | pp. 14, 97, 105, 111, 113, 118-121, 124 |
+| R.K. Fashion Accessories (real filing) | `[]` | none | pp. 14, 97, 105, 111, 113, 118-121, 124 |
+| Aurora synthetic sample | `[]` | none | absent |
+
+Two real filings produced the identical canonical value in two different epistemic states.
+The criterion could not tell them apart, so it awarded the favourable bucket in both.
+
+### 25.2 The contract (one field, four states, no new rule)
+
+`schema/ipo-input.v1.5.schema.json` gains a top-level `coverage` map: field path → state,
+with the states `DISCLOSED`, `VERIFIED_NIL`, `PARTIAL`, `UNREAD`. The description in the
+schema records the migration rule, which is the compatibility guarantee:
+
+> A document that omits this map entirely is a legacy v1.5 input and keeps v1.5 behaviour;
+> once the map is present, a field it does not mention is UNREAD.
+
+Consequences, implemented in `derived._pre_ipo_placement_bucket`:
+
+| Coverage | Empty list means | Bucket |
+|---|---|---|
+| (absent map — legacy record, every published fixture) | unchanged | `none_or_near_ipo` — **behaviour preserved** |
+| `VERIFIED_NIL` | the filing states no shares were issued below the Offer Price in the last year | `none_or_near_ipo` (a **scored, verified nil**) |
+| `DISCLOSED` | the schedule was read and no row qualifies | `none_or_near_ipo` |
+| `PARTIAL` | the schedule's vocabulary was located but no allotment row could be read | **UNKNOWN** |
+| `UNREAD` | nothing of the schedule was found | **UNKNOWN** |
+
+The producer (`extraction/sections.py`) states which one applies, quoting the evidence:
+
+* an allotment row read from the schedule → `DISCLOSED`;
+* the standard Capital Structure sentence *"…has not issued any Equity Shares at a price
+  lower than the Offer Price during the last one year"* → `VERIFIED_NIL`, quoted **with its
+  exception clause** ("Except for the bonus issuance …"); Vishal Nirmiti p. 105 is the live
+  example;
+* the schedule's vocabulary (`Date of Allotment`, `Further Issue`, `History of the …
+  Equity Share Capital`) but no row → `PARTIAL`;
+* neither → `UNREAD`.
+
+Verified nil therefore never collapses into UNKNOWN, and a positive finding (`DISCLOSED`
+with rows) is a third, separate state. `UNKNOWN` never scores.
+
+### 25.3 Where it propagates
+
+Extraction → `coverage` in the canonical → schema validation (`propertyNames` +
+`additionalProperties` enum, so an invented state fails loudly rather than silently
+becoming UNKNOWN) → derivation → criterion → `input_snapshot` in the persisted evaluation
+record (the map rides with the input, so a retrieved record still says what was read) →
+replay. No new scoring weight, threshold or bucket was added, and no issuer is named
+anywhere in the code.
+
+### 25.4 Score effects, all in the honest direction
+
+| Artifact | Before | After | Why |
+|---|---|---|---|
+| Aurora `complete_sample_rhp` (synthetic) | 17.0 | **13.0** | no share history *and* no directorate table → placements −2, board_kmp −2, both UNKNOWN |
+| R.K. Fashion Accessories (real) | 43.0 | **41.0** | schedule located, no row readable → placements UNKNOWN (−2) |
+| Vishal Nirmiti (real) | 35.0 golden | **35.0** | `VERIFIED_NIL` — keeps the 2 points it can evidence |
+| Paras Healthcare (real) | — | placements `DISCLOSED` (3 allotments, 2006-2008) | correctly outside the 12-month test |
+| Jio Platforms (real) | — | placements `PARTIAL` | schedule vocabulary present, no allotment row read |
+
+The synthetic class_a/b/c/d/e fixtures carried no share history at all; three of them lost
+the same 2 points (`tests/test_extraction_phase5b.py`, 36/36/38 → 34/34/36, each with the
+reason recorded inline). Vishal is the counter-example that matters: the correction removes
+points only where the engine had no evidence, and keeps them where the filing states the nil.
+
+## 26. Changes in the board — a reader that anchors on the date, not on the column order — 2026-10-26 (revision 16)
+
+`governance.kmp_exits_2y` had no reader at all: the builder copied it from the input or left
+it `null`, so the D `board_kmp` criterion was structurally UNKNOWN for every extraction-based
+evaluation, and the historical Jio canonical carried an unsupported `0`.
+
+### 26.1 Two real layouts, and why the columns cannot be assumed
+
+| Filing | Heading | Columns (as printed) |
+|---|---|---|
+| Paras Healthcare p. 346 | "Changes to our Board in the last three years" | Name \| Designation \| Date \| Reason |
+| Paras Healthcare p. 357 | "Changes in the Key Managerial Personnel or Senior Management in last three years" | Name \| Date of change \| Reason |
+| Vishal Nirmiti p. 306 | "Changes in our Board of Directors during last three years" | Name of Director \| Appointment/Change/Cessation \| Reason — **date inside the second cell** |
+| Vishal Nirmiti p. 319 | "Changes in Key Managerial Personnel and Senior Management" | Name \| Designation \| Date \| Particulars/Reason, wrapped, **several rows per extracted line** |
+
+Four tables, three different orders, no stable column count, and cells that wrap across lines
+*and* across page breaks. The reader (`extraction/directorate.py`) therefore anchors rows on
+the **date token** — every one of these layouts prints it between the person and the reason —
+and recovers the row from the two neighbouring dates:
+
+* the name is the capitalised run immediately before the date (honorific-anchored, so
+  "…President, Network Solutions Mr. Daniel Bailey" yields *Mr. Daniel Bailey*);
+* the designation is the title-vocabulary suffix before that name (column or, when absent as
+  in Vishal p. 306, taken from the reason: "Cessation as Non-Executive Director …");
+* the reason is everything after the date up to the start of the *next* name, which rejoins
+  wrapped cells without any column arithmetic.
+
+Heading detection requires a caption at line start (`Changes (in|to) … Board/Key Managerial
+Personnel`), so the cross-reference sentence *"For details on changes in our Key Managerial
+Personnel … see page 357"* does not open a table; notes, numbering footnotes and the next
+section heading close it.
+
+### 26.2 Events, not just a count
+
+`governance.board_changes` (schema: array of `{name, role, event, date, reason}`, `event` ∈
+`resignation | cessation | retirement | term_expiry | appointment | other`) preserves each
+dated row with its own reason text. Classification follows the source: a bare "Cessation as
+Non-Executive Director for pre-occupation and personal reasons" (Vishal p. 306) stays a
+`cessation` and is **not** promoted to a resignation; "Resignation under Section 168" is a
+resignation; "Retirement on attaining the age of superannuation" and "Expiry/Termination of
+the term of office" are their own types and only count as exits.
+
+### 26.3 The 24-month window
+
+`kmp_exits_2y` is derived in the builder from the dated events against the **offer open
+date** (falling back to close date, then listing date) — a fixed filing fact, never
+`date.today()`, so a stored record re-derives the same count. The window is calendar-aware
+and inclusive at both ends; a pure `730`-day subtraction is not used.
+
+| Situation | `kmp_exits_2y` | Coverage |
+|---|---|---|
+| Rows read, ≥1 exit inside the window | the count | `DISCLOSED` |
+| Rows read, no exit inside the window | **0** (a verified zero) | `VERIFIED_NIL` |
+| Table positively states there were no changes | **0** | `VERIFIED_NIL` |
+| No heading anywhere in the management section | **null** | `UNREAD` |
+| Heading found, table unreadable, or an exit row with no date | **null** | `PARTIAL` |
+| Events read, but no offer date to anchor the window | **null** | `PARTIAL` |
+
+A curated input value is never overwritten when the reader established nothing (that would
+destroy captured evidence); it **is** superseded when the reader did establish the section,
+because an evidenced count beats an unevidenced one.
+
+### 26.4 Cross-issuer validation on real filings
+
+| Issuer (open date) | Rows read | Exits in the 24 months to the open date | Result |
+|---|---|---|---|
+| Vishal Nirmiti (2026-09-30) | 18 (9 board + 9 KMP) | 0 — the only cessation is 2024-04-16, outside the window | `0`, `VERIFIED_NIL` |
+| R.K. Fashion Accessories (2026-10-05) | 1 | 0 | `0`, `VERIFIED_NIL` |
+| Paras Healthcare (2026-10-21) | 14 (7 board + 7 KMP) | **4** — Shirodkar 2025-05-22, Teotia 2026-02-28, Sajan 2025-01-31, Mishra 2025-02-21 | `4`, `DISCLOSED` → D `board_kmp` = `high_churn` |
+| Jio Platforms (2026-10-21) | 17 | **6** — four non-executive/independent resignations 2026-03, one CEO resignation 2026-03-23, one company-secretary resignation 2026-06-19 | `6`, `DISCLOSED` → `high_churn` |
+
+Paras and Jio move from UNKNOWN to an **adverse** bucket on evidence. That is the direction
+the rules were written for: the engine had been giving the neutral treatment to filings that
+disclose churn. No threshold was touched.
+
+## 27. Jio's 3.26 — the value was real, the attribution was missing — 2026-10-26 (revision 16)
+
+### 27.1 End-to-end trace
+
+| Layer | What it holds | Verdict |
+|---|---|---|
+| Source (RHP p. 129) | Basic/Diluted FY2026 EPS **33.63/33.59**, weighted-average count 30.55/30.51 crore; P/E and post-issue NAV rows are `[●]` | the filing prints **no** post-issue earnings figure |
+| Unit | `financials.reporting_unit = INR_MILLIONS`, FY2026 PAT 300,527 | millions, not lakhs |
+| Derivation | 300,527 × 1e6 ÷ 9,209,030,830 = **32.6339** ; 300,527 × 1e5 ÷ 9,209,030,830 = **3.2634** | the stored **3.26 is the lakh-assumption form of the same arithmetic** |
+| Historical canonical | `post_issue_eps: 3.26`, no `basis`, no evidence entry | an unattributed value with a 10× scale defect |
+| Validation | `pat × 1e7 ÷ shares` = 32.63 vs stored 3.26 → 90% apart | warned, then scored anyway |
+| Persistence/retrieval · evaluation | 3.26 → issuer P/E, industry P/E premium, PEG | the defect reached Module B |
+
+So the pre-fix extractor did assume a lakh reporting unit and wrote 32.63/10 as if the filing
+had said it. The builder fix at `4308d1b` removed the assumption (the filing's own unit
+factor is applied). Three things were still wrong, and this pass fixes them:
+
+1. **The derived number had no provenance.** It appeared in the canonical exactly like a
+   disclosed figure.
+2. **There was no precedence rule.** Had the filing printed a post-issue figure, the engine
+   would still have overwritten it with its own arithmetic.
+3. **The two components used the factor in two places** in a way that could silently diverge,
+   and nothing tied them together.
+
+### 27.2 Implementation
+
+* **Precedence — disclosed beats derived.** A new reader (`sections.py`,
+  `extract_post_issue_eps_disclosure`) captures a figure only when the filing labels it
+  *post-issue* ("post-issue EPS", "EPS on post-issue capital"). It deliberately **refuses**
+  the historical weighted-average rows: Jio's "Earnings per share (Basic) 33.63" is a
+  different quantity and reading it as post-issue EPS would relabel the filing's own number.
+  `[●]` is never a value.
+* **Attribution.** `issue.post_issue_eps_basis` ∈ {`disclosed`, `derived`} (schema enum) is
+  set by the builder; a derived figure also gets an `_evidence` entry with
+  `extraction_method: DERIVED`, locator "Derived by the engine (not printed in the filing)"
+  and a note naming the exact inputs and factor — e.g. *"derived: latest full-year PAT
+  300527.0 INR_MILLIONS × 1,000,000 / post-issue shares 9,209,030,830 = 32.63 (FY2026)"*. The
+  number can be recomputed from the record alone. A curated value that predates the field
+  keeps no basis and is not relabelled.
+* **One factor.** `semantic_validation._CRORE_TO_RUPEES = 1e7` is now the single named
+  constant for the crore↔rupee step shared by every EPS/PAT comparison, and the
+  reconciliation says which basis it is comparing.
+* **Conflict = unresolved, never an overwrite.** When the stored value and the PAT/share
+  implication differ by more than 10%, the finding now records the stored value, the implied
+  value, whether the stored value is engine-derived and whether it carries any evidence, and
+  states that **the post-issue EPS is unresolved** — the evidence that settles it being the
+  filing's own post-issue figure with its period and basic/diluted basis. A historical
+  weighted-average EPS cannot settle it. The captured value is preserved: this reports a
+  conflict, it does not rewrite the record and it does not fabricate a replacement.
+
+### 27.3 The regression tests that would have caught it
+
+* `test_the_historical_jio_record_is_the_lakh_assumption_of_the_same_derivation` pins both
+  forms against the real fixture (`× 1e5 → 3.26`, `× 1e6 → 32.63`), so the scale defect
+  cannot return unnoticed.
+* `test_the_historical_jio_record_is_flagged_as_unresolved_by_the_validator` runs the real
+  historical canonical through the validator and requires the unresolved finding, while
+  asserting the fixture still holds 3.26.
+* `test_derived_eps_matches_the_crore_basis_the_validator_uses` ties the builder's
+  filing-unit derivation to the validator's crore-basis implication for an INR-millions
+  filing — the two components can no longer drift apart silently.
+* `test_the_reader_never_reads_a_weighted_average_row_as_post_issue_eps`,
+  `test_a_disclosed_post_issue_figure_wins_over_the_derivation`,
+  `test_a_curated_value_keeps_no_basis_and_is_not_relabelled`,
+  `test_a_derived_value_is_never_reported_as_a_conflict`.
+
+The published Jio bridge (29 → 21) is untouched: it reads the frozen historical canonical and
+its result hash is verified unchanged.
+
+## 28. Verification — focused, exact commands
+
+Run from the repository root with `PYTHONPATH="$PWD/engine"`:
+
+| Command | Result |
+|---|---|
+| `pytest tests/test_directorate_events_20261026.py tests/test_coverage_nil_vs_unread_20261026.py tests/test_post_issue_eps_provenance_20261026.py -q` | **57 passed** |
+| `pytest tests/test_extraction_phase5b.py tests/test_fixture_fallback_isolation.py tests/test_jio_fresh_regressions.py tests/test_jio_score_bridge.py tests/test_global_value_semantics_20261026.py tests/test_extraction.py -q` | **55 passed** |
+| `pytest tests/test_ui7_ingestion.py tests/test_jio_fresh_regressions.py tests/test_jio_score_bridge.py tests/test_fixture_fallback_isolation.py -q` | **36 passed** |
+| `pytest tests/test_derived_evidence_registration.py tests/test_core_semantics.py tests/test_governance_contract_audit.py tests/test_litigation_regulatory_defaults.py tests/test_suite_tiers.py tests/test_frozen_core_line_endings.py tests/test_reading_defects_20261026.py -q` | **185 passed** |
+| `pytest tests/test_ui7_ingestion.py tests/test_directorate_events_20261026.py tests/test_coverage_nil_vs_unread_20261026.py tests/test_post_issue_eps_provenance_20261026.py tests/test_suite_tiers.py -q` | **76 passed** |
+
+`verify_frozen_core()` → all six **True**; `verify_golden_result()` → **True**
+(`e84f8bc0…`). `derived.py` is re-pinned to
+`7783dfeb2cae2d68083fef5ebd6dde8567ad110b53253a4c8fe5516a70ce1f2c` with the reason recorded in
+`v16_implementation.FROZEN_CORE_HASHES` — the bucket change is the only edit, and the
+golden-result check independently still reproduces the published hash.
+
+The full backend, regression and frontend suites were deliberately not run, per the standing
+instruction.
+
+## 29. What is still open
+
+| # | Item | Next action |
+|---|---|---|
+| 1 | The placement reader still cannot read an allotment row out of R.K. Fashion's share-history schedule (coverage `PARTIAL`) | read the schedule layout on pp. 118-121 before widening the reader; the contract now reports the gap instead of hiding it |
+| 2 | Jio's share history is also `PARTIAL` | same |
+| 3 | Paras Note 34 (pp. 416-420) remains unreadable; the RPT summary pp. 92-93 is the evidence in use (§23) | unchanged from the previous pass |
+| 4 | The 24-month window is anchored to the offer open date; filings whose open date is `[●]` at extraction time yield `PARTIAL` | accept the RHP date as an alternative anchor once it is captured as a canonical field |
+| 5 | Sector overlays, penalties and knockouts were not re-examined this pass | no defect observed; no change made |

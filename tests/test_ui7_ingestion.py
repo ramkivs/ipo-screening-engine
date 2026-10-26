@@ -114,7 +114,14 @@ def test_ingest_document_success_and_coexistence(test_env):
     # 2026-10-26: -1 point. large_holders_unlocked_early no longer defaults to
     # False; this filing states neither the lock-in nor an early unlock, so
     # lockin_bucket is UNKNOWN. No weight or bucket boundary changed.
-    assert body["final_score"] == pytest.approx(17.0)
+    # 2026-10-26 (report s.25): -4 points. The synthetic filing has no
+    # share-capital history and no changes-in-directorate table at all. Those
+    # sections are now reported UNREAD, so `pre_ipo_placement_bucket` (-2) and
+    # `board_kmp` (-2) are UNKNOWN instead of earning the favourable bucket for
+    # a section the engine never read. Weights and boundaries are unchanged;
+    # the same filing keeps its points wherever the source does disclose the
+    # facts (verified-nil stays a scored nil).
+    assert body["final_score"] == pytest.approx(13.0)
     assert body["verdict"] == "INSUFFICIENT_DATA"
     assert body["confidence"] == "Low"
     assert body["result_hash"] is not None
@@ -148,7 +155,10 @@ def test_ingest_document_success_and_coexistence(test_env):
     detail = detail_res.json()
     assert detail["evaluation_id"] == sample_eval_id
     assert detail["company_name"] == "AURORA SYSTEMS LIMITED"
-    assert detail["score"]["final_score"] == pytest.approx(17.0)  # D-5; kmp/lockin defaults removed
+    # 2026-10-26 (report s.25): 17.0 -> 13.0 -- share-capital history and
+    # directorate sections are absent from this synthetic filing and are now
+    # UNREAD rather than a favourable default (placements -2, board_kmp -2).
+    assert detail["score"]["final_score"] == pytest.approx(13.0)
 
     # Step 7: Verify golden hash for Vishal Nirmiti is strictly preserved
     vishal_detail = client.get(f"/api/v1/evaluations/{test_env['vishal_eval_id']}").json()
@@ -704,15 +714,22 @@ def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):
     # lock-in but says nothing about an early release for large pre-IPO
     # holders, so `lockin_bucket` is UNKNOWN rather than "intact"; the point
     # and the availability move together (44.0 -> 43.0, base 47.0 -> 46.0).
-    assert body["final_score"] == pytest.approx(43.0)
+    # 2026-10-26 (report s.25): -2 points. RK's share-capital history schedule
+    # was located (pages 14/97/105/111/113/118-121/124) but no allotment row
+    # could be read from it, so coverage is PARTIAL and
+    # `pre_ipo_placement_bucket` is UNKNOWN: the engine no longer awards 2/2
+    # points for a section it could not extract. RK's directorate table *was*
+    # read (1 appointment, 0 exits in the window), so board_kmp keeps its
+    # verified evidence (43.0 -> 41.0).
+    assert body["final_score"] == pytest.approx(41.0)
     assert body["confidence"] == "Low"
     assert body["verdict"] == "INSUFFICIENT_DATA"
 
     eval_data = body["evaluation"]
-    assert eval_data["score"]["final_score"] == pytest.approx(43.0)  # D-5; kmp/lockin defaults removed
-    assert eval_data["score"]["base_score"] == pytest.approx(46.0)  # D-5; kmp/lockin defaults removed
+    assert eval_data["score"]["final_score"] == pytest.approx(41.0)  # D-5; kmp/lockin defaults removed
+    assert eval_data["score"]["base_score"] == pytest.approx(44.0)  # s.25: placements UNKNOWN (-2)
     assert eval_data["score"]["penalties_total"] == pytest.approx(-3.0)
-    assert eval_data["score"]["completeness_pct"] == pytest.approx(66.0)  # D-5; kmp + lockin unknown
+    assert eval_data["score"]["completeness_pct"] == pytest.approx(64.0)  # s.25: + placements unknown
 
     # Prove absence of Vishal Nirmiti qualitative defaults
     modules = {m["id"]: m for m in eval_data["score"]["modules"]}

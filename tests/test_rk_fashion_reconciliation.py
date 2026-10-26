@@ -170,12 +170,18 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     # 2026-10-26: -1 more: the unsupported large_holders_unlocked_early = False
     # default is gone, so `lockin_bucket` is UNKNOWN (the filing states the
     # promoter lock-in but never an early release for large pre-IPO holders).
-    assert outcome.record.score["final_score"] == 43.0
-    assert outcome.record.score["base_score"] == 46.0  # -1 kmp default, -1 lockin default
+    # 2026-10-26 (report s.25): -2 more. RK's share-capital history schedule is
+    # located (pp. 14/97/105/111/113/118-121/124) but no allotment row can be
+    # read from it, so coverage is PARTIAL and `pre_ipo_placement_bucket` is
+    # UNKNOWN instead of the favourable 2/2 an unexamined section used to earn.
+    # No weight or boundary changed; the same filing keeps the points wherever
+    # the source establishes the fact (its directorate table reads cleanly).
+    assert outcome.record.score["final_score"] == 41.0
+    assert outcome.record.score["base_score"] == 44.0  # -1 kmp default, -1 lockin default, -2 placements
     assert outcome.record.score["penalties_total"] == -3.0
     assert outcome.record.confidence["level"] == "Low"
-    assert outcome.record.confidence["completeness_pct"] == 66.0  # -2 board_kmp, -1 lockin
-    assert outcome.record.score["lower_bound"] == 28.0
+    assert outcome.record.confidence["completeness_pct"] == 64.0  # -2 board_kmp, -1 lockin, -2 placements
+    assert outcome.record.score["lower_bound"] == 26.0  # s.25: two more unknown points
     assert outcome.record.score["upper_bound"] == 77.0
     assert outcome.record.verdict["verdict"] == "INSUFFICIENT_DATA"
 
@@ -195,11 +201,12 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     assert pe_crit["state"] == "SCORED"
     assert pe_crit["score"] == 8.0
 
-    # Module C: 9 / 15 of available points scored (OFS=0, 100% fresh, dilution
+    # Module C: 7 / 13 of available points scored (OFS=0, 100% fresh, dilution
     # 27.5% > 25% -> 0 pts; the lock-in point is gone with the removed
-    # large_holders_unlocked_early default, and use_of_proceeds is unknown
-    # because the GCP amount is undisclosed).
-    assert modules["C"]["score"] == 9.0
+    # large_holders_unlocked_early default, use_of_proceeds is unknown because
+    # the GCP amount is undisclosed, and pre_ipo_placement is unknown because
+    # RK's share-history schedule is located but unreadable -- report s.25).
+    assert modules["C"]["score"] == 7.0
     fresh_crit = next(c for c in modules["C"]["criteria"] if c["criterion_id"] == "fresh_share")
     assert fresh_crit["state"] == "SCORED"
     assert fresh_crit["score"] == 3.0
@@ -375,17 +382,17 @@ def test_missing_promoter_post_holding_remains_unknown_not_four_earned_points():
     metric_reason = derived_outcome.derived.metrics["promoter_post_pct"].reason
     assert "derived" in metric_reason
     assert "does not change the count" not in metric_reason
-    assert derived.score["final_score"] == 43.0
+    assert derived.score["final_score"] == 41.0
 
     # The derivation's own inputs gone: still UNKNOWN, and nothing is earned.
     assert no[key]["state"] == "UNKNOWN"
     assert no[key].get("score") is None
-    assert supported.score["base_score"] == 46.0
-    assert missing.score["base_score"] == 42.0
+    assert supported.score["base_score"] == 44.0
+    assert missing.score["base_score"] == 40.0
     assert supported.score["penalties_total"] == missing.score["penalties_total"] == -3.0
     assert supported.penalties == missing.penalties
-    assert supported.score["final_score"] == 43.0
-    assert missing.score["final_score"] == 39.0
+    assert supported.score["final_score"] == 41.0
+    assert missing.score["final_score"] == 37.0
 
 
 def test_real_filing_wrapped_total_extracts_without_fixture_fallbacks(monkeypatch):

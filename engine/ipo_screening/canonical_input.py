@@ -179,6 +179,29 @@ class CanonicalInput:
             return value
         return None
 
+    def coverage_states(self) -> Mapping[str, str]:
+        """Per-field extraction coverage, when the producer recorded it.
+
+        Absent map == legacy v1.5 document: the field is treated as it was
+        before coverage existed. Callers that need the three-way
+        verified-nil / unread distinction must go through
+        :meth:`coverage_state` rather than this accessor.
+        """
+        value = self.raw.get("coverage")
+        return value if isinstance(value, Mapping) else {}
+
+    def coverage_state(self, field_path: str) -> Optional[str]:
+        """Coverage state for one input field, or None for a legacy input.
+
+        None means "this document predates coverage reporting", which is
+        distinct from ``UNREAD`` ("this document reports coverage and the
+        reader never examined the field").
+        """
+        states = self.coverage_states()
+        if not states:
+            return None
+        return (states.get(field_path) or "UNREAD").upper()
+
     def evidence_for(self, path: str) -> Optional[str]:
         """Return the evidence_id registered for a JSON path, if any."""
         return self._evidence_index.get(path)

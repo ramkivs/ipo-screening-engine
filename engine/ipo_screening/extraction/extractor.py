@@ -67,6 +67,13 @@ class DocumentExtractor:
         rpt_extractions = section_extractor.extract_related_party_transactions(page_ranges)
         extractions.extend(rpt_extractions)
 
+        # A post-issue earnings figure the filing itself prints (report s.27).
+        # A disclosed value wins over the builder's PAT/shares derivation; when
+        # the filing prints none, nothing is emitted and the derivation stands
+        # with its own provenance.
+        eps_extractions = section_extractor.extract_post_issue_eps_disclosure(page_ranges)
+        extractions.extend(eps_extractions)
+
         biz_extractions = section_extractor.extract_business(page_ranges)
         extractions.extend(biz_extractions)
 

@@ -9,6 +9,7 @@ Technical Design v1.5 s3.2, s15:
 
 from __future__ import annotations
 
+import datetime
 import json
 import re
 from pathlib import Path
@@ -16,6 +17,7 @@ from typing import Any, Dict, List, Optional
 
 import jsonschema
 
+from .directorate import count_exits
 from .interfaces import RawExtraction, SourceDocument
 
 
@@ -76,12 +78,67 @@ class CanonicalInputBuilder:
             "peers": peers_list,
         }
 
+        coverage = self._build_coverage()
+        if coverage:
+            output["coverage"] = coverage
+
+        self._attach_derived_eps_evidence(output)
+
         if "market" in self.base:
             output["market"] = self.base["market"]
         if "recent_sector_ipos" in self.base:
             output["recent_sector_ipos"] = self.base["recent_sector_ipos"]
 
         return output
+
+    def _attach_derived_eps_evidence(self, output: Dict[str, Any]) -> None:
+        """Record how a derived post-issue EPS was formed.
+
+        A number the engine computed must never look like a number the filing
+        printed.  The derivation is written to ``_evidence`` with the inputs it
+        used, so the Explorer (and the semantic validator) can tell a disclosed
+        figure from a derived one and can recompute it.
+        """
+        if output.get("issue", {}).get("post_issue_eps_basis") != "derived":
+            return
+        note = getattr(self, "_derived_eps_note", None)
+        evidence = output.get("_evidence") or {}
+        if "issue.post_issue_eps" in evidence:
+            return
+        evidence["issue.post_issue_eps"] = {
+            "evidence_id": "EV-issue-post_issue_eps",
+            "source_id": self.doc.source_id,
+            "locator": "Derived by the engine (not printed in the filing)",
+            "extraction_method": "DERIVED",
+            "extraction_confidence": 0.9,
+            "note": note
+            or (
+                "derived: latest full-year PAT / post-issue shares; no post-issue earnings figure "
+                "was found in the sections read"
+            ),
+        }
+        output["_evidence"] = evidence
+
+    def _build_coverage(self) -> Dict[str, str]:
+        """Collect `coverage.<...>` extraction results into the inputs map.
+
+        Each reader that can distinguish "read it, nothing there" from
+        "never read it" emits a string-valued RawExtraction on a
+        `coverage.` path.  Those are stripped out of the ordinary field
+        tree here so they never collide with real input fields.
+        """
+        coverage: Dict[str, str] = {}
+        for ex in self.extractions:
+            path = ex.field_path or ""
+            if not path.startswith("coverage."):
+                continue
+            value = str(ex.candidate_value or "").strip().upper()
+            if value in {"DISCLOSED", "VERIFIED_NIL", "PARTIAL", "UNREAD"}:
+                coverage[path[len("coverage."):]] = value
+        derived = getattr(self, "_kmp_exits_coverage", None)
+        if derived and "governance.kmp_exits_2y" not in coverage:
+            coverage["governance.kmp_exits_2y"] = derived
+        return coverage
 
     def _detect_sector_profile(self) -> str:
         """Heuristic detection of sector profile from filing indicators."""
@@ -279,7 +336,16 @@ class CanonicalInputBuilder:
         # INR millions previously produced an EPS ten times too small
         # (Jio: 3.26 instead of 32.63), which feeds P/E and PEG.
         post_eps = _pick_issue("post_issue_eps", None)
-        if post_eps is None:
+        # Basis of the figure, so the number is never anonymous.  A value the
+        # reader took from the filing's own post-issue disclosure is
+        # ``disclosed``; a value the engine formed is ``derived`` and carries a
+        # derivation note in _evidence.  A value supplied by a curated input
+        # that predates this field keeps no basis (reconciled by the validator).
+        eps_basis: Optional[str] = None
+        if post_eps is not None:
+            if self._get_field("issue.post_issue_eps") is not None:
+                eps_basis = "disclosed"
+        else:
             fin_base = self.base.get("financials", {})
             periods = fin_base.get("periods") or self._get_field("financials.periods", [])
             unit = fin_base.get("reporting_unit") or self._get_field(
@@ -291,8 +357,17 @@ class CanonicalInputBuilder:
                 latest_pat = latest_p.get("pat")
                 if latest_pat is not None:
                     post_eps = round((latest_pat * factor) / post_shares, 2)
+                    eps_basis = "derived"
+                    self._derived_eps_note = (
+                        f"derived: latest full-year PAT {latest_pat} {unit} x "
+                        f"{factor:,.0f} / post-issue shares {post_shares:,} = {post_eps} "
+                        f"({latest_p.get('fy') or 'latest period'}); no post-issue earnings figure "
+                        "was found in the sections read, and a historical basic/diluted EPS on the "
+                        "weighted-average count is not the same quantity"
+                    )
         if post_eps is None and self.allow_fixture_fallbacks:
             post_eps = default_eps
+            eps_basis = None
 
         res: Dict[str, Any] = {
             "price_band_low": _pick_issue("price_band_low", default_low),
@@ -307,6 +382,9 @@ class CanonicalInputBuilder:
             "open_date": _pick_issue("open_date", default_open),
             "close_date": _pick_issue("close_date", default_close),
         }
+        if eps_basis is not None and post_eps is not None:
+            res["post_issue_eps_basis"] = eps_basis
+
         if "quota_pct" in issue_base:
             res["quota_pct"] = issue_base["quota_pct"]
         elif self._get_field("issue.quota_pct"):
@@ -473,7 +551,76 @@ class CanonicalInputBuilder:
                 if extracted is not None:
                     gov[optional_key] = extracted
         self._derive_rpt_metrics(gov)
+        self._derive_board_changes(gov)
         return gov
+
+    def _derive_board_changes(self, gov: Dict[str, Any]) -> None:
+        """Carry the directorate events through, and count exits in window.
+
+        ``kmp_exits_2y`` is no longer taken on trust from whatever the reader
+        happened to leave behind.  When the changes-in-directorate table was
+        read, the events are persisted on ``governance.board_changes`` and the
+        count is derived here against the offer open date, so the same
+        canonical record always re-derives the same count.  When the table was
+        *not* read, the count stays ``None`` (UNKNOWN) and the coverage state
+        records why -- an unread section is never a zero.
+
+        Only the two states that establish the count keep a number:
+
+        * ``DISCLOSED``  -- rows read; the window decides the count;
+        * ``VERIFIED_NIL`` -- the filing positively states there were no
+          changes, so zero exits is a verified zero.
+        """
+        events = self._get_field("governance.board_changes")
+        if events is None:
+            events = gov.get("board_changes")
+        if isinstance(events, list) and events:
+            gov["board_changes"] = events
+        elif "board_changes" not in gov:
+            gov.pop("board_changes", None)
+
+        state = self._get_field("coverage.governance.board_changes")
+        base_has_value = "kmp_exits_2y" in self.base.get("governance", {})
+
+        if state not in ("DISCLOSED", "VERIFIED_NIL"):
+            # The reader established nothing about the directorate section.
+            # A curated input value is then left exactly as supplied, with no
+            # coverage claim either way (legacy/v1.5 behaviour); otherwise the
+            # field stays UNKNOWN -- never zero.
+            if base_has_value:
+                return
+            gov["kmp_exits_2y"] = None
+            if state is not None:
+                self._kmp_exits_coverage = state
+            return
+
+        if state == "VERIFIED_NIL" and isinstance(events, list) and not events:
+            gov["kmp_exits_2y"] = 0
+            self._kmp_exits_coverage = "VERIFIED_NIL"
+            return
+
+        anchor_raw = (
+            self._get_field("issue.open_date")
+            or self.base.get("issue", {}).get("open_date")
+            or self._get_field("issue.close_date")
+            or self.base.get("issue", {}).get("close_date")
+            or self._get_field("issue.listing_date")
+            or self.base.get("issue", {}).get("listing_date")
+        )
+        anchor = None
+        if anchor_raw:
+            try:
+                anchor = datetime.date.fromisoformat(str(anchor_raw)[:10])
+            except ValueError:
+                anchor = None
+        count = count_exits(events or [], anchor)
+        if count is None:
+            # No offer date to anchor the window: the count is not established.
+            gov["kmp_exits_2y"] = None
+            self._kmp_exits_coverage = "PARTIAL"
+        else:
+            gov["kmp_exits_2y"] = count
+            self._kmp_exits_coverage = "DISCLOSED" if count else "VERIFIED_NIL"
 
     # Approved RPT metric definitions (Ramki, 2026-10-17; see
     # docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md):
