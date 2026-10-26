@@ -721,15 +721,23 @@ def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):
     # points for a section it could not extract. RK's directorate table *was*
     # read (1 appointment, 0 exits in the window), so board_kmp keeps its
     # verified evidence (43.0 -> 41.0).
-    assert body["final_score"] == pytest.approx(41.0)
+    # 2026-10-26 (report s.33): +2 points. Those two points were lost to the
+    # reader, not to the filing: the allotment schedule prints every cell over
+    # several lines and the flat-text regex could not join them. Read by
+    # geometry it reconciles to the filing's own paid-up capital, and none of
+    # its nine priced allotments falls inside the 365 days before the offer
+    # open date (the last is 2025-05-31, 492 days earlier), so
+    # `pre_ipo_placement_bucket` is decided on evidence (41.0 -> 43.0, base
+    # 44.0 -> 46.0, completeness 64% -> 66%). No weight or boundary changed.
+    assert body["final_score"] == pytest.approx(43.0)
     assert body["confidence"] == "Low"
     assert body["verdict"] == "INSUFFICIENT_DATA"
 
     eval_data = body["evaluation"]
-    assert eval_data["score"]["final_score"] == pytest.approx(41.0)  # D-5; kmp/lockin defaults removed
-    assert eval_data["score"]["base_score"] == pytest.approx(44.0)  # s.25: placements UNKNOWN (-2)
+    assert eval_data["score"]["final_score"] == pytest.approx(43.0)  # D-5; kmp/lockin defaults removed
+    assert eval_data["score"]["base_score"] == pytest.approx(46.0)  # s.33: placements read
     assert eval_data["score"]["penalties_total"] == pytest.approx(-3.0)
-    assert eval_data["score"]["completeness_pct"] == pytest.approx(64.0)  # s.25: + placements unknown
+    assert eval_data["score"]["completeness_pct"] == pytest.approx(66.0)  # s.33: placements read
 
     # Prove absence of Vishal Nirmiti qualitative defaults
     modules = {m["id"]: m for m in eval_data["score"]["modules"]}

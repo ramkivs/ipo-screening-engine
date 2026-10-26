@@ -2802,8 +2802,11 @@ standalone-basis metric with its own denominator).
 `test_coverage_nil_vs_unread_20261026.py` + `test_directorate_events_20261026.py` +
 `test_post_issue_eps_provenance_20261026.py` **80**; `test_rk_fashion_reconciliation.py` +
 `test_paras_evidence_regression.py` + `test_paras_extraction_gaps_20261024.py` **48**;
-`test_suite_tiers.py` **1** (new real-file module registered in `tests/tier_inventory.py`). The
-full backend, regression and frontend suites were deliberately not run.
+`test_ui7_ingestion.py` **20**; `test_suite_tiers.py` **1** (new real-file module registered in
+`tests/tier_inventory.py`). The first push failed CI on one expectation that had encoded the old,
+reader-limited score (`tests/test_ui7_ingestion.py`, `assert 43.0 == 41.0`); it is updated with
+the same reasoning and the module now passes 20/20. The full backend, regression and frontend
+suites were deliberately not run.
 
 ### Status and next actions
 

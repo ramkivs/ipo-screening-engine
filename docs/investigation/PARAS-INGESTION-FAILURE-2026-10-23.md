@@ -2666,8 +2666,11 @@ intra-group revenue. Nothing was implemented unilaterally.
 was rewritten as `…_falls_back_to_the_scanned_note`: it used to assert that R.K. Fashion yields no
 rows, which was the limitation this revision removes. It now asserts that every row carries OCR
 provenance, a movement column and the note's unit, and that coverage remains `PARTIAL`.
-`tests/test_rk_fashion_reconciliation.py` expectations move with the score (41 → 43) and record
-why in the comment. No other expectation was changed.
+`tests/test_rk_fashion_reconciliation.py` and
+`tests/test_ui7_ingestion.py::test_ingest_rk_fashion_accessories_real_statutory_filing`
+expectations move with the score (41 → 43, base 44 → 46, completeness 64% → 66%) and record why
+in the comment; `test_ui7_ingestion.py` only surfaced this in CI, which is why the first push
+failed with `assert 43.0 == 41.0`. No other expectation was changed.
 
 ### 33.10 Remaining limitations and next actions
 
