@@ -599,24 +599,36 @@ class CanonicalInputBuilder:
             self._kmp_exits_coverage = "VERIFIED_NIL"
             return
 
-        anchor_raw = (
-            self._get_field("issue.open_date")
-            or self.base.get("issue", {}).get("open_date")
-            or self._get_field("issue.close_date")
-            or self.base.get("issue", {}).get("close_date")
-            or self._get_field("issue.listing_date")
-            or self.base.get("issue", {}).get("listing_date")
-        )
-        anchor = None
-        if anchor_raw:
+        # The 24-month window is anchored on the date the offer opens -- never
+        # on the ingestion date, the retrieval date or "today".  When the filing
+        # has not disclosed the open date, the next date on the same offer
+        # timeline is used, and the count is reported as PARTIAL rather than
+        # DISCLOSED: a later anchor starts the window later, so it can only
+        # narrow the window the rule defines.
+        anchor_raw = None
+        anchor_is_open_date = False
+        for field in ("open_date", "close_date", "listing_date"):
+            candidate = self._get_field("issue.%s" % field) or self.base.get(
+                "issue", {}
+            ).get(field)
+            if not candidate:
+                continue
             try:
-                anchor = datetime.date.fromisoformat(str(anchor_raw)[:10])
+                anchor = datetime.date.fromisoformat(str(candidate)[:10])
             except ValueError:
-                anchor = None
+                continue
+            anchor_raw = candidate
+            anchor_is_open_date = field == "open_date"
+            break
+        else:
+            anchor = None
         count = count_exits(events or [], anchor)
         if count is None:
             # No offer date to anchor the window: the count is not established.
             gov["kmp_exits_2y"] = None
+            self._kmp_exits_coverage = "PARTIAL"
+        elif not anchor_is_open_date:
+            gov["kmp_exits_2y"] = count
             self._kmp_exits_coverage = "PARTIAL"
         else:
             gov["kmp_exits_2y"] = count

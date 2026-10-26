@@ -127,3 +127,22 @@ real Vishal Note 47 extraction (category totals hand-verified, verbatim
 quotes); real-PDF canonical mapping (evidence registered, scoring
 fields null, no schema change); golden-fixture consumer invariance
 (score 35.0, K6 UNVERIFIED, curated `rpt_pct_revenue` 6.67 untouched).
+
+## Numerator basis — evidence added 2026-10-26, definition unchanged
+
+Reading the scanned/dislocated disclosures (investigation §33) made one open question concrete
+without answering it: the Paras summary that the engine reads (pp. 92-93) discloses no
+revenue-type related-party row, while Note 34 §III-A adds "Revenue from sale of healthcare
+services (excluding applicable taxes)" — 28.69 / 14.45 / 6.48 ₹ million for FY2026 / FY2025 /
+FY2024 — under a heading stating that those transactions are **eliminated in consolidation**. The
+denominator is *consolidated* revenue from operations (16,059.52 / 12,940.63 / 11,290.39 ₹
+million), which by construction cannot contain eliminated intra-group revenue, and the
+neighbouring "Outsourced medical services" rows state no direction.
+
+Counting them would change the metric, not the extraction: the share would become
+0.1788% / 0.1116% / 0.0574% (D `rpt` 3/3, K6 change +0.067 pp → still CLEAR). **Nothing was
+redefined.** The approved definition stands, the fields stay null on this evidence, and the
+choice is recorded for Ramki in §33.8: keep the consolidated basis (no eligible numerator for
+Paras, UNKNOWN correct), or adopt a separate standalone-basis exposure metric with its own
+standalone revenue denominator — never a consolidated denominator divided into intra-group
+revenue.

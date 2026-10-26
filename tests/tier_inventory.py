@@ -26,6 +26,7 @@ INTEGRATION_MODULES = frozenset({
     "test_fixture_fallback_isolation.py",
     "test_four_field_manual_terms.py",
     "test_fresh_issue_manual_entry.py",
+    "test_glyph_geometry_and_ocr_note_20261026.py",
     "test_hd_fire_primary_source_extraction.py",
     "test_historical_listing_wiring.py",
     "test_ingestion_activity.py",

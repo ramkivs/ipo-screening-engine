@@ -2486,3 +2486,195 @@ reader changed.
 | 3 | R.K. Fashion and Jio share-history schedules still `PARTIAL` (§29 items 1-2) | unchanged from the previous pass |
 | 4 | The 24-month window still needs an RHP-date anchor when the offer open date is `[●]` (§29 item 4) | unchanged |
 | 5 | Whether rental income / related-party "revenue from sale of healthcare services" enters the Module D numerator | **decision for Ramki**; evidence is now extracted (§30.5) |
+
+## 33. Two readers that were only missing their geometry — 2026-10-26 (revision 27)
+
+This section closes §30.9 items 1, 2 and 3, and re-examines item 5 (the Module D
+numerator) on the evidence those readers now produce. Three defects are fixed, all in shared
+engine paths and all issuer-neutral.
+
+### 33.1 Root causes (all three proved on the filings, none assumed)
+
+**(a) The related-party note had no text layer at all.** R.K. Fashion's restated financial
+statements are scanned: PDF p. 308 carries one embedded image and the six characters
+`304 \n \n \n`, p. 309 `305 \n \n \n`. Note 31 "Related Party Disclosures" sits on those
+pages, so every text-layer reader returns nothing there and the disclosure could only be
+reported `PARTIAL` — 0 transaction rows for a filing that discloses them in full (§30.9 item 2).
+
+**(b) A row's counterparty and its first amount arrive as one text fragment.** On Paras
+Note 34 §III-A (p. 419) the positioned text layer gives, for the revenue row:
+
+``204:Paras Healthcare (Ranchi) Private Limited 40.54   311:34.53   372:132.35   429:106.24   485:80.58``
+
+The counterparty cell and its amount are welded into one fragment whose start x is the
+counterparty's. `_rpt_split_row` splits on fragments, so the row presents four amounts where
+the table has five columns and the counterparty string carries a number. This is the real
+"merged numeric cell" defect in this filing — not glued numerals in `extract_page_text`
+(checked: zero occurrences of `57.94108.63`-shaped tokens on pp. 416-420 in either text mode).
+The characters inside the fragment still carry their own positions, so the cell boundaries can
+be rebuilt from glyph boxes.
+
+**(c) A missed rule silently merges two columns.** Where the printed vertical rule is dotted
+or dashed it is invisible to a dark-ink scan, so two columns become one band whose header
+names two quantities ("Purchases during the Year" and "Amount Paid"). Binding the band's
+amounts to whichever name sorts first is a guess; it is now refused (§33.2).
+
+### 33.2 Shared implementation
+
+| Location | What it does |
+|---|---|
+| `engine/ipo_screening/extraction/glyph_table.py` (new) | Reads a page's **character boxes** (pypdfium2 `get_charbox`) and rebuilds cells from geometry: characters group into lines by vertical centre, lines split into runs only where the gap is wider than the line's own spacing (`MIN_GAP` 2.6 pt, `GAP_FACTOR` 2.4 × the line's median gap) and never between two digits of one figure. Returns the same `(baseline, cells)` shape the text-layer readers already consume. No table semantics: no periods, totals or categories. |
+| `SectionExtractor.extract_page_glyph_lines` | Caches the glyph rows per page; `None` means "no character geometry" (a scan), which is distinct from "read and empty". |
+| `SectionExtractor._rpt_page_rows` | Uses the fragment reading when it separates cells, and the glyph reconstruction when it does not (fewer than two rows with two or more amount cells). The period-matrix reader calls this instead of splitting fragments itself, so every existing layout keeps its current reading. |
+| `engine/ipo_screening/extraction/rpt_image_note.py` (new) | Reads an image-only related-party note: bounded offline OCR (`MAX_SCAN_PAGES` 20 heading strips, `MAX_FULL_PAGES` 3 full pages), then rebuilds the ruled table from the **vertical rules detected in the rendered page** (`RULE_DARK_FRACTION` 0.55), maps each header cell to the band that contains it, binds each amount to the band containing its own centre, and validates every row against the block's own arithmetic (opening + additions − reductions = closing, `ARITHMETIC_TOLERANCE` 0.15). |
+| `SectionExtractor._extract_related_party_image_note` | Runs only when the text layer already located the disclosure and read **no** transaction row (`_RPT_IMAGE_NOTE_PAGES` 22 thin pages inside the restated-financials range). Nothing is OCR'd blind, and a failed OCR attempt claims nothing (the located-but-unread state stands). |
+
+Rules the OCR reader keeps, in full:
+
+* a **balance** column is never a transaction — only movement columns emit values;
+* a block is read only when it states a **control total** (a balance column *and* a movement
+  column), which is what makes each row checkable. Purchase/payment, remuneration and
+  merger-consideration blocks have no control total and are counted as unread (R.K.'s merger
+  block states share counts, 84,388 / 131,200 / 90,200 / 90,528 at ₹10, not rupees);
+* a band whose header names two quantities is refused (a missed dotted rule);
+* an amount is emitted only from a cell whose OCR text has an amount shape (`12.34`,
+  `1,234.56`, `(12.34)`) at confidence ≥ `AMOUNT_CONFIDENCE` 0.94 **and** whose box sits inside
+  its band **and** whose row states its own period and party. A cell read as `480` where the
+  filing prints `4.80` is not an amount; a row whose period printed on a neighbouring line is
+  unread rather than carried forward;
+* the page unit comes from the note's own "Amount (Rs. in lakhs)" line.
+
+### 33.3 Evidence
+
+**R.K. Fashion Note 31 (PDF pp. 308-310, image-only).** The reader maps 5 blocks and reports 19
+values with 55 cells counted unread, coverage `PARTIAL`. The rows that the block's own
+arithmetic validates include the filing's known samples:
+
+| Counterparty | Nature | FY | Opening | Borrowed | Repaid | Closing | Check |
+|---|---|---|---|---|---|---|---|
+| Mohammed Imran | Loan Taken | FY2024 | 24.00 | 18.50 | 42.50 | — | 24.00 + 18.50 − 42.50 = 0.00 |
+| Mohammed Usman | Loan Taken | FY2026 | 49.88 | 170.32 | 49.88 | 170.32 | closes exactly |
+| Mohammed Usman | Loan Taken | FY2025 | 49.90 | 20.00 | 20.03 | 49.88 | 49.90 + 20.00 − 20.03 = 49.87 (rounding) |
+| Mohammed Usman | Loan Taken | FY2024 | 47.21 | 216.00 | 213.31 | 49.90 | closes exactly |
+
+The opening/closing balances are evidence, never transactions: the note supplies 18.50 and
+42.50 for the Imran row, not the 24.00 balance. Cells that the reader could not bind (a value
+whose period printed on another line, a low-confidence amount) are counted unread, which is why
+the coverage is `PARTIAL` and not `DISCLOSED`.
+
+**Paras Note 34 §III-A (p. 419).** With the glyph reconstruction the row above becomes five
+separate amount cells and the counterparty becomes its own cell:
+
+| Nature | Transacting party | 3M Jun-26 | 3M Jun-25 | FY2026 | FY2025 | FY2024 |
+|---|---|---|---|---|---|---|
+| Rent and facility fees (including applicable taxes) | Plus Medicare Hospitals Private Limited | 23.87 | 22.77 | 91.08 | 82.31 | 75.22 |
+| Revenue from sale of healthcare services (excl. taxes) | Paras Healthcare (Ranchi) Private Limited | 5.97 | 3.21 | 17.77 | 8.98 | 3.87 |
+| Revenue from sale of healthcare services (excl. taxes) | Plus Medicare Hospitals Private Limited | 4.20 | 1.33 | 10.92 | 5.47 | 2.61 |
+
+The rent row reproduces the amounts the summary on pp. 92-93 prints for the same nature, which
+is the independent check that the columns are bound correctly.
+
+### 33.4 Coverage changes
+
+| Issuer | Related-party transactions | Coverage | Page |
+|---|---|---|---|
+| Paras Healthcare | **70 (unchanged)** | `DISCLOSED` | 92 |
+| Jio Platforms | **23 (unchanged)** | `DISCLOSED` | 376 |
+| Vishal Nirmiti | **136 (unchanged)** | `DISCLOSED` | 387 |
+| R.K. Fashion Accessories | **0 → 14** (19 when pp. 308-310 are read directly) | `PARTIAL` | 61 (= printed 57) |
+
+### 33.5 Score effects
+
+Only R.K. Fashion moves, and only because the evidence it always disclosed is now read.
+
+| | Before | After | Why |
+|---|---|---|---|
+| Module C | 7 / 13 | **9 / 13** | `pre_ipo_placement_bucket` was UNKNOWN because the share-history schedule was unreadable (§25); it is now read, and no priced allotment falls inside the 365 days before the offer open date |
+| Final score | 41.0 | **43.0** | base 44.0 → 46.0, penalties unchanged at −3.0 |
+| Completeness | 64.0% | **66.0%** | two fewer unknown points |
+| Lower bound | 26.0 | **28.0** | upper bound unchanged at 77.0 |
+
+Paras (D `rpt` UNKNOWN, K6 UNVERIFIED), Jio and Vishal keep their existing values. No weight,
+threshold, band, penalty, knockout or criterion definition was touched; `derived.py` was not
+edited (frozen-core pin unchanged at `7783dfeb…`).
+
+### 33.6 Paid-up share-capital schedule (same pass, published here)
+
+`SectionExtractor._share_history` reads the allotment schedule when the legacy one-sentence
+regex and the filing's positive no-discount statement both establish nothing, and only when the
+coverage is not `VERIFIED_NIL`:
+
+* **R.K. Fashion** — `DISCLOSED`, PDF p. 110, 11 rows read, **9 priced allotments** (2010-03-23
+  10,000 @ ₹10 … 2025-05-31 2,223 @ ₹272), 2 non-cash rows not reported; reconciles to
+  1,12,49,563 shares / ₹11,24,95,630.
+* **Jio Platforms** — `DISCLOSED`, PDF p. 100, **17 priced allotments** (2019-11-15 10,000 @ ₹10,
+  2019-12-12 4,96,12,90,000 @ ₹10, 2020-07-13 76,56,48,027 @ ₹549.31, …).
+* **Vishal Nirmiti** — the schedule is located but its cumulative columns do not reconcile, so
+  **no** placement is claimed (`PARTIAL`); the filing's own no-discount statement keeps
+  `capital_structure.pre_ipo_placements` at `VERIFIED_NIL` exactly as before.
+
+### 33.7 24-month window anchor
+
+Unchanged: the window is anchored on `issue.open_date` (falling back to `close_date`, then
+`listing_date` on the same offer timeline), never on `date.today()`, the ingestion date or the
+retrieval date; the boundary is inclusive and calendar-aware
+(`minus_months(date(2024, 2, 29), 24) == date(2022, 2, 28)`). One hardening: when the anchor is
+**not** the offer open date the count is still reported but its coverage is `PARTIAL`, because a
+later anchor can only narrow the window the rule defines. Offer open dates are disclosed for
+Paras, Jio and Vishal, so no existing record changes.
+
+### 33.8 Module D numerator — disposition (§30.9 item 5)
+
+The new reading makes the question precise, and it is **not** a reader defect. Two different
+disclosures exist in the Paras RHP and they are not duplicates:
+
+* the summary on pp. 92-93 (what the engine reads, 70 rows) covers KMP remuneration, post-
+  employment benefits, share-based payments, retainers, sitting fees, **rental income**,
+  repairs/power & fuel and an advance. It discloses **no revenue-type** related-party row, so
+  under the approved definition the numerator is absent → `rpt_pct_revenue` null
+  (D UNKNOWN / K6 UNVERIFIED);
+* Note 34 §III-A (p. 419) additionally discloses **"Revenue from sale of healthcare services
+  (excluding applicable taxes)"** — 28.69 / 14.45 / 6.48 ₹ million for FY2026 / FY2025 / FY2024 —
+  but the table's own heading is "Transactions and balances with related parties **eliminated in
+  consolidation**". The denominator (`revenue` 16,059.52 / 12,940.63 / 11,290.39 ₹ million) is
+  *consolidated* revenue, which cannot contain revenue eliminated on consolidation.
+
+If those rows were counted, Paras's share would be **0.1788% / 0.1116% / 0.0574%** (change
++0.067 pp, K6 would remain CLEAR) and D `rpt` would score 3/3. That is a metric-definition
+change, not an extraction fix: it mixes gross intra-group revenue with post-elimination revenue,
+and "Outsourced medical services (excluding applicable taxes)" states no direction at all, so
+counting it would require assuming revenue. **Disposition: the fields stay null (UNKNOWN) and
+the evidence is preserved.** Recommendation to Ramki: either (i) keep the consolidated basis —
+then no eligible numerator exists for Paras and UNKNOWN is the correct answer; or (ii) adopt a
+standalone-basis exposure metric with a *standalone* revenue denominator, which needs its own
+definition and its own field, so that a consolidated revenue figure is never divided into
+intra-group revenue. Nothing was implemented unilaterally.
+
+### 33.9 Verification — exact commands and results
+
+| Command | Result |
+|---|---|
+| `pytest tests/test_glyph_geometry_and_ocr_note_20261026.py -q` | **15 passed** |
+| `pytest tests/test_rpt_matrix_reader_20261026.py tests/test_vishal_historical_reconciliation.py tests/test_paras_official_issue_page_terms.py -q` | **43 passed** |
+| `pytest tests/test_rpt_extraction.py tests/test_auditor_evidence_section.py -q` | **20 passed** |
+| `pytest tests/test_acceptance_matrix.py tests/test_vishal_golden.py tests/test_glyph_geometry_and_ocr_note_20261026.py -q` | **89 passed** |
+| `pytest tests/test_cli_phase5i.py tests/test_coverage_nil_vs_unread_20261026.py tests/test_directorate_events_20261026.py tests/test_post_issue_eps_provenance_20261026.py -q` | **80 passed** |
+| `pytest tests/test_rk_fashion_reconciliation.py tests/test_paras_evidence_regression.py tests/test_paras_extraction_gaps_20261024.py -q` | **48 passed** |
+| `pytest tests/test_suite_tiers.py -q` | **1 passed** (the new real-file module is registered in `tests/tier_inventory.py`) |
+
+`tests/test_rpt_matrix_reader_20261026.py::test_aggregate_only_summary_is_partial_coverage_not_values`
+was rewritten as `…_falls_back_to_the_scanned_note`: it used to assert that R.K. Fashion yields no
+rows, which was the limitation this revision removes. It now asserts that every row carries OCR
+provenance, a movement column and the note's unit, and that coverage remains `PARTIAL`.
+`tests/test_rk_fashion_reconciliation.py` expectations move with the score (41 → 43) and record
+why in the comment. No other expectation was changed.
+
+### 33.10 Remaining limitations and next actions
+
+| # | Limitation | Next action |
+|---|---|---|
+| 1 | Note 34 §III-A is now *readable* cell by cell, but it is still not consumed by the metric — by design (§33.8) | Ramki's decision on the numerator basis |
+| 2 | The OCR note reader reports `PARTIAL` on R.K. Fashion: 55 cells unbound, mostly values whose period printed on a neighbouring line and low-confidence amounts | a row-band model that spans two printed lines per row, with the same fail-closed rule |
+| 3 | Paras's summary rows keep their verbatim nature text and are `unclassified` (e.g. "Short term employee benefits and Other long term benefits") — the amounts are right, the category vocabulary does not cover those natures | add non-revenue natures to `_RPT_CATEGORY_PHRASES` only together with a metric review, so no eligible category appears by accident |
+| 4 | Wrapped label words stay as printed ("Dr. Dharminde r Kumar Nagar") — repairing them would be inventing text | leave as is; the quotation is verbatim |
+| 5 | OCR adds ~25 s to a fully scanned filing's extraction (bounded: 20 heading strips + 3 pages) | acceptable for single-filing runs; a cache keyed by (file, page, scale) would remove the repeat cost |

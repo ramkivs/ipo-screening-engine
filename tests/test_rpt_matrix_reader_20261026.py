@@ -337,7 +337,16 @@ def test_paras_balances_table_is_not_read_as_transactions(paras_extractions):
 
 
 @pytest.mark.slow
-def test_aggregate_only_summary_is_partial_coverage_not_values():
+def test_aggregate_only_summary_falls_back_to_the_scanned_note():
+    """R.K. Fashion: the text layer has only control totals, the note is a scan.
+
+    The summary prints "Sum of all related party transactions", revenue and the
+    share -- control totals, not per-counterparty rows -- so the text-layer
+    reading supplies no transaction.  The note itself is printed as an image,
+    and the reader reads it by OCR (report section 33) without ever reporting a
+    balance as a transaction and without claiming a complete disclosure: the
+    coverage stays PARTIAL because cells that could not be bound are counted.
+    """
     if not RK_RHP.exists():  # pragma: no cover - fixture absent
         pytest.skip("R.K. Fashion RHP is not present in this checkout")
     import pypdf
@@ -347,9 +356,21 @@ def test_aggregate_only_summary_is_partial_coverage_not_values():
     doc = SourceDocument(source_id="RK-RHP", uri=str(RK_RHP), content_hash="rk")
     extractor = SectionExtractor(doc, pypdf.PdfReader(str(RK_RHP)))
     extractions = extractor.extract_related_party_transactions()
-    # The summary prints "Sum of all related party transactions", revenue and
-    # the share -- control totals, not per-counterparty rows.
-    assert _rows(extractions) == []
+    rows = _rows(extractions)
     coverage = _coverage(extractions)
     assert coverage.candidate_value == "PARTIAL"
-    assert "aggregate" in coverage.raw_text
+    for row in rows:
+        # Every OCR row states its column and says where it came from; no row
+        # is a balance, and no row is a value the text layer produced.
+        assert row["reading"] == "ocr_geometry"
+        # Only a block that prints a control total is read, and a balance is
+        # never a transaction: the column is one of the movement columns (or
+        # the "transaction during the year" column of a block that closes
+        # against its own closing balance).
+        assert row["column"] in {"loan_taken", "loan_repaid", "purchase_of_goods",
+                                 "payment_made", "interest_paid", "interest_received",
+                                 "transaction_amount"}
+        assert row["unit"] == "INR_LAKHS"
+    if not rows:
+        # OCR unavailable (no local engine): the located-but-unread state.
+        assert "image-only" in coverage.raw_text or "aggregate" in coverage.raw_text

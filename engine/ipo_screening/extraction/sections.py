@@ -1268,6 +1268,43 @@ class SectionExtractor:
                     # row from it: partially examined, not nil.
                     coverage_state = "PARTIAL"
                     coverage_page = p
+
+        # The allotment schedule (report section 33).  Read only when neither
+        # the one-sentence row regex nor the filing's positive no-discount
+        # statement established anything: the statement is the filing's own
+        # direct answer to the criterion and outranks a reconstruction, and
+        # the row regex reads the simple layouts it was written for.  What is
+        # left is a schedule whose columns have to be rebuilt from geometry --
+        # R.K. Fashion (wrapped header and cells) and Jio (allottee and nature
+        # columns before the amounts, a text column after them).
+        if not placements and coverage_state != "VERIFIED_NIL":
+            history_rows, history_page, history_state, history_note = (
+                self._share_history(p_start, p_end)
+            )
+            if history_rows:
+                placements = history_rows
+                coverage_state = history_state
+                coverage_quote = history_note
+                coverage_page = history_page or coverage_page
+                extractions.append(
+                    RawExtraction(
+                        field_path="capital_structure.pre_ipo_placements",
+                        candidate_value=history_rows,
+                        raw_text=history_note,
+                        page=history_page or found_page,
+                        section="Capital Structure",
+                        locator="History of paid-up equity share capital (allotment rows)",
+                        quote=history_note,
+                        quote_is_processing=True,
+                        extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                        extraction_confidence=0.9,
+                    )
+                )
+            elif history_state == "PARTIAL":
+                coverage_state = "PARTIAL"
+                coverage_quote = history_note
+                coverage_page = history_page or coverage_page
+
         extractions.append(
             RawExtraction(
                 field_path="coverage.capital_structure.pre_ipo_placements",
@@ -1339,6 +1376,466 @@ class SectionExtractor:
             )
 
         return extractions
+
+    # ------------------------------------------------------------------
+    # Paid-up share-capital history: the allotment schedule
+    # ------------------------------------------------------------------
+    #
+    # Proven defect (2026-10-26).  ``capital_structure.pre_ipo_placements``
+    # was read by one flat-text regex that expected a single sentence shape --
+    # "<Month> <day>, <year> <shares> Further issue of equity shares ...
+    # Cash <face value> <issue price>".  Two filings that do disclose a full
+    # allotment schedule were therefore reported as PARTIAL:
+    #
+    #   * R.K. Fashion (printed p. 106 / PDF p. 110, "HISTORY OF PAID-UP
+    #     EQUITY SHARE CAPITAL OF OUR COMPANY") states every allotment with
+    #     its date, share count, face value, issue price and cumulative
+    #     totals -- but the header wraps ("Date of / Allotme / nt") and the
+    #     cells wrap too ("10/" + "-"), so the sentence never matches;
+    #   * Jio (PDF pp. 100-102) states the same information with the columns
+    #     in a different order (allottee and nature first, amounts later) and
+    #     a "Nature of consideration" text column *after* the amounts, so no
+    #     left-to-right numeric run exists to split.
+    #
+    # PARTIAL is not a scoring state -- the bucket rule refuses to read an
+    # unread schedule as "no placement" -- so both issuers had an UNKNOWN
+    # ``pre_ipo_placement_bucket`` while the evidence sat in the filing as
+    # positioned text.  The reader below rebuilds the table from that
+    # geometry: column roles come from the header band, every cell is bound
+    # to a column by position (so wrapped cells and reordered columns are
+    # handled), rows are anchored on dates, and the reconstruction is
+    # *validated* against the schedule's own cumulative-share arithmetic
+    # before any row is emitted.  A reconstruction that does not add up is
+    # reported as PARTIAL with no rows -- never as a placement.
+    #
+    # Non-cash capital events (bonus, gift, transfer, extinguishment, split,
+    # consolidation) are not placements at a price: the schedule states no
+    # issue price for them, and reading a face value as a price would
+    # manufacture a discount.  They are skipped, and the skip is counted in
+    # the coverage note.
+
+    _HISTORY_MONTHS = {
+        "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+        "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+    }
+    # The date cell can wrap mid-word ("Novemb" + "er") and carry footnote
+    # markers; only letters, digits and the comma of "March 23, 2010" count.
+    _HISTORY_DATE_COMPLETE = re.compile(
+        r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(\d{1,2}),?(\d{4})"
+    )
+    _HISTORY_NON_PLACEMENT = re.compile(
+        r"bonus|gift|extinguish|sub-?division|subdivision|split|consolidat|"
+        r"transferred|transfer|forfeit|reduction\s+of\s+capital",
+        re.IGNORECASE,
+    )
+    _HISTORY_ROLE_WORDS: Tuple[Tuple[str, str], ...] = (
+        ("dateof", "date"),
+        ("detailsof", "allottee"),
+        ("nameof", "allottee"),
+        ("natureof", "nature"),
+        ("noof", "shares"),
+        ("numberof", "shares"),
+        ("face", "face"),
+        ("issue", "price"),
+        ("cumulative", "cumulative"),
+    )
+    _HISTORY_NUMERIC_ROLES = frozenset(
+        {"shares", "face", "price", "cumulative_shares", "cumulative_capital"}
+    )
+
+    @staticmethod
+    def _history_compact(text: str) -> str:
+        """``text`` without whitespace or punctuation, lower-cased.
+
+        Header words wrap mid-word ("Allotme" + "nt") and the schedule prints
+        abbreviations with periods ("No. of Equity Shares allotted"), so the
+        comparison form keeps letters and digits only.
+        """
+        return re.sub(r"[^0-9a-z]", "", (text or "").lower())
+
+    @classmethod
+    def _history_date(cls, text: str) -> Optional[str]:
+        """ISO date from a wrapped date cell, or ``None``."""
+        compact = re.sub(r"[^0-9A-Za-z,]", "", text or "").lower()
+        match = cls._HISTORY_DATE_COMPLETE.search(compact)
+        if not match:
+            return None
+        month = cls._HISTORY_MONTHS.get(match.group(1))
+        try:
+            return datetime.date(
+                int(match.group(3)), month, int(match.group(2))
+            ).isoformat()
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _history_first_number(text: str) -> Optional[float]:
+        """The first number of a cell, keeping a parenthesised negative."""
+        if not text:
+            return None
+        match = re.search(r"\d[\d,]*(?:\.\d+)?", text)
+        if not match:
+            return None
+        value = float(match.group(0).replace(",", ""))
+        before = text[: match.start()]
+        if before.count("(") > before.count(")"):
+            return -value
+        return value
+
+    @classmethod
+    def _history_header(cls, lines):
+        """``(columns, first_data_index, date_x)`` for an allotment schedule.
+
+        ``columns`` is an ordered list of ``(x, role)`` built from the header
+        band above the first dated row.  The band starts at the "Date of
+        allotment" column word and stops at the first dated row, so a heading
+        or a totals table above it is never read as a column header.
+        """
+        for index, (_, cells) in enumerate(lines):
+            for x, text in cells:
+                if not cls._history_compact(text).startswith("dateof"):
+                    continue
+                start = max(0, index - 6)
+                # Column roles first, from a band that reaches a little above
+                # the "Date of" word -- a table can print "Face value" and
+                # "Cumulative paid-up" on the lines above it.
+                provisional = [
+                    (lines[j][0], cx, ct)
+                    for j in range(start, min(index + 12, len(lines)))
+                    for cx, ct in lines[j][1]
+                ]
+                trial = cls._history_columns(provisional, x)
+                numeric = [
+                    anchor for anchor, role in trial
+                    if role in cls._HISTORY_NUMERIC_ROLES
+                ]
+                if "cumulative_capital" not in {role for _, role in trial}:
+                    # Not a company-wide paid-up capital schedule: a promoter
+                    # shareholding build-up also prints a "Date of Allotment"
+                    # column but has no cumulative paid-up capital column.
+                    return None, None, None
+                first = None
+                for j in range(index + 1, len(lines)):
+                    if any(
+                        min((abs(cx - anchor) for anchor in numeric), default=999.0) <= 90
+                        and cls._history_first_number(ct) is not None
+                        for cx, ct in lines[j][1]
+                    ):
+                        first = j
+                        break
+                if first is None:
+                    return None, None, None
+                # A row's date can sit on the line(s) above its amounts.
+                for j in range(first - 1, max(start, first - 5) - 1, -1):
+                    if any(
+                        abs(cx - x) <= 26 and re.search(r"[A-Za-z]", ct)
+                        for cx, ct in lines[j][1]
+                    ):
+                        first = j
+                    else:
+                        break
+                band = [
+                    (lines[j][0], cx, ct)
+                    for j in range(start, first)
+                    for cx, ct in lines[j][1]
+                ]
+                return cls._history_columns(band, x), first, x
+        return None, None, None
+
+    @classmethod
+    def _history_columns(cls, band, date_x: float = 0.0):
+        """``[(x, role)]`` from a header band, in left-to-right order."""
+        clusters: List[List[Any]] = []
+        for y, x, text in sorted(band, key=lambda item: (item[1], -item[0])):
+            if clusters and x - clusters[-1][0] <= 14:
+                clusters[-1][1].append((y, text))
+            else:
+                clusters.append([x, [(y, text)]])
+        columns: List[Tuple[float, str]] = []
+        used: set = set()
+        for x, fragments in clusters:
+            joined = cls._history_compact("".join(text for _, text in fragments))
+            role: Optional[str] = None
+            for _, text in sorted(fragments, key=lambda item: -item[0]):
+                head = cls._history_compact(text)
+                for word, name in cls._HISTORY_ROLE_WORDS:
+                    if head.startswith(word):
+                        role = name
+                        break
+                if role:
+                    break
+            if role == "cumulative":
+                role = (
+                    "cumulative_capital"
+                    if ("paid" in joined or "capital" in joined)
+                    else "cumulative_shares"
+                )
+            if role == "nature" and "consider" in joined:
+                role = "consideration"
+            if role is None or role in used:
+                continue
+            used.add(role)
+            columns.append((x, role))
+        columns.sort()
+        if "date" not in used:
+            columns.insert(0, (date_x, "date"))
+        return columns
+
+    def _share_history(
+        self, page_start: int, page_end: int
+    ) -> Tuple[List[Dict[str, Any]], Optional[int], str, str]:
+        """Read the paid-up share-capital allotment schedule.
+
+        Returns ``(placements, first_page, coverage_state, note)``.
+        ``placements`` holds ``{date, price, shares}`` for every allotment that
+        states an issue price and is not a non-cash capital event.
+        """
+        placements: List[Dict[str, Any]] = []
+        first_page: Optional[int] = None
+        columns: Optional[List[Tuple[float, str]]] = None
+        date_x = 0.0
+        strict = 90.0
+        rows_read = skipped = unassigned = unvalidated = 0
+        for page in range(page_start, min(page_end, self.page_count) + 1):
+            lines = self._rpt_visual_lines(self.extract_page_fragments(page) or [])
+            if not lines:
+                if first_page is not None:
+                    break
+                continue
+            header_columns, first_data, header_date_x = self._history_header(lines)
+            if header_columns is not None:
+                columns, date_x, strict = header_columns, header_date_x, 90.0
+                if first_page is None:
+                    first_page = page
+            else:
+                if columns is None:
+                    continue
+                # A continuation page without a repeated header: the same
+                # columns apply, so read the whole page as body text -- but
+                # only where the amounts sit exactly on those columns.  A page
+                # of notes mentions the same dates and the same share counts
+                # in prose, and prose does not line up with the table.
+                numeric_anchors = [
+                    anchor for anchor, role in columns
+                    if role in self._HISTORY_NUMERIC_ROLES
+                ]
+                first_line = next((cells for _, cells in lines if cells), [])
+                if not any(
+                    self._history_first_number(text) is not None
+                    and min(
+                        (abs(x - anchor) for anchor in numeric_anchors), default=999.0
+                    ) <= 12.0
+                    for x, text in first_line
+                ):
+                    # The first line of the page is prose, not a table row:
+                    # the schedule ended on the previous page and this is a
+                    # note that repeats its dates and figures in words.
+                    break
+                first_data = 0
+                strict = 12.0
+            if first_data is None:
+                break
+            result = self._history_page_rows(
+                lines, columns, first_data, date_x, strict
+            )
+            if not result["dates"]:
+                break
+            if strict < 90.0 and not result["core"]:
+                # A page of notes repeats the same dates and share counts in
+                # prose; only a page that still lines up with *both* the share
+                # count and the cumulative-share column continues the table.
+                break
+            rows_read += result["dates"]
+            skipped += result["skipped"]
+            unassigned += result["unassigned"]
+            unvalidated += result["unvalidated"]
+            placements.extend(result["placements"])
+        if first_page is None or (not rows_read and not skipped):
+            return [], None, "UNREAD", ""
+        if unvalidated:
+            return [], first_page, "PARTIAL", (
+                "a paid-up share-capital allotment schedule was located and %d row(s) "
+                "were read, but the reconstruction does not reconcile with the "
+                "schedule's own cumulative-share totals, so no allotment is reported"
+                % (rows_read,)
+            )
+        if not placements:
+            return [], first_page, "PARTIAL", (
+                "a paid-up share-capital allotment schedule was located but it states "
+                "no priced allotment row (%d row(s) read)" % (rows_read,)
+            )
+        state = "DISCLOSED" if not unassigned else "PARTIAL"
+        note = (
+            "%d allotment row(s) read from a paid-up share-capital schedule: %d priced "
+            "allotment(s) reported, %d non-cash or unpriced row(s) not reported as "
+            "placements; the reconstruction reconciles with the schedule's cumulative "
+            "share and paid-up capital columns"
+            % (rows_read, len(placements), skipped)
+        )
+        if unassigned:
+            note += "; %d amount line(s) could not be attributed to a date" % unassigned
+        return placements, first_page, state, note
+
+    def _history_page_rows(
+        self, lines, columns, first_data: int, date_x: float, tolerance: float = 90.0
+    ) -> Dict[str, Any]:
+        """Rows of one page of an allotment schedule."""
+        anchors = list(columns)
+
+        def role_of(x: float) -> Optional[str]:
+            if abs(x - date_x) <= 45:
+                # The date column: "March 31, 2010" can split as "March" +
+                # "31," + "2010", and the day fragment sits closer to the
+                # share-count column than to the month.  It belongs to the
+                # date, never to an amount.
+                return None
+            best: Optional[Tuple[float, str]] = None
+            for anchor_x, name in anchors:
+                distance = abs(x - anchor_x)
+                if best is None or distance < best[0]:
+                    best = (distance, name)
+            if best is None or best[0] > tolerance:
+                return None
+            return best[1]
+
+        body = lines[first_data:]
+        # Date cells: accumulate fragments until a complete date is formed, so
+        # a row whose date wraps over three lines is one date, not three.
+        dates: List[Dict[str, Any]] = []
+        buffer_text = ""
+        buffer_ys: List[float] = []
+        for y, cells in body:
+            for x, text in cells:
+                if abs(x - date_x) > 45 or not re.search(r"[0-9A-Za-z]", text):
+                    continue
+                buffer_text += text
+                buffer_ys.append(y)
+                iso = self._history_date(buffer_text)
+                if iso:
+                    dates.append(
+                        {
+                            "iso": iso,
+                            "top": max(buffer_ys),
+                            "bottom": min(buffer_ys),
+                            "cells": {},
+                        }
+                    )
+                    buffer_text = ""
+                    buffer_ys = []
+                elif len(buffer_text) > 48:
+                    buffer_text = ""
+                    buffer_ys = []
+        if not dates:
+            return {
+                "placements": [], "dates": 0, "skipped": 0,
+                "unassigned": 0, "unvalidated": 0,
+            }
+
+        # Every body line that carries an amount, with its cells bound to
+        # columns by position.
+        data_lines: List[Dict[str, Any]] = []
+        for y, cells in body:
+            cells_by_role: Dict[str, List[str]] = {}
+            for x, text in cells:
+                role = role_of(x)
+                if role:
+                    cells_by_role.setdefault(role, []).append(text)
+            numeric_cells = [
+                role for role in cells_by_role
+                if role in self._HISTORY_NUMERIC_ROLES
+                and self._history_first_number("".join(cells_by_role[role])) is not None
+            ]
+            if not numeric_cells:
+                continue
+            if len(numeric_cells) < 2 and not any(
+                abs(x - date_x) <= 45 and re.search(r"[0-9A-Za-z]", text)
+                for x, text in cells
+            ):
+                # A row of a share-capital table states at least two amounts
+                # (shares and a cumulative/price column); a single number on
+                # its own line is a page number or a footnote marker, never a
+                # row -- and attributing it to a row would corrupt the
+                # cumulative-share reconciliation.
+                continue
+            data_lines.append({"y": y, "cells": cells_by_role})
+
+        # A table row occupies the vertical band between two date cells: its
+        # amounts print above its date (the layout engine can place a row's
+        # date below its figures), so a row's band runs from its own date down
+        # to the next date below it.
+        for index, row in enumerate(dates):
+            row["low"] = row["bottom"] - 6.0
+            row["high"] = dates[index - 1]["bottom"] if index else float("inf")
+
+        # Attribute each amount line to the row whose band contains it.
+        rows: List[Dict[str, Any]] = []
+        unassigned = 0
+        for line in data_lines:
+            owner = None
+            best = None
+            for row in dates:
+                if not (row["low"] <= line["y"] <= row["high"]):
+                    continue
+                distance = abs(line["y"] - row["bottom"])
+                if best is None or distance < best:
+                    best = distance
+                    owner = row
+            if owner is None:
+                unassigned += 1
+                continue
+            if not any(row is owner for row in rows):
+                rows.append(owner)
+            for role, texts in line["cells"].items():
+                owner["cells"].setdefault(role, []).extend(texts)
+
+        placements: List[Dict[str, Any]] = []
+        skipped = 0
+        unvalidated = 0
+        core_rows = 0
+        previous_cumulative: Optional[float] = None
+        for row in rows:
+            cells = row["cells"]
+            values = {
+                role: self._history_first_number("".join(cells.get(role, [])))
+                for role in self._HISTORY_NUMERIC_ROLES
+            }
+            text = " ".join(
+                " ".join(cells.get(role, [])) for role in sorted(cells)
+            )
+            cumulative = values.get("cumulative_shares")
+            shares = values.get("shares")
+            if cumulative is not None and shares is not None:
+                core_rows += 1
+            if (
+                cumulative is not None
+                and previous_cumulative is not None
+                and shares is not None
+                and abs(cumulative - (previous_cumulative + shares)) > 0.5
+            ):
+                unvalidated += 1
+            if cumulative is not None:
+                previous_cumulative = cumulative
+            price = values.get("price")
+            if (
+                price is None
+                or price <= 0
+                or shares is None
+                or shares <= 0
+                or self._HISTORY_NON_PLACEMENT.search(text)
+            ):
+                skipped += 1
+                continue
+            placements.append(
+                {"date": row["iso"], "price": float(price), "shares": float(shares)}
+            )
+        return {
+            "placements": placements,
+            "dates": len(rows),
+            "skipped": skipped,
+            "unassigned": unassigned,
+            "unvalidated": unvalidated,
+            "core": core_rows,
+        }
 
     def extract_objects_of_offer(self, page_ranges: Optional[Dict[str, Tuple[int, int]]] = None) -> List[RawExtraction]:
         """Extract use_of_proceeds schedule with fail-closed [●] GCP detection."""
@@ -1679,13 +2176,102 @@ class SectionExtractor:
             )
             return extractions
         matrix, state, note = self._extract_related_party_matrix_table(page_ranges)
+        if matrix:
+            return matrix + [
+                self._rpt_coverage_extraction(matrix[0].page, state, note)
+            ]
+        if state is not None:
+            # The disclosure was located in the text layer but no transaction
+            # row could be read there.  When the note itself is printed as a
+            # scanned image, read it by OCR (report section 33); when it is
+            # not, the located-but-unread state stands unchanged.
+            image_note = self._extract_related_party_image_note(page_ranges)
+            if image_note:
+                return image_note
         if state is None:
             return []
-        return matrix + [
-            self._rpt_coverage_extraction(
-                matrix[0].page if matrix else None, state, note
+        return [self._rpt_coverage_extraction(None, state, note)]
+
+    # ------------------------------------------------------------------
+    # Related-party note printed as a scanned image (report section 33)
+    # ------------------------------------------------------------------
+    #
+    # R.K. Fashion's restated financial statements are image-only (one embedded
+    # image and a bare printed page number per page), and its Note 31 related
+    # party disclosure lives on those pages.  The text-layer readers above can
+    # therefore only report that they located the disclosure -- the aggregate
+    # summary elsewhere in the document -- and every per-counterparty
+    # transaction stays unread.  This path reads the scanned note itself, with
+    # bounded offline OCR and a geometry reconstruction of the ruled table
+    # (``rpt_image_note``), and only when the text layer already established
+    # that the disclosure exists.  Nothing is OCR'd blind.
+    _RPT_IMAGE_NOTE_PAGES = 22
+
+    def _extract_related_party_image_note(
+        self, page_ranges: Optional[Dict[str, Tuple[int, int]]]
+    ) -> List[RawExtraction]:
+        """Read a scanned related-party note; empty when there is none."""
+        path = getattr(self.doc, "uri", None)
+        if not path or not str(path).lower().endswith(".pdf"):
+            return []
+        ranges = page_ranges or {}
+        window = ranges.get("restated_financials") or ranges.get("related_party")
+        start, end = (
+            (max(1, window[0]), min(window[1], self.page_count))
+            if window
+            else (1, self.page_count)
+        )
+        candidates: List[int] = []
+        for page in range(start, end + 1):
+            if len(self.extract_page_text(page).strip()) >= 40:
+                continue
+            candidates.append(page)
+            if len(candidates) >= self._RPT_IMAGE_NOTE_PAGES:
+                break
+        if not candidates:
+            return []
+        try:
+            from .rpt_image_note import read_related_party_note
+        except Exception:  # OCR dependencies are optional at import time
+            return []
+        try:
+            result = read_related_party_note(str(path), candidates)
+        except Exception:
+            # A failed OCR attempt claims nothing: the located-but-unread
+            # state of the text-layer path stands.
+            return []
+        if not result.get("found"):
+            return []
+        extractions: List[RawExtraction] = []
+        for index, transaction in enumerate(result.get("transactions") or []):
+            value = dict(transaction)
+            quote = value.pop("ocr_text", None)
+            extractions.append(
+                RawExtraction(
+                    field_path="governance.related_party_transactions[%d]" % index,
+                    candidate_value=value,
+                    raw_text=quote,
+                    page=value.get("page"),
+                    section="Related Party Transactions",
+                    locator="Related Party Transactions (scanned note) — %s — %s — %s"
+                    % (
+                        value.get("category_label") or value.get("category"),
+                        value.get("counterparty"),
+                        value.get("period"),
+                    ),
+                    quote=quote,
+                    quote_is_processing=True,
+                    extraction_method=ExtractionMethod.OCR.value,
+                    extraction_confidence=0.75,
+                )
             )
-        ]
+        pages = result.get("pages") or []
+        extractions.append(
+            self._rpt_coverage_extraction(
+                pages[0] if pages else None, result.get("state") or "PARTIAL", result.get("note") or ""
+            )
+        )
+        return extractions
 
     def _rpt_coverage_extraction(
         self, page: Optional[int], state: str, note: str
@@ -2111,6 +2697,73 @@ class SectionExtractor:
             return fallback
         return [], None, ""
 
+    def extract_page_glyph_lines(
+        self, page_1_indexed: int
+    ) -> Optional[List[Tuple[float, List[Tuple[float, str]]]]]:
+        """Positioned cells rebuilt from character geometry for one page.
+
+        Used when the text layer of a table row arrives as a handful of wide
+        fragments with several numeric cells glued into each string: the
+        characters inside a fragment are still positioned, so the cells can be
+        rebuilt from their glyph boxes (``glyph_table``).  ``None`` means the
+        page has no character geometry at all.
+        """
+        cache = getattr(self, "_glyph_cache", None)
+        if cache is None:
+            cache = {}
+            self._glyph_cache = cache
+        if page_1_indexed in cache:
+            return cache[page_1_indexed]
+        path = getattr(self.doc, "uri", None)
+        lines: Optional[List[Tuple[float, List[Tuple[float, str]]]]] = None
+        if path and 1 <= page_1_indexed <= self.page_count:
+            try:
+                from .glyph_table import page_cells
+            except Exception:  # optional dependency
+                page_cells = None
+            if page_cells is not None:
+                try:
+                    rows = page_cells(str(path), page_1_indexed)
+                except Exception:
+                    rows = None
+                if rows:
+                    lines = [
+                        (baseline, [(cell.x0, cell.text) for cell in cells])
+                        for baseline, cells in rows
+                    ]
+        cache[page_1_indexed] = lines
+        return lines
+
+    def _rpt_page_rows(
+        self, page_1_indexed: int
+    ) -> List[Tuple[float, List[Tuple[float, str]], List[Tuple[float, str]]]]:
+        """Rows of ``(baseline, label cells, amount cells)`` for one page.
+
+        The fragment reading is used when it separates cells; the glyph
+        reconstruction replaces it when the text layer merges a row's numeric
+        cells into one fragment (which leaves the row with fewer amount cells
+        than it has columns).
+        """
+
+        def parse(lines) -> List[Tuple[float, List[Tuple[float, str]], List[Tuple[float, str]]]]:
+            parsed = []
+            for baseline, cells in lines:
+                label, amounts = self._rpt_split_row(cells)
+                parsed.append((baseline, label, amounts))
+            return parsed
+
+        fragment_rows = parse(
+            self._rpt_visual_lines(self.extract_page_fragments(page_1_indexed) or [])
+        )
+
+        def wide(rows) -> int:
+            return sum(1 for _y, _label, amounts in rows if len(amounts) >= 2)
+
+        if wide(fragment_rows) >= 2:
+            return fragment_rows
+        glyph_rows = parse(self.extract_page_glyph_lines(page_1_indexed) or [])
+        return glyph_rows if wide(glyph_rows) > wide(fragment_rows) else fragment_rows
+
     def _rpt_matrix_table_at(
         self, anchor_page: int
     ) -> Tuple[List[RawExtraction], Optional[str], str]:
@@ -2128,10 +2781,7 @@ class SectionExtractor:
             frags = self.extract_page_fragments(p)
             if not frags:
                 break
-            parsed = []
-            for y, cells in self._rpt_visual_lines(frags):
-                label, amounts = self._rpt_split_row(cells)
-                parsed.append((y, label, amounts))
+            parsed = self._rpt_page_rows(p)
             if p == anchor_page:
                 # The table's column count is the width of its own amount rows,
                 # taken on the page it starts on so a different table further
@@ -2263,6 +2913,10 @@ class SectionExtractor:
         header_lines = [
             (y, cells)
             for y, cells in self._rpt_visual_lines(self.extract_page_fragments(anchor_page) or [])
+            if y > data_rows[0][2]
+        ] or [
+            (y, cells)
+            for y, cells in self._rpt_visual_lines(self.extract_page_glyph_lines(anchor_page) or [])
             if y > data_rows[0][2]
         ]
         role_centres = self._rpt_role_columns(header_lines, centre_values)

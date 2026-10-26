@@ -2716,3 +2716,116 @@ and frontend suites were deliberately not run.
   SHARE REMAINS UNKNOWN WHERE THE DISCLOSURE CARRIES NO REVENUE-TYPE CATEGORY, AS A RECORDED
   DECISION RATHER THAN A FABRICATED ZERO; NO CONFIG, WEIGHT, THRESHOLD, PENALTY, KNOCKOUT OR
   FROZEN-CORE FILE CHANGED; PR #12 OPEN AND UNMERGED.**
+
+## Revision 27 — the two disclosures that only needed their geometry (glyph cells, scanned notes, allotment schedule)
+
+— 2026-10-26
+
+**Scope: three shared readers finished and one metric question re-examined on evidence. No
+scoring weight, threshold, band, penalty, knockout or criterion definition was changed, no
+configuration was touched, no frozen-core file was edited, and no issuer name appears in any
+engine path.** Branch `arena/79aac867-ipo-screening-engine`, PR **#12** (base `main`), left
+**OPEN**. Full account: §33 of
+`docs/investigation/PARAS-INGESTION-FAILURE-2026-10-23.md`.
+
+### What was wrong, and where
+
+1. **R.K. Fashion's Note 31 has no text layer.** The restated financial statements are scans
+   (PDF p. 308 carries one image and the text `304`), so the per-counterparty disclosure could
+   only be reported `PARTIAL` — 0 rows for a filing that discloses them in full.
+2. **A row's counterparty and its first amount arrive as one text fragment.** On Paras Note 34
+   §III-A (p. 419) the layer gives `204:Paras Healthcare (Ranchi) Private Limited 40.54
+   311:34.53 372:132.35 …`: splitting on fragments yields four amounts where the table has five
+   columns. The characters inside the fragment are still positioned, so the cells can be rebuilt
+   from glyph boxes. (This replaces §30.9's "glued numerals" hypothesis, which was re-checked and
+   does not occur on pp. 416-420 in either text mode.)
+3. **A missed dotted rule merges two columns.** A band whose header names two quantities is now
+   refused instead of bound to whichever name sorts first.
+4. **The share-history schedule** (`_share_history`, published here) reads the allotment table by
+   geometry when the legacy one-sentence regex and the filing's positive no-discount statement
+   establish nothing.
+
+### What was implemented (shared, issuer-neutral)
+
+- `extraction/glyph_table.py` — character-box cell reconstruction (`get_charbox` → lines → runs
+  split only on gaps wider than the line's own spacing, never between the digits of one figure
+  or between adjacent digits of a number).
+- `SectionExtractor.extract_page_glyph_lines` + `_rpt_page_rows` — the period-matrix reader falls
+  back to glyph cells only when the fragment reading cannot separate a row, so every layout it
+  reads today is unchanged.
+- `extraction/rpt_image_note.py` — image-only related-party note: bounded offline OCR, **vertical
+  rules detected in the rendered page** → column bands → header cell per band → amount bound by
+  its own centre → every row checked against the block's arithmetic (opening + additions −
+  reductions = closing). Balances are never transactions, a block with no control total is
+  counted unread, a band naming two quantities is refused, an amount needs two decimals and
+  confidence ≥ 0.94, and a row needs its own period and party.
+- `SectionExtractor._extract_related_party_image_note` — runs only when the text layer already
+  located the disclosure and read no row; a failed OCR attempt claims nothing.
+- `CanonicalInputBuilder` — the 24-month window keeps the offer-open-date anchor and is now
+  reported `PARTIAL` when it is anchored on any other offer date (a later anchor can only narrow
+  the window).
+
+### Coverage and score effects
+
+| Issuer | RPT rows | Coverage | Placements | Window |
+|---|---|---|---|---|
+| Paras | 70 (unchanged) | `DISCLOSED` | unchanged | unchanged |
+| Jio | 23 (unchanged) | `DISCLOSED` | **17 priced, `DISCLOSED`** (p. 100) | unchanged |
+| Vishal | 136 (unchanged) | `DISCLOSED` | `VERIFIED_NIL` preserved (schedule fails closed) | unchanged |
+| R.K. Fashion | **0 → 14** (`PARTIAL`) | `PARTIAL` | **9 priced, `DISCLOSED`** (p. 110) | unchanged |
+
+R.K. Fashion moves **41.0 → 43.0** (Module C 7 → 9, base 44 → 46, completeness 64% → 66%,
+lower bound 26 → 28) because `pre_ipo_placement_bucket` is now decided on the filing's own
+priced allotments — none falls inside the 365 days before the offer open date of 2026-10-05 (the
+last is 2025-05-31). Nothing else moves; `derived.py` untouched (pin `7783dfeb…`), Vishal golden
+hash `e84f8bc0…` unchanged.
+
+### Module D numerator — re-examined, still not changed
+
+The summary the engine reads (pp. 92-93) carries no revenue-type related-party row, so the
+numerator is absent and `rpt_pct_revenue` stays null. Note 34 §III-A additionally discloses
+"Revenue from sale of healthcare services (excluding applicable taxes)" — 28.69 / 14.45 / 6.48
+₹ million for FY2026 / FY2025 / FY2024 — but under a heading that says the transactions are
+**eliminated in consolidation**, while the denominator is *consolidated* revenue (16,059.52 /
+12,940.63 / 11,290.39 ₹ million). Counting them would put gross intra-group revenue over
+post-elimination revenue (0.1788% → D `rpt` 3/3, K6 still CLEAR) and would also require assuming
+a direction for "Outsourced medical services". **Disposition: UNKNOWN stands, evidence preserved;
+recommendation to Ramki recorded in §33.8** (keep the consolidated basis, or define a separate
+standalone-basis metric with its own denominator).
+
+### Verification — focused suites only
+
+`test_glyph_geometry_and_ocr_note_20261026.py` **15**; `test_rpt_matrix_reader_20261026.py`
++ `test_vishal_historical_reconciliation.py` + `test_paras_official_issue_page_terms.py` **43**;
+`test_rpt_extraction.py` + `test_auditor_evidence_section.py` **20**; `test_acceptance_matrix.py`
++ `test_vishal_golden.py` + new module **89**; `test_cli_phase5i.py` +
+`test_coverage_nil_vs_unread_20261026.py` + `test_directorate_events_20261026.py` +
+`test_post_issue_eps_provenance_20261026.py` **80**; `test_rk_fashion_reconciliation.py` +
+`test_paras_evidence_regression.py` + `test_paras_extraction_gaps_20261024.py` **48**;
+`test_suite_tiers.py` **1** (new real-file module registered in `tests/tier_inventory.py`). The
+full backend, regression and frontend suites were deliberately not run.
+
+### Status and next actions
+
+- Readiness: **NOT ESTABLISHED**. Required-term gate: **CLOSED**. PR **#12 OPEN**, not merged,
+  not claimed closed.
+- Done here: §30.9 items 1 (Note 34 glyph recovery), 2 (R.K. Fashion Note 31) and 3 (share
+  history for R.K. and Jio); item 4 (window anchor) hardened; item 5 re-examined and left as an
+  explicit decision for Ramki.
+- Remaining, in order: (1) **Ramki's decision** on the numerator basis (§33.8); (2) the OCR note
+  reader is `PARTIAL` on R.K. Fashion — 55 cells unbound, mostly values whose period printed on a
+  neighbouring line; a two-line row-band model would close most of it; (3) Paras summary rows are
+  read with their verbatim nature text and stay `unclassified` — the category vocabulary does not
+  cover "short term employee benefits"-style natures, and extending it must not add an eligible
+  revenue category by accident.
+- A32 remains **"IMPLEMENTED 2026-10-26; FULL BACKEND SUITE EXECUTED; READY FOR RAMKI
+  RATIFICATION (NOT RATIFIED)"**; nothing in this revision ratifies it.
+
+- **Disposition: AN IMAGE-ONLY RELATED-PARTY NOTE IS NOW READ (RULES + ARITHMETIC, BALANCES
+  NEVER TRANSACTIONS, UNBOUND CELLS COUNTED UNREAD, `PARTIAL` RATHER THAN A GUESS), A TEXT LAYER
+  THAT MERGES A ROW'S CELLS NO LONGER BINDS A VALUE TO THE WRONG COLUMN (GLYPH RECONSTRUCTION,
+  FALLBACK ONLY), AND THE PAID-UP SHARE-CAPITAL SCHEDULE IS READ FOR R.K. FASHION AND JIO
+  (9 AND 17 PRICED ALLOTMENTS, `DISCLOSED`) WITH VISHAL'S `VERIFIED_NIL` PRESERVED; R.K. FASHION
+  41.0 → 43.0 SOLELY BECAUSE THAT SCHEDULE IS NOW READ; THE MODULE D NUMERATOR STAYS UNKNOWN WITH
+  THE EVIDENCE AND A RECOMMENDATION RECORDED; NO CONFIG, WEIGHT, THRESHOLD, PENALTY, KNOCKOUT OR
+  FROZEN-CORE FILE CHANGED; PR #12 OPEN AND UNMERGED.**
