@@ -2808,6 +2808,10 @@ reader-limited score (`tests/test_ui7_ingestion.py`, `assert 43.0 == 41.0`); it 
 the same reasoning and the module now passes 20/20. The full backend, regression and frontend
 suites were deliberately not run.
 
+CI (`regression`, workflow "A9 contract boundary regression") was **PASS** on `fad5a53`
+(21m32s, 2,074 tests) after the `test_ui7_ingestion.py` expectation was corrected; the run on
+`17f2ae0` failed on that single stale expectation.
+
 ### Status and next actions
 
 - Readiness: **NOT ESTABLISHED**. Required-term gate: **CLOSED**. PR **#12 OPEN**, not merged,
