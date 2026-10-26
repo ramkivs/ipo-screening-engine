@@ -1586,11 +1586,23 @@ class SectionExtractor:
         ``governance.related_party_transactions[i]`` paths.  The runtime
         canonical schema is closed, so no structured canonical field is
         added; the values live in the evidence registry with verbatim
-        quotes.  They deliberately do NOT populate the scoring fields
-        ``rpt_pct_revenue`` / ``rpt_pct_of_revenue_growth``:
-        the approved metric definitions do not yet specify transaction
-        categories, growth window or negative-growth treatment (see
-        docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md).
+        quotes.
+
+        The scoring fields ``rpt_pct_revenue`` (Module D) and
+        ``rpt_pct_of_revenue_growth`` (K6) are NOT written here.  They are
+        derived in ``CanonicalInputBuilder._derive_rpt_metrics`` from these
+        extractions under the approved definitions (Ramki, 2026-10-17; see
+        docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md):
+        revenue-type related-party income over revenue from operations for the
+        latest audited year, and the change in that share between the latest
+        two audited years.  This docstring previously said those definitions
+        did not exist; they do, and the note is corrected here (report §24).
+
+        A filing whose note is headed only "Related parties disclosures" /
+        "Summary of related party transactions and balances" (Paras
+        Healthcare, pp. 416-420) still yields nothing: no anchor is found, so
+        ``rpt_pct_revenue`` stays null.  That is a reader gap, not a missing
+        metric definition.
         """
         fin_range = page_ranges.get("restated_financials") if page_ranges else None
         scan = range(fin_range[0], fin_range[1] + 1) if fin_range else range(1, self.page_count + 1)

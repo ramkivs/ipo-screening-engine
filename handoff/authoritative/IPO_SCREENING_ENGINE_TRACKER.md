@@ -2372,3 +2372,113 @@ or disclosure).
   RETAINED; MODULE B REMAINS BLOCKED ON AN UNDISCLOSED POST-ISSUE SHARE COUNT; ONE FROZEN-CORE
   EMPTY-SCHEDULE DEFAULT FOUND AND LEFT OPEN FOR GOVERNANCE; NO CODE, CONFIG, SCORING,
   THRESHOLD, PENALTY OR FROZEN-CORE CHANGE; PR #12 OPEN AND UNMERGED.**
+
+## Revision 24 — two shared derivation defects fixed in the common path; the frozen-core pin re-set with a reason
+
+**Scope: `derived.py` (derivation layer), one corrected docstring in `sections.py`, the
+frozen-core pin in `v16_implementation.py`, one rewritten expectation in
+`test_rk_fashion_reconciliation.py`, one new focused module. No config, schema, weight,
+threshold, penalty, knockout, golden-record or criterion-definition change.** Branch
+`arena/79aac867-ipo-screening-engine`, PR **#12** (base `main`), published and verified below.
+Full account: §24 of `docs/investigation/PARAS-INGESTION-FAILURE-2026-10-23.md`.
+
+### Shared defects, root causes, affected paths
+
+| # | Defect | Root cause | Affected |
+|---|---|---|---|
+| 1 | An **empty** objects-of-the-offer schedule scored `mixed_ok` (2/4) and `gcp_amount` reported `0.0` | every three-valued test "not triggered" on an empty list, so the function fell through to the lenient bucket. A *derivation* default of the same class Revision 22 removed from the builder — invisible while schedules were unreadable, and it paid the bonus exactly where the engine knew least | C `use_of_proceeds`; `gcp_amount`; `dilution_ok` via the bucket |
+| 2 | `post_issue_shares` / `post_issue_eps` were never assembled | they were only ever read as raw inputs; nothing derived them, so a filing disclosing pre-issue count + fresh-issue count + PAT but not the post-issue count produced UNKNOWN valuation, dilution and promoter holding with no reason given | B `pe_vs_peers`, `second_multiple`, `peg`, `sector_ipo_relative`; C `dilution`; D `promoter_post_holding`; `market_cap`, P/B, EV/EBITDA, PS |
+
+### Implementation (shared components only — no issuer branch anywhere)
+
+* `_post_issue_shares`: disclosed wins; otherwise **pre-issue + fresh-issue** (an OFS transfers
+  existing shares and never changes the count); a disclosed count *below* the pre-issue count is
+  refused as contradictory. The **`fresh issue ÷ price band` shortcut stays prohibited** and the
+  refusal message names it.
+* `_post_issue_eps`: disclosed wins; otherwise **latest full-year PAT ÷ post-issue shares** —
+  the prospectus convention, and the conservative direction (unweighted, so the P/E is higher).
+* `promoter_post_pct`: disclosed wins; otherwise **(pre-issue % × pre-issue shares − promoter
+  shares sold in the OFS) ÷ post-issue shares**, with the group's holding taken from the
+  disclosed percentage (only some promoter holders sell) and structural refusals kept
+  (seller cannot offer more than it held; group cannot sell more than it owned).
+* `use_of_proceeds_bucket`: empty schedule + fresh issue > 0 → **UNKNOWN**; empty schedule +
+  fresh issue == 0 → **NOT_APPLICABLE** (unchanged, so the genuine not-applicable case stays
+  distinct); a read schedule with no GCP line still means a **nil GCP**; a schedule allocating
+  more than the fresh issue it distributes → **UNKNOWN** (the signature of a double-read).
+* `gcp_amount`: empty schedule → **UNKNOWN**, not `0.0`.
+* Provenance: every derived value carries its `formula`, the exact `inputs` consumed (extra
+  inputs appear only on the derived path) and a `reason` beginning "derived:" that states the
+  arithmetic. Disclosed and derived values are distinguishable in `derived_metrics`, in the
+  stored record and in replay.
+
+### Frozen-core pin — re-set, with the reason recorded
+
+`derived.py` is one of the six pinned files. The pin is a change-detector, not an approval
+authority; the owner's standing authorization covers this in-scope correction, so the pin was
+re-set to `a9e4e5da884f8228f79be9d7ff3f3c3def11dc97327e7d778103cf5f9e05d359` with the rationale
+in the pin's own comment (as A15 did for `evaluation.py`, A30 for `price_band_notice.py`).
+`verify_golden_result()` is unchanged and still reproduces
+`e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`.
+
+### Cross-issuer impact
+
+| Artifact | Before | After | Why |
+|---|---|---|---|
+| Vishal Nirmiti (golden) | 35.0, base 38.0, hash `e84f8bc0…` | **identical, hash identical** | all three fields disclosed; the golden hash passing is the proof that no scoring output moved |
+| Vishal Nirmiti, three fields stripped | UNKNOWN dilution / promoter holding / EPS | 35.0 **unchanged**, values derived | derived post-issue count 26,390,909 = 19,800,000 + 6,590,909 exactly; derived promoter post 49.400193% vs disclosed 49.4%; derived EPS 9.4635 vs disclosed 9.46 |
+| R.K. Fashion Accessories | 43.0 | **43.0 unchanged** | its disclosed 72.25% is reproduced by the derivation as 72.2588%; the one test that removed the disclosure was rewritten to remove the derivation's *inputs* instead, where UNKNOWN → base 46→42, final 43→39 is still asserted |
+| Jio Platforms | — | unchanged | all values disclosed; pre + fresh = post exactly (8,939,030,830 + 270,000,000) |
+| Paras Healthcare | 13.0 | **13.0, unchanged by construction** | its schedule is non-empty with a `[●]` GCP (pre-existing blind-test path) and its post-issue count is `[●]` with no fresh share count, so the derivation returns UNKNOWN with a more specific message. **No new Paras run was made** — the previous run's input snapshot was not retained and the retained issue-terms package forbids its own use as evaluation input |
+
+### Findings recorded, not "fixed"
+
+* **§20.4(b) / §23.7 are wrong about RPT.** The metric definitions exist and are approved
+  (2026-10-17) and implemented; Module D `rpt` and K6 are **reader-gated, not decision-gated**.
+  Paras's note is headed "Related parties disclosures" / "Summary of related party transactions
+  and balances" (pp. 416–420) and matches no anchor, so nothing is extracted. The stale docstring
+  asserting the definitions did not exist was corrected in `sections.py`.
+* **Jio fixture internal inconsistency:** `post_issue_eps` 3.26 against PAT/post-shares = 32.63
+  (factor ten). Left exactly as captured — it is retained evidence, and editing captured evidence
+  silently would be worse than the inconsistency. Recorded with the arithmetic.
+* **K1/K2 handling already meets the standard** (positive-only going concern; SEBI/ED denial vs
+  action separation; A24/A25/A29 party scope). No change was made or needed.
+
+### Focused verification (full suite deliberately not run)
+
+```
+tests/test_global_value_semantics_20261026.py ....................... 18 passed (new)
+tests/test_core_semantics.py test_overlays_knockouts.py
+  test_auditor_tenure_defaults.py test_litigation_regulatory_defaults.py
+  test_jio_score_bridge.py test_frozen_core_line_endings.py
+  test_v16_implementation.py test_vishal_golden.py
+  test_acceptance_matrix.py test_global_value_semantics_20261026.py
+  test_fresh_issue_manual_entry.py .......................... 318 passed
+tests/test_rk_fashion_reconciliation.py .............................. 7 passed
+tests/test_reading_defects_20261026.py test_paras_evidence_regression.py  45 passed
+tests/test_extraction.py test_extraction_phase5b.py
+  test_jio_fresh_regressions.py test_suite_tiers.py
+  test_paras_extraction_gaps_20261024.py ............................. 52 passed
+```
+New module covers empty / partial / complete / malformed schedules, the pure-OFS
+NOT_APPLICABLE case, disclosed-wins, derivation of shares / EPS / promoter holding,
+contradictory counts, the band-refusal message, and the exact reconstruction of the Vishal
+disclosures.
+
+### Status and next actions
+
+- Readiness: **NOT ESTABLISHED**. Required-term gate: **CLOSED**. Frozen-core pin: **VERIFIED**,
+  re-set to the reviewed hash with the golden result unchanged.
+- Next actions, in order: (1) RPT reader anchors for "Related parties disclosures" notes —
+  unblocks D `rpt` and K6; (2) a dated `kmp_exits_2y` reader over the changes-in-directorate
+  table — unblocks D `board_kmp`; (3) a coverage marker in the canonical input so a disclosed
+  nil can be told from an unread section (contract change); (4) Paras Module B stays blocked on
+  the filing's `[●]` post-issue share count — a genuine missing disclosure.
+- A32 remains **"IMPLEMENTED 2026-10-26; FULL BACKEND SUITE EXECUTED; READY FOR RAMKI
+  RATIFICATION (NOT RATIFIED)"**; nothing in this revision ratifies it.
+
+- **Disposition: THE EMPTY-SCHEDULE DERIVATION DEFAULT AND THE UNASSEMBLED POST-ISSUE CAPITAL
+  STRUCTURE ARE FIXED IN THE SHARED DERIVATION LAYER; DERIVED VALUES REPRODUCE THE DISCLOSED
+  ONES EXACTLY ON THREE REAL ARTIFACTS; VISHAL GOLDEN HASH AND SCORE UNCHANGED, RK FASHION
+  43.0 UNCHANGED, PARAS 13.0 UNCHANGED BY CONSTRUCTION; FROZEN-CORE PIN RE-SET WITH A RECORDED
+  REASON; RPT/K6 RECLASSIFIED FROM DECISION-GATED TO READER-GATED; NO WEIGHT, THRESHOLD,
+  PENALTY, KNOCKOUT OR CONFIG CHANGE; PR #12 OPEN AND UNMERGED.**

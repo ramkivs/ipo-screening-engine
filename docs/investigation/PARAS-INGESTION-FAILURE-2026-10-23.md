@@ -1870,3 +1870,189 @@ Revision 22.
 (aggregator) issue terms; it is not an official determination about the issuer. K5 being
 TRIGGERED is a statement about the numbers in the filing, not a recommendation. Nothing was
 merged, closed, ratified or published beyond documentation.
+
+## 24. Two shared derivation defects, fixed in the common path — 2026-10-26 (revision 15)
+
+This pass implements the two defects §23 recorded and stops there. Both fixes are in one
+place — `engine/ipo_screening/derived.py`, the derivation layer every criterion and knockout
+reads — and neither contains an issuer name, a filing-specific branch or a score target.
+`config/`, `schema/`, scoring weights, thresholds, penalties and knockout definitions are
+untouched.
+
+### 24.1 Defect 1 — silence scored as `mixed_ok`
+
+`use_of_proceeds_bucket` evaluated three tests over the allocation schedule. With an **empty**
+schedule every test was simply "not triggered": no GCP (so not blind-heavy), no debt (so not
+debt-heavy), no growth (so not growth) — and the function fell through to `mixed_ok`, which is
+2 of 4 points. `gcp_amount` reported `0.0` from the same empty list.
+
+That is the Revision-22 defect class (a default is not evidence), one layer deeper: it was not
+a builder default, it was a *derivation* default, and it could not be seen while the schedule
+was unreadable. It became visible only after the readers landed, because a schedule that used
+to be empty for everyone suddenly became empty only for the filings whose schedule the reader
+still could not find — i.e. the defect now paid a favourability bonus precisely where the
+engine knew least.
+
+Fixed in the common path:
+
+| Case | Before | After |
+|---|---|---|
+| Empty schedule, fresh issue > 0 | `mixed_ok`, 2/4; `gcp_amount` 0.0 | **UNKNOWN** with the reason "the objects-of-the-offer schedule is empty… missing evidence rather than a disclosed mixed allocation"; `gcp_amount` **UNKNOWN** |
+| Empty schedule, fresh issue == 0 (pure OFS) | `NOT_APPLICABLE` | **unchanged** — the genuine not-applicable case stays distinct from the missing one |
+| Read schedule with no GCP line | 0.0 | **unchanged** — a read, complete schedule that names no GCP *is* evidence of a nil GCP |
+| Partially disclosed category | UNKNOWN | **unchanged** (the pre-existing three-valued logic is correct) |
+| Schedule allocating more than the fresh issue | shares computed anyway | **UNKNOWN** — a schedule cannot distribute more than the gross proceeds it splits; this is the signature of a double-read (the objects schedule is often printed twice) |
+| Malformed (negative) amount | rejected by the schema | **unchanged** — the contract gate stops it before derivation |
+
+The empty-schedule rule is categorical, not a heuristic: a fresh issue must state the objects
+of the offer, so with a fresh issue present an empty schedule can only mean the schedule was
+not read. The same argument does **not** hold for `capital_structure.pre_ipo_placements`,
+where an empty list is a legitimate disclosed nil, so that field's behaviour was left alone —
+with the residual risk recorded in §24.6 rather than papered over.
+
+### 24.2 Defect 2 — the capital structure was never assembled
+
+`post_issue_shares` and `post_issue_eps` were read as raw inputs only. A filing that discloses
+the pre-issue count, the fresh-issue count and a year's PAT but not the post-issue count
+produced UNKNOWN valuation (Module B, 20 points), UNKNOWN `dilution` (C) and UNKNOWN
+`promoter_post_holding` (D) — with a message that could not say which input was missing.
+
+The derivation now exists once, in the shared layer:
+
+* **post-issue shares = pre-issue shares + fresh-issue shares.** A fresh issue creates shares;
+  an offer for sale only transfers shares that already exist, so the OFS never enters the
+  addition. Disclosed wins. A disclosed count *below* the pre-issue count is a contradiction
+  and is refused rather than used.
+* **post-issue EPS = latest full-year PAT ÷ post-issue shares**, used only when no EPS is
+  disclosed. This is the prospectus convention for EPS on post-issue capital, and it is the
+  *conservative* direction: charging the whole year against the enlarged base (instead of a
+  weighted average) raises the P/E, which can only make a valuation less favourable.
+* **promoter post-issue % = (promoter pre-issue shares − promoter shares sold in the OFS) ÷
+  post-issue shares**, where the pre-issue holding comes from the disclosed percentage, not
+  from the sellers' holdings (only some promoter holders sell). Structural checks remain: a
+  seller cannot offer more than it held (`SELLER_OVERSELL`, unchanged), and the group cannot
+  sell more than it owned.
+
+**The prohibited shortcut is still prohibited** and the refusal now names it: the fresh share
+count is never formed as `fresh issue amount ÷ price band`, because the band is a range and
+the offer price is struck inside it.
+
+Provenance: every derived value carries `formula`, the exact `inputs` consumed (the extra
+inputs appear only on the derived path, so the record always describes what actually produced
+the value) and a `reason` beginning "derived:" that states the arithmetic and its basis. A
+derived value is therefore distinguishable from a disclosed one in `derived_metrics`, in the
+stored record and in the replay.
+
+### 24.3 Cross-issuer validation — the derivations reconstruct real disclosures exactly
+
+The strongest available check is a derivation that reproduces a number the filing printed.
+
+| Artifact | Disclosed | Derived by the new code | Agreement |
+|---|---|---|---|
+| Vishal Nirmiti (golden input) | post-issue 26,390,909 | 19,800,000 + 6,590,909 = **26,390,909** | exact |
+| Vishal Nirmiti | dilution 24.974164% | **24.974164%** from the derived count | exact |
+| Vishal Nirmiti | promoter post 49.4% | **49.400193%** (73.42% × 19,800,000 − 1,500,000, over 26,390,909) | 0.0002 pp |
+| Vishal Nirmiti | EPS 9.46 | **9.4635** (PAT 2,497.5 lakh ÷ 26,390,909) | rounding step |
+| Jio Platforms (canonical fixture) | post-issue 9,209,030,830 | 8,939,030,830 + 270,000,000 = **9,209,030,830** | exact |
+| R.K. Fashion Accessories (real filing, extracted) | promoter post 72.25% | **72.2588%** (99.67% × 11,249,563, over 15,516,763) | 0.01 pp |
+
+Score effects, which are the point of the table:
+
+* **Vishal Nirmiti — unchanged, 35.0 (base 38.0, penalties −3.0), golden hash still
+  `e84f8bc0…`.** With all three disclosed fields removed the run still scores **35.0**, because
+  every derived value reproduces the disclosed one. The golden record is untouched.
+* **R.K. Fashion Accessories — unchanged, 43.0.** Its own test that removed the disclosed
+  post-issue percentage used to see UNKNOWN; it now sees the value derived from the pre-issue
+  percentage and counts 4 points earned from arithmetic. The test was rewritten (see §24.4) to
+  keep its real intent: remove the derivation's *inputs* as well and the criterion is UNKNOWN
+  again, base 46 → 42, final 43 → 39.
+* **Jio Platforms — unchanged.** Disclosed values win.
+* **Paras Healthcare — unchanged by construction, not by a new run.** Its schedule is
+  non-empty with a `[●]` GCP, so it takes the pre-existing blind-test path
+  (`test_p14_s1_missing_gcp_is_unknown_not_the_ceiling`, and the new
+  `test_partial_schedule_stays_unknown`), and its post-issue count is `[●]` with no fresh share
+  count, so the new derivation returns UNKNOWN with a more specific message. The score (13.0)
+  cannot move. **No new Paras evaluation was run in this pass:** the previous run's input
+  snapshot was not retained, and the retained issue-terms package states in its own README
+  that its values "were not written into the engine … and into no evaluation", so rebuilding an
+  input from it would contradict the evidence record rather than extend it.
+
+### 24.4 What the frozen-core label did and did not mean
+
+`derived.py` is one of the six files pinned in `FROZEN_CORE_HASHES`. The pin is a
+*change-detector*, not an approval authority: it exists so that a scoring change cannot happen
+silently. The owner's standing authorization covers an in-scope engineering correction of an
+identified defect, so the pin was re-set to the reviewed hash
+`a9e4e5da884f8228f79be9d7ff3f3c3def11dc97327e7d778103cf5f9e05d359`, with the reason recorded
+in the pin's own comment — exactly as A15 did for `evaluation.py` and A30 for
+`price_band_notice.py`. The independent protection is untouched and still passes:
+`verify_golden_result()` reproduces `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`
+and 35.0, so no scoring output moved without a reviewed reason.
+
+### 24.5 Findings that are not code defects — recorded, not "fixed"
+
+* **§20.4(b) and §23.7 are wrong about the RPT metric.** Both said the related-party metric
+  definition "does not exist", making Module D `rpt` and K6 decision-gated. The definitions were
+  approved on 2026-10-17 and are implemented: `rpt_pct_revenue` = revenue-type related-party
+  income ÷ revenue from operations for the latest audited year, and
+  `rpt_pct_of_revenue_growth` = the change in that share between the latest two audited years
+  (`builder._derive_rpt_metrics`, documented in
+  `docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md`). The real blocker is
+  a **reader** gap: Paras's note is headed "Related parties disclosures" / "Summary of related
+  party transactions and balances" (pp. 416–420), which the reader's anchor does not match, so no
+  transactions are extracted and both fields stay null. The stale docstring in
+  `sections.extract_related_party_transactions` that asserted the opposite was corrected.
+* **The Jio canonical fixture contains an internal inconsistency** —
+  `issue.post_issue_eps = 3.26`, while its own disclosed PAT (300,527 INR_MILLIONS) over its own
+  disclosed post-issue count (9,209,030,830) is **32.63**, a factor of ten. The share counts and
+  the fresh issue reconcile exactly; the EPS does not reconcile with them. It is left exactly as
+  captured, because it is a retained evidence artifact and silently editing captured evidence
+  would be worse than the inconsistency; the finding is recorded here with the arithmetic.
+* **K1/K2 evidence handling is already at the standard this pass was asked to reach.** Going
+  concern is emitted only on positive uncertainty language and never as `False`; the SEBI/ED
+  reader separates an issued action from an issuer-authored denial and records that a `false`
+  means "no action disclosed on the searched pages", not "verified none exists" (A24/A25/A29
+  party scope). Nothing was changed. The Paras UNKNOWNs are genuine: the filing carries no
+  going-concern paragraph, and its nil statements are promoter-scoped.
+
+### 24.6 Verification
+
+Focused runs only; the full suite was not run, as instructed.
+
+```
+tests/test_global_value_semantics_20261026.py .......................... 18 passed
+tests/test_vishal_golden.py + test_acceptance_matrix.py ................ 74 passed
+tests/test_core_semantics.py test_overlays_knockouts.py
+  test_auditor_tenure_defaults.py test_litigation_regulatory_defaults.py
+  test_jio_score_bridge.py test_frozen_core_line_endings.py
+  test_v16_implementation.py test_vishal_golden.py
+  test_acceptance_matrix.py test_global_value_semantics_20261026.py
+  test_fresh_issue_manual_entry.py ............................. 318 passed
+tests/test_rk_fashion_reconciliation.py ................................. 7 passed
+tests/test_reading_defects_20261026.py test_paras_evidence_regression.py  45 passed
+tests/test_extraction.py test_extraction_phase5b.py
+  test_jio_fresh_regressions.py test_suite_tiers.py
+  test_paras_extraction_gaps_20261024.py ................................ 52 passed
+```
+
+`test_rk_fashion_reconciliation.py` was edited in one place (§24.3) and its expectation now
+encodes the corrected semantics rather than the old leniency. Nothing else in `tests/` changed
+except the new module.
+
+### 24.7 Residual, with the exact next action
+
+* **RPT reader anchor** (unblocks Module D `rpt` and K6 for filings that head the note
+  "Related parties disclosures" / "Summary of related party transactions and balances"):
+  add that heading as an anchor and read its five-year column layout. Not attempted here
+  because it needs the row/column semantics of that specific note, and a half-read RPT table
+  would populate a scored field with a wrong number.
+* **`kmp_exits_2y`** — the changes-in-directorate table is present (Paras p. 346 lists
+  resignations dated 2024) and the field is never read, so D `board_kmp` cannot score. Next
+  action: a dated-exit reader over that table, scoped to KMP/director rows within 24 months of
+  the cut-off.
+* **`pre_ipo_placements: []`** remains a legitimate disclosed nil *and* an unread section's
+  value; the input contract cannot yet tell them apart. Resolving it needs a coverage marker in
+  the canonical input (a contract change), not another derivation rule.
+* **Paras Module B** remains blocked on the filing's `[●]` post-issue share count. That is a
+  genuine missing disclosure, not a software defect, and the fix in §24.2 does not and should
+  not invent it.

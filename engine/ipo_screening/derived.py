@@ -556,9 +556,98 @@ def _as_float(raw: Any) -> Optional[float]:
     return None
 
 
+def _positive(raw: Any) -> Optional[float]:
+    value = _as_float(raw)
+    if value is None or value <= 0:
+        return None
+    return value
+
+
+def _post_issue_shares(ctx: DerivationContext) -> Tuple[Optional[float], str]:
+    """The post-issue share count, and where it came from.
+
+    A fresh issue *creates* shares; an offer for sale only transfers shares
+    that already exist, so the post-issue count is
+
+        post-issue shares = pre-issue shares + fresh-issue shares
+
+    and the OFS never enters the addition.  Both retained canonical filings
+    satisfy this exactly (Jio 8,939,030,830 + 270,000,000 = 9,209,030,830;
+    Vishal 19,800,000 + 6,590,909 = 26,390,909), which is why the derivation
+    is safe to apply when one of the three counts is missing.
+
+    The fresh share count is **never** manufactured from
+    ``fresh issue amount / price``: the price band is a range and the offer
+    price is struck inside it, so dividing an amount by one end of a band
+    would invent a share count the filing did not disclose (report §20.4(c)).
+    A disclosed value always wins; every other outcome is UNKNOWN with the
+    missing input named.
+    """
+    issue = ctx.canonical.issue()
+    pre = _positive(issue.get("pre_issue_shares"))
+    fresh = _as_float(issue.get("fresh_shares"))
+    post = _positive(issue.get("post_issue_shares"))
+    if post is not None:
+        if pre is not None and post < pre:
+            return None, (
+                f"the supplied post-issue share count ({post:,.0f}) is smaller than the "
+                f"pre-issue count ({pre:,.0f}), which an issue cannot produce"
+            )
+        return post, "disclosed"
+    if pre is not None and fresh is not None and fresh >= 0:
+        return pre + fresh, (
+            "derived: post-issue shares = pre-issue shares + fresh-issue shares "
+            f"({pre:,.0f} + {fresh:,.0f}); an offer for sale transfers existing shares "
+            "and does not change the count"
+        )
+    missing = "the pre-issue share count" if pre is None else "the fresh-issue share count"
+    return None, (
+        "the post-issue share count is not disclosed and cannot be derived because "
+        f"{missing} is not disclosed; it is not reconstructed as fresh issue / price band "
+        "because the band is a range, not the offer price"
+    )
+
+
+def _post_issue_eps(ctx: DerivationContext) -> Tuple[Optional[float], str]:
+    """Post-issue earnings per share, disclosed or derived conservatively.
+
+    When the filing does not print a post-issue EPS, it is formed as
+
+        EPS = latest full-year PAT / post-issue shares
+
+    which is the prospectus convention for "EPS on post-issue capital" and is
+    the *conservative* direction: it charges the whole year's PAT against the
+    enlarged share base instead of a weighted average, so the resulting P/E is
+    higher (less favourable) than the weighted-average figure.  A disclosed
+    EPS always wins.
+    """
+    eps = _positive(ctx.canonical.issue().get("post_issue_eps"))
+    if eps is not None:
+        return eps, "disclosed"
+    shares, shares_note = _post_issue_shares(ctx)
+    if shares is None:
+        return None, f"post-issue EPS is not disclosed and {shares_note}"
+    latest = ctx.canonical.latest
+    pat = _as_float(latest.get("pat")) if latest is not None else None
+    if pat is None or pat <= 0:
+        return None, (
+            "post-issue EPS is not disclosed and the latest full-year PAT is not a positive "
+            "figure, so an EPS on post-issue capital cannot be formed"
+        )
+    # ``FinancialPeriod.values`` are already normalised to INR crore, so the
+    # rupee value is crore x 1e7 and the result is INR per share.  The reporting
+    # unit is not applied again here (doing so would divide the EPS by 100 for
+    # a lakh-denominated filing).
+    return (
+        pat * 1e7 / shares,
+        "derived: latest full-year PAT / post-issue shares (conservative, unweighted basis); "
+        + shares_note,
+    )
+
+
 def _market_cap(ctx: DerivationContext) -> Optional[float]:
     price = _issue_price(ctx.canonical)
-    shares = _as_float(ctx.canonical.issue().get("post_issue_shares"))
+    shares, _ = _post_issue_shares(ctx)
     if price is None or shares is None:
         return None
     # Shares are in absolute units; price is INR per share. Result in INR crore.
@@ -567,7 +656,7 @@ def _market_cap(ctx: DerivationContext) -> Optional[float]:
 
 def _issuer_pe(ctx: DerivationContext) -> Optional[float]:
     price = _issue_price(ctx.canonical)
-    eps = _as_float(ctx.canonical.issue().get("post_issue_eps"))
+    eps, _ = _post_issue_eps(ctx)
     if price is None or eps is None or eps <= 0:
         return None
     return price / eps
@@ -1054,28 +1143,139 @@ def _promoter_full_exit(ctx: DerivationContext) -> MetricValue:
 @metric("promoter_post_pct")
 def _promoter_post_pct(ctx: DerivationContext) -> MetricValue:
     formula = "promoter and promoter-group holding post-issue, %"
-    inputs = ["capital_structure.promoter_post_pct"]
+    # The disclosed path consumes exactly one input; the derivation below adds
+    # its own inputs to the record only when it is the path actually taken, so
+    # the declared inputs always describe what produced the value.
+    disclosed_inputs = ["capital_structure.promoter_post_pct"]
+    inputs = [
+        "capital_structure.promoter_post_pct",
+        "capital_structure.promoter_pre_pct",
+        "issue.pre_issue_shares",
+        "issue.post_issue_shares",
+        "issue.ofs_sellers",
+    ]
     post = ctx.canonical.number("capital_structure", "promoter_post_pct")
-    if post is None:
-        return _u("promoter_post_pct", "post-issue promoter holding is not disclosed", formula=formula, inputs=inputs)
-    return _v("promoter_post_pct", post, formula=formula, inputs=inputs)
+    if post is not None:
+        return _v("promoter_post_pct", post, formula=formula, inputs=disclosed_inputs)
+
+    # Derived path.  The holding after the offer is the holding before it,
+    # less whatever the promoter group sold in the offer for sale, over the
+    # post-issue share count.  It is only formed when every leg is disclosed
+    # *and* the seller list can be shown to describe the same promoter group:
+    # the promoter sellers' disclosed pre-issue holdings must add up to the
+    # pre-issue percentage applied to the pre-issue share count.  Without
+    # that check an incomplete seller list would silently understate the
+    # stake sold, so the value stays UNKNOWN instead.
+    pre_pct = ctx.canonical.number("capital_structure", "promoter_pre_pct")
+    pre_shares = _positive(ctx.canonical.issue().get("pre_issue_shares"))
+    shares, shares_note = _post_issue_shares(ctx)
+    if pre_pct is None or pre_shares is None or shares is None:
+        return _u(
+            "promoter_post_pct",
+            "post-issue promoter holding is not disclosed and cannot be derived: "
+            + ("the pre-issue promoter percentage is not disclosed"
+               if pre_pct is None
+               else "the pre-issue share count is not disclosed"
+               if pre_shares is None
+               else shares_note),
+            formula=formula,
+            inputs=inputs,
+        )
+    if not _sellers_available(ctx):
+        return _u(
+            "promoter_post_pct",
+            "post-issue promoter holding is not disclosed, and the offer for sale's selling "
+            "shareholders were not supplied, so what the promoter group sold cannot be "
+            "established",
+            formula=formula,
+            inputs=inputs,
+        )
+    promoter_sellers = [
+        s for s in _sellers(ctx) if s.get("type") in ("promoter", "promoter_group")
+    ]
+    sold = 0.0
+    for seller in promoter_sellers:
+        sold_shares = _as_float(seller.get("shares_sold"))
+        if sold_shares is None:
+            return _u(
+                "promoter_post_pct",
+                "post-issue promoter holding is not disclosed and a promoter seller has no "
+                "number of shares sold, so the stake sold cannot be established",
+                formula=formula,
+                inputs=inputs,
+            )
+        sold += sold_shares
+    implied_pre = pre_pct / 100.0 * pre_shares
+    # Structural checks that can be made from the seller list itself: a seller
+    # cannot sell more than it held, and the group cannot sell more than it
+    # owned.  The list is not required to name every promoter holder -- only
+    # some of them typically sell in an offer for sale -- so the group's
+    # pre-issue holding comes from the disclosed percentage, not from the sum
+    # of the sellers' holdings.
+    for seller in promoter_sellers:
+        held = _as_float(seller.get("pre_issue_shares"))
+        sold_shares = _as_float(seller.get("shares_sold")) or 0.0
+        if held is not None and held >= 0 and sold_shares > held + 1e-6:
+            return _u(
+                "promoter_post_pct",
+                "post-issue promoter holding is not disclosed and cannot be derived: a "
+                f"promoter seller offers {sold_shares:,.0f} shares but held only {held:,.0f}",
+                formula=formula,
+                inputs=inputs,
+            )
+    promoter_post_shares = implied_pre - sold
+    if promoter_post_shares < 0:
+        return _u(
+            "promoter_post_pct",
+            "the promoter sellers' combined shares sold exceed the promoter group's implied "
+            "pre-issue holding, so the post-issue percentage cannot be formed",
+            formula=formula,
+            inputs=inputs,
+        )
+    return _v(
+        "promoter_post_pct",
+        promoter_post_shares / shares * 100.0,
+        formula=formula + " = (promoter pre-issue shares - promoter shares sold) / post-issue shares x 100",
+        inputs=inputs,
+        reason=(
+            "derived: promoter pre-issue shares "
+            f"({pre_pct}% x {pre_shares:,.0f} = {implied_pre:,.0f}) less {sold:,.0f} shares "
+            f"sold in the offer for sale, over the post-issue count ({shares_note})"
+        ),
+    )
 
 
 @metric("dilution_pct")
 def _dilution_pct(ctx: DerivationContext) -> MetricValue:
     formula = "fresh shares / post-issue shares x 100"
     inputs = ["issue.fresh_shares", "issue.post_issue_shares"]
+    post, post_note = _post_issue_shares(ctx)
     fresh = _as_float(ctx.canonical.issue().get("fresh_shares"))
-    post = _as_float(ctx.canonical.issue().get("post_issue_shares"))
+    if fresh is None and post is not None:
+        # A pure offer for sale has no fresh shares; otherwise the fresh count
+        # follows from the two disclosed counts, and OFS shares are excluded
+        # because they transfer ownership rather than create shares.
+        pre = _positive(ctx.canonical.issue().get("pre_issue_shares"))
+        if pre is not None:
+            fresh = post - pre
     if fresh is None or post is None:
         return _u(
             "dilution_pct",
-            "the fresh share count or the post-issue share count is not disclosed",
+            "the fresh share count or the post-issue share count is not disclosed"
+            + ("" if post is not None else f"; {post_note}"),
             formula=formula,
             inputs=inputs,
         )
     if post <= 0:
         return _na("dilution_pct", "post-issue share count is zero", formula=formula, inputs=inputs)
+    if post_note != "disclosed":
+        return _v(
+            "dilution_pct",
+            fresh / post * 100.0,
+            formula=formula,
+            inputs=inputs,
+            reason=post_note,
+        )
     return _v("dilution_pct", fresh / post * 100.0, formula=formula, inputs=inputs)
 
 
@@ -1120,7 +1320,19 @@ def _dilution_ok(ctx: DerivationContext) -> MetricValue:
 def _gcp_amount(ctx: DerivationContext) -> MetricValue:
     formula = "the disclosed general corporate purposes amount; UNKNOWN when the RHP shows [●]"
     inputs = ["use_of_proceeds"]
-    entries = [u for u in ctx.canonical.use_of_proceeds() if u.get("category") == "gcp"]
+    schedule = ctx.canonical.use_of_proceeds()
+    if not schedule:
+        # An empty schedule is the absence of a reading, not a disclosed nil:
+        # a fresh issue must state the objects of the offer, so a schedule with
+        # no rows cannot be evidence that GCP is zero (report §23.7).
+        return _u(
+            "gcp_amount",
+            "no objects-of-the-offer schedule was supplied, so the general corporate purposes "
+            "amount is unknown rather than zero",
+            formula=formula,
+            inputs=inputs,
+        )
+    entries = [u for u in schedule if u.get("category") == "gcp"]
     if not entries:
         return _v(
             "gcp_amount",
@@ -1200,9 +1412,26 @@ def _use_of_proceeds_bucket(ctx: DerivationContext) -> MetricValue:
     # entry is treated as unknown for the whole category: a partial total
     # would understate the share and could silently clear the blind_heavy
     # test (spec s3.2 - absence is never treated as zero).
+    schedule = ctx.canonical.use_of_proceeds()
+    if not schedule:
+        # The same defect as the removed builder defaults, one layer down: an
+        # empty schedule used to fall through every test (no GCP, no debt, no
+        # growth) and land on `mixed_ok`, i.e. two points awarded from silence.
+        # A fresh issue must disclose the objects of the offer, so an empty
+        # schedule is a missing reading.  It is not the same as a disclosed
+        # allocation of zero, and it is not `mixed_ok`.
+        return _u(
+            "use_of_proceeds_bucket",
+            "the objects-of-the-offer schedule is empty, so no allocation was read and the "
+            "bucket cannot be established; a fresh issue must state its objects, so an empty "
+            "schedule is missing evidence rather than a disclosed mixed allocation",
+            kind="categorical",
+            formula=formula,
+            inputs=inputs,
+        )
     totals: Dict[str, Optional[float]] = {}
     undisclosed: set = set()
-    for entry in ctx.canonical.use_of_proceeds():
+    for entry in schedule:
         category = str(entry.get("category"))
         amount = _as_float(entry.get("amount"))
         if amount is None:
@@ -1222,6 +1451,25 @@ def _use_of_proceeds_bucket(ctx: DerivationContext) -> MetricValue:
         if category in undisclosed:
             return None
         return (totals.get(category) or 0.0) / fresh * 100.0
+
+    # A schedule cannot allocate more than the gross proceeds it distributes.
+    # When it does, a row has been misread or double-counted (the objects
+    # schedule is often printed twice: requirement of funds, then deployment),
+    # and every share below would be overstated -- including the blind_heavy
+    # and debt_heavy tests.  The allocation is therefore not scored.
+    if undisclosed == set():
+        disclosed_total = sum(totals.values())
+        if disclosed_total > fresh * 1.001:
+            return _u(
+                "use_of_proceeds_bucket",
+                "the objects-of-the-offer schedule allocates "
+                f"{disclosed_total:,.2f} against a fresh issue of {fresh:,.2f}, which exceeds "
+                "the gross proceeds it distributes; the schedule has been misread or "
+                "double-counted, so no bucket can be established from it",
+                kind="categorical",
+                formula=formula,
+                inputs=inputs,
+            )
 
     gcp_share = share("gcp")
     unidentified_share = share("acquisition_unidentified")

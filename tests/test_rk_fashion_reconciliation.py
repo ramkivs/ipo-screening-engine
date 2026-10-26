@@ -329,6 +329,15 @@ def test_missing_promoter_post_holding_remains_unknown_not_four_earned_points():
 
     This controlled intervention explains the reported 44 -> 40 symptom; it
     deliberately does not claim to reproduce the native Windows extraction.
+
+    Updated 2026-10-26 (report section 24).  With only the *disclosed*
+    post-issue percentage removed, the value no longer disappears: it is
+    derived from the disclosed pre-issue percentage and share counts, and it
+    reproduces the stated 72.25% to two decimals -- the 4 points are earned
+    from arithmetic, not from a default.  The property this test protects is
+    therefore expressed against the inputs the derivation needs: remove those
+    as well and the criterion is UNKNOWN again, with the four points gone
+    (base 46 -> 42, final 43 -> 39).
     """
     from copy import deepcopy
 
@@ -336,29 +345,47 @@ def test_missing_promoter_post_holding_remains_unknown_not_four_earned_points():
     config = load_config(CONFIG_FILE)
     at = datetime(2026, 10, 5, 12, tzinfo=timezone.utc)
     supported = evaluate(canonical, config, mode="final", evaluation_datetime=at).record
-    missing_input = deepcopy(canonical)
-    missing_input["capital_structure"]["promoter_post_pct"] = None
-    missing_input.get("_evidence", {}).pop("capital_structure.promoter_post_pct", None)
+
+    derived_input = deepcopy(canonical)
+    derived_input["capital_structure"]["promoter_post_pct"] = None
+    derived_input.get("_evidence", {}).pop("capital_structure.promoter_post_pct", None)
+    derived_outcome = evaluate(derived_input, config, mode="final", evaluation_datetime=at)
+    derived = derived_outcome.record
+
+    missing_input = deepcopy(derived_input)
+    missing_input["capital_structure"]["promoter_pre_pct"] = None
     missing = evaluate(missing_input, config, mode="final", evaluation_datetime=at).record
 
     def criteria(record):
         return {(m["module_id"], c["criterion_id"]): c
                 for m in record.score["modules"] for c in m["criteria"]}
 
-    yes, no = criteria(supported), criteria(missing)
+    yes, deriv, no = criteria(supported), criteria(derived), criteria(missing)
     key = ("D", "promoter_post_holding")
+
+    # The disclosure itself.
+    assert canonical["capital_structure"]["promoter_post_pct"] == 72.25
     assert yes[key]["state"] == "SCORED"
     assert yes[key]["score"] == 4.0
+
+    # Same value, derived: pre-issue % x pre-issue shares / post-issue shares.
+    assert deriv[key]["state"] == "SCORED"
+    assert deriv[key]["score"] == 4.0
+    assert deriv[key]["value"] == pytest.approx(72.25, abs=0.02)
+    metric_reason = derived_outcome.derived.metrics["promoter_post_pct"].reason
+    assert "derived" in metric_reason
+    assert "does not change the count" not in metric_reason
+    assert derived.score["final_score"] == 43.0
+
+    # The derivation's own inputs gone: still UNKNOWN, and nothing is earned.
     assert no[key]["state"] == "UNKNOWN"
     assert no[key].get("score") is None
-    assert {k: v for k, v in yes.items() if k != key} == {k: v for k, v in no.items() if k != key}
     assert supported.score["base_score"] == 46.0
     assert missing.score["base_score"] == 42.0
     assert supported.score["penalties_total"] == missing.score["penalties_total"] == -3.0
     assert supported.penalties == missing.penalties
     assert supported.score["final_score"] == 43.0
     assert missing.score["final_score"] == 39.0
-    assert canonical["capital_structure"]["promoter_post_pct"] == 72.25
 
 
 def test_real_filing_wrapped_total_extracts_without_fixture_fallbacks(monkeypatch):

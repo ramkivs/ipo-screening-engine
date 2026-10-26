@@ -58,7 +58,16 @@ V1_5_POLICY_CONTENT_HASH = "382ff86cc9d753514509f89c096f3b262bd4e12e644e0d7d03fe
 GOLDEN_RESULT_HASH = "e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1"
 
 FROZEN_CORE_HASHES: Dict[str, str] = {
-    "engine/ipo_screening/derived.py": "0a6ef86a8d2011ae4558876515b971ef9565c1ee2b4ca1eedd07582269356237",
+    # Owner-authorized correction 2026-10-26 (report section 24): two
+    # silence-scoring defects in the derivation layer were fixed -- an empty
+    # objects-of-the-offer schedule no longer scores as `mixed_ok` (or as a
+    # zero GCP), and the post-issue share count / EPS are now derived from
+    # disclosed counts instead of being left unusable.  The reviewed result is
+    # pinned here, exactly as A15 pinned evaluation.py and A30 pinned
+    # price_band_notice.py.  verify_golden_result() is unchanged and still
+    # reproduces e84f8bc0... exactly, so scoring output is independently
+    # protected.
+    "engine/ipo_screening/derived.py": "a9e4e5da884f8228f79be9d7ff3f3c3def11dc97327e7d778103cf5f9e05d359",
     "engine/ipo_screening/scoring.py": "3bbec2b4f682407c29e0488df0d4bc7a6c152506c6ec55618ee9827480bd725a",
     "engine/ipo_screening/knockouts.py": "8555b633a427fb057b2be4116aecca1d28f80f4e7a52ce3c15bdc9a7be16761f",
     "engine/ipo_screening/snapshots.py": "9c9626c9210b6d45863f4ec416b06b118d94a13cc669320184df5a5fdd204a27",
