@@ -1696,7 +1696,7 @@ class SectionExtractor:
             candidate_value=state,
             raw_text=note or state,
             page=page,
-            section="Restated Financial Information",
+            section="Related Party Transactions",
             locator="Related-party transactions coverage",
             quote=note or None,
             quote_is_processing=True,
@@ -2376,7 +2376,7 @@ class SectionExtractor:
                     candidate_value=value,
                     raw_text=quote,
                     page=page,
-                    section="Our Business" if page < 200 else "Restated Financial Information",
+                    section="Related Party Transactions",
                     locator="Related Party Transactions — %s — %s — %s"
                     % (value["category_label"], value["counterparty"], value["period"]),
                     quote=quote,
