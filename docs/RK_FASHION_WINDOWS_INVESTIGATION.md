@@ -1,3 +1,25 @@
+# Revision21 integration closure — PR #10 MERGED / Windows gate user-accepted
+
+PR #10 merged at2026-10-26T05:43:31Z: `70c5b0facc20f718500bcddc1efaae778ebd78c5`;
+accepted implementation head `9333b1cd7f55af1c45a73a06655967fc138a35ad`.
+Independent main/parent/tree verification includes all parser/regression/provenance
+changes with no unrelated source modifications. Closure changes are docs-only.
+
+**Windows validation accepted by explicit user decision**, not a new clean full
+run: exact target verified in temporary worktree; focused exit0; initial full
+**1941passed,1failed** (CLI extraction `subprocess.TimeoutExpired`); the same test's
+isolated rerun passed **98.51s**. User directs proceeding without another full
+Windows suite. The initial timeout is retained, never rewritten as1942passed.
+Original checkout/harness/five retained restorations are untouched. No scoring,
+assertion, timeout or checksum changes. Revision20's pending gate below is history.
+
+See existing authoritative tracker revision21 and [remote closure receipt](https://github.com/ramkivs/ipo-screening-engine/pull/10#issuecomment-6409140261)
+for exact merged-main publication and follow-up full Linux CI evidence. No main
+push CI is configured; manual dispatch403 is documented, not called successful.
+
+---
+## Historical repair/investigation record
+
 # Revision20 — wrapped capital-table row repair
 
 **Current status: repair implemented; Arena/Linux validation below; Windows

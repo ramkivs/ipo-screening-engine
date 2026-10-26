@@ -1,3 +1,56 @@
+# Revision21 — PR #10 integrated; Windows gate accepted with qualification
+
+**Controlling closure status (2026-10-26): PR #10 MERGED**, not OPEN.
+Exact accepted PR head: `9333b1cd7f55af1c45a73a06655967fc138a35ad`.
+Actual GitHub merge: `70c5b0facc20f718500bcddc1efaae778ebd78c5`, merged2026-10-26T05:43:31Z.
+Independent remote fetch verifies main contains that head; exact merge parents
+are dedb4b8 and9333b1c and the entire merge tree equals9333b1c. Parser repair,
+regressions, R.K. reconciliation, investigation and tracker blobs are included;
+no unexpected source changes. Prior revision20 Windows-OPEN/PR-OPEN statements
+below are historical and superseded by this explicit disposition.
+
+## Windows validation: ACCEPTED BY USER DECISION, qualified full-suite evidence
+
+User verified the exact target9333b1c in a temporary Windows worktree; focused
+tests passed with exit0. Initial full suite: **1,941 passed,1 failed**;
+`tests/test_extraction.py::test_cli_extract_subcommand` raised
+`subprocess.TimeoutExpired`. Isolated rerun of that same test **passed in98.51s**.
+User explicitly accepts the Windows gate on this evidence without another full
+run. **This is not a clean1,942-pass Windows full suite.** No Windows repeat,
+new acceptance condition, scoring workaround or timeout/test weakening is made.
+These are user-reported Windows observations, not an Arena-executed Windows run.
+Original Windows checkout, five retained restorations and harness correction
+are untouched; no Windows checkout access/reset/clean/overwrite/normalization.
+
+## Integration policy / evidence / closure publication
+
+- Fresh pre-merge GitHub state: head9333b1c, base main/dedb4b8 unchanged,
+  MERGEABLE/CLEAN, no reviews/requests, full CI SUCCESS. Branch endpoint shows
+  protected=false/check enforcement off; active branch rules[]/rulesets[];
+  `gh pr checks 10 --required` reports none. Detailed protection GET403 is
+  preserved as a visibility limitation, not treated as permission evidence.
+- Repository permits merge commits; normal `gh pr merge 10 --merge` with exact
+  head-SHA guard succeeded and independent PR/main/parents/tree retrieval proves
+  the result. No auto-merge (disabled), admin bypass or fabricated approval.
+- Accepted-head Linux CI40232275033/job121286334430: **1,942 tests,0failures/
+  errors/skips**, JUnit707.733s; frontend/integrity/compile/clean diff all PASS.
+- Post-merge local Linux check on byte-identical merged source:4schemas,
+  6frozen pins, golden, inactivev1.6, pip and compile PASS. No Windows rerun.
+- No main-push CI trigger exists. Manual full-main dispatch returned403
+  Resource not accessible by integration. No protection/check/workflow changes
+  are made to conceal that limitation. Documentation-only follow-up PR full CI
+  verifies the integrated source under the normal existing PR trigger; exact
+  outcome and final main publication are in the durable closure receipt below.
+- Closure changes touch only existing documentation/tracker evidence. Accepted
+  source/test/config/evidence/dependencies/harness blobs stay identical to9333b1c;
+  Windows decision therefore applies unchanged. No competing tracker or IIPS work.
+- [Authoritative remote integration/publication receipt](https://github.com/ramkivs/ipo-screening-engine/pull/10#issuecomment-6409140261) records the
+  follow-up commit/PR/full-CI result and final main readback. It is updated only
+  after those operations are independently observed, not planned-as-completed.
+
+---
+## Historical revisions (superseded integration/Windows status follows)
+
 > **Revision20 — wrapped promoter-total repair implemented; Windows acceptance
 > OPEN.** User-supplied native diagnostic identifies multi-lineTotal(A) cells
 > truncated by the old one-line/five-token helper. General bounded numeric-row
