@@ -224,7 +224,13 @@ def print_run_report(outcome, *, verbose: bool) -> None:
         print()
         print("  Top risks")
         for item in outcome.top_risks(5):
-            print(f"    {item['id']:<26} {item['impact']:g}  {item['label'][:52]}")
+            # An UNKNOWN criterion has no point impact: it is a gap whose
+            # size is the criterion's own weight, not a number of points
+            # already lost.  ``:g`` on ``None`` raised TypeError here and
+            # killed the report after the score had been printed.
+            impact = item.get("impact")
+            impact_text = f"{impact:g}" if isinstance(impact, (int, float)) else "unknown"
+            print(f"    {item['id']:<26} {impact_text:<8} {item['label'][:52]}")
 
     print()
     print(f"  Result hash         {record.result_hash}")

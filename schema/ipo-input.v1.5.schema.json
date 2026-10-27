@@ -465,6 +465,13 @@
           "items": {
             "$ref": "#/$defs/seller"
           }
+        },
+        "post_issue_eps_basis": {
+          "enum": [
+            "disclosed",
+            "derived"
+          ],
+          "description": "How issue.post_issue_eps was obtained. `disclosed` means the filing printed a post-issue earnings figure (quote and period recorded in _evidence); `derived` means the engine formed it as latest full-year PAT / post-issue shares, with the derivation recorded in _evidence. Absent for inputs that pre-date this field; such a value is not attributed to either basis and is reconciled against PAT by the semantic validator."
         }
       }
     },
@@ -736,6 +743,55 @@
             "null"
           ],
           "minimum": 0
+        },
+        "board_changes": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "Dated director / key-managerial-personnel events read from the changes-in-directorate table. The 24-month exit window is applied at evaluation time, not here.",
+          "items": {
+            "type": "object",
+            "required": [
+              "date",
+              "event"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "role": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "event": {
+                "enum": [
+                  "resignation",
+                  "cessation",
+                  "retirement",
+                  "term_expiry",
+                  "appointment",
+                  "other"
+                ]
+              },
+              "date": {
+                "type": "string",
+                "format": "date"
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
         }
       }
     },
@@ -1102,6 +1158,21 @@
       "type": "object",
       "additionalProperties": {
         "$ref": "#/$defs/evidenceRef"
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "description": "Per-field extraction coverage. A field listed here records what the reader established about the source section: DISCLOSED (read, values supplied), VERIFIED_NIL (read, and the filing positively discloses nothing), PARTIAL (section found but only partly read), UNREAD (not examined). A document that omits this map entirely is a legacy v1.5 input and keeps v1.5 behaviour; once the map is present, a field it does not mention is UNREAD.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "enum": [
+          "DISCLOSED",
+          "VERIFIED_NIL",
+          "PARTIAL",
+          "UNREAD"
+        ]
       }
     }
   }

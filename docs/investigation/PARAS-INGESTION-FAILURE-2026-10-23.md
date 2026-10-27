@@ -1477,3 +1477,1448 @@ The file contains no `else`, no `elseif` and no `finally`: every decision is an 
 **1908 collected / 1908 passed / 0 failed / 0 skipped**, exit 0, 30 m 16 s (1,892 before this pass + 16 new). No assertion weakened, no test converted to a skip, no test removed, and no expectation relaxed: the only existing expectations touched in this pass were none — every changed module is covered by tests that were added, and the Vishal golden result hash still reproduces `e84f8bc0…`.
 
 The suite is evidence about the code, never about the network: **no test in this repository reached an official host**, and nothing above shows that Vishal's Prospectus URL will be retrievable on the operator's host. The one-shot command in §21.5 is what decides that.
+
+## 22. The readers §20.4(a) asked for — implemented, verified, and what they did *not* buy — 2026-10-26 (revision 13)
+
+§20.4(a) listed the facts the filing discloses and no reader could reach. This pass
+implemented those readers, plus two defects of the mirror kind that §20.4(e) had left as a
+policy question: fields that were never read and were nonetheless **defaulted to the
+favourable answer**. Every change is in `extraction/sections.py`, `extraction/toc.py`,
+`extraction/builder.py` (non-frozen) and one CLI formatter; no weight, threshold, penalty,
+criterion definition, knockout, config file, schema or frozen-core module was touched.
+
+### 22.1 The routing defect that came first
+
+The table of contents routes sections by matching `TITLE ..... 124`. Justified TOC layouts
+extract the page number with a space inside it (`OBJECTS OF THE OFFER ..... 12 4`), and the
+old `(\d+)$` group rejected those rows silently. On this filing that dropped **four**
+sections — objects of the offer, industry overview, basis for offer price, and capital
+structure — each of which then fell back to a fixed page window that missed the section.
+Nothing downstream could recover: the readers were pointed at the wrong pages.
+`toc.py` now accepts a number split into two groups and joins it. Routed sections went
+from 10 to 14 on the retained filing, and every reader below depends on that.
+
+### 22.2 The objects schedule is a table, not a caption
+
+The keyword scan looked for the caption phrases it had been written against
+("repayment and/ or pre", "prepayment, in full or in part"). This filing says
+"Prepayment or scheduled re-payment, in full or part, of certain outstanding borrowings",
+so the debt line was dropped while the GCP line — whose caption *was* in the list — was
+still read. The schedule is now read **row by row**: a numbered row plus its continuation
+lines, terminating at the first line that carries a money cell or an undisclosed marker
+(prose paragraphs follow the schedule and were previously absorbed into the row), and the
+row is classified from its own verb and party:
+
+| Row (p. 129) | Category | Amount |
+|---|---|---|
+| "Prepayment or scheduled re-payment … of certain outstanding borrowings availed by our Company" | `debt_repayment` | 3,209.00 |
+| "Investment in our wholly owned Subsidiary, PMHPL … for repayment/prepayment of borrowings" | `other` | 541.00 |
+| "General corporate purposes*#" | `gcp` | `[●]` (undisclosed) |
+
+Two rules fell out of the reading, both pinned by tests:
+
+* **An equity investment in a group company is `other`** — the issuer parts with cash and
+  retires none of its own debt. A *direct* prepayment of a subsidiary's borrowings is
+  still `debt_repayment` (Jio: "Prepayment … of certain outstanding borrowings availed by
+  the Material Subsidiary, RJIL"), because the object is the retirement of debt whichever
+  entity holds it.
+* **The first stated row for a category wins.** This filing prints the objects twice (the
+  requirement of funds, then the deployment schedule). Summing them double-counted: the
+  run reported 8,185.95 where the filing says 3,750.00 for the two disclosed objects.
+
+The top-level `use_of_proceeds` evidence quote was a processing summary
+("Use of proceeds categories: [...]"). It is now the schedule's own row text.
+
+### 22.3 Concentration, industry forecast, capital structure, governance
+
+| Fact | Where | Reader added |
+|---|---|---|
+| Top-five suppliers 21.94% of purchases, FY2026 | p. 61 | the row is spelled "Top **five** suppliers"; a literal `top 5` regex could not read it. Read by position inside the table, preferring the fiscal-column header, first amount/% pair = latest FY, and **fail-closed without a fiscal header** |
+| India healthcare delivery market CAGR 10–12%, FY2025–FY2030, CRISIL Report dated September 2026 | pp. 6, 204 | the range is recorded at its **lower bound** (the filing commits to no point estimate), with its period and its publisher read from the filing's own definition of the report. `industry_scope` stays a schema enum (`india`); the market name goes in the locator |
+| Promoter holds 72.80% pre-Offer | p. 111 | prose fallback ("equivalent to 72.80% of the issued, subscribed and paid-up") — the table route had missed it |
+| No promoter shares are pledged | p. 114 | the pattern required the plural ("our promoters are pledged"); this filing uses the singular. Both forms now read, quoted verbatim |
+| Promoter contribution locked in for three years | p. 116 | "locked in for a period of …", "locked in for …", 18 months / one year / three years, all read and quoted verbatim |
+| No auditor change in three years | p. 99 | the auditors' own letter. It names no firm, so it used to be read only inside the branch that had already captured the firm's name — it is now an independent observation |
+| 7 directors, 3 independent | p. 337 | counts are spelled in words ("we have seven Directors … of whom … three are Independent Directors"); both counts are required and the value is emitted **only when the composition sentence is read** |
+
+### 22.4 The mirror-image defects: a default is not evidence
+
+`builder.py` supplied `promoter_pledge_pct = 0.0`, `promoter_lockin_in_place = True`,
+`large_holders_unlocked_early = False`, `discounted_allotments_18m_before_drhp = False` and
+`board_independent_majority = False` when nothing had been read. Each one cleared a scored
+point without evidence: K2's pledge limb, the C `lockin` criterion, the
+discounted-allotment penalty, and (in the other direction) the D `board_kmp` criterion.
+They are now **absent on the strict path** — the dependent metric is UNKNOWN — and remain
+available only on the synthetic template path (`allow_fixture_fallbacks`), where a
+reference base is deliberate.
+
+Consequence, recorded rather than absorbed: two real filings' pinned scores moved **down**
+by one point each (RK Fashion 44 → 43, the Aurora ingestion case 18 → 17) because neither
+states an early unlock, so `lockin_bucket` is now UNKNOWN rather than "intact". The
+availability moved with the point, as it must. Four test expectations were corrected with
+the reason written next to them; no assertion was weakened and no test was skipped.
+
+### 22.5 The peer table (§20.4(d) — partly reachable after all)
+
+§20.4(d) said Module B needs "peer multiples from a dated peer snapshot … the filing
+contains no peer table". That was wrong: p. 150 **is** a peer table — twelve columns
+(face value, EV, closing price 5 Oct 2026, revenue FY26, EBITDA FY26, EPS basic/diluted,
+P/E, EV/EBITDA, net worth, RONW, NAV/share) — and it matches none of the three recognised
+column layouts, so `extract_peers` skipped the page. It also required a literal
+"PEER GROUP"/"PEER COMPANIES" line, which this table heads "Listed Peers".
+
+A fourth layout, read by a streaming row-parser (values wrap mid-number:
+`1,228,529.3` / `9`), now reads **nine** listed peers with their P/E, P/B (struck on the
+closing price and NAV) and ROE, dated 5 October 2026. The issuer's own row sits *above*
+the "Listed Peers" label and is never counted as a peer; a table with no such label yields
+nothing (fail-closed); `listed_years` stays `None`, because the table discloses no listing
+history.
+
+**This did not move the score.** Module B is still 0/20, and the reason is now explicit in
+the derived metrics rather than hidden: `pe_vs_peers`, `peg` and `sector_ipo_relative` need
+a **post-issue EPS**, and `second_multiple` needs an issuer P/B or EV/EBITDA, both of which
+need the post-issue share count. The filing prints the fresh issue as money only
+(`₹5,000.00 million`; share count `[●]`), and its own P/E table on p. 147 is `[●]`
+"to be computed after finalisation of the Price Band". Deriving shares from
+fresh amount ÷ cap price is arithmetic the policy forbids, so the fields stay UNKNOWN.
+Nine genuine peers sitting behind one undisclosed divisor is the honest state of this
+filing, and it is what the run now says.
+
+### 22.6 The run, after the readers
+
+`ipo_screen run build/paras/input.json --mode final --at 2026-10-26T09:15:00Z`:
+
+| | §20 (before) | now |
+|---|---|---|
+| Final / base | 9.0 / 12.0 | **13.0 / 16.0** |
+| Range | 0–70 | 1.0 – 69.0 |
+| Verdict | AVOID (K5 knockout) | AVOID (K5 knockout) |
+| Confidence | Low 35.79% | Low 41.05% |
+| Modules A · B · C · D · E · F | 6 · 0 · 6 · 0 · 0 · 0 | 6 · 0 · 3 · 1 · 6 · 0 |
+| Knockouts | K3 CLEAR, K5 TRIGGERED, K1/K2/K4/K6 UNVERIFIED | unchanged |
+| Warnings | `PEER_SET_NO_VALID_ENTRIES`, `MARKET_BLOCK_UNUSABLE` ×4 | `GCP_UNDISCLOSED`, `MARKET_BLOCK_UNUSABLE` ×4 (no peer-set warning: nine VALID peers) |
+
+Module C fell from 6 to 3 and Module D rose from 0 to 1 for the same reason: the removed
+defaults were C's lock-in point (gone) and D's auditor point (now evidenced — p. 99 gives
+continuity, so `auditor_changed_3y` is `False` from a quotation, and the bucket is
+`eom_only` because the examination report does carry Emphasis of Matter paragraphs for the
+interim periods). The apparent loss is the removal of two unevidenced points and the
+appearance of one evidenced point; the number is not the point.
+
+Also fixed: `print_run_report` crashed with `TypeError: unsupported format string passed
+to NoneType.__format__` on any UNKNOWN criterion in "Top risks" (`item['impact']` is
+`None` for those). The crash happened *after* the score printed, so `ipo_screen run`
+exited 1 with a traceback and no result path — which is why this run had to be read out of
+the store.
+
+### 22.7 What was deliberately *not* done
+
+* **`governance.auditor_opinion` stays `emphasis_of_matter`.** p. 366 states the report
+  "expresses an unmodified opinion", and p. 440 states there is no Emphasis of Matter for
+  FY2024–FY2026 — but p. 367 does carry Emphasis of Matter paragraphs for the two interim
+  periods covered by the same examination report. The schema distinguishes `unqualified`
+  from `emphasis_of_matter` for exactly this case, and the config scores the second as
+  `eom_only` (1/2). Changing it would add a point on a re-reading of the enum, not on new
+  evidence, so it is left as it is.
+* **`rpt` / K6 stay unfed** — the approved metric definition still does not exist
+  (§20.4(b)). Note for whoever writes it: p. 92 gives the percentages directly, per row,
+  for five periods, all well under 1%; the only large ratio in the filing is loans to a
+  wholly owned subsidiary (2.55% of total assets, p. 73).
+* **`going_concern_uncertainty` and `sebi_ed_action_active` stay UNKNOWN** — both need an
+  approved rule for explicit negatives (§20.4(e), A19/A25). "The Restated Consolidated
+  Financial Information have been prepared on accrual and going concern basis" is a basis
+  of preparation statement, not a going-concern uncertainty; the SEBI/ED nil statements on
+  pp. 493/500 are promoter-scoped, and "Enforcement Directorate" does not appear in this
+  document at all.
+* **`moat`, `visibility`, `board_kmp`** — qualitative ratings and a KMP-exit rule, still
+  decision-gated rather than reader-gated.
+* **The score was not steered.** Nothing here was tuned to move it; two of the changes
+  moved real filings' scores down, and the Paras number rose only because four criteria
+  that were previously unread (concentration, industry growth, auditor, and the object
+  schedule's two amounts) became evidenced — while two unevidenced points went away.
+
+### 22.8 Verification
+
+* `tests/test_reading_defects_20261026.py` — **28 new cases**, all synthetic and instant:
+  justified TOC page numbers; the objects schedule read by row, printed twice, with prose
+  after it; the subsidiary-investment vs subsidiary-debt distinction; the word-form
+  supplier row and its fail-closed twin; the forecast range with and without a defined
+  report; pledge and lock-in grammar variants; the auditors' letter; word-counted board
+  composition and the unread-board case; the twelve-column wrapping peer table, the
+  excluded issuer row, the rejoined split number, and the missing-label fail-closed case;
+  and the builder's absent-vs-default behaviour on both paths. The suite-tier inventory
+  lists the module as synthetic (it hands the router a fake reader).
+* Affected suites: `test_paras_evidence_regression` (18), `test_paras_extraction_gaps_20261024`
+  (23), `test_paras_official_issue_page_terms` (25), `test_acceptance_matrix` (55),
+  `test_v16_implementation` (45), `test_frozen_core_line_endings` (3) — **169 passed**,
+  including the golden result hash.
+* **Full backend suite: 1970 collected / 1969 passed / 1 failed** on the first run; the one
+  failure was the tier inventory rejecting the new module (it mentions `from_pdf`), fixed
+  by listing it with the other fake-reader module. Both are green on re-run.
+* Frozen core: untouched, and `test_frozen_core_line_endings` / `test_v16_implementation`
+  pass; the Vishal golden hash still reproduces.
+
+**Not claimed:** the Paras evaluation is a run over **non-authoritative** evidence with
+third-party (aggregator) issue terms; it is not an official determination about the issuer,
+and no store outside `build/` was written. The remaining unknowns are classified in §20.4
+and §22.5–22.7, and none of them is now waiting on a reader.
+
+## 23. Reconciliation, the K5 trigger, and the boundary the evidence stops at — 2026-10-26 (revision 14)
+
+This section closes workstreams B and C of the PR #12 pass and records them for workstream D.
+**No code was changed in this pass.** Nothing in `engine/`, `config/`, `tests/`, the schema or
+the frozen core was touched, so no test was run: §23.9 says exactly what was executed instead.
+
+### 23.1 The report, the stored evaluation and the hash are one run
+
+The run cited in §22.6 is a single run. Read back from
+`build/paras/store/PARAS-HEALTHCARE-LIMITED-20261026-091500Z-final-c123e138`:
+
+| Artifact | Value |
+|---|---|
+| `result.json` `result_hash` | `c123e13848def545eef07eb16e6f5cee7f3cf71f72dca34b706613523d6edf35` |
+| `manifest.json` `result_hash` | the same value |
+| `evaluation-record.v1.json` `evaluation_id` | `…-c123e138`, i.e. the hash is the record's identity |
+| input snapshot | `0c32701c…`; market block `8844b2a8…`; peers `c96ff9f3…`; source manifest `60c60c81…` |
+| config hash | `4a5d92e8…` (v1.5.0) |
+
+Re-running the **CLI** against the stored input snapshot with the same `--at` reproduced
+`c123e138…` **bit-for-bit** (written to `build/paras/store_verify/`). The hash is therefore a
+statement about the stored evidence, not about the machine that first computed it.
+
+Two caveats, both recorded because they bound what a hash may be used to claim:
+
+* **The hash covers the run timestamp.** The same inputs re-run at the baseline timestamp
+  (`2026-10-26T06:24:47Z`) produce the *identical scores* — 13.0 final, 16.0 base, 39.0
+  available — under a *different* hash, `413682ae…`. So the score is clock-independent; the
+  hash is not. In particular, replaying today's inputs at yesterday's clock does **not**
+  reproduce the 9.0 baseline (§23.2); only the `96379ab` tree plus its own input does.
+* **`pipeline.evaluate()` is not hash-equivalent to the CLI.** Called directly on
+  `json.load(input)["snapshot"]["input"]` it returns the same scores but `2bf73f02…`. The CLI
+  run profile is the only hash-authoritative path (`§20.4(c)` line 615; line 1372).
+
+### 23.2 The 9.0 baseline, and the complete list of what differs
+
+The baseline was rebuilt by extracting the retained RHP and building the input with
+**commit `96379ab`** in a throwaway worktree (`/tmp/base`, not persisted): 06:24:47Z, final
+**9.0**, base 12.0, penalty −3, completeness **35.7895%**, hash `dc3d136e…`, modules
+A 6/25 · B 0/20 · C 6/15 · D 0/15 · E 0/15 · F 0/10.
+
+The input diff between that baseline and the current input is **exhaustive** and small — 13
+leaf changes, and none of them is a financial, issue-term, clause or config change. Price band
+(660/693), lot (21), fresh (₹5,000 m), OFS (₹9,500 m), pre-issue shares (100,986,187), dates
+(2026-10-21/23), quota, and every financial line are identical in both:
+
+| # | Field | Baseline | Current | Cause |
+|---|---|---|---|---|
+| 1 | `business.top5_supplier_pct` | `None` | `21.94` (p61) | new reader (§22.3) |
+| 2 | `business.industry_cagr_pct` | `None` | `10.0` (p204) | new reader |
+| 3 | `business.industry_forecast_period` | `None` | `FY2025-FY2030` | new reader |
+| 4 | `business.industry_scope` | `None` | `india` | new reader |
+| 5 | `business.industry_source` | `None` | CRISIL, Sept 2026 | new reader |
+| 6 | `capital_structure.pre_ipo_placements` | `[]` | 3 issues (2006–2008, ₹60) | new reader |
+| 7 | `capital_structure.promoter_pre_pct` | `None` | `72.8` (p111) | new reader |
+| 8 | `governance.auditor_changed_3y` | `None` | `False` (p99) | new reader |
+| 9 | `use_of_proceeds` | `[]` | 3,209.00 + 541.00 + `gcp [●]` | new reader |
+| 10 | `peers` | `[]` | 9 peers (p150) | new reader |
+| 11 | `capital_structure.large_holders_unlocked_early` | `False` | `None` | **builder default removed** |
+| 12 | `capital_structure.discounted_allotments_18m_before_drhp` | `False` | `None` | **builder default removed** |
+| 13 | `_sources[0].retrieval_timestamp` | 09:24:36Z | 08:34:06Z | re-extraction clock (no content change; `content_hash` identical) |
+
+`promoter_pledge_pct 0.0` and `promoter_lockin_in_place True` take the same values on both
+sides, but they are now evidence-backed (pp. 114/115) rather than builder-supplied — a
+provenance change with no score effect. Field 13 touches the source manifest only.
+
+### 23.3 The score ledger, criterion by criterion
+
+Five criteria changed state. Everything else — including all of Module A and all of Module B —
+is identical:
+
+| Module/criterion | Baseline | Current | Evidence for the change |
+|---|---|---|---|
+| C `use_of_proceeds` | SCORED **2/4** (`mixed_ok`) | **UNKNOWN** (0 of 4) | the schedule is now read: 3,209.00 + 541.00 = 3,750.00 = 75% of the ₹5,000 m fresh issue, and GCP is `[●]`. The 20% blind test cannot be evaluated because the GCP amount is undisclosed; the engine will not read `[●]` as zero nor substitute the legal maximum |
+| C `lockin` | SCORED **1/1** (`intact`) | **UNKNOWN** | the point rested on the builder's `large_holders_unlocked_early False`; nothing in the filing establishes it, so it is removed rather than kept |
+| D `auditor` | UNKNOWN | SCORED **1/2** (`eom_only`) | p99 "no change in our statutory auditors in the last three years"; EOM stays as §22.7 explains |
+| E `industry_growth` | UNKNOWN | SCORED **3/5** | `industry_cagr_pct 10.0 ≥ 8` (p204; lower bound of the 10–12% range) |
+| E `concentration` | UNKNOWN | SCORED **3/3** | `top5_supplier_pct 21.94 < 30` (p61) |
+
+Ledger: base **12 → 16** (+4: −2 −1 +1 +3 +3), final **9 → 13**, penalty total **−3
+unchanged**, available points **34 → 39**, unknown points **61 → 56**, total evaluable **95
+unchanged**, N/A **5 unchanged**, completeness **35.7895% → 41.0526%** (still `Low`; the
+Medium band starts at 80%).
+
+The confidence interval moves in both directions, and the *downward* movement is the
+interesting one:
+
+* **Upper bound 70 → 69** = `base + unknown + penalties` = 16 + 56 − 3. It falls even though
+  the point score rose, because five previously-open points are now closed *against* the
+  issuer (the two C points) or *earned* (the three E points) while four points of peer
+  valuation and five of market demand remain genuinely unknowable from this filing.
+* **Lower bound 0 → 1** = `base + penalties − unresolved penalty envelope` = 16 − 3 − **12**.
+  The envelope grew 10 → 12 because `discounted_allotments` (−2) used to be *cleared* by the
+  builder's `False` default and is now carried as unresolved: removing a favourable default
+  makes the worst case worse even as the central estimate improves. That is the intended
+  direction of the change.
+
+### 23.4 K5 — "contingent liabilities >50% of net worth" — investigated to the source and retained
+
+Rule (`config/ipo-config.v1.5.0.json`, K5):
+`when: any[contingent_liab_pct_networth > 50, contingent_liab_unquantified]`.
+`derived.py::_contingent_liab_pct_networth` computes `contingent / net_worth × 100`, returns
+UNKNOWN if either input is missing and N/A if net worth ≤ 0.
+
+* **Numerator.** `financials.contingent_liabilities = 3,905.01` INR millions, evidence p91,
+  quote `"Total | 3,905.01 as at 31 March 2026"`, locator "Contingent Liabilities and
+  Commitments (claims not acknowledged as debts, latest fiscal year)". Composition on the same
+  page, and it adds exactly: liquidated damages **27.50** + bank guarantee to HEC **75.00** +
+  corporate guarantees **3,694.21** + claims not acknowledged as debts **108.30** = **3,905.01**.
+* **Denominator.** FY2026 net worth **3,949.41** INR millions (the same figure the restated
+  statements carry; the report's lakh-denominated `394.941` is the same number in other units).
+* **Arithmetic.** 3,905.01 / 3,949.41 × 100 = **98.8758%** > 50 → **TRIGGERED**. The engine's
+  leaf records `contingent_liab_pct_networth = 98.87578144583622 > 50 -> True`; the second
+  limb (`contingent_liab_unquantified`) is UNKNOWN, which does not affect the result.
+* **Independent corroboration from the issuer itself.** p36 states that "contingent
+  liabilities, as of June 30, 2026, constituted **89.55%** of our net worth", and the coverage
+  table on the same page prints "Total Contingent Liabilities 3,905.01 **98.88%** … as at
+  March 31, 2026". The engine's 98.8758% and the filing's 98.88% agree to two decimals on the
+  same date and the same denominator.
+
+**Material nuance, recorded rather than "fixed".** 3,694.21 of the 3,905.01 (93.54% of the
+numerator) is corporate guarantees; excluding them the remainder is **210.80**, i.e. **5.34%**
+of net worth, which would *not* trigger K5. The trigger therefore rests on the issuer's own
+classification of corporate guarantees as contingent liabilities inside the "Total" it
+discloses — a classification the risk factor and the coverage table both repeat. Excluding
+them would be the engine second-guessing the issuer's accounting presentation in order to
+clear a knockout, which is exactly the kind of adjustment §22.7 forbids. **K5 stands as
+TRIGGERED.** (Cash-flow corroboration for the reading: FY2026 CFO 1,635.12 against PAT
+438.34 — nothing in the accounts is being misread.)
+
+### 23.5 The other five knockouts, verified
+
+| Rule | State | Why, from the leaves |
+|---|---|---|
+| K1 going concern / opinion | UNVERIFIED | `auditor_opinion = emphasis_of_matter` is not in `[qualified, adverse, disclaimer]` → False; `net_worth_latest 394.941 < 0` → False; only `going_concern_uncertainty` is missing (A19: "prepared on a going concern basis" is a basis of preparation, not an uncertainty) |
+| K2 pledge / SEBI-ED | UNVERIFIED | `promoter_pledge_pct 0.0 > 25` → False; `sebi_ed_action_active` missing — the nil statements on pp. 493/500 are promoter-scoped and "Enforcement Directorate" does not appear in the document |
+| K3 OFS / declining profit | **CLEAR** | `ofs_share_pct 65.517 > 80` → False (OFS ₹9,500 m of ₹14,500 m); `profit_declining False` — FY2026 PAT 438.34 against FY2025 −579.83, and PAT CAGR is not negative |
+| K4 promoter exit / CFO-PAT | UNVERIFIED | `roce_latest 13.54 < 10` → False and `profit_declining False`; `cfo_pat_cumulative` is UNKNOWN because cumulative PAT is non-positive, so the ratio is **not meaningful and is not forced to zero**; `pe_promoter_sold_pct_combined`, `promoter_full_exit`, `promoter_post_pct` are UNKNOWN because the seller list and the post-issue holding are not disclosed |
+| K6 RPT growth | UNVERIFIED | `rpt_pct_of_revenue_growth` is not disclosed and has no approved metric definition (§20.4(b)); note the raw disclosure exists — RPT are 0.47% of revenue across pp. 92–95 — so this is decision-gated, not reader-gated |
+
+### 23.6 Module B: all nine peers are real and the module is still 0/20
+
+The peer table on p150 is now read in full — nine listed peers, priced 5 October 2026, with
+P/E, P/B and ROE, the issuer's own row excluded (Aster 91.89, Apollo 59.36, Fortis 55.43,
+Global Health 64.46, Jupiter 42.92, KIMS 116.41, Manipal 87.00, Max 62.10, Narayana 43.41;
+median P/E **62.10**, median P/B **8.37**, median ROE **13.41%**). All nine are `VALID`; none
+is rejected.
+
+Every B criterion nevertheless stays UNKNOWN, and for one unchanged reason: they need the
+issuer's own P/E, which needs the post-issue share count, which the filing prints as `[●]`
+(its own P/E table on p147 is `[●]` "to be computed after finalisation of the Price Band").
+Deriving shares as `fresh issue ÷ price band` is the arithmetic §20.4(c) forbids (lines 615
+and 1372). So `dilution`, `promoter_ofs_pct` and all of B remain blocked on a **disclosure**,
+not on a reader — and the 20 unknown points in B are the single largest reason completeness
+sits at 41%.
+
+### 23.7 One frozen-core behaviour recorded, not changed
+
+Rebuilding the baseline surfaced a second instance of the §22.4 class of defect, this time
+inside the frozen core: with `use_of_proceeds: []` — no schedule read at all — the baseline
+scored C `use_of_proceeds` as `mixed_ok` **2/4**. An empty allocation list is not evidence of a
+mixed-use offer, and awarding the midpoint for it is a favourable default, not a reading. It
+is **not** fixed here: `derived.py` is in the frozen core, the fix is a behaviour change that
+would move other issuers' scores, and no governance decision authorises it. It disappears
+from Paras only because the schedule is now read and the `[●]` GCP makes the bucket genuinely
+undecidable. Recorded as an open item for the next governance decision; do not treat it as
+resolved.
+
+### 23.8 The governance boundary, read back — and left exactly where it was
+
+* **A22** — RAMKI-APPROVED POLICY: evidence-or-UNKNOWN, with cross-year EOM deferred. Every
+  choice in §23.3/§23.5 follows it: an unread value is UNKNOWN, never a negative, never a
+  favourable default.
+* **A23** — defaults removal executed under the existing contract; two coverage standards are
+  still marked "RAMKI DECISION REQUIRED" and remain open.
+* **A21** — reads: post-issue holding must be the disclosed number, and the `SRC-DERIVED`
+  enrichment path is a provenance-marked derivation, not a substitution of a disclosed value.
+  It is unchanged, and it is why `promoter_post_pct` stays UNKNOWN rather than derived here.
+* **A32** — header unchanged and quoted verbatim from the record: "IMPLEMENTED 2026-10-26;
+  FULL BACKEND SUITE EXECUTED; READY FOR RAMKI RATIFICATION (NOT RATIFIED)". Nothing in this
+  pass ratifies, amends or re-implements it.
+* Still decision-gated, with the exact dependency for each: `rpt`/K6 → an approved metric
+  definition for the related-party share of revenue *growth*; `moat`/`visibility` → approved
+  ratings definitions; `board_kmp` → an approved KMP-exit rule; K1 `going_concern_uncertainty`
+  and K2 `sebi_ed_action_active` → an approved explicit-negative rule (A19/A25); post-issue
+  share count → an approved derivation or the disclosed number (A21/§20.4(c)).
+
+### 23.9 Verification and non-claims
+
+Executed in this pass, and nothing else:
+
+* two CLI runs — the reproduction into `build/paras/store_verify/` and the clock control into
+  `build/paras/store_clockctrl/` (§23.1);
+* one baseline reconstruction and its run in `/tmp/base` (§23.2);
+* readbacks of `result.json`, `manifest.json`, `evaluation-record.v1.json`, `input.json`,
+  `peers.json`, the K leaves and the pens, the config clauses, `derived.py`'s two helpers, and
+  the RHP pages 30/36/39/40/44/45/61/91/99/111/114/115/129/145/150/152/155/156/162/165/167/204/
+  228/233/235–238/258/259/263/266/275/277/337/346/366/367/440/445/493/494.
+
+**No tests were run** — correctly, because no file under `engine/`, `config/` or `tests/`
+changed. The last test evidence for this code is the focused run recorded in §22.8 and
+Revision 22.
+
+**Not claimed:** this is a run over **non-authoritative** evidence with third-party
+(aggregator) issue terms; it is not an official determination about the issuer. K5 being
+TRIGGERED is a statement about the numbers in the filing, not a recommendation. Nothing was
+merged, closed, ratified or published beyond documentation.
+
+## 24. Two shared derivation defects, fixed in the common path — 2026-10-26 (revision 15)
+
+This pass implements the two defects §23 recorded and stops there. Both fixes are in one
+place — `engine/ipo_screening/derived.py`, the derivation layer every criterion and knockout
+reads — and neither contains an issuer name, a filing-specific branch or a score target.
+`config/`, `schema/`, scoring weights, thresholds, penalties and knockout definitions are
+untouched.
+
+### 24.1 Defect 1 — silence scored as `mixed_ok`
+
+`use_of_proceeds_bucket` evaluated three tests over the allocation schedule. With an **empty**
+schedule every test was simply "not triggered": no GCP (so not blind-heavy), no debt (so not
+debt-heavy), no growth (so not growth) — and the function fell through to `mixed_ok`, which is
+2 of 4 points. `gcp_amount` reported `0.0` from the same empty list.
+
+That is the Revision-22 defect class (a default is not evidence), one layer deeper: it was not
+a builder default, it was a *derivation* default, and it could not be seen while the schedule
+was unreadable. It became visible only after the readers landed, because a schedule that used
+to be empty for everyone suddenly became empty only for the filings whose schedule the reader
+still could not find — i.e. the defect now paid a favourability bonus precisely where the
+engine knew least.
+
+Fixed in the common path:
+
+| Case | Before | After |
+|---|---|---|
+| Empty schedule, fresh issue > 0 | `mixed_ok`, 2/4; `gcp_amount` 0.0 | **UNKNOWN** with the reason "the objects-of-the-offer schedule is empty… missing evidence rather than a disclosed mixed allocation"; `gcp_amount` **UNKNOWN** |
+| Empty schedule, fresh issue == 0 (pure OFS) | `NOT_APPLICABLE` | **unchanged** — the genuine not-applicable case stays distinct from the missing one |
+| Read schedule with no GCP line | 0.0 | **unchanged** — a read, complete schedule that names no GCP *is* evidence of a nil GCP |
+| Partially disclosed category | UNKNOWN | **unchanged** (the pre-existing three-valued logic is correct) |
+| Schedule allocating more than the fresh issue | shares computed anyway | **UNKNOWN** — a schedule cannot distribute more than the gross proceeds it splits; this is the signature of a double-read (the objects schedule is often printed twice) |
+| Malformed (negative) amount | rejected by the schema | **unchanged** — the contract gate stops it before derivation |
+
+The empty-schedule rule is categorical, not a heuristic: a fresh issue must state the objects
+of the offer, so with a fresh issue present an empty schedule can only mean the schedule was
+not read. The same argument does **not** hold for `capital_structure.pre_ipo_placements`,
+where an empty list is a legitimate disclosed nil, so that field's behaviour was left alone —
+with the residual risk recorded in §24.6 rather than papered over.
+
+### 24.2 Defect 2 — the capital structure was never assembled
+
+`post_issue_shares` and `post_issue_eps` were read as raw inputs only. A filing that discloses
+the pre-issue count, the fresh-issue count and a year's PAT but not the post-issue count
+produced UNKNOWN valuation (Module B, 20 points), UNKNOWN `dilution` (C) and UNKNOWN
+`promoter_post_holding` (D) — with a message that could not say which input was missing.
+
+The derivation now exists once, in the shared layer:
+
+* **post-issue shares = pre-issue shares + fresh-issue shares.** A fresh issue creates shares;
+  an offer for sale only transfers shares that already exist, so the OFS never enters the
+  addition. Disclosed wins. A disclosed count *below* the pre-issue count is a contradiction
+  and is refused rather than used.
+* **post-issue EPS = latest full-year PAT ÷ post-issue shares**, used only when no EPS is
+  disclosed. This is the prospectus convention for EPS on post-issue capital, and it is the
+  *conservative* direction: charging the whole year against the enlarged base (instead of a
+  weighted average) raises the P/E, which can only make a valuation less favourable.
+* **promoter post-issue % = (promoter pre-issue shares − promoter shares sold in the OFS) ÷
+  post-issue shares**, where the pre-issue holding comes from the disclosed percentage, not
+  from the sellers' holdings (only some promoter holders sell). Structural checks remain: a
+  seller cannot offer more than it held (`SELLER_OVERSELL`, unchanged), and the group cannot
+  sell more than it owned.
+
+**The prohibited shortcut is still prohibited** and the refusal now names it: the fresh share
+count is never formed as `fresh issue amount ÷ price band`, because the band is a range and
+the offer price is struck inside it.
+
+Provenance: every derived value carries `formula`, the exact `inputs` consumed (the extra
+inputs appear only on the derived path, so the record always describes what actually produced
+the value) and a `reason` beginning "derived:" that states the arithmetic and its basis. A
+derived value is therefore distinguishable from a disclosed one in `derived_metrics`, in the
+stored record and in the replay.
+
+### 24.3 Cross-issuer validation — the derivations reconstruct real disclosures exactly
+
+The strongest available check is a derivation that reproduces a number the filing printed.
+
+| Artifact | Disclosed | Derived by the new code | Agreement |
+|---|---|---|---|
+| Vishal Nirmiti (golden input) | post-issue 26,390,909 | 19,800,000 + 6,590,909 = **26,390,909** | exact |
+| Vishal Nirmiti | dilution 24.974164% | **24.974164%** from the derived count | exact |
+| Vishal Nirmiti | promoter post 49.4% | **49.400193%** (73.42% × 19,800,000 − 1,500,000, over 26,390,909) | 0.0002 pp |
+| Vishal Nirmiti | EPS 9.46 | **9.4635** (PAT 2,497.5 lakh ÷ 26,390,909) | rounding step |
+| Jio Platforms (canonical fixture) | post-issue 9,209,030,830 | 8,939,030,830 + 270,000,000 = **9,209,030,830** | exact |
+| R.K. Fashion Accessories (real filing, extracted) | promoter post 72.25% | **72.2588%** (99.67% × 11,249,563, over 15,516,763) | 0.01 pp |
+
+Score effects, which are the point of the table:
+
+* **Vishal Nirmiti — unchanged, 35.0 (base 38.0, penalties −3.0), golden hash still
+  `e84f8bc0…`.** With all three disclosed fields removed the run still scores **35.0**, because
+  every derived value reproduces the disclosed one. The golden record is untouched.
+* **R.K. Fashion Accessories — unchanged, 43.0.** Its own test that removed the disclosed
+  post-issue percentage used to see UNKNOWN; it now sees the value derived from the pre-issue
+  percentage and counts 4 points earned from arithmetic. The test was rewritten (see §24.4) to
+  keep its real intent: remove the derivation's *inputs* as well and the criterion is UNKNOWN
+  again, base 46 → 42, final 43 → 39.
+* **Jio Platforms — unchanged.** Disclosed values win.
+* **Paras Healthcare — unchanged by construction, not by a new run.** Its schedule is
+  non-empty with a `[●]` GCP, so it takes the pre-existing blind-test path
+  (`test_p14_s1_missing_gcp_is_unknown_not_the_ceiling`, and the new
+  `test_partial_schedule_stays_unknown`), and its post-issue count is `[●]` with no fresh share
+  count, so the new derivation returns UNKNOWN with a more specific message. The score (13.0)
+  cannot move. **No new Paras evaluation was run in this pass:** the previous run's input
+  snapshot was not retained, and the retained issue-terms package states in its own README
+  that its values "were not written into the engine … and into no evaluation", so rebuilding an
+  input from it would contradict the evidence record rather than extend it.
+
+### 24.4 What the frozen-core label did and did not mean
+
+`derived.py` is one of the six files pinned in `FROZEN_CORE_HASHES`. The pin is a
+*change-detector*, not an approval authority: it exists so that a scoring change cannot happen
+silently. The owner's standing authorization covers an in-scope engineering correction of an
+identified defect, so the pin was re-set to the reviewed hash
+`a9e4e5da884f8228f79be9d7ff3f3c3def11dc97327e7d778103cf5f9e05d359`, with the reason recorded
+in the pin's own comment — exactly as A15 did for `evaluation.py` and A30 for
+`price_band_notice.py`. The independent protection is untouched and still passes:
+`verify_golden_result()` reproduces `e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1`
+and 35.0, so no scoring output moved without a reviewed reason.
+
+### 24.5 Findings that are not code defects — recorded, not "fixed"
+
+* **§20.4(b) and §23.7 are wrong about the RPT metric.** Both said the related-party metric
+  definition "does not exist", making Module D `rpt` and K6 decision-gated. The definitions were
+  approved on 2026-10-17 and are implemented: `rpt_pct_revenue` = revenue-type related-party
+  income ÷ revenue from operations for the latest audited year, and
+  `rpt_pct_of_revenue_growth` = the change in that share between the latest two audited years
+  (`builder._derive_rpt_metrics`, documented in
+  `docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md`). The real blocker is
+  a **reader** gap: Paras's note is headed "Related parties disclosures" / "Summary of related
+  party transactions and balances" (pp. 416–420), which the reader's anchor does not match, so no
+  transactions are extracted and both fields stay null. The stale docstring in
+  `sections.extract_related_party_transactions` that asserted the opposite was corrected.
+* **The Jio canonical fixture contains an internal inconsistency** —
+  `issue.post_issue_eps = 3.26`, while its own disclosed PAT (300,527 INR_MILLIONS) over its own
+  disclosed post-issue count (9,209,030,830) is **32.63**, a factor of ten. The share counts and
+  the fresh issue reconcile exactly; the EPS does not reconcile with them. It is left exactly as
+  captured, because it is a retained evidence artifact and silently editing captured evidence
+  would be worse than the inconsistency; the finding is recorded here with the arithmetic.
+* **K1/K2 evidence handling is already at the standard this pass was asked to reach.** Going
+  concern is emitted only on positive uncertainty language and never as `False`; the SEBI/ED
+  reader separates an issued action from an issuer-authored denial and records that a `false`
+  means "no action disclosed on the searched pages", not "verified none exists" (A24/A25/A29
+  party scope). Nothing was changed. The Paras UNKNOWNs are genuine: the filing carries no
+  going-concern paragraph, and its nil statements are promoter-scoped.
+
+### 24.6 Verification
+
+Focused runs only; the full suite was not run, as instructed.
+
+```
+tests/test_global_value_semantics_20261026.py .......................... 18 passed
+tests/test_vishal_golden.py + test_acceptance_matrix.py ................ 74 passed
+tests/test_core_semantics.py test_overlays_knockouts.py
+  test_auditor_tenure_defaults.py test_litigation_regulatory_defaults.py
+  test_jio_score_bridge.py test_frozen_core_line_endings.py
+  test_v16_implementation.py test_vishal_golden.py
+  test_acceptance_matrix.py test_global_value_semantics_20261026.py
+  test_fresh_issue_manual_entry.py ............................. 318 passed
+tests/test_rk_fashion_reconciliation.py ................................. 7 passed
+tests/test_reading_defects_20261026.py test_paras_evidence_regression.py  45 passed
+tests/test_extraction.py test_extraction_phase5b.py
+  test_jio_fresh_regressions.py test_suite_tiers.py
+  test_paras_extraction_gaps_20261024.py ................................ 52 passed
+```
+
+`test_rk_fashion_reconciliation.py` was edited in one place (§24.3) and its expectation now
+encodes the corrected semantics rather than the old leniency. Nothing else in `tests/` changed
+except the new module.
+
+### 24.7 Residual, with the exact next action
+
+* **RPT reader anchor** (unblocks Module D `rpt` and K6 for filings that head the note
+  "Related parties disclosures" / "Summary of related party transactions and balances"):
+  add that heading as an anchor and read its five-year column layout. Not attempted here
+  because it needs the row/column semantics of that specific note, and a half-read RPT table
+  would populate a scored field with a wrong number.
+* **`kmp_exits_2y`** — the changes-in-directorate table is present (Paras p. 346 lists
+  resignations dated 2024) and the field is never read, so D `board_kmp` cannot score. Next
+  action: a dated-exit reader over that table, scoped to KMP/director rows within 24 months of
+  the cut-off.
+* **`pre_ipo_placements: []`** remains a legitimate disclosed nil *and* an unread section's
+  value; the input contract cannot yet tell them apart. Resolving it needs a coverage marker in
+  the canonical input (a contract change), not another derivation rule.
+* **Paras Module B** remains blocked on the filing's `[●]` post-issue share count. That is a
+  genuine missing disclosure, not a software defect, and the fix in §24.2 does not and should
+  not invent it.
+
+## 25. `pre_ipo_placements: []` — verified nil is not the same as never looked — 2026-10-26 (revision 16)
+
+§24.1 left one residual risk explicitly recorded rather than papered over: an empty
+`capital_structure.pre_ipo_placements` was still read as the favourable
+`none_or_near_ipo` bucket (2/2), even though the same empty list is produced by a filing
+with no discounted allotments **and** by a filing whose share-history schedule the reader
+never opened. This pass closes it at the smallest shared boundary that can carry the
+distinction — the canonical input.
+
+### 25.1 The ambiguity was live on two issuers
+
+| Issuer | `pre_ipo_placements` | Placement evidence | Share-history schedule in the filing |
+|---|---|---|---|
+| Vishal Nirmiti (real filing) | `[]` | none | pp. 14, 97, 105, 111, 113, 118-121, 124 |
+| R.K. Fashion Accessories (real filing) | `[]` | none | pp. 14, 97, 105, 111, 113, 118-121, 124 |
+| Aurora synthetic sample | `[]` | none | absent |
+
+Two real filings produced the identical canonical value in two different epistemic states.
+The criterion could not tell them apart, so it awarded the favourable bucket in both.
+
+### 25.2 The contract (one field, four states, no new rule)
+
+`schema/ipo-input.v1.5.schema.json` gains a top-level `coverage` map: field path → state,
+with the states `DISCLOSED`, `VERIFIED_NIL`, `PARTIAL`, `UNREAD`. The description in the
+schema records the migration rule, which is the compatibility guarantee:
+
+> A document that omits this map entirely is a legacy v1.5 input and keeps v1.5 behaviour;
+> once the map is present, a field it does not mention is UNREAD.
+
+Consequences, implemented in `derived._pre_ipo_placement_bucket`:
+
+| Coverage | Empty list means | Bucket |
+|---|---|---|
+| (absent map — legacy record, every published fixture) | unchanged | `none_or_near_ipo` — **behaviour preserved** |
+| `VERIFIED_NIL` | the filing states no shares were issued below the Offer Price in the last year | `none_or_near_ipo` (a **scored, verified nil**) |
+| `DISCLOSED` | the schedule was read and no row qualifies | `none_or_near_ipo` |
+| `PARTIAL` | the schedule's vocabulary was located but no allotment row could be read | **UNKNOWN** |
+| `UNREAD` | nothing of the schedule was found | **UNKNOWN** |
+
+The producer (`extraction/sections.py`) states which one applies, quoting the evidence:
+
+* an allotment row read from the schedule → `DISCLOSED`;
+* the standard Capital Structure sentence *"…has not issued any Equity Shares at a price
+  lower than the Offer Price during the last one year"* → `VERIFIED_NIL`, quoted **with its
+  exception clause** ("Except for the bonus issuance …"); Vishal Nirmiti p. 105 is the live
+  example;
+* the schedule's vocabulary (`Date of Allotment`, `Further Issue`, `History of the …
+  Equity Share Capital`) but no row → `PARTIAL`;
+* neither → `UNREAD`.
+
+Verified nil therefore never collapses into UNKNOWN, and a positive finding (`DISCLOSED`
+with rows) is a third, separate state. `UNKNOWN` never scores.
+
+### 25.3 Where it propagates
+
+Extraction → `coverage` in the canonical → schema validation (`propertyNames` +
+`additionalProperties` enum, so an invented state fails loudly rather than silently
+becoming UNKNOWN) → derivation → criterion → `input_snapshot` in the persisted evaluation
+record (the map rides with the input, so a retrieved record still says what was read) →
+replay. No new scoring weight, threshold or bucket was added, and no issuer is named
+anywhere in the code.
+
+### 25.4 Score effects, all in the honest direction
+
+| Artifact | Before | After | Why |
+|---|---|---|---|
+| Aurora `complete_sample_rhp` (synthetic) | 17.0 | **13.0** | no share history *and* no directorate table → placements −2, board_kmp −2, both UNKNOWN |
+| R.K. Fashion Accessories (real) | 43.0 | **41.0** | schedule located, no row readable → placements UNKNOWN (−2) |
+| Vishal Nirmiti (real) | 35.0 golden | **35.0** | `VERIFIED_NIL` — keeps the 2 points it can evidence |
+| Paras Healthcare (real) | — | placements `DISCLOSED` (3 allotments, 2006-2008) | correctly outside the 12-month test |
+| Jio Platforms (real) | — | placements `PARTIAL` | schedule vocabulary present, no allotment row read |
+
+The synthetic class_a/b/c/d/e fixtures carried no share history at all; three of them lost
+the same 2 points (`tests/test_extraction_phase5b.py`, 36/36/38 → 34/34/36, each with the
+reason recorded inline). Vishal is the counter-example that matters: the correction removes
+points only where the engine had no evidence, and keeps them where the filing states the nil.
+
+## 26. Changes in the board — a reader that anchors on the date, not on the column order — 2026-10-26 (revision 16)
+
+`governance.kmp_exits_2y` had no reader at all: the builder copied it from the input or left
+it `null`, so the D `board_kmp` criterion was structurally UNKNOWN for every extraction-based
+evaluation, and the historical Jio canonical carried an unsupported `0`.
+
+### 26.1 Two real layouts, and why the columns cannot be assumed
+
+| Filing | Heading | Columns (as printed) |
+|---|---|---|
+| Paras Healthcare p. 346 | "Changes to our Board in the last three years" | Name \| Designation \| Date \| Reason |
+| Paras Healthcare p. 357 | "Changes in the Key Managerial Personnel or Senior Management in last three years" | Name \| Date of change \| Reason |
+| Vishal Nirmiti p. 306 | "Changes in our Board of Directors during last three years" | Name of Director \| Appointment/Change/Cessation \| Reason — **date inside the second cell** |
+| Vishal Nirmiti p. 319 | "Changes in Key Managerial Personnel and Senior Management" | Name \| Designation \| Date \| Particulars/Reason, wrapped, **several rows per extracted line** |
+
+Four tables, three different orders, no stable column count, and cells that wrap across lines
+*and* across page breaks. The reader (`extraction/directorate.py`) therefore anchors rows on
+the **date token** — every one of these layouts prints it between the person and the reason —
+and recovers the row from the two neighbouring dates:
+
+* the name is the capitalised run immediately before the date (honorific-anchored, so
+  "…President, Network Solutions Mr. Daniel Bailey" yields *Mr. Daniel Bailey*);
+* the designation is the title-vocabulary suffix before that name (column or, when absent as
+  in Vishal p. 306, taken from the reason: "Cessation as Non-Executive Director …");
+* the reason is everything after the date up to the start of the *next* name, which rejoins
+  wrapped cells without any column arithmetic.
+
+Heading detection requires a caption at line start (`Changes (in|to) … Board/Key Managerial
+Personnel`), so the cross-reference sentence *"For details on changes in our Key Managerial
+Personnel … see page 357"* does not open a table; notes, numbering footnotes and the next
+section heading close it.
+
+### 26.2 Events, not just a count
+
+`governance.board_changes` (schema: array of `{name, role, event, date, reason}`, `event` ∈
+`resignation | cessation | retirement | term_expiry | appointment | other`) preserves each
+dated row with its own reason text. Classification follows the source: a bare "Cessation as
+Non-Executive Director for pre-occupation and personal reasons" (Vishal p. 306) stays a
+`cessation` and is **not** promoted to a resignation; "Resignation under Section 168" is a
+resignation; "Retirement on attaining the age of superannuation" and "Expiry/Termination of
+the term of office" are their own types and only count as exits.
+
+### 26.3 The 24-month window
+
+`kmp_exits_2y` is derived in the builder from the dated events against the **offer open
+date** (falling back to close date, then listing date) — a fixed filing fact, never
+`date.today()`, so a stored record re-derives the same count. The window is calendar-aware
+and inclusive at both ends; a pure `730`-day subtraction is not used.
+
+| Situation | `kmp_exits_2y` | Coverage |
+|---|---|---|
+| Rows read, ≥1 exit inside the window | the count | `DISCLOSED` |
+| Rows read, no exit inside the window | **0** (a verified zero) | `VERIFIED_NIL` |
+| Table positively states there were no changes | **0** | `VERIFIED_NIL` |
+| No heading anywhere in the management section | **null** | `UNREAD` |
+| Heading found, table unreadable, or an exit row with no date | **null** | `PARTIAL` |
+| Events read, but no offer date to anchor the window | **null** | `PARTIAL` |
+
+A curated input value is never overwritten when the reader established nothing (that would
+destroy captured evidence); it **is** superseded when the reader did establish the section,
+because an evidenced count beats an unevidenced one.
+
+### 26.4 Cross-issuer validation on real filings
+
+| Issuer (open date) | Rows read | Exits in the 24 months to the open date | Result |
+|---|---|---|---|
+| Vishal Nirmiti (2026-09-30) | 18 (9 board + 9 KMP) | 0 — the only cessation is 2024-04-16, outside the window | `0`, `VERIFIED_NIL` |
+| R.K. Fashion Accessories (2026-10-05) | 1 | 0 | `0`, `VERIFIED_NIL` |
+| Paras Healthcare (2026-10-21) | 14 (7 board + 7 KMP) | **4** — Shirodkar 2025-05-22, Teotia 2026-02-28, Sajan 2025-01-31, Mishra 2025-02-21 | `4`, `DISCLOSED` → D `board_kmp` = `high_churn` |
+| Jio Platforms (2026-10-21) | 17 | **6** — four non-executive/independent resignations 2026-03, one CEO resignation 2026-03-23, one company-secretary resignation 2026-06-19 | `6`, `DISCLOSED` → `high_churn` |
+
+Paras and Jio move from UNKNOWN to an **adverse** bucket on evidence. That is the direction
+the rules were written for: the engine had been giving the neutral treatment to filings that
+disclose churn. No threshold was touched.
+
+## 27. Jio's 3.26 — the value was real, the attribution was missing — 2026-10-26 (revision 16)
+
+### 27.1 End-to-end trace
+
+| Layer | What it holds | Verdict |
+|---|---|---|
+| Source (RHP p. 129) | Basic/Diluted FY2026 EPS **33.63/33.59**, weighted-average count 30.55/30.51 crore; P/E and post-issue NAV rows are `[●]` | the filing prints **no** post-issue earnings figure |
+| Unit | `financials.reporting_unit = INR_MILLIONS`, FY2026 PAT 300,527 | millions, not lakhs |
+| Derivation | 300,527 × 1e6 ÷ 9,209,030,830 = **32.6339** ; 300,527 × 1e5 ÷ 9,209,030,830 = **3.2634** | the stored **3.26 is the lakh-assumption form of the same arithmetic** |
+| Historical canonical | `post_issue_eps: 3.26`, no `basis`, no evidence entry | an unattributed value with a 10× scale defect |
+| Validation | `pat × 1e7 ÷ shares` = 32.63 vs stored 3.26 → 90% apart | warned, then scored anyway |
+| Persistence/retrieval · evaluation | 3.26 → issuer P/E, industry P/E premium, PEG | the defect reached Module B |
+
+So the pre-fix extractor did assume a lakh reporting unit and wrote 32.63/10 as if the filing
+had said it. The builder fix at `4308d1b` removed the assumption (the filing's own unit
+factor is applied). Three things were still wrong, and this pass fixes them:
+
+1. **The derived number had no provenance.** It appeared in the canonical exactly like a
+   disclosed figure.
+2. **There was no precedence rule.** Had the filing printed a post-issue figure, the engine
+   would still have overwritten it with its own arithmetic.
+3. **The two components used the factor in two places** in a way that could silently diverge,
+   and nothing tied them together.
+
+### 27.2 Implementation
+
+* **Precedence — disclosed beats derived.** A new reader (`sections.py`,
+  `extract_post_issue_eps_disclosure`) captures a figure only when the filing labels it
+  *post-issue* ("post-issue EPS", "EPS on post-issue capital"). It deliberately **refuses**
+  the historical weighted-average rows: Jio's "Earnings per share (Basic) 33.63" is a
+  different quantity and reading it as post-issue EPS would relabel the filing's own number.
+  `[●]` is never a value.
+* **Attribution.** `issue.post_issue_eps_basis` ∈ {`disclosed`, `derived`} (schema enum) is
+  set by the builder; a derived figure also gets an `_evidence` entry with
+  `extraction_method: DERIVED`, locator "Derived by the engine (not printed in the filing)"
+  and a note naming the exact inputs and factor — e.g. *"derived: latest full-year PAT
+  300527.0 INR_MILLIONS × 1,000,000 / post-issue shares 9,209,030,830 = 32.63 (FY2026)"*. The
+  number can be recomputed from the record alone. A curated value that predates the field
+  keeps no basis and is not relabelled.
+* **One factor.** `semantic_validation._CRORE_TO_RUPEES = 1e7` is now the single named
+  constant for the crore↔rupee step shared by every EPS/PAT comparison, and the
+  reconciliation says which basis it is comparing.
+* **Conflict = unresolved, never an overwrite.** When the stored value and the PAT/share
+  implication differ by more than 10%, the finding now records the stored value, the implied
+  value, whether the stored value is engine-derived and whether it carries any evidence, and
+  states that **the post-issue EPS is unresolved** — the evidence that settles it being the
+  filing's own post-issue figure with its period and basic/diluted basis. A historical
+  weighted-average EPS cannot settle it. The captured value is preserved: this reports a
+  conflict, it does not rewrite the record and it does not fabricate a replacement.
+
+### 27.3 The regression tests that would have caught it
+
+* `test_the_historical_jio_record_is_the_lakh_assumption_of_the_same_derivation` pins both
+  forms against the real fixture (`× 1e5 → 3.26`, `× 1e6 → 32.63`), so the scale defect
+  cannot return unnoticed.
+* `test_the_historical_jio_record_is_flagged_as_unresolved_by_the_validator` runs the real
+  historical canonical through the validator and requires the unresolved finding, while
+  asserting the fixture still holds 3.26.
+* `test_derived_eps_matches_the_crore_basis_the_validator_uses` ties the builder's
+  filing-unit derivation to the validator's crore-basis implication for an INR-millions
+  filing — the two components can no longer drift apart silently.
+* `test_the_reader_never_reads_a_weighted_average_row_as_post_issue_eps`,
+  `test_a_disclosed_post_issue_figure_wins_over_the_derivation`,
+  `test_a_curated_value_keeps_no_basis_and_is_not_relabelled`,
+  `test_a_derived_value_is_never_reported_as_a_conflict`.
+
+The published Jio bridge (29 → 21) is untouched: it reads the frozen historical canonical and
+its result hash is verified unchanged.
+
+## 28. Verification — focused, exact commands
+
+Run from the repository root with `PYTHONPATH="$PWD/engine"`:
+
+| Command | Result |
+|---|---|
+| `pytest tests/test_directorate_events_20261026.py tests/test_coverage_nil_vs_unread_20261026.py tests/test_post_issue_eps_provenance_20261026.py -q` | **57 passed** |
+| `pytest tests/test_extraction_phase5b.py tests/test_fixture_fallback_isolation.py tests/test_jio_fresh_regressions.py tests/test_jio_score_bridge.py tests/test_global_value_semantics_20261026.py tests/test_extraction.py -q` | **55 passed** |
+| `pytest tests/test_ui7_ingestion.py tests/test_jio_fresh_regressions.py tests/test_jio_score_bridge.py tests/test_fixture_fallback_isolation.py -q` | **36 passed** |
+| `pytest tests/test_derived_evidence_registration.py tests/test_core_semantics.py tests/test_governance_contract_audit.py tests/test_litigation_regulatory_defaults.py tests/test_suite_tiers.py tests/test_frozen_core_line_endings.py tests/test_reading_defects_20261026.py -q` | **185 passed** |
+| `pytest tests/test_ui7_ingestion.py tests/test_directorate_events_20261026.py tests/test_coverage_nil_vs_unread_20261026.py tests/test_post_issue_eps_provenance_20261026.py tests/test_suite_tiers.py -q` | **76 passed** |
+
+`verify_frozen_core()` → all six **True**; `verify_golden_result()` → **True**
+(`e84f8bc0…`). `derived.py` is re-pinned to
+`7783dfeb2cae2d68083fef5ebd6dde8567ad110b53253a4c8fe5516a70ce1f2c` with the reason recorded in
+`v16_implementation.FROZEN_CORE_HASHES` — the bucket change is the only edit, and the
+golden-result check independently still reproduces the published hash.
+
+The full backend, regression and frontend suites were deliberately not run, per the standing
+instruction.
+
+## 29. What is still open
+
+| # | Item | Next action |
+|---|---|---|
+| 1 | The placement reader still cannot read an allotment row out of R.K. Fashion's share-history schedule (coverage `PARTIAL`) | read the schedule layout on pp. 118-121 before widening the reader; the contract now reports the gap instead of hiding it |
+| 2 | Jio's share history is also `PARTIAL` | same |
+| 3 | Paras Note 34 (pp. 416-420) remains unreadable; the RPT summary pp. 92-93 is the evidence in use (§23) | unchanged from the previous pass |
+| 4 | The 24-month window is anchored to the offer open date; filings whose open date is `[●]` at extraction time yield `PARTIAL` | accept the RHP date as an alternative anchor once it is captured as a canonical field |
+| 5 | Sector overlays, penalties and knockouts were not re-examined this pass | no defect observed; no change made |
+
+## 30. The related-party disclosure that was there all along — a period-matrix reader — 2026-10-26 (revision 17)
+
+### 30.1 The defect, stated exactly
+
+`SectionExtractor.extract_related_party_transactions` returned **zero extractions** on the
+Paras Healthcare RHP, so `governance.rpt_pct_revenue` was null, Module D `rpt` was UNKNOWN
+and knockout K6 was UNVERIFIED — on a filing that discloses related-party transactions in
+full, with amounts, on two adjacent pages.
+
+The earlier reading of this ("no anchor") was half right. Verified against the PDF:
+
+| Page | `_RPT_TRANSACTIONS_HEADER` finds the anchor? | What the reader then did |
+|---|---|---|
+| 92 (printed 87) | **yes** — the preamble reads "…the summary of transactions **with related parties** for three months ended June 30, 2026…" | collected the note, found **no** column header of the form "year ended 31 March YYYY", so `len(years) < 2` → returned `[]` |
+| 93 (printed 88) | no — continuation page, header repeated but no anchor phrase | never reached |
+| 419 (printed 414) | no — "Transactions **and balances** with related parties eliminated on consolidation" is not the anchor phrase | never reached |
+
+So the failure is the **column model**, not the search: the reader assumed three annual
+"31 March" amount columns under transaction-category headings. The filing discloses a
+**matrix**.
+
+### 30.2 The actual layout (read from the text layer, not assumed from the title)
+
+`SUMMARY OF RELATED PARTY TRANSACTIONS`, PDF pp. 92-93, unit line `(₹ in million)`,
+preamble naming the periods: *"for three months ended June 30, 2026 and June 30, 2025 along
+with Fiscals 2026, 2025 and 2024, as per the requirements under Ind AS 24"*.
+
+* **Ten numeric columns = five periods × (amount, "% revenue from operations")**:
+  3M Jun-2026, 3M Jun-2025, FY2026, FY2025, FY2024.
+* **Row = counterparty → nature of transaction → ten cells.** e.g.
+  `Dr. Dharminder Kumar Nagar | Short term employee benefits and Other long term benefits |
+  21.97 0.47% 13.44 0.36% 53.77 0.33% 53.77 0.42% 53.77 0.48%`.
+* The header is **wrapped vertically**, mid-word (`transactio`/`ns`, `Particular`/`s`,
+  `%-revenue` cells identical to the amount columns' width).
+* **17 transaction rows** (12 counterparties, 8 natures), and the note **continues onto
+  p. 93 with the whole header repeated**.
+* `-` cells are undisclosed (e.g. `Advance to key managerial person` is FY2026-only;
+  `Share based payment expenses` has 3M-Jun-2026 and FY2026 only).
+* **p. 94 is a different disclosure** — *"Please see below the balances as at end of the
+  period/year"*, with columns `% of total assets` — a balance is not a transaction.
+* Note 34 (pp. 416-420) repeats the transactions in a `Reporting entity | Nature |
+  Transacting party` layout whose numerals are glued in the text layer
+  (`57.94108.63`), so it is not a usable source.
+
+### 30.3 What was implemented (issuer-neutral, layout-driven)
+
+New reader in `engine/ipo_screening/extraction/sections.py`, tried **only when the
+category-header reader yields nothing**, so every issuer it already read is bit-for-bit
+unaffected:
+
+1. `extract_page_fragments` — the positioned text layer (`y`, `x`, text) per page, cached;
+   `None` when a page has no layer (distinct from blank).
+2. `_rpt_visual_lines` — fragments sharing a baseline (±2.5 pt) are one visual line,
+   ordered left to right.
+3. `_rpt_split_row` — the trailing numeric fragments are the amount cells. A number the text
+   layer splits at a kerning point (`0.` + `12`, `0.0` + `7` + `%`) is **one** cell: cell
+   tokens starting within 12 pt of each other are joined. Two columns are a column width
+   apart and never merge.
+4. **Column count from the anchor page only** — the width every amount row of *this* table
+   shares (a later table on a following page cannot redefine it; without this, R.K.
+   Fashion's revenue-bifurcation table on p. 63 hijacked p. 62's four-column summary).
+5. **Period columns from the table header** — the page lines above the first data row,
+   matched in disclosure order: `three|six|nine|twelve months (period) ended <date>`,
+   `stub period ended <date>`, `fiscal|financial year <year>`, `year ended <date>`
+   (day-first or month-first). Annual → `FY2026`; interim → `3M-2026-06-30` /
+   `INTERIM-2026-06-30`, so an interim column can never be mistaken for a financial year.
+   Repeated labels (each period is printed twice — once for the amount column, once inside
+   its "% revenue" column) collapse, and the trailing run that matches the amount columns is
+   used.
+6. **Label columns by position, roles by header word.** The counterparty and the nature sit
+   left of the first amount column; their x centres come from the rows themselves
+   (left-aligned cell text), and the header words (`parties`, `transacting`,
+   `nature`/`particulars`, `entity`/`reporting`) map roles to those centres — by each word's
+   x, or by its order when the whole header row is one fragment. The page heading is
+   excluded by distance, so it cannot claim a column.
+7. **Undisclosed is not zero** — `-` cells emit nothing.
+8. **The table ends where the balances begin** (`balances as at`, `outstanding balances`).
+9. **Control totals are not transactions** (`Sum of all related party transactions`,
+   `Revenue from Operations`, `% of revenue`) — R.K. Fashion's summary is exactly that, and
+   is reported as `PARTIAL`, not as data.
+10. **A nil statement is a verified nil** — "no related-party transactions were entered
+    into" → `VERIFIED_NIL`.
+11. Every value keeps its page, a **verbatim page line** as its quote (the positioned reading
+    is only used when no plain-text line matches), the disclosed unit, the disclosed revenue
+    share (`pct_revenue`) and the counterparty/nature as disclosed.
+
+A cell the *source* wraps mid-word is preserved with the wrap as a space
+(`Paras RE Facilities Manageme nt Private Limited`, `Dr. Dharminde r Kumar Nagar`). That is
+the filing's own line breaking; no speculative dictionary repair is applied to source text.
+
+### 30.4 Coverage, and how it is reported
+
+`coverage.governance.rpt_pct_revenue` is now emitted by the reader:
+
+| State | Meaning | Producers |
+|---|---|---|
+| `DISCLOSED` | the disclosure was read and its amount rows parsed | matrix reader (all rows mapped), category-header reader (its existing output, unchanged) |
+| `VERIFIED_NIL` | the filing states there were no related-party transactions | matrix reader, nil statement |
+| `PARTIAL` | located, not fully readable — rows of another width, an unmappable period header, aggregate-only totals | matrix reader |
+| *(absent)* | never seen — read as UNREAD by the contract (§25) | when no candidate page carries the disclosure |
+
+### 30.5 The metric boundary — why Paras still has no share, deliberately
+
+Paras's disclosure contains **no revenue-type category** under the approved numerator
+definition (Ramki, 2026-10-17: `sale_of_*` except `sale_of_ppe`, and job-work charges
+received). Its rows are employee benefits, post-employment benefits, share-based payment,
+retainers, directors' sitting fees, **rental income**, repairs/maintenance/power & fuel, and
+an advance to a KMP. Note 34 also prints "Revenue from sale of healthcare services (excluding
+applicable taxes)" against the subsidiaries, but as a related-party transaction without a
+debit/credit indicator, and the RHP's own summary does not carry it.
+
+Consequences, implemented and visible in the live canonical:
+
+* every row is extracted with its category slugged `unclassified` and retained as evidence
+  (70 values registered under `governance.related_party_transactions[i]`);
+* `rpt_pct_revenue` / `rpt_pct_of_revenue_growth` stay **null** — a **decision point, not a
+  defect**: treating "no revenue-type row disclosed" as a measured 0.0% would hand Module D
+  the full `<5%` band (3 points) and clear K6, on a document that calls itself a *summary*.
+  Per the standing instruction — never award points to a missing value without a documented,
+  defensible rule — the unknown is left unknown, and the coverage record now proves the
+  section *was* read, which is what was missing before. If Ramki decides that rental income,
+  or the note's "revenue from sale of healthcare services" row, belongs in the numerator, the
+  rule change is one definition (not a reader change), and the evidence to apply it is now
+  captured.
+
+One shared derivation change was required so that a matrix disclosure can feed the metric at
+all: `CanonicalInputBuilder._derive_rpt_metrics` now **skips** a non-financial-year period
+column (an interim `3M-…` column carries no annual share) instead of failing the whole
+derivation closed on it. An unconvertible **unit** or a non-numeric **amount** still fails
+closed, exactly as before.
+
+### 30.6 Cross-issuer validation (real filings, live extraction)
+
+| Issuer | RPT values | Coverage | Pages | Effect |
+|---|---|---|---|---|
+| Paras Healthcare | **70** (17 rows × disclosed cells) | `DISCLOSED` | 92-93 | section now read; metric unchanged (null — §30.5) |
+| Vishal Nirmiti | **136** (unchanged) | `DISCLOSED` | 387 | `rpt_pct_revenue` still `11.8418`, growth `-0.3703` — unchanged |
+| Jio Platforms | **23** (unchanged) | `DISCLOSED` | 376 | unchanged |
+| R.K. Fashion Accessories | 0 | `PARTIAL` | — | its summary prints **aggregate totals only**; reported as unread per-transaction, not as data |
+
+### 30.7 Score effects
+
+**None.** Paras: D `rpt` stays UNKNOWN and K6 UNVERIFIED (§30.5). Vishal and Jio keep their
+existing metric values; R.K. Fashion was already UNKNOWN on this criterion. No configuration,
+weight, threshold, band, penalty, knockout or criterion definition was touched, and no frozen
+core file was edited in this revision (pin unchanged at `7783dfeb…`).
+
+### 30.8 Verification — exact commands and results
+
+| Command | Result |
+|---|---|
+| `pytest tests/test_rpt_matrix_reader_20261026.py -q` | **14 passed** |
+| `pytest tests/test_rpt_extraction.py tests/test_rpt_matrix_reader_20261026.py tests/test_coverage_nil_vs_unread_20261026.py tests/test_directorate_events_20261026.py tests/test_post_issue_eps_provenance_20261026.py tests/test_suite_tiers.py -q` | **83 passed** |
+| `pytest tests/test_acceptance_matrix.py tests/test_vishal_golden.py tests/test_vishal_historical_reconciliation.py tests/test_rk_fashion_reconciliation.py -q` | **85 passed** |
+| `pytest tests/test_paras_evidence_regression.py tests/test_paras_extraction_gaps_20261024.py tests/test_paras_official_issue_page_terms.py tests/test_coverage_nil_vs_unread_20261026.py -q` | **91 passed** |
+| `pytest tests/test_rpt_extraction.py tests/test_coverage_nil_vs_unread_20261026.py -q` | **36 passed** |
+
+`tests/test_rpt_matrix_reader_20261026.py` covers: interim vs annual period labels; the
+kerning-split cell; a bare `%` fragment; header rows are not amount rows; aggregate labels
+are not transactions; an interim column cannot suppress the annual share; a disclosure with
+no revenue-type row leaves the share unknown (not zero); the real Paras rows (amounts,
+periods, counterparty/nature separation, disclosed shares, `-` cells, page bounds, verbatim
+quotes); and R.K. Fashion's aggregate-only summary → `PARTIAL`.
+
+`tests/test_rpt_extraction.py` was adjusted only to skip the new coverage record in its
+helpers (it carries a state string, not a transaction dict) — no expectation on the legacy
+reader changed.
+
+### 30.9 What is still open (supersedes §29 item 3)
+
+| # | Item | Next action |
+|---|---|---|
+| 1 | Paras Note 34 (pp. 416-420) remains unread: its numerals are glued in the text layer (`57.94108.63`) and its heading is "Related parties disclosures" | the RHP summary (pp. 92-93) is now read in full and is the evidence in use; reading Note 34 needs glyph-level position recovery, not a new rule |
+| 2 | R.K. Fashion's per-counterparty note (Note 31, printed p. 305) is read by neither reader; only its aggregate summary is located (`PARTIAL`) | next reader candidate: Note 31's layout on PDF pp. ~350+ |
+| 3 | R.K. Fashion and Jio share-history schedules still `PARTIAL` (§29 items 1-2) | unchanged from the previous pass |
+| 4 | The 24-month window still needs an RHP-date anchor when the offer open date is `[●]` (§29 item 4) | unchanged |
+| 5 | Whether rental income / related-party "revenue from sale of healthcare services" enters the Module D numerator | **decision for Ramki**; evidence is now extracted (§30.5) |
+
+## 33. Two readers that were only missing their geometry — 2026-10-26 (revision 27)
+
+This section closes §30.9 items 1, 2 and 3, and re-examines item 5 (the Module D
+numerator) on the evidence those readers now produce. Three defects are fixed, all in shared
+engine paths and all issuer-neutral.
+
+### 33.1 Root causes (all three proved on the filings, none assumed)
+
+**(a) The related-party note had no text layer at all.** R.K. Fashion's restated financial
+statements are scanned: PDF p. 308 carries one embedded image and the six characters
+`304 \n \n \n`, p. 309 `305 \n \n \n`. Note 31 "Related Party Disclosures" sits on those
+pages, so every text-layer reader returns nothing there and the disclosure could only be
+reported `PARTIAL` — 0 transaction rows for a filing that discloses them in full (§30.9 item 2).
+
+**(b) A row's counterparty and its first amount arrive as one text fragment.** On Paras
+Note 34 §III-A (p. 419) the positioned text layer gives, for the revenue row:
+
+``204:Paras Healthcare (Ranchi) Private Limited 40.54   311:34.53   372:132.35   429:106.24   485:80.58``
+
+The counterparty cell and its amount are welded into one fragment whose start x is the
+counterparty's. `_rpt_split_row` splits on fragments, so the row presents four amounts where
+the table has five columns and the counterparty string carries a number. This is the real
+"merged numeric cell" defect in this filing — not glued numerals in `extract_page_text`
+(checked: zero occurrences of `57.94108.63`-shaped tokens on pp. 416-420 in either text mode).
+The characters inside the fragment still carry their own positions, so the cell boundaries can
+be rebuilt from glyph boxes.
+
+**(c) A missed rule silently merges two columns.** Where the printed vertical rule is dotted
+or dashed it is invisible to a dark-ink scan, so two columns become one band whose header
+names two quantities ("Purchases during the Year" and "Amount Paid"). Binding the band's
+amounts to whichever name sorts first is a guess; it is now refused (§33.2).
+
+### 33.2 Shared implementation
+
+| Location | What it does |
+|---|---|
+| `engine/ipo_screening/extraction/glyph_table.py` (new) | Reads a page's **character boxes** (pypdfium2 `get_charbox`) and rebuilds cells from geometry: characters group into lines by vertical centre, lines split into runs only where the gap is wider than the line's own spacing (`MIN_GAP` 2.6 pt, `GAP_FACTOR` 2.4 × the line's median gap) and never between two digits of one figure. Returns the same `(baseline, cells)` shape the text-layer readers already consume. No table semantics: no periods, totals or categories. |
+| `SectionExtractor.extract_page_glyph_lines` | Caches the glyph rows per page; `None` means "no character geometry" (a scan), which is distinct from "read and empty". |
+| `SectionExtractor._rpt_page_rows` | Uses the fragment reading when it separates cells, and the glyph reconstruction when it does not (fewer than two rows with two or more amount cells). The period-matrix reader calls this instead of splitting fragments itself, so every existing layout keeps its current reading. |
+| `engine/ipo_screening/extraction/rpt_image_note.py` (new) | Reads an image-only related-party note: bounded offline OCR (`MAX_SCAN_PAGES` 20 heading strips, `MAX_FULL_PAGES` 3 full pages), then rebuilds the ruled table from the **vertical rules detected in the rendered page** (`RULE_DARK_FRACTION` 0.55), maps each header cell to the band that contains it, binds each amount to the band containing its own centre, and validates every row against the block's own arithmetic (opening + additions − reductions = closing, `ARITHMETIC_TOLERANCE` 0.15). |
+| `SectionExtractor._extract_related_party_image_note` | Runs only when the text layer already located the disclosure and read **no** transaction row (`_RPT_IMAGE_NOTE_PAGES` 22 thin pages inside the restated-financials range). Nothing is OCR'd blind, and a failed OCR attempt claims nothing (the located-but-unread state stands). |
+
+Rules the OCR reader keeps, in full:
+
+* a **balance** column is never a transaction — only movement columns emit values;
+* a block is read only when it states a **control total** (a balance column *and* a movement
+  column), which is what makes each row checkable. Purchase/payment, remuneration and
+  merger-consideration blocks have no control total and are counted as unread (R.K.'s merger
+  block states share counts, 84,388 / 131,200 / 90,200 / 90,528 at ₹10, not rupees);
+* a band whose header names two quantities is refused (a missed dotted rule);
+* an amount is emitted only from a cell whose OCR text has an amount shape (`12.34`,
+  `1,234.56`, `(12.34)`) at confidence ≥ `AMOUNT_CONFIDENCE` 0.94 **and** whose box sits inside
+  its band **and** whose row states its own period and party. A cell read as `480` where the
+  filing prints `4.80` is not an amount; a row whose period printed on a neighbouring line is
+  unread rather than carried forward;
+* the page unit comes from the note's own "Amount (Rs. in lakhs)" line.
+
+### 33.3 Evidence
+
+**R.K. Fashion Note 31 (PDF pp. 308-310, image-only).** The reader maps 5 blocks and reports 19
+values with 55 cells counted unread, coverage `PARTIAL`. The rows that the block's own
+arithmetic validates include the filing's known samples:
+
+| Counterparty | Nature | FY | Opening | Borrowed | Repaid | Closing | Check |
+|---|---|---|---|---|---|---|---|
+| Mohammed Imran | Loan Taken | FY2024 | 24.00 | 18.50 | 42.50 | — | 24.00 + 18.50 − 42.50 = 0.00 |
+| Mohammed Usman | Loan Taken | FY2026 | 49.88 | 170.32 | 49.88 | 170.32 | closes exactly |
+| Mohammed Usman | Loan Taken | FY2025 | 49.90 | 20.00 | 20.03 | 49.88 | 49.90 + 20.00 − 20.03 = 49.87 (rounding) |
+| Mohammed Usman | Loan Taken | FY2024 | 47.21 | 216.00 | 213.31 | 49.90 | closes exactly |
+
+The opening/closing balances are evidence, never transactions: the note supplies 18.50 and
+42.50 for the Imran row, not the 24.00 balance. Cells that the reader could not bind (a value
+whose period printed on another line, a low-confidence amount) are counted unread, which is why
+the coverage is `PARTIAL` and not `DISCLOSED`.
+
+**Paras Note 34 §III-A (p. 419).** With the glyph reconstruction the row above becomes five
+separate amount cells and the counterparty becomes its own cell:
+
+| Nature | Transacting party | 3M Jun-26 | 3M Jun-25 | FY2026 | FY2025 | FY2024 |
+|---|---|---|---|---|---|---|
+| Rent and facility fees (including applicable taxes) | Plus Medicare Hospitals Private Limited | 23.87 | 22.77 | 91.08 | 82.31 | 75.22 |
+| Revenue from sale of healthcare services (excl. taxes) | Paras Healthcare (Ranchi) Private Limited | 5.97 | 3.21 | 17.77 | 8.98 | 3.87 |
+| Revenue from sale of healthcare services (excl. taxes) | Plus Medicare Hospitals Private Limited | 4.20 | 1.33 | 10.92 | 5.47 | 2.61 |
+
+The rent row reproduces the amounts the summary on pp. 92-93 prints for the same nature, which
+is the independent check that the columns are bound correctly.
+
+### 33.4 Coverage changes
+
+| Issuer | Related-party transactions | Coverage | Page |
+|---|---|---|---|
+| Paras Healthcare | **70 (unchanged)** | `DISCLOSED` | 92 |
+| Jio Platforms | **23 (unchanged)** | `DISCLOSED` | 376 |
+| Vishal Nirmiti | **136 (unchanged)** | `DISCLOSED` | 387 |
+| R.K. Fashion Accessories | **0 → 14** (19 when pp. 308-310 are read directly) | `PARTIAL` | 61 (= printed 57) |
+
+### 33.5 Score effects
+
+Only R.K. Fashion moves, and only because the evidence it always disclosed is now read.
+
+| | Before | After | Why |
+|---|---|---|---|
+| Module C | 7 / 13 | **9 / 13** | `pre_ipo_placement_bucket` was UNKNOWN because the share-history schedule was unreadable (§25); it is now read, and no priced allotment falls inside the 365 days before the offer open date |
+| Final score | 41.0 | **43.0** | base 44.0 → 46.0, penalties unchanged at −3.0 |
+| Completeness | 64.0% | **66.0%** | two fewer unknown points |
+| Lower bound | 26.0 | **28.0** | upper bound unchanged at 77.0 |
+
+Paras (D `rpt` UNKNOWN, K6 UNVERIFIED), Jio and Vishal keep their existing values. No weight,
+threshold, band, penalty, knockout or criterion definition was touched; `derived.py` was not
+edited (frozen-core pin unchanged at `7783dfeb…`).
+
+### 33.6 Paid-up share-capital schedule (same pass, published here)
+
+`SectionExtractor._share_history` reads the allotment schedule when the legacy one-sentence
+regex and the filing's positive no-discount statement both establish nothing, and only when the
+coverage is not `VERIFIED_NIL`:
+
+* **R.K. Fashion** — `DISCLOSED`, PDF p. 110, 11 rows read, **9 priced allotments** (2010-03-23
+  10,000 @ ₹10 … 2025-05-31 2,223 @ ₹272), 2 non-cash rows not reported; reconciles to
+  1,12,49,563 shares / ₹11,24,95,630.
+* **Jio Platforms** — `DISCLOSED`, PDF p. 100, **17 priced allotments** (2019-11-15 10,000 @ ₹10,
+  2019-12-12 4,96,12,90,000 @ ₹10, 2020-07-13 76,56,48,027 @ ₹549.31, …).
+* **Vishal Nirmiti** — the schedule is located but its cumulative columns do not reconcile, so
+  **no** placement is claimed (`PARTIAL`); the filing's own no-discount statement keeps
+  `capital_structure.pre_ipo_placements` at `VERIFIED_NIL` exactly as before.
+
+### 33.7 24-month window anchor
+
+Unchanged: the window is anchored on `issue.open_date` (falling back to `close_date`, then
+`listing_date` on the same offer timeline), never on `date.today()`, the ingestion date or the
+retrieval date; the boundary is inclusive and calendar-aware
+(`minus_months(date(2024, 2, 29), 24) == date(2022, 2, 28)`). One hardening: when the anchor is
+**not** the offer open date the count is still reported but its coverage is `PARTIAL`, because a
+later anchor can only narrow the window the rule defines. Offer open dates are disclosed for
+Paras, Jio and Vishal, so no existing record changes.
+
+### 33.8 Module D numerator — disposition (§30.9 item 5)
+
+The new reading makes the question precise, and it is **not** a reader defect. Two different
+disclosures exist in the Paras RHP and they are not duplicates:
+
+* the summary on pp. 92-93 (what the engine reads, 70 rows) covers KMP remuneration, post-
+  employment benefits, share-based payments, retainers, sitting fees, **rental income**,
+  repairs/power & fuel and an advance. It discloses **no revenue-type** related-party row, so
+  under the approved definition the numerator is absent → `rpt_pct_revenue` null
+  (D UNKNOWN / K6 UNVERIFIED);
+* Note 34 §III-A (p. 419) additionally discloses **"Revenue from sale of healthcare services
+  (excluding applicable taxes)"** — 28.69 / 14.45 / 6.48 ₹ million for FY2026 / FY2025 / FY2024 —
+  but the table's own heading is "Transactions and balances with related parties **eliminated in
+  consolidation**". The denominator (`revenue` 16,059.52 / 12,940.63 / 11,290.39 ₹ million) is
+  *consolidated* revenue, which cannot contain revenue eliminated on consolidation.
+
+If those rows were counted, Paras's share would be **0.1788% / 0.1116% / 0.0574%** (change
++0.067 pp, K6 would remain CLEAR) and D `rpt` would score 3/3. That is a metric-definition
+change, not an extraction fix: it mixes gross intra-group revenue with post-elimination revenue,
+and "Outsourced medical services (excluding applicable taxes)" states no direction at all, so
+counting it would require assuming revenue. **Disposition: the fields stay null (UNKNOWN) and
+the evidence is preserved.** Recommendation to Ramki: either (i) keep the consolidated basis —
+then no eligible numerator exists for Paras and UNKNOWN is the correct answer; or (ii) adopt a
+standalone-basis exposure metric with a *standalone* revenue denominator, which needs its own
+definition and its own field, so that a consolidated revenue figure is never divided into
+intra-group revenue. Nothing was implemented unilaterally.
+
+### 33.9 Verification — exact commands and results
+
+| Command | Result |
+|---|---|
+| `pytest tests/test_glyph_geometry_and_ocr_note_20261026.py -q` | **15 passed** |
+| `pytest tests/test_rpt_matrix_reader_20261026.py tests/test_vishal_historical_reconciliation.py tests/test_paras_official_issue_page_terms.py -q` | **43 passed** |
+| `pytest tests/test_rpt_extraction.py tests/test_auditor_evidence_section.py -q` | **20 passed** |
+| `pytest tests/test_acceptance_matrix.py tests/test_vishal_golden.py tests/test_glyph_geometry_and_ocr_note_20261026.py -q` | **89 passed** |
+| `pytest tests/test_cli_phase5i.py tests/test_coverage_nil_vs_unread_20261026.py tests/test_directorate_events_20261026.py tests/test_post_issue_eps_provenance_20261026.py -q` | **80 passed** |
+| `pytest tests/test_rk_fashion_reconciliation.py tests/test_paras_evidence_regression.py tests/test_paras_extraction_gaps_20261024.py -q` | **48 passed** |
+| `pytest tests/test_suite_tiers.py -q` | **1 passed** (the new real-file module is registered in `tests/tier_inventory.py`) |
+
+`tests/test_rpt_matrix_reader_20261026.py::test_aggregate_only_summary_is_partial_coverage_not_values`
+was rewritten as `…_falls_back_to_the_scanned_note`: it used to assert that R.K. Fashion yields no
+rows, which was the limitation this revision removes. It now asserts that every row carries OCR
+provenance, a movement column and the note's unit, and that coverage remains `PARTIAL`.
+`tests/test_rk_fashion_reconciliation.py` and
+`tests/test_ui7_ingestion.py::test_ingest_rk_fashion_accessories_real_statutory_filing`
+expectations move with the score (41 → 43, base 44 → 46, completeness 64% → 66%) and record why
+in the comment; `test_ui7_ingestion.py` only surfaced this in CI, which is why the first push
+failed with `assert 43.0 == 41.0`. No other expectation was changed.
+
+### 33.10 Remaining limitations and next actions
+
+| # | Limitation | Next action |
+|---|---|---|
+| 1 | Note 34 §III-A is now *readable* cell by cell, but it is still not consumed by the metric — by design (§33.8) | Ramki's decision on the numerator basis |
+| 2 | The OCR note reader reports `PARTIAL` on R.K. Fashion: 55 cells unbound, mostly values whose period printed on a neighbouring line and low-confidence amounts | a row-band model that spans two printed lines per row, with the same fail-closed rule |
+| 3 | Paras's summary rows keep their verbatim nature text and are `unclassified` (e.g. "Short term employee benefits and Other long term benefits") — the amounts are right, the category vocabulary does not cover those natures | add non-revenue natures to `_RPT_CATEGORY_PHRASES` only together with a metric review, so no eligible category appears by accident |
+| 4 | Wrapped label words stay as printed ("Dr. Dharminde r Kumar Nagar") — repairing them would be inventing text | leave as is; the quotation is verbatim |
+| 5 | OCR adds ~25 s to a fully scanned filing's extraction (bounded: 20 heading strips + 3 pages) | acceptable for single-filing runs; a cache keyed by (file, page, scale) would remove the repeat cost |
+
+## 34. Printed rows rebuilt from their rules, and one vocabulary for natures — 2026-10-26 (revision 28)
+
+Revision 27 read an image-only related-party note, but it read it as **OCR rows**: whatever lines
+the
+recogniser grouped together became a table row. That is enough for a simple block and wrong for
+every block where the filing merges cells vertically (one party name against four financial years),
+wraps a nature over three lines, or prints a figure a few pixels below its own row's rule. Revision
+28 rebuilds the table from the table itself — the printed rules — and places every value by the box
+overlap it has with its own printed row. It also gives both related-party readers one shared nature
+vocabulary, so the same printed nature cannot be classified two ways.
+
+### 34.1 What was still wrong after revision 27
+
+| # | Defect | Consequence on R.K. Fashion Note 31 |
+|---|---|---|
+| 1 | A row was an OCR line group, not a printed row | a merged label cell (party or nature) covered only the line OCR happened to put its text on; a second row of figures lost its counterparty |
+| 2 | A value was assigned by the OCR item's own line | these scans print a figure's baseline ~7 px **below its own row's rule**, so a value could land in the following year |
+| 3 | Continuation was decided by page adjacency | the reader walked into the profit-and-loss page (309) and the cash-flow page (310); page 310 is Note 9, property, plant and equipment, with no table block at all |
+| 4 | Nothing recorded *why* a cell was unread | coverage said "55 unread" and no more |
+| 5 | Each reader kept its own nature phrase list | the same nature could be a sale in the period-matrix reader and `unclassified` in the note reader; a phrase added for readability could make an expense eligible for the Module D numerator |
+| 6 | A rule was "a row that is dark across the window" | a **densely set word** in a narrow label column reaches the same darkness. "Investment", the third line of a merged nature cell, was read as a rule, splitting the cell and truncating the description to "Advances against" |
+| 7 | The reader's failures were swallowed by its caller | see §34.4 — a defect in the reader and a document with no such note were indistinguishable |
+
+### 34.2 The reconstruction
+
+* **Printed rows** come from `horizontal_rules` → `row_bands`: the y positions where the table is
+  ruled across the value columns. Fewer than three rules means the printed rows cannot be
+  separated and the block is left unread (`printed_rows_not_separable`) rather than guessed.
+* **A rule is a continuous stroke.** `_rule_rows` accepts a dark row only when one unbroken dark run
+  covers at least `RULE_CONTINUITY` (55%) of the scan window *and* the row's mean darkness exceeds
+  `RULE_DARK_FRACTION`. Text is a row of short strokes and never qualifies; a rule interrupted by a
+  merged label cell still does. This is what keeps a merged nature cell whole.
+* **A merged label cell** is the interval between the rules that cross *its own column* (`_spans`).
+  Its text — every printed line of it — is repeated into every printed row that interval covers, so
+  a party name printed once against four years governs all four without moving any value.
+* **A value** belongs to the printed row its box overlaps most (`_band_table`, `_overlap`), never to
+  the row its baseline is nearest.
+* **A row is emitted only when it states its own period**, has a counterparty, and closes against
+  its own balances: opening + additions − reductions = closing, with a printed dash accepted as an
+  explicit nil (`_reconciles`, `_NIL_CELL`). Negative balances are accepted as balances, so a row
+  whose closing is `(38.44)` is checkable, but a balance is never emitted as a transaction.
+* **An uncertain cell** (OCR confidence ≥ `UNCERTAIN_CONFIDENCE`, 0.80, below the 0.94 read floor)
+  is admitted only when the row's own control total proves it — arithmetic, not proximity.
+* **Every unread cell is counted with a reason** (`reasons`), and the coverage note prints the
+  breakdown.
+* **Continuation is decided by the table**: a following candidate page is part of the note only
+  when it produces mapped blocks. A page that prints prose only ends the note.
+
+### 34.3 Result on R.K. Fashion Note 31 (same OCR, same fixtures, measured in this revision)
+
+| | Revision 27 | Revision 28 |
+|---|---|---|
+| Transaction values reported | **19** | **23** |
+| Unread cells | **55** | **47** |
+| Pages read | **[308, 309, 310]** | **[308, 309]** |
+| Coverage state | `PARTIAL` | `PARTIAL` |
+
+Recovered (4 values, both rows verified by the filing's own arithmetic):
+
+| Counterparty | Category | Period | Amount (₹ lakh) | Proof printed in the note |
+|---|---|---|---|---|
+| Mohammed Usman | `loan_taken` | FY2024 | 216.00 | 47.21 + 216.00 − 213.31 = 49.90 |
+| Mohammed Usman | `loan_repaid` | FY2024 | 213.31 | ″ |
+| M.K.Jewellers | `purchase_of_goods` | 3M-2026-06-30 | 9.13 | 36.88 + 9.13 − 16.02 = 29.99 (printed 29.98) |
+| M.K.Jewellers | `payment_made` | 3M-2026-06-30 | 16.02 | ″ |
+
+All 19 revision-27 values are still reported, unchanged. Unread, by reason:
+`block_without_opening_and_closing_control` **30** (the remuneration block prints a closing balance
+and no control total; Note 34's balance block likewise), `row_does_not_close_against_its_balances`
+**10**, `row_without_period` **7**.
+
+The 38.44 row on page 309 is *not* new and is not a balance: the filing prints `38.44` in its
+"Amount Repaid" column against a closing balance of `(38.44)` for FY2025-26, and a nil opening. It
+is reported as a repayment with its verbatim nature, "Advances against Investment" — which this
+revision now recovers whole (defect 6 above); revision 27 reported the same value labelled
+"Advances against".
+
+All four categories produced for R.K. Fashion (`loan_taken`, `loan_repaid`, `purchase_of_goods`,
+`payment_made`) are non-revenue, so `governance.rpt_pct_revenue` stays **null** (Module D
+`UNKNOWN`, K6 `UNVERIFIED`) and the score is unchanged at **43.0**.
+
+### 34.4 A swallowed exception hid a broken reader
+
+While this revision was being written, the row-band rewrite lost a module constant
+(`_VALUE_ROLE_STEMS`), so `parse_page` raised `NameError` on every block. `SectionExtractor`
+caught it in `_extract_related_party_image_note` and returned `[]` — deliberately fail-closed, but
+silently: the production path then reported exactly what a document *without* such a note reports
+(the aggregate-summary `PARTIAL`), and the loss looked like a coverage limit, not a defect. The
+constant is restored (derived from `_COLUMN_WORDS`, so it cannot be deleted again without deleting
+its source), and the caller now logs the exception with `exc_info` before returning `[]`. Its
+output semantics are unchanged: a failed read still claims nothing.
+
+**Rule adopted:** a fail-closed path may discard a result, never the evidence that it failed.
+
+### 34.5 One vocabulary for transaction natures (shared, issuer-neutral)
+
+`engine/ipo_screening/extraction/rpt_categories.py` is now the only phrase list. It is called by
+the period-matrix reader (`sections._rpt_matrix_table_at`), the scanned-note reader
+(`rpt_image_note._category`) and *is* the set the builder counts
+(`CanonicalInputBuilder._RPT_SALES_SERVICES_CATEGORIES = REVENUE_CATEGORIES`,
+`_rpt_is_sales_services` → `is_revenue_category`). Two rules govern it:
+
+1. **A nature is classified only when the wording establishes the economic meaning *and the
+   direction*.** "Rental income" is `rent_received` (`income_other`); "Rent paid" is `rent_paid`
+   (`expense`); "Rent and facility fees" states no direction and stays **unclassified**.
+   "Loan to and from group companies" and "Reimbursements" likewise. Direction is never inferred
+   from a category name.
+2. **Classification never changes eligibility.** `REVENUE_CATEGORIES` is unchanged and remains
+   `sale_of_goods`, `sale_of_services`, `revenue_from_operations`, `job_work_charges_received`
+   (+ the existing `sale_of_*` prefix rule, excluding `sale_of_ppe`). Everything else recognised —
+   employee benefits (short-term, post-employment, gratuity, leave encashment, provident fund),
+   share-based payment, remuneration, salary, sitting fees, retainers and professional fees,
+   purchases, repairs and power and fuel, hire/transport/job-work charges paid, reimbursements,
+   interest paid/received, rent paid/received, loans taken/given/repaid, advances, deemed capital
+   contribution, merger consideration, share of profit paid, sale of PPE — is `expense`,
+   `income_other`, `asset`, `liability`, `settlement`, `capital` or `disposal`, and is recorded as
+   evidence only.
+
+Tests prove both directions: every `CATEGORY_CLASS` entry must have `is_revenue_category(category)
+== (CATEGORY_CLASS[category] == "revenue") == (category in REVENUE_CATEGORIES)`, so neither half of
+the mapping can be widened alone; and the negative set (employee benefits, retainers, sitting fees,
+rents, purchases, loans) must classify but never be eligible. **No test, and no code path, gains an
+eligible related-party revenue category from this revision, so nothing can clear K6 that did not
+already.**
+
+Effect on the other issuers, measured this revision (unchanged row counts and totals):
+
+| Issuer | Rows | Coverage | Classification change | Metric effect |
+|---|---|---|---|---|
+| Paras Healthcare | 70 | `DISCLOSED` | summary rows now classified (e.g. "Short term employee benefits and Other long term benefits" → `employee_benefits`, was `unclassified`) | none — non-revenue; numerator stays absent |
+| Jio Platforms | 23 | `DISCLOSED` | none | `rpt_pct_revenue` **4.3094** unchanged |
+| Vishal Nirmiti | 136 | `DISCLOSED` | none | `rpt_pct_revenue` **11.8418** unchanged |
+| R.K. Fashion | 23 | `PARTIAL` | all four categories non-revenue | `rpt_pct_revenue` null; score **43.0** unchanged |
+
+`tests/test_rpt_matrix_reader_20261026.py::test_paras_amounts_periods_and_disclosed_share` asserted
+`category == "unclassified"` for the Dharminder Kumar row; it now asserts `employee_benefits`, the
+verbatim `category_label`, and — the point of the test — that `is_revenue_category` is `False`.
+
+### 34.6 Module D numerator — disposition unchanged, and the question for Ramki
+
+Paras discloses "Revenue from sale of healthcare services (excluding applicable taxes)" of
+28.69 / 14.45 / 6.48 ₹ million (FY2026 / FY2025 / FY2024) in Note 34 §III-A, under a heading that
+states those transactions are **eliminated in consolidation**, while the denominator is
+*consolidated* revenue (16,059.52 / 12,940.63 / 11,290.39 ₹ million). The fields stay null.
+
+* Counting them would divide gross intra-group revenue by post-elimination revenue:
+  0.1788% / 0.1116% / 0.0574% — Module D `rpt` 3/3, K6 CLEAR.
+* It would also require assuming a direction for "Outsourced medical services (excluding applicable
+  taxes)", which states none.
+* A standalone-basis metric is a **metric definition change**, not an extraction workaround: it
+  needs its own numerator, its own standalone denominator and its own field.
+
+**Recommendation:** keep the consolidated basis (so UNKNOWN is the correct answer where the
+eligibility of the numerator is not established), or define a separate standalone-basis exposure
+metric with a standalone denominator.
+
+**The exact question for Ramki:** *For the Module D related-party revenue share, should the
+numerator be related-party revenue as reported in the consolidated statements (only revenue that is
+not eliminated in consolidation), or a standalone-basis exposure that would also require the
+issuer's standalone revenue as the denominator?* Until that is answered the fields stay null — no
+zero substitution, no inference, no change to weights or thresholds.
+
+### 34.7 Verification — focused suites during the work, the comprehensive run once at the end
+
+| Command | Result |
+|---|---|
+| `pytest tests/test_rpt_nature_classification_and_row_bands_20261026.py -q` | **64 passed** (`55` non-OCR + `9` R.K. OCR) |
+| `pytest tests/test_glyph_geometry_and_ocr_note_20261026.py tests/test_rpt_matrix_reader_20261026.py tests/test_rpt_extraction.py -q` | **40 passed** after one expectation update (§34.5) |
+| `pytest tests/test_glyph_geometry_and_ocr_note_20261026.py tests/test_coverage_nil_vs_unread_20261026.py -q` | **40 passed** (re-run after `_rule_rows`; the note's coverage wording is unchanged) |
+| `pytest tests/test_rk_fashion_reconciliation.py -q` | **7 passed** (score 43.0, base 46.0, completeness 66%) |
+| `pytest tests/test_paras_evidence_regression.py tests/test_jio_evidence_remediation.py -q` | **19 passed** (Jio `rpt_pct_revenue` 4.3094, growth −0.1141) |
+| `pytest tests/test_ui7_ingestion.py tests/test_suite_tiers.py -q` | **21 passed** (new real-file module registered in `tests/tier_inventory.py`) |
+| `python /tmp/rptprod.py <RK pdf>` (production `extract_related_party_transactions`) | 23 transactions, coverage `PARTIAL`, categories `{loan_taken 6, loan_repaid 10, purchase_of_goods 3, payment_made 4}`, annual totals 3M 25.15 / FY2024 753.96 / FY2025 126.51 / FY2026 434.94 ₹ lakh |
+
+**Final comprehensive validation — executed once, after every in-scope item was dispositioned:**
+
+| Command | Result |
+|---|---|
+| `PYTHONPATH=engine .venv/bin/python -m pytest tests/ -q --durations=30` | **2,138 passed, 0 failed**, 25 warnings, **1191.93 s (19 m 51 s)**, exit 0 |
+| `cd frontend && node --test test/*.test.js` | **93 passed, 0 failed** (1.03 s) |
+
+That run includes `tests/test_rpt_nature_classification_and_row_bands_20261026.py`. Nothing here
+required changing a weight, threshold, penalty, band or knockout, and `derived.py` (pin
+`7783dfeb…`) is untouched. (The Module D numerator remains Ramki's decision; §34.6 records it and
+it blocks no code path.)
+
+### 34.8 Remaining limitations
+
+| # | Limitation | Next action |
+|---|---|---|
+| 1 | 30 cells in the remuneration/Note 34 balance blocks stay unread: those blocks print a closing balance and no control total | none by design — reading them would be position-only binding |
+| 2 | 10 rows do not close against their printed balances (OCR digits) and 7 rows state no period | a higher-resolution render per block would raise confidence, not the rule set |
+| 3 | The same party prints as `MK.Jewellers` and `M.K.Jewellers` in different blocks (one with a 3M column, one without) | normalising the name would be inventing text; the verbatim name is kept per block |
+| 4 | Module D numerator | Ramki's decision (§34.6) |
+| 5 | The scanned-note reader runs OCR (~15 s for 3 candidate pages on R.K. Fashion) | acceptable; a cache keyed by (file, page, scale) would remove the repeat cost |
+
+## 35. Module D numerator — the consolidated basis is retained (owner decision, 2026-10-27)
+
+Ramki decided the question left open in §33.8 and §34.6:
+
+> Retain the existing consolidated-basis definition for Module D's related-party revenue metric.
+> Do not include transactions eliminated in consolidation in the numerator unless the existing
+> definition and accounting evidence explicitly support their inclusion. Keep the metric UNKNOWN
+> when qualifying consolidated-basis revenue cannot be established. Do not substitute zero for
+> missing evidence. Any standalone-basis exposure metric must be separately defined and use a
+> matching standalone revenue denominator.
+
+The decision **confirms** the definition in
+`RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md`; it does not change a weight, threshold,
+band, penalty, knockout or criterion, and no schema field is added. What changed is that two
+fail-closed rules which were previously implicit in the data now hold in the shared path:
+
+| # | Rule | Implementation |
+|---|---|---|
+| 1 | A revenue-type row the disclosure marks as eliminated in consolidation is never in the numerator | `rpt_categories.is_consolidation_eliminated(...)`, applied to the row's own verbatim text (`category_label`, `nature`, `description`, `heading`, `block_label`) in `CanonicalInputBuilder._derive_rpt_metrics`. No category name and no issuer name is involved; the exclusion is per row, so a supported row beside an eliminated one still counts |
+| 2 | A year whose qualifying amount the note does not state has **no** share (previously a zero numerator was assumed) | `shares` is built only from years the note states an amount for |
+| 3 | The metric is UNKNOWN when the latest audited FY's qualifying revenue is not established | `latest = max(periods)`; if that year has no share, both fields stay null. An older year can no longer become "latest" |
+| 4 | The change is UNKNOWN when the comparable prior FY's share is not established | growth computed only when the immediately preceding period in the financials has a share; no zero prior |
+| 5 | No zero substitution anywhere in the path | a null field stays null; `derived.py` maps absent → `UNKNOWN` (frozen pin `7783dfeb…` untouched) |
+
+**Effect on the issuers on record — none.** Vishal Nirmiti 11.8418 % / −0.3708 pp, Jio Platforms
+4.3094 % / −0.1141 pp, Paras null/null, R.K. Fashion null/null with the score still **43.0**; the
+consolidated-basis share of Paras's Note 34 evidence (0.1788 / 0.1116 / 0.0574 %, which would give
+D `rpt` 3/3 and clear K6) is **not** used, because that evidence is eliminated in consolidation and
+the denominator is consolidated revenue. If a standalone-basis exposure measure is ever wanted it
+needs its own numerator, its own standalone denominator and its own field — a separate definition,
+not an extraction workaround.
+
+### 35.1 Verification (exact commands, this revision)
+
+| Command | Result |
+|---|---|
+| `pytest tests/test_module_d_consolidated_basis_20261027.py -q` | **7 passed** (new module; registered in `tests/tier_inventory.py`) |
+| `pytest tests/test_rpt_extraction.py -q` | **11 passed** (Vishal 11.8418 % / −0.3708 pp unchanged; the former zero-prior test now asserts UNKNOWN) |
+| `pytest tests/test_jio_evidence_remediation.py tests/test_rk_fashion_reconciliation.py tests/test_paras_evidence_regression.py -q` | **26 passed** (Jio 4.3094 % / −0.1141 pp; R.K. 43.0 / base 46.0 / completeness 66 %) |
+| `pytest tests/test_ui7_ingestion.py tests/test_suite_tiers.py tests/test_module_d_consolidated_basis_20261027.py -q` | **28 passed** |
+
+Comprehensive backend + frontend runs from §34.7 remain valid for everything they covered; this
+revision changes the metric derivation and its tests only, so the full backend suite is re-run once
+through CI on the pushed commit (2,138 tests) rather than locally a second time.

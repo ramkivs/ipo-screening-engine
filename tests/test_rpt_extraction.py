@@ -48,9 +48,13 @@ def _extractor(pages: dict[int, str], page_count: int | None = None):
 
 
 def _by_key(extractions):
+    # Coverage records (`coverage.*`) carry a state string, not a transaction;
+    # they are asserted separately by the matrix-reader tests.
     out = {}
     for ex in extractions:
         v = ex.candidate_value
+        if not isinstance(v, dict):
+            continue
         out[(v["category"], v["counterparty"].lower(), v["period"])] = v
     return out
 
@@ -172,6 +176,8 @@ def test_vishal_note47_real_filing_extraction():
     assert total("purchase_of_goods", "FY2026") == 2427.54
     # Evidence quotes are verbatim substrings of the source pages.
     for ex in extractions:
+        if not isinstance(ex.candidate_value, dict):
+            continue  # coverage record
         assert ex.quote in extractor.extract_page_text(ex.candidate_value["page"])
 
 
@@ -280,7 +286,7 @@ def test_derivation_sales_services_only_latest_and_change():
     assert gov["rpt_pct_of_revenue_growth"] == pytest.approx(7.0)
 
 
-def test_derivation_unit_conversion_and_zero_prior():
+def test_derivation_unit_conversion_and_no_zero_prior():
     periods = [
         {"fy": "FY2025", "revenue": 500.0},
         {"fy": "FY2026", "revenue": 1000.0},
@@ -289,9 +295,10 @@ def test_derivation_unit_conversion_and_zero_prior():
     txns = [_txn("sale_of_goods", "Example Industries", "FY2026", 2500.0, "INR_LAKHS", 0)]
     gov = _builder_gov(periods, txns, reporting_unit="INR_CRORES")
     assert gov["rpt_pct_revenue"] == pytest.approx(2.5)
-    # Prior year: eligible category disclosed, no amounts -> share 0,
-    # so the change equals the latest share (no division by zero).
-    assert gov["rpt_pct_of_revenue_growth"] == pytest.approx(2.5)
+    # The prior year states no eligible amount, so its share is *not
+    # established*: it is left out rather than filled with zero (owner
+    # decision 2026-10-27, report s.35), and the change is therefore unknown.
+    assert gov["rpt_pct_of_revenue_growth"] is None
 
 
 def test_derivation_fail_closed_cases():

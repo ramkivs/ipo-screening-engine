@@ -122,7 +122,9 @@ def test_fixture_class_b_cyclical_manufacturing_5fy():
     # Group Companies -- not the issuer.  The criterion therefore reports UNKNOWN:
     # 4 points off the earned score, 4 off the available base, Module D 6.0 ->
     # 2.0 and unknown points 6.0 -> 10.0.  Measured on the fixture, not asserted.
-    assert outcome.record.score["final_score"] == 36.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
+    assert outcome.record.score["final_score"] == 34.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
+      # -2 (report s.25): the synthetic filing carries no share-capital history, so `pre_ipo_placement_bucket` is UNKNOWN instead of the
+    # free `none_or_near_ipo` 2/2 that an unexamined section used to earn.
 
 
 # --------------------------------------------------------------------------
@@ -153,7 +155,9 @@ def test_fixture_class_c_epc_infrastructure():
     # the `clean` bucket, so the bucket is UNKNOWN instead of the favourable 4/4
     # (score 41.0 -> 37.0, and 4 points of availability with it).
     assert canonical["governance"]["litigation_bucket"] is None
-    assert outcome.record.score["final_score"] == 36.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
+    assert outcome.record.score["final_score"] == 34.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
+      # -2 (report s.25): the synthetic filing carries no share-capital history, so `pre_ipo_placement_bucket` is UNKNOWN instead of the
+    # free `none_or_near_ipo` 2/2 that an unexamined section used to earn.
 
 
 # --------------------------------------------------------------------------
@@ -208,7 +212,9 @@ def test_fixture_class_e_modern_complex_rhp():
     # SEBI/Stock Exchange regulatory actions" is a one-dimension denial, so
     # `clean` is not established (43.0 -> 39.0).
     assert canonical["governance"]["litigation_bucket"] is None
-    assert outcome.record.score["final_score"] == 38.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
+    assert outcome.record.score["final_score"] == 36.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
+      # -2 (report s.25): the synthetic filing carries no share-capital history, so `pre_ipo_placement_bucket` is UNKNOWN instead of the
+    # free `none_or_near_ipo` 2/2 that an unexamined section used to earn.
 
 
 # --------------------------------------------------------------------------

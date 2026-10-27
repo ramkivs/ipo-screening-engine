@@ -167,12 +167,32 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     # 55.0 - 2 (supplier) - 2 (cagr) - 1 (cfo) - 1 (auditor opinion unknown, B(i))
     # - 4 (litigation unknown, D-5: the "clean" that earned these 4 points was a
     # default, and availability drops by the same 4 points, 73 -> 69).
-    assert outcome.record.score["final_score"] == 44.0  # -1: unsupported kmp_exits_2y=0 default removed (board_kmp UNKNOWN)
-    assert outcome.record.score["base_score"] == 47.0  # -1: kmp default removed
+    # 2026-10-26: -1 more: the unsupported large_holders_unlocked_early = False
+    # default is gone, so `lockin_bucket` is UNKNOWN (the filing states the
+    # promoter lock-in but never an early release for large pre-IPO holders).
+    # 2026-10-26 (report s.25): -2 more. RK's share-capital history schedule is
+    # located (pp. 14/97/105/111/113/118-121/124) but no allotment row can be
+    # read from it, so coverage is PARTIAL and `pre_ipo_placement_bucket` is
+    # UNKNOWN instead of the favourable 2/2 an unexamined section used to earn.
+    # No weight or boundary changed; the same filing keeps the points wherever
+    # the source establishes the fact (its directorate table reads cleanly).
+    #
+    # 2026-10-26 (report s.33): those two points are now earned by evidence.
+    # The defect was the reader, not the filing: the allotment schedule on
+    # pp. 110-113 prints each cell over several lines, and the flat-text regex
+    # could not join them.  Read by geometry the schedule reconciles to the
+    # filing's own paid-up capital (1,12,49,563 shares / Rs. 11,24,95,630), so
+    # nine priced allotments are now known -- and none of them falls inside the
+    # 365 days before the offer open date of 2026-10-05 (the last is
+    # 2025-05-31, 492 days earlier), which is what the bucket measures.  The
+    # bucket is therefore `none_or_near_ipo` (2/2) on evidence; no weight,
+    # boundary or threshold moved.
+    assert outcome.record.score["final_score"] == 43.0
+    assert outcome.record.score["base_score"] == 46.0  # -1 kmp default, -1 lockin default
     assert outcome.record.score["penalties_total"] == -3.0
     assert outcome.record.confidence["level"] == "Low"
-    assert outcome.record.confidence["completeness_pct"] == 67.0  # -2: board_kmp leaves availability
-    assert outcome.record.score["lower_bound"] == 31.0
+    assert outcome.record.confidence["completeness_pct"] == 66.0  # -2 board_kmp, -1 lockin
+    assert outcome.record.score["lower_bound"] == 28.0
     assert outcome.record.score["upper_bound"] == 77.0
     assert outcome.record.verdict["verdict"] == "INSUFFICIENT_DATA"
 
@@ -192,8 +212,14 @@ def test_rk_fashion_accessories_extraction_and_reconciliation():
     assert pe_crit["state"] == "SCORED"
     assert pe_crit["score"] == 8.0
 
-    # Module C: 10 / 11 of available points scored (OFS=0, 100% fresh, dilution 27.5% > 25% -> 0 pts)
-    assert modules["C"]["score"] == 10.0
+    # Module C: 9 / 13 of available points scored (OFS=0, 100% fresh, dilution
+    # 27.5% > 25% -> 0 pts; the lock-in point is gone with the removed
+    # large_holders_unlocked_early default, and use_of_proceeds is unknown
+    # because the GCP amount is undisclosed).  pre_ipo_placement is now scored
+    # 2/2 because the allotment schedule is read (report s.33) and no priced
+    # allotment falls within the 365 days before the offer open date; report
+    # s.25 had left the point unknown while the schedule was unreadable.
+    assert modules["C"]["score"] == 9.0
     fresh_crit = next(c for c in modules["C"]["criteria"] if c["criterion_id"] == "fresh_share")
     assert fresh_crit["state"] == "SCORED"
     assert fresh_crit["score"] == 3.0
@@ -323,6 +349,15 @@ def test_missing_promoter_post_holding_remains_unknown_not_four_earned_points():
 
     This controlled intervention explains the reported 44 -> 40 symptom; it
     deliberately does not claim to reproduce the native Windows extraction.
+
+    Updated 2026-10-26 (report section 24).  With only the *disclosed*
+    post-issue percentage removed, the value no longer disappears: it is
+    derived from the disclosed pre-issue percentage and share counts, and it
+    reproduces the stated 72.25% to two decimals -- the 4 points are earned
+    from arithmetic, not from a default.  The property this test protects is
+    therefore expressed against the inputs the derivation needs: remove those
+    as well and the criterion is UNKNOWN again, with the four points gone
+    (base 46 -> 42, final 43 -> 39).
     """
     from copy import deepcopy
 
@@ -330,29 +365,47 @@ def test_missing_promoter_post_holding_remains_unknown_not_four_earned_points():
     config = load_config(CONFIG_FILE)
     at = datetime(2026, 10, 5, 12, tzinfo=timezone.utc)
     supported = evaluate(canonical, config, mode="final", evaluation_datetime=at).record
-    missing_input = deepcopy(canonical)
-    missing_input["capital_structure"]["promoter_post_pct"] = None
-    missing_input.get("_evidence", {}).pop("capital_structure.promoter_post_pct", None)
+
+    derived_input = deepcopy(canonical)
+    derived_input["capital_structure"]["promoter_post_pct"] = None
+    derived_input.get("_evidence", {}).pop("capital_structure.promoter_post_pct", None)
+    derived_outcome = evaluate(derived_input, config, mode="final", evaluation_datetime=at)
+    derived = derived_outcome.record
+
+    missing_input = deepcopy(derived_input)
+    missing_input["capital_structure"]["promoter_pre_pct"] = None
     missing = evaluate(missing_input, config, mode="final", evaluation_datetime=at).record
 
     def criteria(record):
         return {(m["module_id"], c["criterion_id"]): c
                 for m in record.score["modules"] for c in m["criteria"]}
 
-    yes, no = criteria(supported), criteria(missing)
+    yes, deriv, no = criteria(supported), criteria(derived), criteria(missing)
     key = ("D", "promoter_post_holding")
+
+    # The disclosure itself.
+    assert canonical["capital_structure"]["promoter_post_pct"] == 72.25
     assert yes[key]["state"] == "SCORED"
     assert yes[key]["score"] == 4.0
+
+    # Same value, derived: pre-issue % x pre-issue shares / post-issue shares.
+    assert deriv[key]["state"] == "SCORED"
+    assert deriv[key]["score"] == 4.0
+    assert deriv[key]["value"] == pytest.approx(72.25, abs=0.02)
+    metric_reason = derived_outcome.derived.metrics["promoter_post_pct"].reason
+    assert "derived" in metric_reason
+    assert "does not change the count" not in metric_reason
+    assert derived.score["final_score"] == 43.0
+
+    # The derivation's own inputs gone: still UNKNOWN, and nothing is earned.
     assert no[key]["state"] == "UNKNOWN"
     assert no[key].get("score") is None
-    assert {k: v for k, v in yes.items() if k != key} == {k: v for k, v in no.items() if k != key}
-    assert supported.score["base_score"] == 47.0
-    assert missing.score["base_score"] == 43.0
+    assert supported.score["base_score"] == 46.0
+    assert missing.score["base_score"] == 42.0
     assert supported.score["penalties_total"] == missing.score["penalties_total"] == -3.0
     assert supported.penalties == missing.penalties
-    assert supported.score["final_score"] == 44.0
-    assert missing.score["final_score"] == 40.0
-    assert canonical["capital_structure"]["promoter_post_pct"] == 72.25
+    assert supported.score["final_score"] == 43.0
+    assert missing.score["final_score"] == 39.0
 
 
 def test_real_filing_wrapped_total_extracts_without_fixture_fallbacks(monkeypatch):

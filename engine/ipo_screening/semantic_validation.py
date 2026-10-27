@@ -32,6 +32,10 @@ from .canonical_input import CanonicalInput, unprovenanced_paths
 from .errors import Finding, SEVERITY_ERROR, SEVERITY_WARNING, SemanticValidationError
 from .snapshots import MarketSnapshot, PeerSnapshot
 
+#: Rupees in one crore: the factor between ``FinancialPeriod`` values (INR
+#: crore) and an absolute rupee amount.  Shared by every EPS/PAT comparison.
+_CRORE_TO_RUPEES = 1e7
+
 MATERIAL_PREFIXES: Tuple[str, ...] = (
     "issue",
     "financials",
@@ -197,19 +201,43 @@ def validate_semantics(
             )
 
     # -- 5. post-issue EPS sanity ------------------------------------------
+    # One unit convention for both sides of this check: ``FinancialPeriod``
+    # values are already normalised to INR crore (see canonical_input), so the
+    # rupee figure is crore x 1e7 -- the same basis the extractor uses when it
+    # derives EPS from the filing's own reporting unit (INR millions x 1e6 for
+    # Jio, INR lakhs x 1e5 for a lakh-denominated filing).  Comparing a
+    # millions-derived EPS against a crore-derived implication is how a value
+    # can look wrong when only the check is wrong, so the factor lives in one
+    # named constant here.
     eps = _num(issue.get("post_issue_eps"))
+    eps_basis = issue.get("post_issue_eps_basis")
     latest = canonical.latest
     if eps is not None and latest is not None:
         pat = latest.get("pat")
         if pat is not None and post_shares:
-            implied = pat * 1e7 / post_shares
+            implied = pat * _CRORE_TO_RUPEES / post_shares
             if implied > 0 and abs(implied - eps) > max(0.05, eps * 0.10):
+                has_evidence = canonical.evidence_for("issue.post_issue_eps") is not None
+                detail = (
+                    "the stored figure is marked as derived by the engine"
+                    if eps_basis == "derived"
+                    else "the stored figure is not marked as derived by the engine"
+                )
+                provenance = (
+                    "it carries an evidence reference"
+                    if has_evidence
+                    else "it carries no evidence reference, so it is unattributed"
+                )
                 report.findings.append(
                     _warn(
                         "POST_ISSUE_EPS_RECONCILIATION",
                         f"latest PAT over the post-issue share count implies an EPS of "
-                        f"{implied:.4f}, which differs from the supplied post-issue EPS of {eps} by "
-                        "more than 10%",
+                        f"{implied:.4f}, which differs from the stored post-issue EPS of {eps} by "
+                        f"more than 10% ({detail}; {provenance}). The post-issue EPS is therefore "
+                        "unresolved: the filing's own post-issue earnings figure, with its period "
+                        "and its basic/diluted basis, is what settles it -- a historical "
+                        "basic/diluted EPS computed on the weighted-average count is a different "
+                        "quantity and does not.",
                         "issue.post_issue_eps",
                     )
                 )

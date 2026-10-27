@@ -9,6 +9,7 @@ Technical Design v1.5 s3.2, s15:
 
 from __future__ import annotations
 
+import datetime
 import json
 import re
 from pathlib import Path
@@ -16,7 +17,13 @@ from typing import Any, Dict, List, Optional
 
 import jsonschema
 
+from .directorate import count_exits
 from .interfaces import RawExtraction, SourceDocument
+from .rpt_categories import (
+    REVENUE_CATEGORIES,
+    is_consolidation_eliminated,
+    is_revenue_category,
+)
 
 
 class CanonicalInputBuilder:
@@ -76,12 +83,67 @@ class CanonicalInputBuilder:
             "peers": peers_list,
         }
 
+        coverage = self._build_coverage()
+        if coverage:
+            output["coverage"] = coverage
+
+        self._attach_derived_eps_evidence(output)
+
         if "market" in self.base:
             output["market"] = self.base["market"]
         if "recent_sector_ipos" in self.base:
             output["recent_sector_ipos"] = self.base["recent_sector_ipos"]
 
         return output
+
+    def _attach_derived_eps_evidence(self, output: Dict[str, Any]) -> None:
+        """Record how a derived post-issue EPS was formed.
+
+        A number the engine computed must never look like a number the filing
+        printed.  The derivation is written to ``_evidence`` with the inputs it
+        used, so the Explorer (and the semantic validator) can tell a disclosed
+        figure from a derived one and can recompute it.
+        """
+        if output.get("issue", {}).get("post_issue_eps_basis") != "derived":
+            return
+        note = getattr(self, "_derived_eps_note", None)
+        evidence = output.get("_evidence") or {}
+        if "issue.post_issue_eps" in evidence:
+            return
+        evidence["issue.post_issue_eps"] = {
+            "evidence_id": "EV-issue-post_issue_eps",
+            "source_id": self.doc.source_id,
+            "locator": "Derived by the engine (not printed in the filing)",
+            "extraction_method": "DERIVED",
+            "extraction_confidence": 0.9,
+            "note": note
+            or (
+                "derived: latest full-year PAT / post-issue shares; no post-issue earnings figure "
+                "was found in the sections read"
+            ),
+        }
+        output["_evidence"] = evidence
+
+    def _build_coverage(self) -> Dict[str, str]:
+        """Collect `coverage.<...>` extraction results into the inputs map.
+
+        Each reader that can distinguish "read it, nothing there" from
+        "never read it" emits a string-valued RawExtraction on a
+        `coverage.` path.  Those are stripped out of the ordinary field
+        tree here so they never collide with real input fields.
+        """
+        coverage: Dict[str, str] = {}
+        for ex in self.extractions:
+            path = ex.field_path or ""
+            if not path.startswith("coverage."):
+                continue
+            value = str(ex.candidate_value or "").strip().upper()
+            if value in {"DISCLOSED", "VERIFIED_NIL", "PARTIAL", "UNREAD"}:
+                coverage[path[len("coverage."):]] = value
+        derived = getattr(self, "_kmp_exits_coverage", None)
+        if derived and "governance.kmp_exits_2y" not in coverage:
+            coverage["governance.kmp_exits_2y"] = derived
+        return coverage
 
     def _detect_sector_profile(self) -> str:
         """Heuristic detection of sector profile from filing indicators."""
@@ -279,7 +341,16 @@ class CanonicalInputBuilder:
         # INR millions previously produced an EPS ten times too small
         # (Jio: 3.26 instead of 32.63), which feeds P/E and PEG.
         post_eps = _pick_issue("post_issue_eps", None)
-        if post_eps is None:
+        # Basis of the figure, so the number is never anonymous.  A value the
+        # reader took from the filing's own post-issue disclosure is
+        # ``disclosed``; a value the engine formed is ``derived`` and carries a
+        # derivation note in _evidence.  A value supplied by a curated input
+        # that predates this field keeps no basis (reconciled by the validator).
+        eps_basis: Optional[str] = None
+        if post_eps is not None:
+            if self._get_field("issue.post_issue_eps") is not None:
+                eps_basis = "disclosed"
+        else:
             fin_base = self.base.get("financials", {})
             periods = fin_base.get("periods") or self._get_field("financials.periods", [])
             unit = fin_base.get("reporting_unit") or self._get_field(
@@ -291,8 +362,17 @@ class CanonicalInputBuilder:
                 latest_pat = latest_p.get("pat")
                 if latest_pat is not None:
                     post_eps = round((latest_pat * factor) / post_shares, 2)
+                    eps_basis = "derived"
+                    self._derived_eps_note = (
+                        f"derived: latest full-year PAT {latest_pat} {unit} x "
+                        f"{factor:,.0f} / post-issue shares {post_shares:,} = {post_eps} "
+                        f"({latest_p.get('fy') or 'latest period'}); no post-issue earnings figure "
+                        "was found in the sections read, and a historical basic/diluted EPS on the "
+                        "weighted-average count is not the same quantity"
+                    )
         if post_eps is None and self.allow_fixture_fallbacks:
             post_eps = default_eps
+            eps_basis = None
 
         res: Dict[str, Any] = {
             "price_band_low": _pick_issue("price_band_low", default_low),
@@ -307,6 +387,9 @@ class CanonicalInputBuilder:
             "open_date": _pick_issue("open_date", default_open),
             "close_date": _pick_issue("close_date", default_close),
         }
+        if eps_basis is not None and post_eps is not None:
+            res["post_issue_eps_basis"] = eps_basis
+
         if "quota_pct" in issue_base:
             res["quota_pct"] = issue_base["quota_pct"]
         elif self._get_field("issue.quota_pct"):
@@ -354,17 +437,37 @@ class CanonicalInputBuilder:
         cap_base = self.base.get("capital_structure", {})
         pre_pct = cap_base["promoter_pre_pct"] if "promoter_pre_pct" in cap_base else self._get_field("capital_structure.promoter_pre_pct", 73.42 if self.allow_fixture_fallbacks else None)
         post_pct = cap_base["promoter_post_pct"] if "promoter_post_pct" in cap_base else self._get_field("capital_structure.promoter_post_pct", None)
-        pledge_pct = cap_base["promoter_pledge_pct"] if "promoter_pledge_pct" in cap_base else self._get_field("capital_structure.promoter_pledge_pct", 0.0)
-        lockin = cap_base["promoter_lockin_in_place"] if "promoter_lockin_in_place" in cap_base else self._get_field("capital_structure.promoter_lockin_in_place", True)
+        # Evidence or UNKNOWN -- never a favourable constant.
+        #
+        # A pledge of 0.0%, a lock-in "in place", "no early unlock" and "no
+        # discounted allotments" were all *defaults*: when the filing was not
+        # read, the builder supplied the answer that scores best (K2's pledge
+        # limb, the C `lockin` criterion and the discounted-allotment penalty
+        # were all cleared without evidence).  The extracted value is used when
+        # it exists; otherwise the field stays absent and the dependent metric
+        # is UNKNOWN.  Where the filing does disclose the fact, the readers in
+        # ``sections.py`` now emit it with a verbatim quotation.
+        def _cap_value(key: str, fallback: Any = None) -> Any:
+            if key in cap_base:
+                return cap_base[key]
+            return self._get_field(f"capital_structure.{key}", fallback)
+
+        fixture = self.allow_fixture_fallbacks
+        pledge_pct = _cap_value("promoter_pledge_pct", 0.0 if fixture else None)
+        lockin = _cap_value("promoter_lockin_in_place", True if fixture else None)
 
         return {
             "promoter_pre_pct": pre_pct,
             "promoter_post_pct": post_pct,
             "promoter_pledge_pct": pledge_pct,
             "promoter_lockin_in_place": lockin,
-            "large_holders_unlocked_early": cap_base.get("large_holders_unlocked_early", False),
-            "pre_ipo_placements": cap_base.get("pre_ipo_placements", []),
-            "discounted_allotments_18m_before_drhp": cap_base.get("discounted_allotments_18m_before_drhp", False),
+            "large_holders_unlocked_early": _cap_value(
+                "large_holders_unlocked_early", False if fixture else None
+            ),
+            "pre_ipo_placements": _cap_value("pre_ipo_placements", []),
+            "discounted_allotments_18m_before_drhp": _cap_value(
+                "discounted_allotments_18m_before_drhp", False if fixture else None
+            ),
         }
 
     def _build_use_of_proceeds(self) -> List[Dict[str, Any]]:
@@ -431,7 +534,11 @@ class CanonicalInputBuilder:
             "sebi_ed_action_active": _pick_gov("sebi_ed_action_active", None),
             "rpt_pct_revenue": _pick_gov("rpt_pct_revenue", 6.67 if self.allow_fixture_fallbacks else None),
             "rpt_pct_of_revenue_growth": _pick_gov("rpt_pct_of_revenue_growth", None),
-            "board_independent_majority": _pick_gov("board_independent_majority", False),
+            # Evidence or UNKNOWN: a board composition that was never read is
+            # not a non-independent board.
+            "board_independent_majority": _pick_gov(
+                "board_independent_majority", False if self.allow_fixture_fallbacks else None
+            ),
             "kmp_exits_2y": _pick_gov("kmp_exits_2y", None),
         }
         # Schema-permitted governance inputs that a penalty/knockout consumes
@@ -449,7 +556,88 @@ class CanonicalInputBuilder:
                 if extracted is not None:
                     gov[optional_key] = extracted
         self._derive_rpt_metrics(gov)
+        self._derive_board_changes(gov)
         return gov
+
+    def _derive_board_changes(self, gov: Dict[str, Any]) -> None:
+        """Carry the directorate events through, and count exits in window.
+
+        ``kmp_exits_2y`` is no longer taken on trust from whatever the reader
+        happened to leave behind.  When the changes-in-directorate table was
+        read, the events are persisted on ``governance.board_changes`` and the
+        count is derived here against the offer open date, so the same
+        canonical record always re-derives the same count.  When the table was
+        *not* read, the count stays ``None`` (UNKNOWN) and the coverage state
+        records why -- an unread section is never a zero.
+
+        Only the two states that establish the count keep a number:
+
+        * ``DISCLOSED``  -- rows read; the window decides the count;
+        * ``VERIFIED_NIL`` -- the filing positively states there were no
+          changes, so zero exits is a verified zero.
+        """
+        events = self._get_field("governance.board_changes")
+        if events is None:
+            events = gov.get("board_changes")
+        if isinstance(events, list) and events:
+            gov["board_changes"] = events
+        elif "board_changes" not in gov:
+            gov.pop("board_changes", None)
+
+        state = self._get_field("coverage.governance.board_changes")
+        base_has_value = "kmp_exits_2y" in self.base.get("governance", {})
+
+        if state not in ("DISCLOSED", "VERIFIED_NIL"):
+            # The reader established nothing about the directorate section.
+            # A curated input value is then left exactly as supplied, with no
+            # coverage claim either way (legacy/v1.5 behaviour); otherwise the
+            # field stays UNKNOWN -- never zero.
+            if base_has_value:
+                return
+            gov["kmp_exits_2y"] = None
+            if state is not None:
+                self._kmp_exits_coverage = state
+            return
+
+        if state == "VERIFIED_NIL" and isinstance(events, list) and not events:
+            gov["kmp_exits_2y"] = 0
+            self._kmp_exits_coverage = "VERIFIED_NIL"
+            return
+
+        # The 24-month window is anchored on the date the offer opens -- never
+        # on the ingestion date, the retrieval date or "today".  When the filing
+        # has not disclosed the open date, the next date on the same offer
+        # timeline is used, and the count is reported as PARTIAL rather than
+        # DISCLOSED: a later anchor starts the window later, so it can only
+        # narrow the window the rule defines.
+        anchor_raw = None
+        anchor_is_open_date = False
+        for field in ("open_date", "close_date", "listing_date"):
+            candidate = self._get_field("issue.%s" % field) or self.base.get(
+                "issue", {}
+            ).get(field)
+            if not candidate:
+                continue
+            try:
+                anchor = datetime.date.fromisoformat(str(candidate)[:10])
+            except ValueError:
+                continue
+            anchor_raw = candidate
+            anchor_is_open_date = field == "open_date"
+            break
+        else:
+            anchor = None
+        count = count_exits(events or [], anchor)
+        if count is None:
+            # No offer date to anchor the window: the count is not established.
+            gov["kmp_exits_2y"] = None
+            self._kmp_exits_coverage = "PARTIAL"
+        elif not anchor_is_open_date:
+            gov["kmp_exits_2y"] = count
+            self._kmp_exits_coverage = "PARTIAL"
+        else:
+            gov["kmp_exits_2y"] = count
+            self._kmp_exits_coverage = "DISCLOSED" if count else "VERIFIED_NIL"
 
     # Approved RPT metric definitions (Ramki, 2026-10-17; see
     # docs/investigation/RPT-EXTRACTION-AND-METRIC-DEFINITIONS-2026-10-17.md):
@@ -465,9 +653,23 @@ class CanonicalInputBuilder:
     # balances are excluded (retained as evidence only).  Fail closed:
     # missing periods/revenue, non-positive revenue, unknown or
     # unconvertible units, or a missing numerator leave the fields null.
-    _RPT_SALES_SERVICES_CATEGORIES = frozenset(
-        {"sale_of_goods", "sale_of_services", "revenue_from_operations", "job_work_charges_received"}
-    )
+    #
+    # Numerator basis — owner decision, 2026-10-27 (report s.35): the
+    # metric is a *consolidated-basis* share.  A related-party figure the
+    # disclosure states is eliminated in consolidation is therefore never
+    # part of the numerator, because consolidated revenue cannot contain
+    # it; a year whose qualifying amount the note does not state has no
+    # share (no zero substitution); and where the latest year's qualifying
+    # consolidated-basis revenue cannot be established the fields stay null
+    # (UNKNOWN).  A standalone-basis exposure measure is a separate metric
+    # with its own standalone revenue denominator and is not implemented
+    # here.
+    # Imported from the shared nature vocabulary (extraction/rpt_categories.py)
+    # rather than restated here, so a reader that recognises a new revenue
+    # nature cannot silently disagree with the numerator about what may be
+    # counted.  The contents are unchanged: the four categories the approved
+    # definition names.
+    _RPT_SALES_SERVICES_CATEGORIES = REVENUE_CATEGORIES
     _ISSUE_UNIT_TO_RUPEES = {
         "INR_LAKHS": 1e5,
         "INR_CRORES": 1e7,
@@ -523,11 +725,20 @@ class CanonicalInputBuilder:
         "INR_BILLIONS": 1e9,
     }
 
+    # The verbatim text a related-party row may carry, in the order the
+    # readers set them.  Used only to recognise a disclosure that says the
+    # figure is eliminated in consolidation.
+    _RPT_EVIDENCE_TEXT_KEYS = (
+        "category_label",
+        "nature",
+        "description",
+        "heading",
+        "block_label",
+    )
+
     @classmethod
     def _rpt_is_sales_services(cls, category: str) -> bool:
-        if category in cls._RPT_SALES_SERVICES_CATEGORIES:
-            return True
-        return category.startswith("sale_of_") and category != "sale_of_ppe"
+        return is_revenue_category(category)
 
     def _derive_rpt_metrics(self, gov: Dict[str, Any]) -> None:
         if gov.get("rpt_pct_revenue") is not None and gov.get("rpt_pct_of_revenue_growth") is not None:
@@ -554,37 +765,59 @@ class CanonicalInputBuilder:
                 periods[int(m.group(1))] = float(revenue)
         if not periods:
             return
-        eligible = [t for t in txns if self._rpt_is_sales_services(str(t.get("category") or ""))]
+        # A revenue-type row is still not eligible when the disclosure says the
+        # figure is eliminated in consolidation: this metric is divided by
+        # *consolidated* revenue, which by construction cannot contain
+        # eliminated intra-group revenue (owner decision 2026-10-27, report
+        # s.35).  The exclusion reads the row's own verbatim text, never a
+        # category name, and an issuer name appears nowhere.
+        eligible = [
+            t
+            for t in txns
+            if self._rpt_is_sales_services(str(t.get("category") or ""))
+            and not is_consolidation_eliminated(
+                *(t.get(key) for key in self._RPT_EVIDENCE_TEXT_KEYS)
+            )
+        ]
         if not eligible:
             return
         sums: Dict[int, float] = {}
         for txn in eligible:
             unit = txn.get("unit")
-            m = re.match(r"FY(20\d{2})$", str(txn.get("period") or ""))
             amount = txn.get("amount")
-            if unit not in self._RPT_UNIT_TO_RUPEES or not m or not isinstance(amount, (int, float)):
+            if unit not in self._RPT_UNIT_TO_RUPEES or not isinstance(amount, (int, float)):
                 return  # unconvertible/insufficient evidence: fail closed
+            m = re.match(r"FY(20\d{2})$", str(txn.get("period") or ""))
+            if m is None:
+                # A column that is not a financial year -- the interim "three
+                # months ended 30 June 2026" column of a period-matrix
+                # disclosure (report section 30) -- is a known period that
+                # carries no annual share.  It is skipped, not treated as an
+                # unknown period, so an interim column cannot suppress the
+                # annual share the note does disclose.
+                continue
             year = int(m.group(1))
             converted = amount * self._RPT_UNIT_TO_RUPEES[unit] / self._RPT_UNIT_TO_RUPEES[reporting_unit]
             sums[year] = sums.get(year, 0.0) + converted
+        # Only years for which the note discloses an eligible amount have a
+        # numerator.  Absence of a disclosed amount is *missing evidence*, not a
+        # disclosed nil, so no year is filled in with zero (owner decision
+        # 2026-10-27, report s.35): a share is computed only where the note
+        # states the amount, and the metric is left null where the latest year's
+        # qualifying revenue cannot be established.
         shares: Dict[int, float] = {}
         for year, revenue in periods.items():
             if year in sums:
-                numerator = sums[year]
-            else:
-                # Eligible categories are disclosed in the note but no
-                # amount was disclosed for this year ("-" cells): the
-                # disclosed numerator is zero, not missing.
-                numerator = 0.0
-            shares[year] = numerator / revenue * 100.0
-        latest = max(shares)
+                shares[year] = sums[year] / revenue * 100.0
+        latest = max(periods)
+        if latest not in shares:
+            return
+        prior_years = [y for y in periods if y < latest]
+        prior = max(prior_years) if prior_years else None
         if gov.get("rpt_pct_revenue") is None:
             gov["rpt_pct_revenue"] = round(shares[latest], 4)
-        if gov.get("rpt_pct_of_revenue_growth") is None:
-            prior_years = [y for y in shares if y < latest]
-            if prior_years:
-                prior = max(prior_years)
-                gov["rpt_pct_of_revenue_growth"] = round(shares[latest] - shares[prior], 4)
+        if gov.get("rpt_pct_of_revenue_growth") is None and prior is not None and prior in shares:
+            gov["rpt_pct_of_revenue_growth"] = round(shares[latest] - shares[prior], 4)
 
     def _build_business(self) -> Dict[str, Any]:
         biz_base = self.base.get("business", {})
