@@ -26,7 +26,7 @@ from types import SimpleNamespace
 import pytest
 
 from ipo_screening.extraction.builder import CanonicalInputBuilder
-from ipo_screening.extraction.interfaces import SourceDocument
+from ipo_screening.extraction.interfaces import RawExtraction, SourceDocument
 from ipo_screening.extraction.sections import SectionExtractor
 from ipo_screening.extraction.toc import TOCRouter
 
@@ -306,6 +306,43 @@ def test_a_lock_in_statement_is_read_in_each_standard_form(sentence):
     assert lockin.quote_is_processing is False
 
 
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        # Paras Healthcare RHP p. 117: the Regulation 17 pre-Offer lock-in is six
+        # months from allotment, but the VCF / AIF carve-out runs from purchase.
+        "the Equity Shares held by a VCF or a Category I AIF or a Category II AIF or a FVCI, "
+        "provided that such Equity Shares will be locked-in for a period of at least six months "
+        "from the date of purchase by the VCF or Category I AIF or Category II AIF or FVCI "
+        "shareholders.",
+        "Shares held by a VCF or Category I AIF will be locked in for at least 6 months from the "
+        "date of their purchase.",
+    ],
+)
+def test_an_early_unlock_of_large_pre_ipo_holders_is_read(sentence):
+    """A holder that purchased before the Offer is free at allotment.
+
+    The promoter lock-in point is separate.  A filing that states only the
+    promoter lock-in does *not* establish that large pre-IPO holders were
+    locked in too, so the flag stays unset (UNKNOWN) -- the mirror image of
+    the earlier ``large_holders_unlocked_early = False`` default.
+    """
+    pages = {117: sentence}
+    fields = _fields(_section(pages).extract_capital_structure({"capital_structure": (117, 117)}))
+    early = fields["capital_structure.large_holders_unlocked_early"]
+    assert early.candidate_value is True
+    assert early.page == 117
+    assert early.quote_is_processing is False
+    assert "purchase" in early.quote
+
+
+def test_a_promoter_lock_in_alone_does_not_set_the_early_unlock_flag():
+    pages = {116: "The Promoter's Contribution is locked in for a period of three years."}
+    fields = _fields(_section(pages).extract_capital_structure({"capital_structure": (116, 116)}))
+    assert "capital_structure.large_holders_unlocked_early" not in fields
+    assert fields["capital_structure.promoter_lockin_in_place"].candidate_value is True
+
+
 def test_promoter_pre_holding_is_read_from_the_prose_percentage():
     pages = {
         111: (
@@ -464,6 +501,22 @@ def test_capital_and_governance_absent_evidence_stays_absent():
     ):
         assert cap.get(key) is None, key
     assert canonical["governance"].get("board_independent_majority") is None
+
+
+def test_an_early_unlock_extraction_reaches_the_canonical_field():
+    """The reader's flag must survive the builder, not be overwritten."""
+    doc = SourceDocument(source_id="RHP-TEST-0001", source_type="RHP")
+    extraction = RawExtraction(
+        field_path="capital_structure.large_holders_unlocked_early",
+        candidate_value=True,
+        raw_text="locked-in for a period of at least six months from the date of purchase",
+        page=117,
+        section="Capital Structure",
+        locator="Early unlock of large pre-IPO holders",
+        quote="locked-in for a period of at least six months from the date of purchase",
+    )
+    canonical = CanonicalInputBuilder(doc, [extraction], allow_fixture_fallbacks=False).build()
+    assert canonical["capital_structure"]["large_holders_unlocked_early"] is True
 
 
 def test_fixture_fallbacks_are_still_available_to_the_template_path():

@@ -38,6 +38,7 @@ INTEGRATION_MODULES = frozenset({
     "test_jio_rhp_issue_terms.py",
     "test_jio_score_bridge.py",
     "test_litigation_regulatory_defaults.py",
+    "test_lockin_institutional_carveout.py",
     "test_manual_terms_audit_log.py",
     "test_module_d_consolidated_basis_20261027.py",
     "test_notice_cache_document_class.py",

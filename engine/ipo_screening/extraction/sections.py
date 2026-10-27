@@ -901,6 +901,16 @@ class SectionExtractor:
         pledge_quote: Optional[str] = None
         lockin_page: Optional[int] = found_page
         lockin_quote: Optional[str] = None
+        # A large pre-IPO holder is unlocked early when the filing states a
+        # lock-in exemption for an institutional/venture category (VCF /
+        # Category I AIF / Category II AIF / FVCI): their shares are locked for
+        # six months from the date of *purchase* rather than from allotment.
+        # For a holder that purchased before the Offer, that means the shares
+        # are free at allotment.  The value is a boolean, so it is read from the
+        # disclosure and never defaulted.
+        early_unlock: Optional[bool] = None
+        early_unlock_page: Optional[int] = found_page
+        early_unlock_quote: Optional[str] = None
         sentence_pre_pct: Optional[float] = None
         sentence_pre_page: Optional[int] = None
         sentence_pre_quote: Optional[str] = None
@@ -921,6 +931,40 @@ class SectionExtractor:
         lockin_re = re.compile(
             r"locked[\s-]*in\s+(?:for\s+)?(?:a\s+period\s+of\s+)?"
             r"(?:18\s+months|one\s+year|three\s+years|1\s+year|3\s+years)",
+            re.IGNORECASE,
+        )
+        # SEBI ICDR Regulation 17 pre-Offer lock-in.  The general rule locks the
+        # entire pre-Offer capital for six months from the date of *Allotment*.
+        # The carve-out for an institutional / venture holder category (VCF,
+        # Category I or II AIF, FVCI) instead locks those shares for six months
+        # from the date of *purchase*: a different commencement date, so a
+        # holder that purchased before the Offer is free at Allotment.  That is
+        # an early unlock of a large pre-IPO holder.
+        #
+        # The rule keys on the disclosed semantics -- an institutional category
+        # stated together with a purchase-anchored lock-in -- not on any
+        # issuer's names, pages, dates, values or passages.  Both orders are
+        # matched (the category may precede or follow the lock-in clause), the
+        # category may be abbreviated or spelled out, and the commencement may
+        # be the date of purchase or acquisition.  A filing that merely mentions
+        # a category without the carve-out, or that states only the promoter
+        # lock-in, leaves the flag unset (UNKNOWN) rather than clearing it.
+        _institutional_category = (
+            r"(?:VCF|Venture\s+Capital\s+Fund|Category\s+I\s+AIF|Category\s+II\s+AIF"
+            r"|Alternative\s+Investment\s+Fund|FVCI|Foreign\s+Venture\s+Capital\s+Investor)"
+        )
+        _purchase_anchored_lockin = (
+            r"locked[\s-]*in[^.]{0,160}?(?:six|6)\s*months[^.]{0,80}?"
+            r"from\s+the\s+date\s+of\s+(?:their\s+)?(?:purchase|acquisition)"
+        )
+        early_unlock_re = re.compile(
+            r"(?:%s)[^.]{0,320}?%s|%s[^.]{0,160}?%s"
+            % (
+                _institutional_category,
+                _purchase_anchored_lockin,
+                _purchase_anchored_lockin,
+                _institutional_category,
+            ),
             re.IGNORECASE,
         )
         pre_sentence_re = re.compile(
@@ -945,6 +989,12 @@ class SectionExtractor:
                     lockin = True
                     lockin_page = p
                     lockin_quote = m_lockin.group(0)
+            if early_unlock is None:
+                m_early = early_unlock_re.search(" ".join(txt.split()))
+                if m_early:
+                    early_unlock = True
+                    early_unlock_page = p
+                    early_unlock_quote = m_early.group(0)
             if sentence_pre_pct is None:
                 m_pre = pre_sentence_re.search(" ".join(txt.split()))
                 if m_pre:
@@ -1373,6 +1423,22 @@ class SectionExtractor:
                     locator="Promoter lock-in disclosure",
                     quote=lockin_quote or "",
                     quote_is_processing=lockin_quote is None,
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=1.0,
+                )
+            )
+
+        if early_unlock is not None:
+            extractions.append(
+                RawExtraction(
+                    field_path="capital_structure.large_holders_unlocked_early",
+                    candidate_value=early_unlock,
+                    raw_text=early_unlock_quote or str(early_unlock),
+                    page=early_unlock_page or found_page,
+                    section="Capital Structure",
+                    locator="Early unlock of large pre-IPO holders",
+                    quote=early_unlock_quote or "",
+                    quote_is_processing=early_unlock_quote is None,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=1.0,
                 )
