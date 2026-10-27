@@ -2,11 +2,14 @@
 
 - **Decision ID:** A33
 - **Title:** what counts as an "exit" for `governance.kmp_exits_2y` — and why the answer must not be changed by an extractor
-- **Record type:** **OPEN DECISION INVESTIGATION.** No decision is recorded and no
-  code change is made or authorized by this record. Per `handoff/decisions/CONVENTION.md`
-  rules 4 and 6, this is an investigation of an ambiguity, with a recommendation; it is
-  not an approval of that recommendation and it grants no implementation authority.
-- **Decision status:** **PROPOSED / UNRESOLVED (not implemented).**
+- **Record type:** **DECISION RECORD — APPROVED (Alternative A).** The investigation
+  text below is retained as the evidence base. §0 records the decision that now
+  governs it; §§8–9 are updated accordingly. Per `handoff/decisions/CONVENTION.md`
+  rule 4, the approval is distinguished from the v1.5 specification text: the
+  specification is not amended by this record.
+- **Decision status:** **APPROVED 2026-10-27 — Alternative A, provisionally.**
+  The current counting rule is preserved; **no counting or scoring change is made
+  or authorized.**
 - **Decision authority:** RAMKI.
 - **Date:** 2026-10-27 (Asia/Calcutta); no decision time is asserted.
 - **Repository:** `ramkivs/ipo-screening-engine`
@@ -19,6 +22,38 @@
 - **Out of scope and unchanged:** every weight, threshold, penalty, band and knockout;
   `config/ipo-config.v1.5.0.json` and `v1.6.0`; `schema/`; the frozen-core pin on
   `engine/ipo_screening/derived.py` (`7783dfeb…`); every historical evaluation record.
+
+---
+
+## 0. Approved decision (2026-10-27)
+
+**Decision (RAMKI, via the governing instruction for the resumed A33/A34
+execution):** **Alternative A is approved, provisionally.** Preserve the current
+counting rule. `governance.kmp_exits_2y` continues to count every dated exit the
+reader established from the changes-in-directorate table, without a `role`
+filter.
+
+- **Effect:** **no counting change and no scoring change.** No engine, config,
+  schema, weight, threshold, penalty, band, knockout or historical record is
+  altered by this decision. Jio stays **6 → `board_kmp` SCORED 0 `high_churn`**;
+  Paras stays **4 → `board_kmp` SCORED 0 `high_churn`** (both measured again in
+  the A34 issuer reproduction, `docs/investigation/A33-A34-ISSUER-REPRODUCTION-2026-10-27.md`).
+- **"Provisionally" means:** the criterion-definition wording question is not
+  re-opened by this approval, but it is not declared permanently settled
+  either. The metric formula still says "KMP exit" while the merged reader
+  counts the whole directorate table. A future rename/split of the field
+  (Alternative C) would be a schema/canonical-input decision with its own
+  authority; nothing here grants it.
+- **Still open and separately authorized:** the role-recovery improvement in
+  §5 (reader returns `role: null` for tables with no designation column). It
+  makes the count more auditable without changing what it counts, but it is an
+  extractor change and is **not** part of this approval.
+- **Regression baseline:** `tests/test_kmp_exit_counting_scope_20261027.py`
+  (14 tests) pins the current rule; `tests/test_a34_issuer_reproduction_20261027.py`
+  pins Jio's unchanged 6 / `high_churn` in both the pre- and post-A34 readings.
+
+This approval resolves §8 item 1. It does not ratify A32 and does not amend the
+v1.5 specification.
 
 ---
 
@@ -148,17 +183,25 @@ improvement and does not require this decision.
   Company Secretary resignation, which does not occur in Jio's window. §6.3(i) and §8(1)
   now cite this record and state the B1/B2 distinction.
 
-## 8. Unresolved dependencies
+## 8. Remaining dependencies (updated 2026-10-27)
 
-1. **RAMKI's decision** on the scope question. Recommended answer: retain the current
-   rule (alternative A).
-2. Whether the metric formula's words ("KMP exit") should be amended to match the count,
-   or the count changed to match the words. That amends a criterion definition and is not
-   this record's authority.
-3. The role-recovery improvement (§5) is an extractor change and needs its own
-   verification pass; it is not authorized here.
+1. **RESOLVED.** RAMKI approved Alternative A on 2026-10-27 (§0): retain the
+   current rule, provisionally, with no counting or scoring change.
+2. **OPEN, separately authorized.** Whether the metric formula's words ("KMP
+   exit") should be amended to match the count, or the count changed to match the
+   words. That amends a criterion definition (and possibly the schema) and is not
+   this record's authority. The approval of Alternative A does not foreclose a
+   future, separately approved Alternative C.
+3. **OPEN, separately authorized.** The role-recovery improvement (§5) is an
+   extractor change and needs its own verification pass; it is not authorized
+   here.
 
-## 9. Implementation authority
+## 9. Implementation authority (updated 2026-10-27)
 
-**Not granted.** This record is an investigation with a recommendation. No change to
-`kmp_exits_2y`, its producers, its consumers or its documentation is authorized by it.
+**Approved for record, with no implementation required.** The approved decision
+is to keep the existing behaviour, so no change to `kmp_exits_2y`, its
+producers, its consumers, the config, the schema or any historical record is
+made. The original investigation's "not granted" status applied only to
+changing that behaviour; it is superseded by §0 for the decision itself. Any
+future change to the counting rule, the field name, the role reader or a scoring
+artefact requires its own explicit approval.

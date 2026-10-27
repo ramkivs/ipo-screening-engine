@@ -3142,3 +3142,129 @@ TRIGGERED / `lockin` SCORED 0 `weak` / `board_kmp` SCORED 0 `high_churn` / `kmp_
   carve-out alone.
 - No score, verdict, knockout, completeness or bound changes on any filing as a result of
   this revision — it records decisions, it does not implement them.
+
+---
+
+## Revision 31 — A33/A34 approved, implemented and focused-verified — 2026-10-27
+
+**Scope: two approved decisions about the meaning of scoring inputs, one narrow
+reader correction, two fresh issuer reproductions, reconstructed decision
+records and documentation. No weight, threshold, penalty, band, knockout,
+config, schema, `derived.py`, builder, frozen-core pin or historical evaluation
+record was changed.** PR **#13** remains **OPEN** and **not merged**.
+
+### 1. Decisions (approved, not proposed)
+
+| ID | Approved answer | Effect |
+| --- | --- | --- |
+| **A33** | **Alternative A, provisionally** — preserve the current `kmp_exits_2y` counting rule (count every dated exit from the changes-in-directorate table, no `role` filter) | **No counting or scoring change.** Jio 6, Paras 4; both `board_kmp` SCORED 0 `high_churn`. The name/formula mismatch and role recovery remain separately authorized open items. |
+| **A34** | **Alternative B** — a category-specific institutional lock-in carve-out alone does **not** establish an early unlock; only an evidenced actual early release may set `capital_structure.large_holders_unlocked_early` | **Implemented** in `engine/ipo_screening/extraction/sections.py::extract_capital_structure`: the PR #13 carve-out regex is removed; a fail-closed sentence-level rule requires holder group + release act + lock-in context + explicit early/before-expiry timing. Ambiguous, pledge, transferability, normal-expiry and hypothetical language stay UNKNOWN. No favourable `False` is inferred. |
+
+Both decision records are updated from `PROPOSED / UNRESOLVED` to approved with
+an explicit implementation boundary (A33 §0, A34 §0, §9, §10). A34 §0.3 records
+the A32 reconciliation.
+
+### 2. A32 reconciliation — genuine governance-recording requirement
+
+A32 remains **`READY FOR RAMKI RATIFICATION (NOT RATIFIED)`**. It removed this
+field's favourable `False` default and left open (§6.2) whether an engine may
+establish it from a filing at all. A34 Alternative B is the criterion owner's
+approved answer to that policy question; it **does not ratify A32**. The genuine
+remaining recording requirements are: (a) keep A32's unratified status visible
+and its separate ratification open; (b) keep A34 recorded as **approved**, not
+as an unapproved proposal; (c) leave alternative C's additive structured
+carve-out field to a separate schema/canonical-input decision; (d) note that
+"no early unlock of large holders" is now applied as an evidenced test without
+claiming the v1.5 specification wording was amended (CONVENTION rule 5). No
+authority question blocks the approved A34 implementation.
+
+### 3. Issuer reproduction (existing baselines vs after A34)
+
+| | Jio pre-A34 (committed probe) | **Jio after A34 (fresh)** | Paras pre-A34 (PR #13) | **Paras after A34 (fresh)** |
+| --- | --- | --- | --- | --- |
+| final / base / penalty | 37.0 / 37.0 / 0.0 | **37.0 / 37.0 / 0.0** | 13.0 / 16.0 / −3.0 | **13.0 / 16.0 / −3.0** |
+| verdict | `AVOID` | **`AVOID`** | `AVOID` | **`AVOID`** |
+| completeness | 63.0% | **62.0%** | 44.21% | **43.16%** |
+| bounds | 25.0 – 74.0 | **25.0 – 75.0** | 1.0 – 66.0 | **1.0 – 67.0** |
+| knockouts | K2 TRIGGERED | **unchanged** | K5 TRIGGERED | **unchanged** |
+| `kmp_exits_2y` / `board_kmp` | 6 / SCORED 0 `high_churn` | **unchanged** | 4 / SCORED 0 `high_churn` | **unchanged** |
+| `large_holders_unlocked_early` | `true` | **`null`** | `true` | **`null`** |
+| C `lockin` | SCORED 0 `weak` | **UNKNOWN** | SCORED 0 `weak` | **UNKNOWN** |
+
+The only A34-attributable differences are the flag, the `lockin` state,
+completeness, available/unknown points and the upper bound. Final score,
+verdict, knockouts and module scores are unchanged on both issuers; A33 causes
+no delta. Quotes and pages: Jio carve-out p. 105, promoter lock-in p. 104,
+directorate table p. 300, K2 p. 468; Paras carve-out p. 117, promoter lock-in
+p. 115, directorate evidence p. 345 (KMP table printed p. 357). Full record:
+`docs/investigation/A33-A34-ISSUER-REPRODUCTION-2026-10-27.md` and
+`docs/investigation/a33-a34-issuer-reproduction-20261027/summary.json`.
+
+### 4. A34 semantic boundary and corpus limitation
+
+Verified by a 28-test suite: the carve-out alone does not set the flag on three
+real filings (Paras p. 117, Jio p. 105, Moneyview p. 485) or four synthetic
+wording variants; an evidenced early release sets it and is consumed by the
+governing criterion (`weak`, SCORED 0); ambiguous, insufficient, hypothetical or
+negated evidence, unrelated pledge/transferability language, and normal release
+on expiry stay UNKNOWN; genuine positive cases remain detectable. A full-text
+scan of the five examined real filings (**2,826 pages**) found **zero** evidenced
+early releases. That is a corpus limitation, **not** proof that early releases
+never occur; labelled synthetic positives are retained.
+
+### 5. Files
+
+| File | Change |
+| --- | --- |
+| `engine/ipo_screening/extraction/sections.py` | **only engine change** — A34 evidenced-release reader replaces the PR #13 carve-out reader |
+| `tests/test_lockin_institutional_carveout.py` | rewritten as the **28-test** A34 semantic-boundary suite (real filings + labelled synthetic cases) |
+| `tests/test_reading_defects_20261026.py` | carve-out no longer sets the flag; one evidenced-release positive added; builder quote corrected |
+| `tests/test_paras_evidence_regression.py` | **+2** A34 tests: absent evidence row on the real filing; full end-to-end after-A34 result |
+| `tests/test_a34_issuer_reproduction_20261027.py` | **new (3 tests)** — committed Jio input before/after; A33 counting pin |
+| `handoff/decisions/A33-…md`, `A34-…md` | approved status, §0 decisions, implementation boundary, A32 reconciliation |
+| `docs/investigation/BROAD-REMEDIATION-CONSOLIDATED-DISPOSITION-2026-10-27.md` | status update superseding the "unresolved" dispositions |
+| `docs/investigation/JIO-34-GLOBAL-ARCHITECTURE-DISPOSITION-2026-10-27.md` | status update + §11 (decisions, Jio before/after, A32, verification) |
+| `docs/investigation/PARAS-UNKNOWN-TRIAGE-2026-10-27.md` | §0 status update; §3 rewritten with three measured states |
+| `docs/investigation/LOCKIN-INSTITUTIONAL-CARVEOUT-GENERALITY-2026-10-27.md` | revision 2: approved rule, cross-issuer before/after, 28-test matrix, corpus limitation |
+| `docs/investigation/A33-A34-ISSUER-REPRODUCTION-2026-10-27.md` + `…/summary.json` | **new** — reproduction record with quotes, pages and before/after values |
+| `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` | this revision |
+
+### 6. Verification
+
+* **65 passed** — `test_lockin_institutional_carveout.py` (28),
+  `test_reading_defects_20261026.py` (33),
+  `test_a34_issuer_reproduction_20261027.py` (3), `test_suite_tiers.py` (1).
+* **132 passed** — eight affected regression modules:
+  `test_paras_evidence_regression.py` (20, including the new Paras
+  reproduction), `test_rk_fashion_reconciliation.py` (7),
+  `test_ui7_ingestion.py` (20), `test_jio_current_engine_result_20261027.py`
+  (3, including fresh Jio ingestion), `test_extraction.py` (12),
+  `test_core_semantics.py` (31), `test_kmp_exit_counting_scope_20261027.py`
+  (14), `test_paras_official_issue_page_terms.py` (25).
+* **Tier gate:** green. The rewritten real-PDF module remains declared in
+  `tests/tier_inventory.py::INTEGRATION_MODULES`; the new issuer module is
+  synthetic-tier and needs no declaration.
+* **CI-equivalent integrity:** `verify_frozen_core()`, `verify_golden_result()`,
+  `verify_v1_6_implementation()`, all `schema/*.json`, and
+  `python -m compileall -q engine` — all PASS.
+* **Full backend suite: NOT RUN, by instruction.** Earlier full-suite figures
+  (2166 / 2169 / 2183) belong to earlier trees and are not claimed for this
+  revision. The paused session's reported "28 A34 tests" and "90 tests across
+  four additional modules" left no surviving output after the workspace reset;
+  the suites were reconstructed and their affected scope re-run as above.
+
+### 7. Status and remaining limitations
+
+- Readiness: **NOT ESTABLISHED** (full suite not run; external inputs still
+  missing). Required-term gate: **CLOSED**. PR **#13 OPEN**, not merged.
+- **A33 approved provisionally**, no counting change; **A34 approved and
+  implemented**; **A32 still NOT RATIFIED** — separate ratification required.
+- No real-filing positive early-release case in the five examined filings;
+  positive coverage is synthetic. Moneyview's provision is outside the routed
+  capital-structure range and is exercised at rule level only.
+- Modules B/E/F remain blocked on peer, assessment and market-observation
+  inputs for both issuers. Jio still uses five manual issue terms with no
+  official discovery provider; Paras uses separately supplied identity-bound
+  terms. Neither is a like-for-like replay of the 2026-10-23 published record.
+- Alternative C (a structured carve-out field) and A33's role-recovery
+  improvement remain separately authorized decisions.

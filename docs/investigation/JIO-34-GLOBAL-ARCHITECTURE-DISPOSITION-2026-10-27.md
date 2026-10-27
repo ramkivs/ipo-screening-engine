@@ -19,6 +19,39 @@ published record.
 
 ---
 
+## STATUS UPDATE — A33/A34 approved and implemented (2026-10-27, later pass)
+
+**The "two decisions required" in §6.3 and §8 are historical.** Both are now
+approved by RAMKI and recorded in their decision records:
+
+* **A33 Alternative A APPROVED (provisionally):** preserve the current
+  `kmp_exits_2y` counting rule; **no counting or scoring change**. Jio stays
+  **6 → `board_kmp` SCORED 0 `high_churn`**. The name/formula mismatch and the
+  role-recovery improvement remain separately authorized open items.
+* **A34 Alternative B APPROVED:** a category-specific institutional lock-in
+  carve-out alone does **not** establish an early unlock. The PR #13 carve-out
+  reader in `engine/ipo_screening/extraction/sections.py` is replaced by a
+  fail-closed evidenced-early-release rule; `large_holders_unlocked_early`
+  stays `null` and C `lockin` is **UNKNOWN** where no release is evidenced.
+
+**Current Jio result after A34 (freshly reproduced):**
+**37.0 / 37.0 / 0.0 / `AVOID` / 62.0% completeness / bounds 25.0–75.0 / K2
+TRIGGERED / `lockin` UNKNOWN / `board_kmp` SCORED 0 `high_churn` / `kmp_exits_2y`
+6 / `large_holders_unlocked_early` `null`.** Pre-A34 baseline (committed probe
+`…145236Z-final-0fde1451`): 37.0 / `AVOID` / **63.0%** / 25–74 / `lockin`
+SCORED 0 `weak` / flag `true`. The final score, verdict, knockouts and module
+scores are identical; A34 returns one point from scored-0 to available.
+
+The §6.3(ii) sentence that "turned `lockin_bucket` from `intact` to `weak`
+(−1 point) relative to the published record" describes the PR #13 intermediate
+state, not the current engine. §9's "No engine file was modified" is a true
+statement **about this earlier pass only**; a later pass changed one engine
+file (`sections.py`) and its tests, with no config/schema/scoring change. New
+§11 below records the measured before/after values, source provenance, the A32
+governance-recording boundary and the focused verification.
+
+---
+
 ## 0. Method and evidence base
 
 Read-only inspection of `main` at `69a9ff9` / branch tip `cac095d`, plus:
@@ -548,3 +581,66 @@ merged.**
 
 Verified remotely: `gh pr view 13` reports state `OPEN`, base `main`, and a
 `headRefOid` equal to the local `HEAD`.
+
+
+---
+
+## 11. Later pass — A33/A34 decisions, Jio reproduction and verification
+
+### 11.1 Decisions and implementation
+
+| Decision | Approved answer | Implementation |
+| --- | --- | --- |
+| **A33** — scope of `kmp_exits_2y` | **Alternative A**, provisionally: keep the current rule (count every dated exit from the changes-in-directorate table, no `role` filter) | **No code change.** `tests/test_kmp_exit_counting_scope_20261027.py` (14 tests) remains the regression baseline; `tests/test_a34_issuer_reproduction_20261027.py` pins Jio 6 → `high_churn` in both readings |
+| **A34** — Regulation 17(1)(c) carve-out | **Alternative B**: a carve-out alone does not establish an early unlock; only evidenced actual early release may set `large_holders_unlocked_early` | `engine/ipo_screening/extraction/sections.py` — carve-out regex removed, replaced by a sentence-level evidenced-release rule; 28-test semantic-boundary suite; no config/schema/`derived.py`/builder/weight/knockout change |
+
+### 11.2 Jio before / after A34 (measured)
+
+| Field | Pre-A34 (committed probe record) | After A34 (fresh ingestion) |
+| --- | --- | --- |
+| final / base / penalty | 37.0 / 37.0 / 0.0 | **37.0 / 37.0 / 0.0** |
+| verdict | `AVOID` | **`AVOID`** |
+| completeness | 63.0% | **62.0%** |
+| bounds | 25.0 – 74.0 | **25.0 – 75.0** |
+| knockouts | K1 UNVERIFIED, K2 TRIGGERED, K3 CLEAR, K4 CLEAR, K5 UNVERIFIED, K6 CLEAR | **identical** |
+| `kmp_exits_2y` / `board_kmp` | 6 / SCORED 0 `high_churn` | **6 / SCORED 0 `high_churn`** |
+| `large_holders_unlocked_early` | `true` (evidence p. 105) | **`null`** (no evidence row) |
+| C `lockin` | SCORED 0 `weak` | **UNKNOWN** |
+| modules A–F | 17 / 1 / 10 / 9 / 0 / 0 | **identical** |
+
+Source provenance: carve-out on printed **p. 105** (re-extracted with `pypdf`;
+before A34 it was the flagged evidence row); promoter lock-in evidence **p. 104**
+"locked-in for a period of three years"; directorate table evidence **p. 300**
+("The changes in the Board during the three years immediately preceding …");
+K2 (A29) **p. 468** "SEBI filed a revision application before the Hon'ble High
+Court of Bombay and the same is currently pending". Full tables and quotes:
+`A33-A34-ISSUER-REPRODUCTION-2026-10-27.md`.
+
+### 11.3 A32 reconciliation and remaining governance-recording items
+
+A32 remains **`READY FOR RAMKI RATIFICATION (NOT RATIFIED)`**. It removed the
+favourable `False` default for this field and explicitly left open whether an
+engine may establish it from a filing at all. A34 Alternative B is the approved
+answer to that policy question; it **does not ratify A32**. The genuine
+governance-recording requirements are: keep A32's unratified status visible,
+keep A34 recorded as **approved** (not as an unapproved proposal), leave
+alternative C's additive structured carve-out field to a separate schema
+decision, and treat the "no early unlock of large holders" wording as now
+applied by an evidenced test without claiming the v1.5 specification text was
+amended (CONVENTION rule 5).
+
+### 11.4 Verification and limitations
+
+Focused: **65 passed** (28 A34 + 33 reading defects + 3 issuer reproduction +
+1 tier gate) and **132 passed** across eight affected regression modules; tier
+gate green; frozen core, golden result, inactive v1.6, schemas and `compileall`
+all PASS. **Full backend suite NOT RUN by instruction.** The earlier reported
+"28 A34 tests" and "90 tests across four additional modules" left no surviving
+output in the resumed workspace, so those suites were reconstructed and their
+affected scope re-run rather than accepted on an unverifiable report.
+
+No real filing among the five examined (2,826 pages) evidences an actual early
+release; positive coverage is synthetic only. This is a corpus limitation, not
+proof that early releases never occur. Module B/E/F external-input gaps, the
+Jio manual-term environmental restriction and A33's provisional name/formula
+mismatch remain as described in the consolidated disposition and tracker.

@@ -1,0 +1,120 @@
+{
+  "record": "A33/A34 issuer reproduction, 2026-10-27",
+  "decisions": {
+    "A33": "APPROVED Alternative A - preserve current kmp_exits_2y counting rule provisionally; no counting or scoring change",
+    "A34": "APPROVED Alternative B - an institutional carve-out alone does not establish an early unlock; only an evidenced early release may set the flag"
+  },
+  "workflow": {
+    "jio": "PresentationService.ingest_document on the committed RHP with the five committed manual terms and IssueTermsResolver(providers=[]); before-A34 values re-evaluated from the committed probe input.json",
+    "paras": "DocumentExtractor -> canonical input with identity-bound issue terms (660/693/21) -> pipeline.evaluate(mode=final, at 2026-10-05T12:00:00Z)"
+  },
+  "jio": {
+    "baseline_record": "JIO-PLATFORMS-LIMITED-20261027-145236Z-final-0fde1451",
+    "after_a34_evaluation_id": "JIO-PLATFORMS-LIMITED-20261027-212245Z-final-4e28d0ac",
+    "before_a34": {
+      "final_score": 37.0,
+      "base_score": 37.0,
+      "penalties_total": 0.0,
+      "verdict": "AVOID",
+      "completeness_pct": 63.0,
+      "lower_bound": 25.0,
+      "upper_bound": 74.0,
+      "available_points": 63.0,
+      "unknown_points": 37.0,
+      "knockouts": {"K1": "UNVERIFIED", "K2": "TRIGGERED", "K3": "CLEAR", "K4": "CLEAR", "K5": "UNVERIFIED", "K6": "CLEAR"},
+      "kmp_exits_2y": 6,
+      "board_kmp": {"state": "SCORED", "band": "high_churn", "score": 0.0},
+      "large_holders_unlocked_early": true,
+      "promoter_lockin_in_place": true,
+      "lockin": {"state": "SCORED", "band": "weak", "score": 0.0},
+      "modules": {"A": 17.0, "B": 1.0, "C": 10.0, "D": 9.0, "E": 0.0, "F": 0.0}
+    },
+    "after_a34": {
+      "final_score": 37.0,
+      "base_score": 37.0,
+      "penalties_total": 0.0,
+      "verdict": "AVOID",
+      "completeness_pct": 62.0,
+      "lower_bound": 25.0,
+      "upper_bound": 75.0,
+      "available_points": 62.0,
+      "unknown_points": 38.0,
+      "knockouts": {"K1": "UNVERIFIED", "K2": "TRIGGERED", "K3": "CLEAR", "K4": "CLEAR", "K5": "UNVERIFIED", "K6": "CLEAR"},
+      "kmp_exits_2y": 6,
+      "board_kmp": {"state": "SCORED", "band": "high_churn", "score": 0.0},
+      "large_holders_unlocked_early": null,
+      "promoter_lockin_in_place": true,
+      "lockin": {"state": "UNKNOWN", "band": null, "score": null},
+      "modules": {"A": 17.0, "B": 1.0, "C": 10.0, "D": 9.0, "E": 0.0, "F": 0.0}
+    },
+    "a34_delta": "one point returns from scored-0 to available: completeness -1pp, upper bound +1; score, verdict, knockouts and module scores unchanged",
+    "source_provenance": [
+      {"page": 105, "what": "Regulation 17(1)(c) carve-out", "quote": "In terms of Regulation 17 (1)(c) of the SEBI ICDR Regulations, equity shares held by a VCF or Category I AIF or Category II AIF or FVCI shall not be locked-in for a period of six months from the date of Allotment, provided that such equity shares shall be locked in for a period of at least six months from the date of purchase by such shareholders.", "role": "pre-A34 flagged evidence row; after A34 present but emits no extraction"},
+      {"page": 104, "what": "promoter lock-in", "quote": "locked-in for a period of three years", "role": "capital_structure.promoter_lockin_in_place = true"},
+      {"page": 300, "what": "changes in the Board of Directors", "quote": "The changes in the Board during the three years immediately preceding the date of this Red Herring Prospectus are set forth below: Name of Director* Date of change Reasons Mr. John William Hegeman March 21, 2026 Resignation as non-executive director ...", "role": "directorate table counted by kmp_exits_2y = 6"},
+      {"page": 468, "what": "SEBI revision application", "quote": "SEBI filed a revision application before the Hon'ble High Court of Bombay and the same is currently pending", "role": "A29 K2 TRIGGERED (unchanged by A33/A34)"}
+    ]
+  },
+  "paras": {
+    "baseline_record": "PARAS-UNKNOWN-TRIAGE-2026-10-27.md section 3 (PR #13 result, reproduced on the same canonical input)",
+    "before_a34": {
+      "final_score": 13.0,
+      "base_score": 16.0,
+      "penalties_total": -3.0,
+      "verdict": "AVOID",
+      "completeness_pct": 44.21,
+      "lower_bound": 1.0,
+      "upper_bound": 66.0,
+      "available_points": 42.0,
+      "unknown_points": 53.0,
+      "knockouts": {"K1": "UNVERIFIED", "K2": "UNVERIFIED", "K3": "CLEAR", "K4": "UNVERIFIED", "K5": "TRIGGERED", "K6": "UNVERIFIED"},
+      "kmp_exits_2y": 4,
+      "board_kmp": {"state": "SCORED", "band": "high_churn", "score": 0.0},
+      "large_holders_unlocked_early": true,
+      "promoter_lockin_in_place": true,
+      "lockin": {"state": "SCORED", "band": "weak", "score": 0.0},
+      "modules": {"A": 6.0, "B": 0.0, "C": 3.0, "D": 1.0, "E": 6.0, "F": 0.0}
+    },
+    "after_a34": {
+      "final_score": 13.0,
+      "base_score": 16.0,
+      "penalties_total": -3.0,
+      "verdict": "AVOID",
+      "completeness_pct": 43.15789473684211,
+      "lower_bound": 1.0,
+      "upper_bound": 67.0,
+      "available_points": 41.0,
+      "unknown_points": 54.0,
+      "knockouts": {"K1": "UNVERIFIED", "K2": "UNVERIFIED", "K3": "CLEAR", "K4": "UNVERIFIED", "K5": "TRIGGERED", "K6": "UNVERIFIED"},
+      "kmp_exits_2y": 4,
+      "board_kmp": {"state": "SCORED", "band": "high_churn", "score": 0.0},
+      "large_holders_unlocked_early": null,
+      "promoter_lockin_in_place": true,
+      "lockin": {"state": "UNKNOWN", "band": null, "score": null},
+      "modules": {"A": 6.0, "B": 0.0, "C": 3.0, "D": 1.0, "E": 6.0, "F": 0.0}
+    },
+    "a34_delta": "one point returns from scored-0 to available: completeness -1.05pp, upper bound +1; score, verdict, K5 and module scores unchanged",
+    "source_provenance": [
+      {"page": 117, "what": "Regulation 17(1)(c) carve-out", "quote": "(iii) the Equity Shares held by a VCF or a Category I AIF or a Category II AIF or a FVCI, provided that such Equity Shares will be locked -in for a period of at least six months from the date of purchase by the VCF or Category I AIF or Category II AIF or FVCI shareholders.", "role": "pre-A34 flagged evidence row; after A34 present but emits no extraction"},
+      {"page": 115, "what": "promoter lock-in", "quote": "locked in for three years", "role": "capital_structure.promoter_lockin_in_place = true"},
+      {"page": 345, "what": "changes in the Board of Directors", "quote": "Except as mentioned below, there have been no changes in our Directors in the last three years: 340 Name Designation (at the time of appointment / change in designation / cessation) ... Ramesh Abhishek Independent Director July 12, 2024 Resignation due to personal commitments ...", "role": "directorate evidence; KMP table at printed p.357 has no designation column (A33 rationale)"}
+    ]
+  },
+  "semantic_boundary": {
+    "carve_out_alone_sets_flag": false,
+    "evidenced_early_release_sets_flag": true,
+    "ambiguous_or_absent_evidence": "UNKNOWN",
+    "pledge_or_transferability_language": "UNKNOWN",
+    "real_filings_examined": ["Paras Healthcare (651 pp)", "Jio (591 pp)", "Moneyview (537 pp)", "Vishal Nirmiti (551 pp)", "R.K. Fashion (496 pp)"],
+    "real_filing_positive_cases": 0,
+    "limitation": "Zero matches in this corpus is not proof that early releases never occur; genuine positive cases are retained as labelled synthetic tests."
+  },
+  "focused_verification": {
+    "a34_semantic_suite": "28 passed",
+    "batch_one": "65 passed (28 + 33 + 3 + tier gate 1)",
+    "batch_two": "132 passed across 8 regression modules",
+    "tier_gate": "passed",
+    "frozen_core_golden_result_v16_schemas_compileall": "passed",
+    "full_suite": "NOT RUN BY INSTRUCTION"
+  }
+}

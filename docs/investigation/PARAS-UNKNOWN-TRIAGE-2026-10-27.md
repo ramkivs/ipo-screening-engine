@@ -15,7 +15,36 @@ v1.5 config is untouched.
 
 ---
 
-## 1. Baseline reproduced exactly
+## 0. Status update — A34 approved and implemented (2026-10-27, later pass)
+
+**This report's §1 is the pre-PR #13 baseline (43.16%, `lockin` UNKNOWN). Its
+§3 "Remediation" described the PR #13 reader, which set
+`large_holders_unlocked_early = True` from the Regulation 17(1)(c) carve-out
+and produced the intermediate 44.21% / `lockin` SCORED 0 `weak` result. That
+intermediate result is retained below as a labelled baseline, not as the
+current engine's answer.**
+
+A34 **Alternative B is now approved and implemented**: a category-specific
+institutional carve-out alone does not establish an early unlock. The PR #13
+carve-out reader has been replaced by a fail-closed evidenced-early-release
+rule in `engine/ipo_screening/extraction/sections.py`. Paras prints the
+carve-out on p. 117 but no evidenced early release, so the field is `null`
+again and C `lockin` is **UNKNOWN**.
+
+**Current Paras result after A34 (freshly reproduced):**
+**13.0 / 16.0 / −3.0 / 43.16% / `AVOID` / K5 TRIGGERED / bounds 1.0–67.0 /
+`lockin` UNKNOWN / `board_kmp` SCORED 0 `high_churn` / `kmp_exits_2y` 4 /
+`large_holders_unlocked_early` `null`.** A33 Alternative A is also approved, so
+the counting rule and the `board_kmp` classification are unchanged.
+
+Full before/after tables, quotations, page provenance and verification are in
+`A33-A34-ISSUER-REPRODUCTION-2026-10-27.md` and in A34 §0. The remainder of
+this report is the historical triage of the other UNKNOWN criteria, which is
+unaffected by A34.
+
+---
+
+## 1. Baseline reproduced exactly (pre-PR #13 baseline)
 
 Authoritative path (`engine/ipo_screening/pipeline.py` → `evaluate`), canonical
 input built by `DocumentExtractor` from the RHP, the issue-terms notice
@@ -162,13 +191,13 @@ regime on the issue window.
 
 ---
 
-## 3. The one confirmed reader defect — `lockin` / `large_holders_unlocked_early`
+## 3. `lockin` / `large_holders_unlocked_early` — reader defect, then semantic correction
 
 `_lockin_bucket` is `intact` only when `promoter_lockin_in_place` is true **and**
 `large_holders_unlocked_early` is false; with the second field `None` it returns
 UNKNOWN. On the strict real-filing path the builder never sets that field
 (`builder.py` supplies it only on the synthetic-template path), so it is `None`
-for every real filing unless a reader emits it. **No reader did.**
+for every real filing unless a reader emits it. **No reader did** before PR #13.
 
 Paras does disclose the Regulation 17(1)(c) carve-out, on **p. 117**:
 
@@ -187,73 +216,70 @@ holder that purchased more than six months before the Offer is free at allotment
 while one that purchased shortly before the Issue can be locked up to *later*
 than allotment + six months. The spec's lock-in row is "promoter lock-in intact,
 **no early unlock of large holders** = 1; otherwise 0". The promoter lock-in is
-separately intact (p. 116), so the field is a distinct fact.
+separately intact (evidence page 115), so the field is a distinct fact.
 
-> **Correction, 2026-10-27.** This report's first draft stated that Paras
-> "discloses the early unlock". Paras discloses the **carve-out**, not an early
-> release; the two sentences above are what the text actually establishes. The
-> reader and its tests are preserved unchanged, but whether a Regulation
-> 17(1)(c) carve-out may set `capital_structure.large_holders_unlocked_early` is
-> recorded as an open decision in
-> `handoff/decisions/A34-early-unlock-carve-out-semantics.md` (PROPOSED, not
-> implemented). **A category carve-out alone must not set the flag; without
-> evidence of an actual early release the field stays `null` and C `lockin`
-> stays UNKNOWN.**
+### Three states, all measured
 
-### Remediation
+| State | `large_holders_unlocked_early` | C `lockin` | completeness | bounds |
+| --- | --- | --- | --- | --- |
+| §1 pre-PR #13 baseline | `null` | UNKNOWN | 43.16% | 1.0–67.0 |
+| PR #13 intermediate (revision 1) | `true` (carve-out, p. 117) | SCORED 0 `weak` | 44.21% | 1.0–66.0 |
+| **After A34 (approved, current)** | **`null`** | **UNKNOWN** | **43.16%** | **1.0–67.0** |
 
-`SectionExtractor.extract_capital_structure` now reads the carve-out and emits
-`capital_structure.large_holders_unlocked_early = True` with a verbatim
-quotation (matched span on the page, `quote_is_processing=False`):
+The intermediate state emitted a p. 117 evidence row with locator "Early
+unlock of large pre-IPO holders" and the quote "VCF or a Category I AIF …
+locked -in for a period of at least six months from the date of purchase".
+**A34 withdraws the inference, not the quotation**: the quote is verbatim and
+correctly page-attributed, but it states a purchase-anchored minimum, not a
+release. After A34 there is no evidence row and no `field_map` entry for this
+field on Paras.
 
-```
-locator: Early unlock of large pre-IPO holders
-quote:   "VCF or a Category I AIF or a Category II AIF or a FVCI, provided that such
-         Equity Shares will be locked -in for a period of at least six months from
-         the date of purchase"
-page:    117
-```
+### Correction and current remediation
 
-The rule keys on the disclosed semantics -- an institutional / venture holder
-category (`VCF`, `Venture Capital Fund`, `Category I AIF`, `Category II AIF`,
-`Alternative Investment Fund`, `FVCI`, `Foreign Venture Capital Investor`)
-stated together with a lock-in anchored to the **date of purchase** rather than
-the general six-months-from-Allotment lock-in -- not on any issuer's names,
-pages, passages, dates or values. It matches the category and the lock-in clause
-in either order and in abbreviated or spelled-out form, and it sets the flag
-only where both halves appear in the same sentence. A filing that merely lists
-a category, that gives the category the general Allotment-anchored lock-in, that
-anchors a longer lock-in to purchase, or that states only the promoter lock-in
-leaves the flag unset (UNKNOWN). The builder already forwards the extracted
-value through `_cap_value`. The rule, its generality and its cross-issuer
-coverage are pinned in `LOCKIN-INSTITUTIONAL-CARVEOUT-GENERALITY-2026-10-27.md`.
+`handoff/decisions/A34-early-unlock-carve-out-semantics.md` first recorded the
+question as PROPOSED; **Alternative B is now approved and implemented**.
+`SectionExtractor.extract_capital_structure` sets the flag `True` only where one
+sentence evidences an actual early release of named large / pre-IPO /
+institutional holders (holder group + release act + lock-in context + explicit
+early / before-expiry timing), and stays UNKNOWN for a carve-out, pledge
+release, transferability wording, normal expiry release, or hypothetical /
+negated language. Nothing infers a favourable `False`. No weight, boundary,
+threshold, penalty, knockout, config, schema or `derived.py` change was made.
 
-### Effect on the pinned record
+A full-text scan of all five real filings examined (2,826 pages) found **no**
+evidenced early release, so the genuine positive cases are labelled synthetic
+tests. Zero matches in this corpus is **not** proof that early releases never
+occur.
 
-The final score is unchanged at **13.0**, verdict **AVOID**, K5 **TRIGGERED** —
-UNKNOWN criteria already contributed 0 to the score. What changes is the
-completeness: `lockin` moves from UNKNOWN (1 point available) to SCORED **0**
-(`weak`), so available points fall by one and completeness rises
-**43.16% → 44.21%**. The score-record hash changes accordingly
-(`f7fab780…` → `15502025…`) because the canonical input now carries the new
-extracted field. No weight, boundary or threshold moved.
+### Effect on the pinned record (restated)
 
-### Regression tests
+Final score **13.0**, verdict **`AVOID`**, K5 **TRIGGERED** — unchanged in all
+three states. What moves is completeness: PR #13 moved `lockin` from UNKNOWN to
+SCORED 0 and completeness rose **43.16% → 44.21%**; A34 returns it to UNKNOWN
+and completeness **43.16%**. The score-record hash changes with the canonical
+input in each state; no historical evaluation record was edited.
 
-`tests/test_reading_defects_20261026.py`:
+### Regression tests (current)
 
-- `test_an_early_unlock_of_large_pre_ipo_holders_is_read` — both phrasings
-  ("six months" and "6 months ... their purchase") set the flag to `True` with a
-  verbatim quote and page.
-- `test_a_promoter_lock_in_alone_does_not_set_the_early_unlock_flag` — the flag
-  is not inferred from the promoter lock-in.
-- `test_an_early_unlock_extraction_reaches_the_canonical_field` — the builder
-  does not overwrite the reader's value.
+`tests/test_lockin_institutional_carveout.py` — 28-test A34 semantic boundary:
+Paras p. 117 carve-out quote asserted on the page and the flag absent; Jio,
+Moneyview, Vishal Nirmiti and R.K. Fashion; carve-out wording variants,
+ambiguous, pledge/transferability, hypothetical/negated and absent cases stay
+UNKNOWN; labelled synthetic evidenced releases set the flag; canonical and
+criterion consumers pinned.
 
-`tests/test_lockin_institutional_carveout.py` — the cross-issuer matrix
-(positive / negative / ambiguous / absent, real filings and labelled synthetic
-wording variants, plus the `lockin_bucket` consumer and the
-module-isolation check). See the generality report for the case list.
+`tests/test_reading_defects_20261026.py` — the two Paras carve-out phrasings no
+longer set the flag; one evidenced release does; promoter-only lock-in and the
+builder path are pinned.
+
+`tests/test_paras_evidence_regression.py` — two new A34 tests pin the absent
+evidence row on the real filing and the full end-to-end result
+(13.0 / 16.0 / −3.0 / 43.16% / `AVOID` / K5 / `lockin` UNKNOWN /
+`board_kmp` `high_churn` / `kmp_exits_2y` 4).
+
+See `LOCKIN-INSTITUTIONAL-CARVEOUT-GENERALITY-2026-10-27.md` (revision 2) and
+`A33-A34-ISSUER-REPRODUCTION-2026-10-27.md` for the cross-issuer matrix and the
+measured before/after values.
 
 ---
 

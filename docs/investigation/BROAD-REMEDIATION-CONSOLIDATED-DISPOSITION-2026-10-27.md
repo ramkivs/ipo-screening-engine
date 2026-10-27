@@ -10,6 +10,40 @@ lock-in generalization and all prior work are preserved.
 
 ---
 
+## STATUS UPDATE — A33/A34 approved, implemented and focused-verified
+(2026-10-27, resumed execution; supersedes the "unresolved" dispositions below)
+
+**This document's §2–§10 describe the earlier pass, in which both decisions were
+PROPOSED and no engine file was changed. They are retained as the evidence base.
+The current state is:**
+
+| Item | Current state |
+| --- | --- |
+| **A33** | **Alternative A APPROVED, provisionally.** Preserve the current `kmp_exits_2y` counting rule; **no counting or scoring change**. Jio 6, Paras 4; both `board_kmp` SCORED 0 `high_churn`. |
+| **A34** | **Alternative B APPROVED and implemented.** A category-specific institutional carve-out alone does not establish an early unlock. The PR #13 reader in `sections.py` now sets `large_holders_unlocked_early` only from an evidenced actual early release; otherwise the field stays `null` and C `lockin` is UNKNOWN. |
+| **A32** | **Still `NOT RATIFIED`.** A34's approval is not A32's ratification. Keeping that status visible, and keeping A34 recorded as approved rather than unapproved, are genuine remaining governance-recording requirements (A34 §0.3). |
+| **Issuer reproduction** | Both issuers reproduced fresh. Jio 37.0 / `AVOID` / K2 / 63.0% → **62.0%**, bounds 25–74 → **25–75**, `lockin` SCORED 0 `weak` → **UNKNOWN**. Paras 13.0 / `AVOID` / K5 / 44.21% → **43.16%**, bounds 1–66 → **1–67**, `lockin` SCORED 0 `weak` → **UNKNOWN**. No final score, verdict or knockout changed. |
+| **Semantic boundary** | Verified: carve-out alone does not set the flag; evidenced early release is handled by the governing criterion; ambiguous/insufficient evidence and unrelated pledge/transferability language stay UNKNOWN; genuine positives remain detectable via labelled synthetic tests. Zero real-filing positives across five filings (2,826 pages) is a corpus limitation, **not** proof that early releases never occur. |
+| **Verification** | 28 A34 tests + 65-test focused batch + 132-test affected-regression batch + tier gate + frozen-core/golden-result/v1.6/schema/compileall checks — all PASS. **Full suite not run by instruction.** |
+| **PR #13** | Still **OPEN, not merged**. |
+
+Authoritative detail: `A33-A34-ISSUER-REPRODUCTION-2026-10-27.md` (with
+`a33-a34-issuer-reproduction-20261027/summary.json`),
+`handoff/decisions/A33-kmp-exit-counting-scope.md` §0,
+`handoff/decisions/A34-early-unlock-carve-out-semantics.md` §0,
+`LOCKIN-INSTITUTIONAL-CARVEOUT-GENERALITY-2026-10-27.md` revision 2,
+`PARAS-UNKNOWN-TRIAGE-2026-10-27.md` §0/§3,
+`JIO-34-GLOBAL-ARCHITECTURE-DISPOSITION-2026-10-27.md` §11, and tracker
+Revision 31.
+
+**Evidence caveat.** The paused session reported 28 A34 tests and 90 tests
+across four additional modules as passing, but that session's uncommitted work
+and test output did not survive the workspace reset. Only PR #13's head tree
+(committed) survived. The A34 suites were reconstructed from the surviving
+decision records and re-run; no unverifiable result was carried forward.
+
+---
+
 ## 1. Authoritative repository / branch / commit / PR / CI state
 
 | Item | Value |

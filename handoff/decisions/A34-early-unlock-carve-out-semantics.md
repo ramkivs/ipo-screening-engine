@@ -2,11 +2,15 @@
 
 - **Decision ID:** A34
 - **Title:** what `capital_structure.large_holders_unlocked_early` may be set from — a category carve-out, or evidence of an actual early release
-- **Record type:** **OPEN DECISION INVESTIGATION.** No decision is recorded and no code
-  change is made or authorized by this record. Per `handoff/decisions/CONVENTION.md`
-  rules 4 and 6, this is an investigation of an ambiguity, with a recommendation; it is
-  not an approval of that recommendation and it grants no implementation authority.
-- **Decision status:** **PROPOSED / UNRESOLVED (not implemented).**
+- **Record type:** **DECISION RECORD — APPROVED (Alternative B) and IMPLEMENTED.**
+  The investigation text below is retained as the evidence base. §0 records the
+  decision, the implemented change and its governance boundary. Per
+  `handoff/decisions/CONVENTION.md` rule 4, the approval is distinguished from
+  v1.5 specification text; rule 5 is respected because the specification is not
+  amended here.
+- **Decision status:** **APPROVED 2026-10-27 — Alternative B.**
+  A category-specific institutional lock-in carve-out alone does **not**
+  establish an early unlock. **Implemented in this branch.**
 - **Decision authority:** RAMKI.
 - **Date:** 2026-10-27 (Asia/Calcutta); no decision time is asserted.
 - **Repository:** `ramkivs/ipo-screening-engine`
@@ -18,8 +22,99 @@
   and the documentation that describes both readings.
 - **Out of scope and unchanged:** every weight, threshold, penalty, band and knockout;
   `config/ipo-config.v1.5.0.json` and `v1.6.0`; `schema/`; the frozen-core pin on
-  `engine/ipo_screening/derived.py`; the reader added by PR #13 (commit `cac095d`), which
-  is **preserved unchanged**.
+  `engine/ipo_screening/derived.py`; `canonical_input.py`; the builder.
+- **In scope and changed by the approved decision:** the PR #13 reader
+  (commit `cac095d`) in `engine/ipo_screening/extraction/sections.py` — the
+  carve-out rule is replaced by an evidenced-early-release rule (§0).
+
+---
+
+## 0. Approved decision and implementation (2026-10-27)
+
+**Decision (RAMKI, via the governing instruction for the resumed A33/A34
+execution):** **Alternative B is approved.** A category-specific institutional
+lock-in carve-out alone does **not** establish an early unlock.
+`capital_structure.large_holders_unlocked_early` may be set only from evidence
+of an **actual early release** of large pre-IPO holders. Where the filing
+discloses only the Regulation 17(1)(c) carve-out, the field stays `null` and C
+`lockin` stays **UNKNOWN**.
+
+### 0.1 What was implemented
+
+`engine/ipo_screening/extraction/sections.py::extract_capital_structure`:
+
+- the PR #13 carve-out regex (institutional category + purchase-anchored
+  lock-in) was **removed**; a carve-out no longer emits any extraction;
+- a fail-closed, sentence-level rule now sets the flag `True` only where one
+  sentence contains (a) a named large / pre-IPO / institutional holder group,
+  (b) a release act, (c) a lock-in context, and (d) explicit early /
+  before-expiry timing. The matched sentence becomes the verbatim quotation
+  with its page;
+- pledge release, ordinary transferability, a release on normal expiry, and
+  hypothetical, conditional or negated language all stay **UNKNOWN**. No
+  favourable `False` is inferred either (A32's rule is preserved);
+- no weight, threshold, penalty, band, knockout, config, schema,
+  `derived.py`, builder or historical evaluation record was changed.
+
+### 0.2 Semantic boundary, verified
+
+`tests/test_lockin_institutional_carveout.py` (28 tests),
+`tests/test_reading_defects_20261026.py`,
+`tests/test_paras_evidence_regression.py` and
+`tests/test_a34_issuer_reproduction_20261027.py` pin: the carve-out alone does
+not set the flag; an evidenced early release is handled by the governing
+criterion (`weak`, SCORED 0); insufficient/ambiguous evidence stays UNKNOWN;
+unrelated pledge/transferability language does not trigger; and genuine
+positive cases remain detectable.
+
+**Corpus limitation.** A full-text scan of the five real filings examined
+(Paras 651 pp., Jio 591, Moneyview 537, Vishal Nirmiti 551, R.K. Fashion 496)
+found **zero** sentences evidencing an early release. That is a limitation of
+this corpus, **not** proof that early releases never occur. Genuine positive
+cases are therefore retained as labelled synthetic fixtures in
+`tests/test_lockin_institutional_carveout.py::EVIDENCED_EARLY_RELEASES` and in
+the reading-defects module. No real-filing positive is claimed.
+
+### 0.3 Reconciliation with A32 — genuine governance-recording requirement
+
+A32 (`A32-builder-defaults-evidence-or-unknown.md`, status
+`READY FOR RAMKI RATIFICATION (NOT RATIFIED)`) removed the favourable `False`
+default for this field and, in §6.2, explicitly left open the policy question
+"whether an engine may ever establish [this field] from a filing at all".
+**A34 Alternative B is the criterion owner's approved answer to that policy
+question for this field**: an engine may establish it, but only from an
+evidenced release, never from a structurally different lock-in anchor.
+
+This does **not** retroactively ratify A32. The genuine governance-recording
+requirement that remains is:
+
+1. **Record A32 as still `NOT RATIFIED`** wherever this decision is cited, and
+   keep its separate ratification as an open action for RAMKI. A34's approval is
+   an approval of the A34 semantic question, not an assertion that every
+   artefact covered by A32 has been ratified.
+2. **Do not treat A34 Alternative B as an unapproved proposal.** It is approved
+   and implemented; documents that still call it PROPOSED are historical and
+   are superseded by this §0.
+3. **Alternative C remains a separate schema decision.** If the carve-out
+   structure itself is to be recorded (category + "six months from purchase"),
+   that needs an additive structured field, a schema/canonical-input migration
+   and its own approval. It was not implemented here.
+4. The v1.5 phrase "no early unlock of large holders" is now applied as an
+   **evidenced** test rather than a structural test. Per CONVENTION rule 5 this
+   decision record documents the resolution of an ambiguity; it does not claim
+   the v1.5 specification text was changed. Amending that text, if wanted, is a
+   separate specification action.
+
+### 0.4 Measured issuer effect
+
+See `docs/investigation/A33-A34-ISSUER-REPRODUCTION-2026-10-27.md` for the full
+before/after tables, quotes and page provenance. Summary: neither final score
+nor verdict nor knockout state changes (Jio 37.0 / `AVOID` / K2 TRIGGERED;
+Paras 13.0 / `AVOID` / K5 TRIGGERED). `lockin` moves SCORED 0 `weak` →
+**UNKNOWN** on both; completeness drops one point (Jio 63.0% → **62.0%**,
+Paras 44.21% → **43.16%**) and the upper bound rises one point. A33's
+`kmp_exits_2y` / `board_kmp` values are unchanged (Jio 6, Paras 4; both
+`high_churn`).
 
 ---
 
@@ -146,8 +241,9 @@ and canonical-input change and is a separate decision.
 * **A. Carve-out alone sets the flag (status quo, PR #13).** Retained unchanged pending
   this decision, per the instruction to preserve prior work, but recorded here as
   resting on an unratified policy question (A32 §6.2) and on an inference the filing
-  does not support.
+  does not support. **Rejected by the approved decision (§0).**
 * **B. Carve-out alone never sets the flag (recommended).** See §6. Effect measured in §5.
+  **APPROVED 2026-10-27 and implemented (§0).**
 * **C. Add a separate structured field for the carve-out**, leaving the boolean for
   evidenced releases only. Most informative; needs a schema decision and a
   canonical-input/`field_map` migration.
@@ -155,30 +251,47 @@ and canonical-input change and is a separate decision.
   the filing does not print it, so the flag would be unreachable and the criterion would
   be structurally UNKNOWN — the outcome A32 already documents for this field.
 
-## 8. Consequences and constraints
+## 8. Consequences and constraints (historical investigation text, superseded by §0)
 
-* No code, schema, config, test expectation or historical record is changed by this
-  record. The reader added by PR #13 (`cac095d`) and its 17-test matrix
-  (`tests/test_lockin_institutional_carveout.py`) are preserved.
-* `docs/investigation/LOCKIN-INSTITUTIONAL-CARVEOUT-GENERALITY-2026-10-27.md` §2 and
-  `docs/investigation/PARAS-UNKNOWN-TRIAGE-2026-10-27.md` §3 present the inference as
-  established ("A holder that purchased before the Offer is therefore free at Allotment";
-  "Paras does disclose the early unlock"). Both are corrected to state that the carve-out
-  is a different anchor whose effect on the Offer date is not disclosed, and both point
-  at this record.
-* No weight, boundary, threshold, penalty or knockout is touched by any of the above.
+The investigation as first written changed no code, schema, config, test
+expectation or historical record: the PR #13 reader (`cac095d`) and its 17-test
+matrix were preserved pending RAMKI's decision. That preservation ended with
+the approval. **After §0:**
 
-## 9. Unresolved dependencies
+* the PR #13 carve-out reader is corrected and its test matrix is rewritten as
+  the 28-test A34 semantic-boundary suite;
+* `docs/investigation/LOCKIN-INSTITUTIONAL-CARVEOUT-GENERALITY-2026-10-27.md`
+  and `docs/investigation/PARAS-UNKNOWN-TRIAGE-2026-10-27.md` are revised to
+  state the approved evidenced-release rule and to label the earlier
+  carve-out-based results as pre-A34 baselines;
+* the Jio disposition, consolidated disposition and authoritative tracker are
+  updated with the before/after issuer results;
+* still unchanged: no weight, boundary, threshold, penalty, knockout, config,
+  schema, `derived.py`, builder, frozen-core pin or historical evaluation
+  record.
 
-1. **RAMKI's decision** on §1. Recommended answer: alternative B.
-2. **Ratification of A32**, which this question is part of and which is still
-   `NOT RATIFIED`.
-3. Whether the specification's phrase "no early unlock of large holders" is meant to be
-   read as a *structural* test (the carve-out) or an *evidenced* test (an actual release).
-   That is a criterion-definition question and is not this record's authority to settle.
+## 9. Remaining dependencies (updated 2026-10-27)
 
-## 10. Implementation authority
+1. **RESOLVED.** RAMKI approved Alternative B on 2026-10-27 (§0).
+2. **OPEN — genuine governance-recording requirement.** Ratification of A32 is
+   still outstanding (`NOT RATIFIED`). A34's approval does not ratify it; see
+   §0.3. This must remain visible in the tracker, not be silently absorbed.
+3. **RESOLVED for this engine, not for the specification text.** The phrase "no
+   early unlock of large holders" is applied as an *evidenced* test. Amending
+   the v1.5 / v1.3 specification wording, if desired, is a separate
+   specification action (CONVENTION rule 5).
+4. **OPEN — separate decision.** Alternative C's additive structured carve-out
+   field (§6 follow-up). No schema change was made.
+5. **OPEN — corpus limitation.** No real filing in the five examined evidences
+   an early release, so the positive cases in the regression suite are
+   synthetic. This is not evidence that early releases never occur.
 
-**Not granted.** This record is an investigation with a recommendation. No change to the
-reader, to `_lockin_bucket`, to the C `lockin` criterion or to any documentation beyond
-the corrections named in §8 is authorized by it.
+## 10. Implementation authority (updated 2026-10-27)
+
+**Granted and exercised, within a narrow boundary.** Authority is granted for
+the reader change described in §0.1 and its regression tests / documentation
+only. No authority is granted or claimed for `_lockin_bucket`, the C `lockin`
+criterion definition beyond applying the approved evidenced reading, any
+scoring artefact, any schema/config change, or any retrospective edit to a
+historical evaluation record. The original "not granted" status applied to the
+unapproved investigation and is superseded by the approved decision.
