@@ -33,6 +33,7 @@ INTEGRATION_MODULES = frozenset({
     "test_ingestion_worker_lifecycle.py",
     "test_issue_terms_runtime_path.py",
     "test_issue_terms_windows_retrieval.py",
+    "test_jio_current_engine_result_20261027.py",
     "test_jio_evidence_remediation.py",
     "test_jio_fresh_regressions.py",
     "test_jio_rhp_issue_terms.py",

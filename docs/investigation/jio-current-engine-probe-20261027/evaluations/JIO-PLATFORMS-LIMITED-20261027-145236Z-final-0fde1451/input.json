@@ -1,0 +1,417 @@
+{
+  "evaluation_id": "JIO-PLATFORMS-LIMITED-20261027-145236Z-final-0fde1451",
+  "input_snapshot_hash": "1fc296ca6da8c296b65384080314a6a65a5479bf7ba4b241a024095150b398e4",
+  "ipo_id": "JIO-PLATFORMS-LIMITED",
+  "snapshot": {
+    "board": "mainboard",
+    "company_name": "JIO PLATFORMS LIMITED",
+    "icdr_route": "6(1)",
+    "input": {
+      "board": "mainboard",
+      "business": {
+        "industry_cagr_pct": null,
+        "industry_forecast_period": null,
+        "industry_scope": null,
+        "industry_source": null,
+        "moat_rating": null,
+        "regulatory_dependence": null,
+        "top5_customer_pct": null,
+        "top5_supplier_pct": null,
+        "visibility_rating": null
+      },
+      "capital_structure": {
+        "discounted_allotments_18m_before_drhp": null,
+        "large_holders_unlocked_early": true,
+        "pre_ipo_placements": [
+          {
+            "date": "2019-11-15",
+            "price": 10.0,
+            "shares": 10000.0
+          },
+          {
+            "date": "2019-12-12",
+            "price": 10.0,
+            "shares": 4961290000.0
+          },
+          {
+            "date": "2020-07-07",
+            "price": 10.0,
+            "shares": 38700000.0
+          },
+          {
+            "date": "2020-07-07",
+            "price": 488.34,
+            "shares": 554938340.0
+          },
+          {
+            "date": "2020-07-09",
+            "price": 549.31,
+            "shares": 34488650.0
+          },
+          {
+            "date": "2020-07-10",
+            "price": 549.31,
+            "shares": 512786330.0
+          },
+          {
+            "date": "2020-07-10",
+            "price": 488.34,
+            "shares": 60740774.0
+          },
+          {
+            "date": "2020-07-13",
+            "price": 549.31,
+            "shares": 765648027.0
+          },
+          {
+            "date": "2020-07-13",
+            "price": 488.34,
+            "shares": 84977490.0
+          },
+          {
+            "date": "2020-09-30",
+            "price": 549.31,
+            "shares": 47778022.0
+          },
+          {
+            "date": "2020-09-30",
+            "price": 488.34,
+            "shares": 5302771.0
+          },
+          {
+            "date": "2020-11-23",
+            "price": 488.34,
+            "shares": 690854775.0
+          },
+          {
+            "date": "2020-11-23",
+            "price": 488.34,
+            "shares": 76676361.0
+          },
+          {
+            "date": "2020-12-21",
+            "price": 488.34,
+            "shares": 109640177.0
+          },
+          {
+            "date": "2020-12-21",
+            "price": 488.34,
+            "shares": 987859113.0
+          },
+          {
+            "date": "2021-11-17",
+            "price": 10.0,
+            "shares": 4000000.0
+          },
+          {
+            "date": "2022-01-04",
+            "price": 10.0,
+            "shares": 3340000.0
+          }
+        ],
+        "promoter_lockin_in_place": true,
+        "promoter_pledge_pct": null,
+        "promoter_post_pct": null,
+        "promoter_pre_pct": 66.43
+      },
+      "company_name": "JIO PLATFORMS LIMITED",
+      "coverage": {
+        "capital_structure.pre_ipo_placements": "DISCLOSED",
+        "governance.board_changes": "DISCLOSED",
+        "governance.kmp_exits_2y": "DISCLOSED",
+        "governance.rpt_pct_revenue": "DISCLOSED"
+      },
+      "financials": {
+        "contingent_liabilities": 15021.0,
+        "contingent_liabilities_unquantified": null,
+        "periods": [
+          {
+            "cash_and_equivalents": 24889.0,
+            "cfo": 576616.0,
+            "disclosed_roce_pct": 12.83,
+            "ebit": 322383.0,
+            "ebitda": 543414.0,
+            "fy": "FY2024",
+            "interest_expense": 40476.0,
+            "net_worth": 2782864.0,
+            "pat": 214340.0,
+            "receivable_days": 9.5,
+            "revenue": 1095581.0,
+            "total_debt": 543489.0
+          },
+          {
+            "cash_and_equivalents": 80115.0,
+            "cfo": 681557.0,
+            "disclosed_roce_pct": 12.5,
+            "ebit": 389178.0,
+            "ebitda": 630554.0,
+            "fy": "FY2025",
+            "interest_expense": 49051.0,
+            "net_worth": 3050474.0,
+            "pat": 261203.0,
+            "receivable_days": 7.0,
+            "revenue": 1282184.0,
+            "total_debt": 730603.0
+          },
+          {
+            "cash_and_equivalents": 165570.0,
+            "cfo": 775563.0,
+            "disclosed_roce_pct": 10.76,
+            "ebit": 461327.0,
+            "ebitda": 733816.0,
+            "fy": "FY2026",
+            "interest_expense": 86534.0,
+            "net_worth": 3359769.0,
+            "pat": 300527.0,
+            "receivable_days": 6.3,
+            "revenue": 1468853.0,
+            "total_debt": 707810.0
+          }
+        ],
+        "reporting_unit": "INR_MILLIONS"
+      },
+      "governance": {
+        "auditor_changed_3y": false,
+        "auditor_opinion": "unqualified",
+        "auditor_reputed": true,
+        "board_changes": [
+          {
+            "date": "2026-03-21",
+            "event": "resignation",
+            "name": "Mr. John William Hegeman",
+            "reason": "Resignation as non-executive director",
+            "role": "non-executive director"
+          },
+          {
+            "date": "2026-03-23",
+            "event": "resignation",
+            "name": "Mr. Donald Stewart Harrison",
+            "reason": "Resignation as non-executive director",
+            "role": "non-executive director"
+          },
+          {
+            "date": "2026-03-23",
+            "event": "resignation",
+            "name": "Mr. Pankaj Mohan Pawar",
+            "reason": "Resignation as non-executive director",
+            "role": "non-executive director"
+          },
+          {
+            "date": "2026-03-23",
+            "event": "resignation",
+            "name": "Mr. Dileep Chinubhai Choksi",
+            "reason": "Resignation as an independent director",
+            "role": "independent director"
+          },
+          {
+            "date": "2026-03-25",
+            "event": "appointment",
+            "name": "Ms. Zia Jaydev Mody",
+            "reason": "Appointment as an Independent Director",
+            "role": "independent director"
+          },
+          {
+            "date": "2026-04-09",
+            "event": "appointment",
+            "name": "Mr. Akash Mukesh Ambani",
+            "reason": "Change in designation from executive director to Managing Director** *This table does not include details of re-appointment of directors. **Regularised pursuant to a resolution passed by the Shareholders at its meeting held on May 4, 2026. Borrowing Powers In accordance with the Articles of",
+            "role": "managing director"
+          },
+          {
+            "date": "2024-10-11",
+            "event": "appointment",
+            "name": "Mr. Mathew Oommen",
+            "reason": "Appointment as group chief executive officer",
+            "role": null
+          },
+          {
+            "date": "2026-03-23",
+            "event": "resignation",
+            "name": "Mr. Kiran Mathew Thomas",
+            "reason": "Resignation as chief executive officer",
+            "role": "chief executive officer"
+          },
+          {
+            "date": "2026-03-24",
+            "event": "appointment",
+            "name": "Mr. Pankaj Mohan Pawar",
+            "reason": "Appointment as Chief Executive Officer",
+            "role": "chief executive officer"
+          },
+          {
+            "date": "2026-06-19",
+            "event": "appointment",
+            "name": "Mr. Mathew Oommen",
+            "reason": "Re-designation as Group President",
+            "role": null
+          },
+          {
+            "date": "2026-06-19",
+            "event": "resignation",
+            "name": "Mr. Jyoti Jain",
+            "reason": "Resignation as the company secretary and compliance officer",
+            "role": null
+          },
+          {
+            "date": "2026-06-19",
+            "event": "appointment",
+            "name": "Ms. Savithri Parekh",
+            "reason": "Appointment as the Company Secretary",
+            "role": null
+          },
+          {
+            "date": "2026-06-19",
+            "event": "appointment",
+            "name": "Mr. Venkataraman Ramachandran",
+            "reason": "Appointment as the Compliance Officer Senior Management",
+            "role": null
+          },
+          {
+            "date": "2026-03-01",
+            "event": "appointment",
+            "name": "Mr. Shyam Prabhakar Mardikar",
+            "reason": "Appointment as President, Autonomous Network Platform",
+            "role": null
+          },
+          {
+            "date": "2026-03-01",
+            "event": "appointment",
+            "name": "Mr. Puneet Kumar Garg",
+            "reason": "Appointment as President, Network Solutions",
+            "role": null
+          },
+          {
+            "date": "2026-03-03",
+            "event": "appointment",
+            "name": "Mr. Daniel Bailey",
+            "reason": "Appointment as President, International Business",
+            "role": null
+          },
+          {
+            "date": "2026-06-01",
+            "event": "appointment",
+            "name": "Mr. Rajagopal Venkatakrishnan",
+            "reason": "Appointment as the General Counsel * Mr. Jyoti Jain continues to be the company secretary of the Material Subsidiary, RJIL. Employee stock option and stock purchase schemes For details of the employee stock option scheme of the Company, see “Capital Structure – Employee Stock Option Scheme” on page",
+            "role": null
+          }
+        ],
+        "board_independent_majority": null,
+        "eom_materiality": null,
+        "going_concern_uncertainty": null,
+        "kmp_exits_2y": 6,
+        "litigation_bucket": "criminal_or_regulatory",
+        "repeated_eom": false,
+        "rpt_pct_of_revenue_growth": -0.1141,
+        "rpt_pct_revenue": 4.3094,
+        "sebi_ed_action_active": true
+      },
+      "icdr_route": "6(1)",
+      "ipo_id": "JIO-PLATFORMS-LIMITED",
+      "issue": {
+        "close_date": "2026-10-23",
+        "fresh_issue": 302130.0,
+        "fresh_shares": 270000000,
+        "lot_size": 12,
+        "ofs": 0.0,
+        "ofs_sellers": [],
+        "open_date": "2026-10-21",
+        "post_issue_eps": 32.63,
+        "post_issue_eps_basis": "derived",
+        "post_issue_shares": 9209030830,
+        "pre_issue_shares": 8939030830,
+        "price_band_high": 1119.0,
+        "price_band_low": 1065.0
+      },
+      "peers": [
+        {
+          "as_of": "2026-10-13",
+          "business_match": "partial",
+          "listed_years": null,
+          "name": "Bharti Airtel Limited",
+          "pb": null,
+          "pe": 40.71,
+          "roe_pct": 20.32,
+          "source_id": "RHP-FILING-72480c2e"
+        },
+        {
+          "as_of": "2026-10-13",
+          "business_match": "partial",
+          "listed_years": null,
+          "name": "Vodafone Idea Limited",
+          "pb": null,
+          "pe": 3.99,
+          "roe_pct": null,
+          "source_id": "RHP-FILING-72480c2e"
+        }
+      ],
+      "sector": "Diversified / General",
+      "sector_profile": "standard",
+      "use_of_proceeds": [
+        {
+          "amount": 275000.0,
+          "category": "debt_repayment"
+        },
+        {
+          "amount": null,
+          "category": "gcp",
+          "undisclosed_marker": "[●]"
+        }
+      ]
+    },
+    "ipo_id": "JIO-PLATFORMS-LIMITED",
+    "periods": [
+      {
+        "cash_and_equivalents": 2488.9,
+        "cfo": 57661.600000000006,
+        "disclosed_roce_pct": 12.83,
+        "ebit": 32238.300000000003,
+        "ebitda": 54341.4,
+        "fy": "FY2024",
+        "interest_expense": 4047.6000000000004,
+        "is_stub": false,
+        "net_worth": 278286.4,
+        "pat": 21434.0,
+        "receivable_days": 9.5,
+        "reporting_unit": "INR_MILLIONS",
+        "revenue": 109558.1,
+        "total_debt": 54348.9
+      },
+      {
+        "cash_and_equivalents": 8011.5,
+        "cfo": 68155.7,
+        "disclosed_roce_pct": 12.5,
+        "ebit": 38917.8,
+        "ebitda": 63055.4,
+        "fy": "FY2025",
+        "interest_expense": 4905.1,
+        "is_stub": false,
+        "net_worth": 305047.4,
+        "pat": 26120.300000000003,
+        "receivable_days": 7.0,
+        "reporting_unit": "INR_MILLIONS",
+        "revenue": 128218.40000000001,
+        "total_debt": 73060.3
+      },
+      {
+        "cash_and_equivalents": 16557.0,
+        "cfo": 77556.3,
+        "disclosed_roce_pct": 10.76,
+        "ebit": 46132.700000000004,
+        "ebitda": 73381.6,
+        "fy": "FY2026",
+        "interest_expense": 8653.4,
+        "is_stub": false,
+        "net_worth": 335976.9,
+        "pat": 30052.7,
+        "receivable_days": 6.3,
+        "reporting_unit": "INR_MILLIONS",
+        "revenue": 146885.30000000002,
+        "total_debt": 70781.0
+      }
+    ],
+    "reporting_unit": "INR_MILLIONS",
+    "sector_profile": "standard",
+    "snapshot_grammar": "{\"v\":1}",
+    "unit_factor": 0.1
+  }
+}
