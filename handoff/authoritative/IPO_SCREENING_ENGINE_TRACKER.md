@@ -3056,3 +3056,89 @@ commit (2,138 tests), not re-run locally for a metric-derivation-only change.
   DENOMINATOR; VISHAL 11.8418 %/−0.3708 pp, JIO 4.3094 %/−0.1141 pp, PARAS AND R.K. FASHION NULL,
   R.K. SCORE 43.0 — ALL UNCHANGED; NO CONFIG, WEIGHT, THRESHOLD, PENALTY, KNOCKOUT, SCHEMA OR
   FROZEN-CORE FILE CHANGED; PR #12 OPEN AND UNMERGED.**
+
+---
+
+## Revision 30 — `kmp_exits_2y` scope and the Regulation 17(1)(c) carve-out: two decisions recorded, no code change
+— 2026-10-27
+
+**Scope: two semantic questions about scoring *inputs*, answered with a measurement and a
+decision record each. No engine file, schema, config, weight, threshold, penalty, knockout,
+band or criterion definition was changed.** Branch `arena/342ccacc-ipo-screening-engine`,
+PR **#13** (base `main`), left **OPEN** and **not merged**.
+
+### Why these two, and why not by an extractor
+
+`docs/investigation/JIO-34-GLOBAL-ARCHITECTURE-DISPOSITION-2026-10-27.md` §6.3 and §8
+presented both as decisions required. This pass measured them rather than arguing them, and
+wrote each up as a decision record with a recommendation, the alternatives and an explicit
+**no implementation authority**. Neither is ratified.
+
+### 1. `kmp_exits_2y` — `handoff/decisions/A33-kmp-exit-counting-scope.md`
+
+The rule implemented, merged in PR #12 and validated in tracker Revision 25 counts **every
+dated exit the reader established from the changes-in-directorate table**; `count_exits`
+does not consult `role`. The metric formula says "KMP exit", so the scope was open.
+
+Two KMP-only readings were computed on the real tables:
+
+| Reading | Jio (17 rows) | Paras KMP p. 357 (7 rows) | Consequence |
+|---|---|---|---|
+| **B1** recognised KMP `role` only | **1** | **0** | both < ≥2 → `board_kmp` `high_churn` → `other` (**+1 each**) |
+| **B2** skip a *known* non-KMP designation, count an unrecognised one fail-closed | **2** | **4** | no bucket changes |
+
+**Recommendation: retain the current rule.** B1 discards disclosed evidence — Paras's KMP
+table prints no designation column, so `role` is null on every row and all four resignations
+would become unclassifiable. B2 buys nothing. The real defect is **role recovery**, which
+is an extractor improvement and a separate decision. The disposition report's §6.3(i)
+parenthetical is corrected: the two Jio exits B2 retains are the CEO resignation and the one
+exit whose designation the reader did not recover; there is no Company Secretary resignation
+in Jio's window.
+
+### 2. Regulation 17(1)(c) — `handoff/decisions/A34-early-unlock-carve-out-semantics.md`
+
+Both quotes were **re-extracted from the evidence PDFs this pass and are verbatim with
+correct page attribution**: Jio printed p. 105 (PDF index 104), Paras printed p. 117 (PDF
+index 116). The carve-out removes the general six-months-from-Allotment lock-in for
+VCF/AIF/FVCI shares and imposes a *minimum* six months from **purchase**. It does not state
+when those holders purchased, so it does not establish that any holder is released *earlier*
+than the general rule.
+
+**Recommendation: a category carve-out alone must not set
+`capital_structure.large_holders_unlocked_early`.** Without evidence of an actual early
+release the field stays `null` and C `lockin` stays UNKNOWN. The reader added by PR #13
+(`cac095d`) and its 17-test matrix are **preserved unchanged** pending the decision; A32,
+which this question belongs to, remains `NOT RATIFIED` and asserts no authority over any
+scoring artefact. The lock-in generality report's §2 and the Paras triage report's §3 are
+corrected to state that the carve-out is a different anchor, not an established early
+release.
+
+### Files
+
+| File | Change |
+|---|---|
+| `handoff/decisions/A33-kmp-exit-counting-scope.md` | **new** — PROPOSED, not implemented |
+| `handoff/decisions/A34-early-unlock-carve-out-semantics.md` | **new** — PROPOSED, not implemented |
+| `tests/test_kmp_exit_counting_scope_20261027.py` | **new**, 14 tests, synthetic tier: pins the current rule issuer-neutrally (KMP exit, non-KMP board exit, mixed table, duplicate rows, unrecognised designation, window boundaries, UNKNOWN-not-zero anchor, builder derivation, criterion bucket) |
+| `docs/investigation/JIO-34-GLOBAL-ARCHITECTURE-DISPOSITION-2026-10-27.md` | §6.3(i) and §8(1) corrected with the B1/B2 measurement; §6.3(ii) and §8(2) corrected with the verified quotes and the A34 boundary |
+| `docs/investigation/LOCKIN-INSTITUTIONAL-CARVEOUT-GENERALITY-2026-10-27.md` | §2 and §6: the carve-out is recorded as a different anchor, not an established early release; pointer to A34 |
+| `docs/investigation/PARAS-UNKNOWN-TRIAGE-2026-10-27.md` | §3: same correction and pointer to A34 |
+
+### Verification
+
+`tests/test_kmp_exit_counting_scope_20261027.py` **14 passed**; the new module is not in
+`INTEGRATION_MODULES`, so it runs in the fast synthetic tier. The two quotes were verified
+by independent re-extraction with `pypdf`, not by trusting the reader's own match. Paras was
+reproduced end-to-end from the committed RHP (13.0 / 16.0 / −3.0 / **44.21%** / `AVOID` / K5
+TRIGGERED / `lockin` SCORED 0 `weak` / `board_kmp` SCORED 0 `high_churn` / `kmp_exits_2y` 4
+`DISCLOSED`). Full backend suite: **2183 passed, 0 failed, 25 warnings in 1462.48s** — the
++14 over the previous 2169 is exactly the new module.
+
+### Status and next actions
+
+- Readiness: **NOT ESTABLISHED**. Required-term gate: **CLOSED**. PR **#13 OPEN**, not merged.
+- **A33 and A34 are PROPOSED and UNRESOLVED.** Both need RAMKI. Recommended answers: retain
+  the current `kmp_exits_2y` rule; do not set `large_holders_unlocked_early` from a category
+  carve-out alone.
+- No score, verdict, knockout, completeness or bound changes on any filing as a result of
+  this revision — it records decisions, it does not implement them.

@@ -170,7 +170,7 @@ UNKNOWN. On the strict real-filing path the builder never sets that field
 (`builder.py` supplies it only on the synthetic-template path), so it is `None`
 for every real filing unless a reader emits it. **No reader did.**
 
-Paras does disclose the early unlock, on **p. 117** (Regulation 17):
+Paras does disclose the Regulation 17(1)(c) carve-out, on **p. 117**:
 
 > the entire pre -Offer Equity Share capital of our Company shall be locked -in
 > for a period of six months from the date of Allotment, except for … (iii) the
@@ -179,11 +179,26 @@ Paras does disclose the early unlock, on **p. 117** (Regulation 17):
 > least six months from the date of purchase** by the VCF or Category I AIF or
 > Category II AIF or FVCI shareholders.
 
-Every other pre-Offer holder is locked six months from allotment; a VCF/AIF/FVCI
-holder that purchased before the Offer is free at allotment. That is an early
-unlock of large pre-IPO holders, and the spec's lock-in row is "promoter lock-in
-intact, **no early unlock of large holders** = 1; otherwise 0". The promoter
-lock-in is separately intact (p. 116), so the field is a distinct fact.
+Every other pre-Offer holder is locked six months from allotment. For the
+carve-out, the lock-in is instead a *minimum* six months from **purchase** — a
+different commencement date, not a shorter period. Whether that is an *early*
+unlock depends on when each holder purchased, which the filing does not state: a
+holder that purchased more than six months before the Offer is free at allotment,
+while one that purchased shortly before the Issue can be locked up to *later*
+than allotment + six months. The spec's lock-in row is "promoter lock-in intact,
+**no early unlock of large holders** = 1; otherwise 0". The promoter lock-in is
+separately intact (p. 116), so the field is a distinct fact.
+
+> **Correction, 2026-10-27.** This report's first draft stated that Paras
+> "discloses the early unlock". Paras discloses the **carve-out**, not an early
+> release; the two sentences above are what the text actually establishes. The
+> reader and its tests are preserved unchanged, but whether a Regulation
+> 17(1)(c) carve-out may set `capital_structure.large_holders_unlocked_early` is
+> recorded as an open decision in
+> `handoff/decisions/A34-early-unlock-carve-out-semantics.md` (PROPOSED, not
+> implemented). **A category carve-out alone must not set the flag; without
+> evidence of an actual early release the field stays `null` and C `lockin`
+> stays UNKNOWN.**
 
 ### Remediation
 

@@ -56,8 +56,24 @@ discloses the **Regulation 17 pre-Offer lock-in carve-out**:
   which is a **different commencement date** from the general pre-Offer lock-in
   (six months from Allotment).
 
-A holder that purchased before the Offer is therefore free at Allotment: an
-early unlock of a large pre-IPO holder.
+A holder whose lock-in runs from purchase is therefore governed by a *different
+commencement date* from the general rule. Whether that produces a release
+**earlier** than Allotment + six months depends on when the holder purchased,
+and the filing does not state it: a holder that purchased more than six months
+before the Offer is free at Allotment, while one that purchased shortly before
+the Issue can be locked up to *later* than Allotment + six months. The carve-out
+establishes the anchor, not the release.
+
+> **Correction, 2026-10-27.** This report's first draft inferred an early unlock
+> from the carve-out ("A holder that purchased before the Offer is therefore free
+> at Allotment"). That inference is not supported by the text and is withdrawn.
+> The reader and its 17-test matrix are preserved unchanged, but whether a
+> Regulation 17(1)(c) carve-out may set
+> `capital_structure.large_holders_unlocked_early` is recorded as an open
+> decision in `handoff/decisions/A34-early-unlock-carve-out-semantics.md`
+> (PROPOSED, not implemented). **A category carve-out alone must not set the
+> flag; without evidence of an actual early release the field stays `null` and C
+> `lockin` stays UNKNOWN.**
 
 Recognition rules:
 
@@ -139,7 +155,11 @@ wording the corpus does not represent. No evidence is fabricated.
   44.21%**, `lockin` SCORED 0 (`weak`). The score, verdict and knockout are
   unchanged from the pinned PR #12 record (13.0 / 43.16% / AVOID); the
   completeness rises because the criterion moves from UNKNOWN to scored-0.
-* Full suite: `pytest tests/` — **2166 passed, 0 failed, 0 errors**.
+* Full suite: `pytest tests/` — **2169 passed, 0 failed, 25 warnings** in
+  1173.05s. The **2166 passed / 0 failed** figure stated earlier in this report
+  is **superseded**; it was recorded before the later full-suite runs and does
+  not match the committed tree. Where a figure is needed, use the 2169 result
+  and the run log.
 
 ---
 
@@ -153,3 +173,10 @@ wording the corpus does not represent. No evidence is fabricated.
   corpus, so this is left fail-closed rather than guessed.
 * **Page scope.** The reader scans the TOC-routed capital-structure range. A
   carve-out printed in another section (Moneyview) is not picked up end-to-end.
+* **Semantic scope — the flag is asserted, not evidenced.** This report
+  establishes that the rule *recognises* the carve-out wherever it appears and
+  that its provenance is sound (verbatim match, correct page). It does **not**
+  establish that a carve-out is an early unlock: the text states a purchase
+  anchored *minimum* and no purchase date. Whether `large_holders_unlocked_early`
+  may be set from it at all is the open decision in
+  `handoff/decisions/A34-early-unlock-carve-out-semantics.md`.

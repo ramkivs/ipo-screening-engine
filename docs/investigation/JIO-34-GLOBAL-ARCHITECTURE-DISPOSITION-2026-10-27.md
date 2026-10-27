@@ -350,11 +350,28 @@ series, both with provenance. No substitution rule is authorised.**
 `{resignation, cessation, retirement, term_expiry}` — including
 non-executive-director and independent-director resignations — although the
 field name and the consuming formula (`board_kmp_bucket`: *"high_churn: >=2
-KMP exits"*) both say KMP. For Jio that yields 6; the KMP-only count from the
-same table is 2 (CEO resignation, Company Secretary resignation). Both are
-≥2 so Jio's bucket is unchanged, but an issuer with two director resignations
-and no KMP exit would be scored `high_churn`. `is_exit()` never looks at `role`,
-even though the reader records one.
+KMP exits"*) both say KMP. For Jio that yields 6. `is_exit()` never looks at
+`role`, even though the reader records one.
+
+Two KMP-only readings were computed on the real tables this pass, and they are
+not the same rule:
+
+| Reading | Jio (17 rows) | Paras KMP p. 357 (7 rows) | Consequence |
+|---|---|---|---|
+| **B1** — count only a recognised KMP `role` | **1** | **0** | both fall below ≥2 → `board_kmp` `high_churn` → `other` (**+1 each**) |
+| **B2** — skip a *known* non-KMP designation, count an unrecognised one fail-closed | **2** | **4** | no bucket changes on either filing |
+
+B1 is the reading that destroys evidence: Paras's KMP table prints **no
+designation column**, so the reader leaves `role` null on every row, and all four
+disclosed resignations would become unclassifiable. B2 is the rule this report's
+§8(1) describes, and its estimate ("effect on Jio: none") is correct **under B2** —
+but it still keys a count on a field whose absence is an extraction artifact.
+
+The two Jio exits B2 retains are the CEO resignation (2026-03-23) and the one exit
+whose designation the reader did not recover (2026-06-19); there is **no Company
+Secretary resignation in Jio's window**. Recorded in
+`handoff/decisions/A33-kmp-exit-counting-scope.md` (PROPOSED, not implemented).
+**Recommendation: retain the current rule.**
 
 **(ii) `large_holders_unlocked_early = true` rests on one sentence.**
 The reader matched p. 105: *"equity shares held by a VCF or Category I AIF or
@@ -365,6 +382,19 @@ period of at least six months from the date of purchase"*. That is Regulation
 reading makes it the same six months from allotment. The match turned
 `lockin_bucket` from `intact` to `weak` (−1 point) relative to the published
 record.
+
+The sentence was re-extracted from
+`evidence/non-authoritative/jio/U72900GJ2019PLC110816_JIO.pdf` this pass and is
+verbatim on printed p. 105 (PDF index 104); Paras's parallel sentence is verbatim
+on printed p. 117 (PDF index 116). The provenance is sound. What the sentence does
+**not** state is when those holders purchased, and that date is what decides
+whether the carve-out produces a release *earlier* than the general rule, at the
+same time, or later. The flag as set therefore asserts a release the filing does
+not evidence. Recorded in
+`handoff/decisions/A34-early-unlock-carve-out-semantics.md` (PROPOSED, not
+implemented). **Recommendation: a category carve-out alone must not set the flag;
+without evidence of an actual early release the field stays `null` and C `lockin`
+stays UNKNOWN.**
 
 **Disposition: (d) for both — not implemented.** Each changes the meaning of a
 scoring input while leaving thresholds and weights untouched, so they are
@@ -443,14 +473,36 @@ stated inline; nothing was simulated.
    directors exits? If the former, `directorate.py::count_exits` must skip exits
    whose `role` is a known non-KMP designation and count exits with an unknown
    role (fail-closed). Estimated effect on Jio: none (2 KMP exits still ≥2).
+
+   *Correction, measured this pass.* The "fail-closed on an unknown role" form is
+   one of two KMP-only readings and the milder one. It gives Jio **2** and Paras
+   **4**, so no filing's bucket changes — the estimate above holds **for that
+   form**. The stricter form (count only a *recognised* KMP role) gives Jio **1**
+   and Paras **0**, which is below the ≥2 boundary: `board_kmp` would move
+   `high_churn` → `other` on both (+1 each). The stricter form is rejected because
+   Paras's KMP table has no designation column, so the reader leaves `role` null on
+   every row and all four disclosed resignations would become unclassifiable.
+   Recorded in `handoff/decisions/A33-kmp-exit-counting-scope.md` (PROPOSED, not
+   implemented). **Recommendation: retain the current rule.**
 2. **`large_holders_unlocked_early` reading.** Is Regulation 17(1)(c)'s
    purchase-anchored minimum lock-in an *early unlock* of large pre-IPO holders,
    or the same six-month lock-in measured from a different date? If the latter,
    the p. 105 match should not set the flag. Estimated effect on Jio: `lockin`
    1.0 → 0.0 reversed.
 
+   Recorded in `handoff/decisions/A34-early-unlock-carve-out-semantics.md`
+   (PROPOSED, not implemented). The two quotes are verbatim and correctly
+   page-attributed (Jio p. 105, Paras p. 117, both re-extracted this pass); what
+   they do not state is the holders' purchase dates, which is what decides whether
+   the carve-out is an early release at all. **Recommendation: a category
+   carve-out alone must not set the flag; absent evidence of an actual early
+   release the field stays `null` and C `lockin` stays UNKNOWN.**
+
 Neither decision changes a threshold, weight or verdict band. Both change what a
 scoring *input* means, which is why they are presented rather than implemented.
+Both are now written up as decision records (A33, A34) with a recommendation, the
+measured alternatives and an explicit **no implementation authority**; neither is
+ratified, and A32 — which A34 is part of — remains `NOT RATIFIED`.
 
 ---
 
