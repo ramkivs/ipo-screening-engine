@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import copy
 import io
+from datetime import timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -530,11 +531,19 @@ def test_blank_and_non_numeric_cells_keep_their_columns():
 
 
 def test_valid_peer_ingestion_reaches_a_scored_valuation(
-    tmp_path, monkeypatch, golden_input
+    tmp_path, monkeypatch, golden_input, pinned_evaluation_clock
 ):
     """A contract-valid peer set survives ingestion, is snapshotted as VALID,
     and reaches evaluation: ``pe_vs_peers`` is SCORED (a real zero), not
-    UNKNOWN.  This is the positive control for the rejection tests above."""
+    UNKNOWN.  This is the positive control for the rejection tests above.
+
+    The evaluation instant is pinned (``pinned_evaluation_clock``): the peer's
+    ``as_of`` is a fixed calendar date, so an unpinned run would silently flip
+    this peer to STALE -- and the criterion to UNKNOWN -- once the wall clock
+    passed the 30-day ``peer_staleness_days`` window. That is the policy
+    working, not a regression, so the test pins time instead of moving the
+    window (see ``test_peer_freshness_follows_the_evaluation_instant``).
+    """
 
     def factory():
         doc = copy.deepcopy(golden_input)
@@ -569,3 +578,35 @@ def test_valid_peer_ingestion_reaches_a_scored_valuation(
     # "richer than peers" band: a scored zero, not an unknown.
     assert pe["state"] == "SCORED"
     assert pe["score"] == 0.0
+
+
+def test_peer_freshness_follows_the_evaluation_instant(golden_input):
+    """Peer freshness is decided by the evaluation instant, never by the clock.
+
+    Guards the correction above: the positive-control test pins its evaluation
+    instant, and this test proves that pinning is what makes it stable. The
+    staleness POLICY is untouched -- the same peer is VALID one week after its
+    ``as_of`` and STALE once the 30-day ``peer_staleness_days`` window closes.
+
+    If a future change made the engine read the wall clock somewhere other than
+    the evaluation instant, or relaxed ``peer_staleness_days`` to keep a test
+    green, one of these two assertions would fail.
+    """
+
+    from conftest import EVAL_AT, FrozenEvaluationClock
+    from ipo_screening.snapshots import classify_peers
+
+    peers = [_peer("Peer Limited", pe=12.5, pb=1.4, roe_pct=9.5)]
+
+    def status_at(moment):
+        snapshot = classify_peers(
+            peers, evaluation_datetime=moment, staleness_days=30, min_listed_years=3
+        )
+        return snapshot.observations[0].status, len(snapshot.valid)
+
+    # as_of is 2026-09-28: one week before EVAL_AT, but 31 days before EVAL_AT+24d.
+    assert status_at(EVAL_AT) == ("VALID", 1)
+    assert status_at(EVAL_AT + timedelta(days=24)) == ("STALE", 0)
+
+    # The frozen clock yields exactly EVAL_AT, so an unpinned run cannot drift.
+    assert FrozenEvaluationClock.now(timezone.utc) == EVAL_AT

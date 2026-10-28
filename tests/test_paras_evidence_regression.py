@@ -342,3 +342,82 @@ def test_the_reading_gaps_are_what_kept_knockout_k5_blind(uploaded):
     # The terms the filing states as [●] stay unresolved: this correction
     # reads disclosed facts, it does not fill placeholders.
     assert uploaded["issue"]["price_band_low"] is None
+
+
+# ---------------------------------------------------------------------------
+# A34 (approved alternative B): the p. 117 carve-out is not an early release
+# ---------------------------------------------------------------------------
+
+
+def test_a34_carve_out_leaves_the_early_unlock_field_unknown(uploaded):
+    """Paras prints the Regulation 17(1)(c) carve-out on p. 117, not a release.
+
+    Before A34 the institutional carve-out reader emitted
+    ``large_holders_unlocked_early = True`` with a p. 117 quotation.  A34
+    removes that inference: the carve-out states a purchase-anchored minimum
+    and prints no purchase dates.  No other sentence in this filing evidences
+    an early release, so the field stays ``null`` and no evidence row is
+    emitted for it.  The promoter lock-in is still read on its own evidence.
+    """
+    capital = uploaded["capital_structure"]
+    assert capital["promoter_lockin_in_place"] is True
+    assert capital["large_holders_unlocked_early"] is None
+    evidence = uploaded.get("_evidence", {})
+    assert "capital_structure.large_holders_unlocked_early" not in evidence
+    assert evidence["capital_structure.promoter_lockin_in_place"]["page"] == 115
+    # The carve-out is genuinely in the filing; the reader must ignore it for
+    # this field, not fail to find it.
+    import pypdf
+
+    reader = pypdf.PdfReader(str(EVIDENCE))
+    page_117 = " ".join((reader.pages[116].extract_text() or "").split())
+    assert "at least six months from the date of purchase" in page_117
+
+
+def test_a34_paras_end_to_end_result(uploaded):
+    """A34's measured Paras effect: only completeness / bounds move.
+
+    Rebuilt on the same canonical input with the identity-bound issue terms
+    the pinned record uses (band 660/693, lot 21).  The flag that PR #13 set
+    from the carve-out is absent, so C ``lockin`` is UNKNOWN again: final score
+    13.0, AVOID and K5 TRIGGERED are unchanged, completeness returns from
+    44.21% to 43.16%, and the upper bound returns from 66.0 to 67.0.
+    """
+    import copy
+    from datetime import datetime, timezone
+
+    from ipo_screening.pipeline import evaluate, load_config
+
+    document = copy.deepcopy(uploaded)
+    document["issue"].update(
+        price_band_low=660.0, price_band_high=693.0, lot_size=21
+    )
+    outcome = evaluate(
+        document,
+        load_config(),
+        mode="final",
+        evaluation_datetime=datetime(2026, 10, 5, 12, tzinfo=timezone.utc),
+    )
+    record = outcome.record.to_dict()
+    score = record["score"]
+    assert score["final_score"] == 13.0
+    assert score["base_score"] == 16.0
+    assert score["penalties_total"] == -3.0
+    assert round(score["completeness_pct"], 2) == 43.16
+    assert score["lower_bound"] == 1.0
+    assert score["upper_bound"] == 67.0
+    assert record["verdict"]["verdict"] == "AVOID"
+    knockouts = {rule["rule_id"]: rule["state"] for rule in record["knockouts"]["results"]}
+    assert knockouts["K5"] == "TRIGGERED"
+    assert knockouts["K1"] == "UNVERIFIED"
+    assert knockouts["K2"] == "UNVERIFIED"
+    criteria = {
+        c["criterion_id"]: c
+        for module in score["modules"]
+        for c in module["criteria"]
+    }
+    assert criteria["lockin"]["state"] == "UNKNOWN"
+    assert criteria["lockin"].get("score") is None
+    assert criteria["board_kmp"]["band"] == "high_churn"
+    assert criteria["board_kmp"]["score"] == 0.0
+    assert uploaded["governance"]["kmp_exits_2y"] == 4

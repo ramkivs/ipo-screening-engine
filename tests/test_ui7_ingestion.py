@@ -683,8 +683,23 @@ def test_ingest_vishal_rhp_auto_resolves_terms_from_official_notice(tmp_path, go
     assert store.read(historical_id)["result_hash"] == GOLDEN_RESULT_HASH
 
 
-def test_ingest_rk_fashion_accessories_real_statutory_filing(test_env):
-    """Real statutory RHP (R.K. Fashion Accessories) ingests cleanly without fixture contamination."""
+def test_ingest_rk_fashion_accessories_real_statutory_filing(
+    test_env, pinned_evaluation_clock
+):
+    """Real statutory RHP (R.K. Fashion Accessories) ingests cleanly without fixture contamination.
+
+    The evaluation instant is pinned (``pinned_evaluation_clock``) because RK's
+    peer table prints a fixed market date -- ``Banaras Beads Limited``
+    ``as_of: 2026-09-28``, asserted in ``test_rk_fashion_reconciliation`` -- and
+    peer freshness is measured against ``thresholds.peer_staleness_days`` (30).
+    Unpinned, the peer silently goes STALE once the wall clock is 30 days past
+    that printed date, ``pe_vs_peers``/``second_multiple`` fall to UNKNOWN and
+    the score drops (43.0 -> 35.0) with no change to the filing, the fixture or
+    the engine. Pinning the instant keeps the assertion about the FILING rather
+    than about the day the suite happens to run; the staleness policy itself is
+    unchanged and is covered by
+    ``test_peer_row_mapping_and_bounds.test_peer_freshness_follows_the_evaluation_instant``.
+    """
     client = test_env["client"]
     assert RK_PDF.is_file(), f"Real filing missing at {RK_PDF}"
     pdf_bytes = RK_PDF.read_bytes()

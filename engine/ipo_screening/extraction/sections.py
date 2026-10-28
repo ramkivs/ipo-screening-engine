@@ -26,6 +26,75 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# A34 — what may set capital_structure.large_holders_unlocked_early
+# ---------------------------------------------------------------------------
+#
+# Approved decision A34, alternative B: a Regulation 17(1)(c) institutional
+# carve-out (VCF / AIF / FVCI shares locked for six months from *purchase*
+# rather than from Allotment) states a different commencement date and a
+# *minimum* period.  It does not state when those holders purchased, so it does
+# not evidence that any holder was released earlier than the general rule.  It
+# must therefore never set ``large_holders_unlocked_early``.
+#
+# The flag is set only from a sentence that evidences an *actual early release*:
+# a named large / pre-IPO / institutional holder group, a release act, a
+# lock-in context, and an explicit early / before-expiry timing in the same
+# sentence.  Everything else -- a carve-out, a pledge release, ordinary
+# transferability, a normal release on expiry, or hypothetical / negated
+# language -- leaves the field unset (UNKNOWN).  No favourable ``False`` is
+# inferred either; A32's rule is that absent evidence stays UNKNOWN.
+_EARLY_RELEASE_HOLDER_RE = re.compile(
+    r"\b(?:"
+    r"large\s+(?:pre[-\s]?IPO\s+)?(?:share)?holders?"
+    r"|pre[-\s]?IPO\s+(?:share)?holders?"
+    r"|institutional\s+(?:investors?|shareholders?|holders?)"
+    r"|promoters?(?:\s+(?:and|or)\s+(?:the\s+)?promoter\s+group)?"
+    r"|VCFs?|Venture\s+Capital\s+Funds?|Category\s+I{1,2}\s+AIFs?|AIFs?"
+    r"|Alternative\s+Investment\s+Funds?|FVCIs?"
+    r"|Foreign\s+Venture\s+Capital\s+Investors?"
+    r")\b",
+    re.IGNORECASE,
+)
+_EARLY_RELEASE_ACT_RE = re.compile(
+    r"\b(?:released?|unlocked?|exempted?|waived?|relaxed?|removed?"
+    r"|release|unlock|waiver|relaxation|removal)\b",
+    re.IGNORECASE,
+)
+_EARLY_RELEASE_LOCKIN_RE = re.compile(r"\block[\s-]*in\b|\blocked[\s-]*in\b", re.IGNORECASE)
+_EARLY_RELEASE_TIMING_RE = re.compile(
+    r"\b(?:early|premature(?:ly)?)\b[^.]{0,120}?"
+    r"\b(?:lock[\s-]*in|expiry|expiration|release|unlock)\b"
+    r"|\b(?:release|unlock|waiv|relax|exempt|remov)[a-z]*\b[^.]{0,120}?"
+    r"\b(?:early|prematurely)\b"
+    r"|\b(?:before|prior\s+to|ahead\s+of|in\s+advance\s+of)\s+(?:the\s+)?"
+    r"(?:expiry|expiration|end|completion)\b",
+    re.IGNORECASE,
+)
+# A sentence that floats a possibility, a request, a condition or a denial is
+# ambiguous evidence and is left UNKNOWN rather than read as a release.
+_EARLY_RELEASE_UNCERTAIN_RE = re.compile(
+    r"\b(?:no|not|never|without|might|could|would|unless|whether|proposed|proposal)\b"
+    r"|\b(?:may|might)\s+(?:be|seek|apply|request|grant)\b"
+    r"|\bsubject\s+to\b"
+    r"|\b(?:seek|sought|request(?:ed)?)\b",
+    re.IGNORECASE,
+)
+_EARLY_RELEASE_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.;!?])\s+")
+
+
+def _sentence_evidences_early_release(sentence: str) -> bool:
+    """Whether one filing sentence evidences an actual early lock-in release."""
+    if not (
+        _EARLY_RELEASE_HOLDER_RE.search(sentence)
+        and _EARLY_RELEASE_ACT_RE.search(sentence)
+        and _EARLY_RELEASE_LOCKIN_RE.search(sentence)
+        and _EARLY_RELEASE_TIMING_RE.search(sentence)
+    ):
+        return False
+    return _EARLY_RELEASE_UNCERTAIN_RE.search(sentence) is None
+
+
+# ---------------------------------------------------------------------------
 # Offer-for-Sale NIL binding
 # ---------------------------------------------------------------------------
 #
@@ -901,6 +970,20 @@ class SectionExtractor:
         pledge_quote: Optional[str] = None
         lockin_page: Optional[int] = found_page
         lockin_quote: Optional[str] = None
+        # A34 (approved alternative B).  ``large_holders_unlocked_early`` is
+        # about an *actual early release*, not about the Regulation 17(1)(c)
+        # institutional carve-out.  The carve-out changes the lock-in's
+        # commencement date to the date of purchase and states a minimum; it
+        # prints no purchase date, so it cannot establish an early release.
+        # The regexes below key only on an evidenced release of named large /
+        # pre-IPO / institutional holders before the lock-in expires.  A
+        # carve-out, a pledge release, transferability wording, an ordinary
+        # release on expiry, or hypothetical / negated wording leaves the flag
+        # unset, so the canonical field stays ``null`` and C ``lockin`` stays
+        # UNKNOWN.  The value is never defaulted in either direction.
+        early_unlock: Optional[bool] = None
+        early_unlock_page: Optional[int] = found_page
+        early_unlock_quote: Optional[str] = None
         sentence_pre_pct: Optional[float] = None
         sentence_pre_page: Optional[int] = None
         sentence_pre_quote: Optional[str] = None
@@ -923,6 +1006,12 @@ class SectionExtractor:
             r"(?:18\s+months|one\s+year|three\s+years|1\s+year|3\s+years)",
             re.IGNORECASE,
         )
+        # A34: the SEBI ICDR Regulation 17(1)(c) carve-out regex that used to
+        # live here (institutional category + purchase-anchored lock-in) has
+        # been removed deliberately.  It recognised the carve-out correctly,
+        # but a carve-out is not evidence of an early release.  Recognition is
+        # now sentence-level and lives in the A34 helpers at the top of this
+        # module; the matched sentence itself becomes the verbatim quotation.
         pre_sentence_re = re.compile(
             r"(?:equivalent\s+to|representing|comprising)\s+(?P<pct>\d{1,3}\.\d{1,2})\s*%\s+of\s+the\s+"
             r"issued,\s*subscribed\s+and\s+paid-?up",
@@ -945,6 +1034,14 @@ class SectionExtractor:
                     lockin = True
                     lockin_page = p
                     lockin_quote = m_lockin.group(0)
+            if early_unlock is None:
+                flat_page = " ".join(txt.split())
+                for sentence in _EARLY_RELEASE_SENTENCE_SPLIT_RE.split(flat_page):
+                    if _sentence_evidences_early_release(sentence):
+                        early_unlock = True
+                        early_unlock_page = p
+                        early_unlock_quote = sentence.strip()
+                        break
             if sentence_pre_pct is None:
                 m_pre = pre_sentence_re.search(" ".join(txt.split()))
                 if m_pre:
@@ -1373,6 +1470,22 @@ class SectionExtractor:
                     locator="Promoter lock-in disclosure",
                     quote=lockin_quote or "",
                     quote_is_processing=lockin_quote is None,
+                    extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
+                    extraction_confidence=1.0,
+                )
+            )
+
+        if early_unlock is not None:
+            extractions.append(
+                RawExtraction(
+                    field_path="capital_structure.large_holders_unlocked_early",
+                    candidate_value=early_unlock,
+                    raw_text=early_unlock_quote or str(early_unlock),
+                    page=early_unlock_page or found_page,
+                    section="Capital Structure",
+                    locator="Evidenced early release of large pre-IPO holders",
+                    quote=early_unlock_quote or "",
+                    quote_is_processing=early_unlock_quote is None,
                     extraction_method=ExtractionMethod.DETERMINISTIC_PDF.value,
                     extraction_confidence=1.0,
                 )

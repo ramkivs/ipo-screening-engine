@@ -26,7 +26,7 @@ from types import SimpleNamespace
 import pytest
 
 from ipo_screening.extraction.builder import CanonicalInputBuilder
-from ipo_screening.extraction.interfaces import SourceDocument
+from ipo_screening.extraction.interfaces import RawExtraction, SourceDocument
 from ipo_screening.extraction.sections import SectionExtractor
 from ipo_screening.extraction.toc import TOCRouter
 
@@ -306,6 +306,58 @@ def test_a_lock_in_statement_is_read_in_each_standard_form(sentence):
     assert lockin.quote_is_processing is False
 
 
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        # Paras Healthcare RHP p. 117: the Regulation 17(1)(c) carve-out runs
+        # from purchase instead of Allotment.  A34 (approved alternative B):
+        # that is a different commencement date and a minimum, not evidence
+        # that any holder was released early, so the flag stays unset.
+        "the Equity Shares held by a VCF or a Category I AIF or a Category II AIF or a FVCI, "
+        "provided that such Equity Shares will be locked-in for a period of at least six months "
+        "from the date of purchase by the VCF or Category I AIF or Category II AIF or FVCI "
+        "shareholders.",
+        "Shares held by a VCF or Category I AIF will be locked in for at least 6 months from the "
+        "date of their purchase.",
+    ],
+)
+def test_a_carve_out_alone_does_not_set_the_early_unlock_flag(sentence):
+    """A carve-out is not an early release (A34, approved alternative B).
+
+    The filing prints no purchase dates, so it cannot establish that any
+    holder was released before the general six-months-from-Allotment lock-in
+    expired.  The flag stays unset (UNKNOWN); the earlier
+    ``large_holders_unlocked_early = False`` favourable default is not
+    reinstated either.
+    """
+    pages = {117: sentence}
+    fields = _fields(_section(pages).extract_capital_structure({"capital_structure": (117, 117)}))
+    assert "capital_structure.large_holders_unlocked_early" not in fields
+
+
+def test_an_evidenced_early_release_sets_the_flag():
+    """A34 keeps a genuine positive reachable: an actual dated early release."""
+    sentence = (
+        "The 4,000,000 Equity Shares held by Meridian Ventures, a pre-IPO "
+        "shareholder, were released from lock-in on 15 May 2026, three months "
+        "before the expiry of the six-month lock-in period from the date of Allotment."
+    )
+    pages = {117: sentence}
+    fields = _fields(_section(pages).extract_capital_structure({"capital_structure": (117, 117)}))
+    early = fields["capital_structure.large_holders_unlocked_early"]
+    assert early.candidate_value is True
+    assert early.page == 117
+    assert early.quote_is_processing is False
+    assert "before the expiry" in early.quote
+
+
+def test_a_promoter_lock_in_alone_does_not_set_the_early_unlock_flag():
+    pages = {116: "The Promoter's Contribution is locked in for a period of three years."}
+    fields = _fields(_section(pages).extract_capital_structure({"capital_structure": (116, 116)}))
+    assert "capital_structure.large_holders_unlocked_early" not in fields
+    assert fields["capital_structure.promoter_lockin_in_place"].candidate_value is True
+
+
 def test_promoter_pre_holding_is_read_from_the_prose_percentage():
     pages = {
         111: (
@@ -464,6 +516,26 @@ def test_capital_and_governance_absent_evidence_stays_absent():
     ):
         assert cap.get(key) is None, key
     assert canonical["governance"].get("board_independent_majority") is None
+
+
+def test_an_early_unlock_extraction_reaches_the_canonical_field():
+    """The reader's flag must survive the builder, not be overwritten."""
+    doc = SourceDocument(source_id="RHP-TEST-0001", source_type="RHP")
+    quote = (
+        "The Equity Shares held by a pre-IPO shareholder were released from "
+        "lock-in three months before the expiry of the six-month lock-in period."
+    )
+    extraction = RawExtraction(
+        field_path="capital_structure.large_holders_unlocked_early",
+        candidate_value=True,
+        raw_text=quote,
+        page=117,
+        section="Capital Structure",
+        locator="Evidenced early release of large pre-IPO holders",
+        quote=quote,
+    )
+    canonical = CanonicalInputBuilder(doc, [extraction], allow_fixture_fallbacks=False).build()
+    assert canonical["capital_structure"]["large_holders_unlocked_early"] is True
 
 
 def test_fixture_fallbacks_are_still_available_to_the_template_path():

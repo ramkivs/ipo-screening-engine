@@ -63,6 +63,48 @@ GOLDEN_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "vishal_nirmi
 EVAL_AT = datetime(2026, 10, 5, 12, 0, 0, tzinfo=timezone.utc)
 
 
+class FrozenEvaluationClock(datetime):
+    """A ``datetime`` whose ``now()``/``utcnow()`` is the fixed test instant.
+
+    Only the *wall clock* is frozen; constructor calls, ``fromisoformat``,
+    arithmetic and comparisons all behave normally, so callers that pass an
+    explicit ``evaluation_datetime`` are unaffected.
+    """
+
+    @classmethod
+    def now(cls, tz=None):  # noqa: D102 - drop-in for datetime.now
+        return EVAL_AT if tz is None else EVAL_AT.astimezone(tz)
+
+    @classmethod
+    def utcnow(cls):  # noqa: D102 - drop-in for datetime.utcnow
+        return EVAL_AT.replace(tzinfo=None)
+
+
+@pytest.fixture
+def pinned_evaluation_clock(monkeypatch):
+    """Pin the pipeline's fallback clock to ``EVAL_AT``.
+
+    ``pipeline.evaluate`` uses ``evaluation_datetime`` when given one and
+    falls back to ``datetime.now(timezone.utc)`` otherwise. The API-driven
+    ingestion tests have no seam for passing that argument, so without this
+    fixture they inherit whatever today's date is -- and peer freshness is a
+    function of ``evaluation instant - peer.as_of`` against
+    ``thresholds.peer_staleness_days``. An unpinned test therefore changes
+    verdict purely because the calendar advanced, even though neither the
+    filing, the fixture nor the engine changed.
+
+    Pinning the instant here is the API-path equivalent of the explicit
+    ``evaluation_datetime=EVAL_AT`` the rest of the suite passes directly.
+    It does NOT relax the staleness policy: a peer outside the window is
+    still ``STALE``, as ``test_peer_freshness_follows_the_evaluation_instant``
+    demonstrates.
+    """
+    import ipo_screening.pipeline as pipeline_module
+
+    monkeypatch.setattr(pipeline_module, "datetime", FrozenEvaluationClock)
+    return EVAL_AT
+
+
 @pytest.fixture(scope="session")
 def config() -> Dict[str, Any]:
     return load_config(CONFIG_PATH)
@@ -207,6 +249,7 @@ __all__ = [
     "CONFIG_PATH",
     "SCHEMA_PATH",
     "EVAL_AT",
+    "FrozenEvaluationClock",
     "run",
     "criterion",
     "knockout",

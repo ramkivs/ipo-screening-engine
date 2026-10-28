@@ -1,0 +1,37 @@
+{
+  "evaluation_id": "JIO-PLATFORMS-LIMITED-20261027-145236Z-final-0fde1451",
+  "peer_snapshot_hash": "61f5c9132e97baf987f2693568ab5b4b5ec748136b05453f0e2d155b842edb9b",
+  "snapshot": {
+    "as_of": "2026-10-13",
+    "captured_at": "2026-10-27T14:52:36Z",
+    "content_hash": "61f5c9132e97baf987f2693568ab5b4b5ec748136b05453f0e2d155b842edb9b",
+    "min_listed_years": 3.0,
+    "observations": [
+      {
+        "age_days": 14.61986297755787,
+        "as_of": "2026-10-13",
+        "business_match": "partial",
+        "name": "Bharti Airtel Limited",
+        "pe": 40.71,
+        "peer_id": "PEER-1",
+        "roe_pct": 20.32,
+        "source_id": "RHP-FILING-72480c2e",
+        "status": "VALID"
+      },
+      {
+        "age_days": 14.61986297755787,
+        "as_of": "2026-10-13",
+        "business_match": "partial",
+        "name": "Vodafone Idea Limited",
+        "pe": 3.99,
+        "peer_id": "PEER-2",
+        "source_id": "RHP-FILING-72480c2e",
+        "status": "VALID"
+      }
+    ],
+    "rejected_count": 0,
+    "snapshot_id": "PEERS-1",
+    "staleness_days": 30,
+    "valid_count": 2
+  }
+}
