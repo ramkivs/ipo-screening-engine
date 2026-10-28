@@ -1269,6 +1269,12 @@ class OfficialDiscoveryProvider:
         )
 
 
+#: Document classes whose snapshots are HTML and are produced by
+#: ``ExchangeIssuePageParser``.  Listing them here keeps the cache's re-read
+#: dispatch aligned with the parser that produced the candidate (A30 rule 1).
+_HTML_TERM_CLASSES = frozenset({"EXCHANGE_ISSUE_PAGE", "INVESTMENT_PLATFORM_PAGE"})
+
+
 class NoticeSnapshotCache:
     """Content-addressed snapshot cache for retrieved notices.
 
@@ -1318,6 +1324,22 @@ class NoticeSnapshotCache:
                 elif document_class == "OFFICIAL_RHP_TERMS":
                     from .extraction.official_offer_amounts import parse_official_rhp
                     result = parse_official_rhp(bin_path.read_bytes(), meta.get("uri", ""))
+                elif document_class in _HTML_TERM_CLASSES:
+                    # A30 rule 1: a document is read under its own class.  The
+                    # exchange issue page and the opt-in platform page are HTML
+                    # and are parsed by ExchangeIssuePageParser; sending them to
+                    # the notice path made a verified official exchange page --
+                    # and every platform candidate -- disappear on re-read,
+                    # because the notice parser refuses HTML by class.  The
+                    # stored class is then re-asserted: the platform page must
+                    # never be upgraded to the official exchange class, since a
+                    # platform candidate never confers authority.
+                    from .extraction.exchange_issue_page import ExchangeIssuePageParser
+                    result = ExchangeIssuePageParser().parse(
+                        bin_path.read_bytes(), url=meta.get("uri", "")
+                    )
+                    result.document_class = document_class
+                    result.metadata["document_class"] = document_class
                 else:
                     from .extraction.official_notice_ocr import parse_if_scanned
                     result = parse_if_scanned(bin_path.read_bytes(), meta.get("uri", ""))
