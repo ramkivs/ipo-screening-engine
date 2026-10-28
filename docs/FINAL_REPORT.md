@@ -945,7 +945,11 @@ The contract strictly implements Spec v1.5 fail-closed semantics:
 - Undisclosed, missing, or preliminary fields evaluate to `null` (`None`).
 - Missing values are never defaulted to `0`, `false`, or empty strings.
 - Test fixture values (`208`, `220`, `68`, `9.46`, `85.33`) are strictly forbidden from acting as schema defaults.
-- Detection rule: `validate_fail_closed_unknown()` checks for suspicious unprovenanced fixture values and emits warnings if test constants leak into real evaluations.
+- Detection rule: `validate_fail_closed_unknown()` **exists as an available validator but is not wired into any gate.** It has no caller in `engine/` or `tests/`, so it emits nothing during a real evaluation; this line previously said it "emits warnings if test constants leak into real evaluations", which overstated what the code does. Two further limits, recorded rather than changed (wiring it in would be a behaviour change, not a documentation fix, and needs its own authority):
+  1. It inspects only `price_band.price_band_high == 220`; the other four constants in `FORBIDDEN_FIXTURE_DEFAULTS` (`price_band_low` 208, `lot_size` 68, `post_issue_eps` 9.46, `top5_customer_pct` 85.33) are **never checked**, and that mapping has no consumer at all.
+  2. It exempts any payload whose `ipo_id` contains the substring `VISHAL` (`is_vishal = "VISHAL" in ipo_id`). That is the only issuer-specific special case in `engine/` outside fixture definitions, and it keys a provenance check on a *name* rather than on provenance; a rules-based replacement (locator presence, as the check already tests for 220) would be the issuer-neutral form.
+
+  See `docs/investigation/ARCHITECTURE-RECONCILIATION-2026-10-28.md` §D-3 for the finding and the decision that would be required to change it.
 
 ### L.6 Explicit Scope Boundaries
 

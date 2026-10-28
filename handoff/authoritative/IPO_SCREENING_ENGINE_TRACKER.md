@@ -3268,3 +3268,99 @@ never occur; labelled synthetic positives are retained.
   terms. Neither is a like-for-like replay of the 2026-10-23 published record.
 - Alternative C (a structured carve-out field) and A33's role-recovery
   improvement remain separately authorized decisions.
+
+---
+
+## Revision 32 — Gemini architecture recommendations reconciled against the merged tree; one documentation defect corrected — 2026-10-28
+
+**Scope: read-only architecture reconciliation, one documentation correction, one new
+regression module. No engine, config, schema, scoring, knockout, weight, threshold,
+penalty or historical evaluation record was changed. No adapter was written and no
+provider was selected. PR #13 is MERGED (superseding Revision 31's "OPEN").**
+
+### 1. Authoritative state at the start of this revision
+
+- `main` = `2db28f2aeb17b2542140c4a18ed61ee3bfa9f182`; verified ancestor of `origin/main`.
+- **PR #13 MERGED** 2026-10-28T07:03:40Z; head `c446916a02948a4381d07f632eff4671678e21ea`;
+  merge commit `2db28f2`; merge tree equals the PR head tree (`64fe70a3`).
+  Revision 31's "PR #13 OPEN, not merged" is historical and superseded here.
+- **A33/A34 present in `main`**: both decision records read `APPROVED`;
+  `extraction/sections.py` carries `_sentence_evidences_early_release` (2 hits); no
+  `kmp_exits_2y` engine diff since the pre-A34 base.
+- Latest prior revision: 31. Full reconciliation:
+  `docs/investigation/ARCHITECTURE-RECONCILIATION-2026-10-28.md`.
+
+### 2. Disposition of the Gemini recommendations
+
+| Workstream | Disposition | Basis |
+| --- | --- | --- |
+| Modular input orchestration (10 stages) | **Already the implemented shape — no framework built** | each stage traced to a module; provenance probe green |
+| UNKNOWN scoring / completeness | **Retained; re-measured, not assumed** | available 73 + unknown 27 = 100; completeness 73 %; base 38; bounds 25–62 |
+| Gemini's UNKNOWN-excluded formula | **Refused** | contract is UNKNOWN-in-denominator; not introduced |
+| K1–K6 tri-state | **Retained** | K1/K5/K6 UNVERIFIED on the live record, K2/K3/K4 CLEAR on supplied leaves |
+| RHP placeholder discovery | **Implemented; 13-variant matrix executed** | all markers → `None`; no real number misclassified |
+| RHP addendum class | **Not invented** | no addendum observed in any of the five retained filings |
+| Statutory-ceiling substitution | **Absent — verified** | `_gcp_amount` UNKNOWN; legal max reported separately |
+| `ExchangeDemandAdapter` (Module F) | **Contract complete, acquisition absent** | `OfficialSubscriptionAdapter` + `AnchorAllotmentAdapter`; `fetch` raises `NotImplementedError` |
+| Peer-financials provider | **Same shape** | `PeerMultipleAdapter`; no live client |
+| Governance/disclosure extraction | **Implemented under A19/A22–A29** | 237-test focused battery |
+
+### 3. Proven defect corrected
+
+**D-3 (documentation).** `docs/FINAL_REPORT.md` §L.5 claimed
+`validate_fail_closed_unknown()` "emits warnings if test constants leak into real
+evaluations". It has **no caller** in `engine/` or `tests/`, so it emits nothing. The section
+now states that accurately, records that only `price_band_high == 220` is inspected while the
+other four `FORBIDDEN_FIXTURE_DEFAULTS` entries have no consumer, and records the
+`is_vishal = "VISHAL" in ipo_id` exemption — the only issuer-specific branch in `engine/`
+outside fixture definitions — as a governance question (G-3), not silently "fixed".
+
+**Refuted hypothesis (recorded, no change).** `derived.py`'s
+`sum(x.get("pre_issue_shares") or 0.0 …)` looks like it would zero-fill a partially described
+seller row, overstating `promoter_ofs_pct_of_holding` and possibly firing K4's `> 50`.
+Reproduction returned `SchemaValidationError: 'pre_issue_shares' is a required property`;
+`schema/ipo-input.v1.5.schema.json::$defs.seller` requires both counts, typed `number`,
+`minimum 0`. The fallbacks are unreachable. **No defect, no code change** — pinned instead (§4).
+
+### 4. Regression safeguard added
+
+`tests/test_seller_row_contract_20261028.py` (**8 tests**): complete rows accepted; a row
+missing `pre_issue_shares` or `shares_sold` rejected; `null` rejected; numeric strings
+rejected; and a positive control showing complete rows form the ratio exactly
+(`1,500,000 / 1,500,000` → K4 leaf `100.0`, `TRUE`). This pins the *structural* reason
+"absent" cannot become "zero" in the two ratios that feed K4 and the 2-point band, so a future
+schema relaxation fails loudly instead of silently changing a knockout.
+
+Tier gate green: the module mentions neither `pdf` nor `ingest`, so no
+`tests/tier_inventory.py` declaration is required (verified by running the gate).
+
+### 5. External dependencies — measured, not asserted
+
+`bseindia.com`, `nseindia.com` and `screener.in` all fail at TLS
+(`URLError: TLS/SSL connection has been closed (EOF)`); TCP connects only because the egress
+proxy accepts and then drops. No provider credentials exist; `BaseConnectorAdapter.fetch`
+raises `NotImplementedError`; `connectors/` contains no HTTP client. **Therefore every
+acquisition statement in this revision is a contract statement, never a source claim**, and
+no provider was integrated.
+
+### 6. Governance decisions opened (not decided here)
+
+- **G-1** — may a specific provider be adopted, under what licence and retention rules?
+- **G-2** — if an addendum is ever ingested, does it supersede the RHP value or is it an
+  A30 same-class conflict to withhold? (unobservable without a specimen)
+- **G-3** — should `validate_fail_closed_unknown()` be wired to a gate, under a
+  provenance-based rule rather than an issuer-name substring?
+- **G-4** — **A32 remains NOT RATIFIED**; A34 does not ratify it (A34 §0.3).
+- **G-5** — A33's name/formula mismatch and role recovery; A34 alternative C.
+
+### 7. Verification (this tree)
+
+- Focused battery, 10 authoritative modules (invariants, governance, coverage, peers,
+  connectors, tier gate): **237 passed**.
+- `tests/test_seller_row_contract_20261028.py`: **8 passed**. Tier gate: **1 passed**.
+- **Full suite: 2209 passed, 0 failed, 0 skipped** (1251.0 s) — the 2201 baseline plus this
+  revision's 8 new tests.
+- Integrity: 4 schemas valid; `verify_frozen_core()` True; `verify_golden_result()` True;
+  `verify_v1_6_implementation()` PASS; `compileall` over `engine` and `tests` clean.
+- No A33/A34 semantics, weights, thresholds, bands, knockouts or evaluation records changed;
+  golden hash and frozen core untouched.
