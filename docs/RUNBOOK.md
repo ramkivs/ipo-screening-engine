@@ -149,6 +149,84 @@ python3 engine/tools/ipo_screen.py assemble raw_rhp.json \
     --mode final
 ```
 
+`--peers` is an existing connector-snapshot interface, not an approved route for
+manually entered peer evidence. For a real filing, retain the RHP-extracted peer
+rows unless a separately qualified provider snapshot is available. Do not use a
+test fixture or a hand-built peer file to make missing valuation evidence score.
+
+### 3.2.3 Real-filing operational checklist
+
+Use this two-step path for a new IPO so extraction can be inspected before an
+immutable evaluation is written.
+
+1. Download the RHP/DRHP PDF manually from the applicable official filing or
+   exchange publication. Keep the original PDF unchanged and retain its exact
+   publication URL and retrieval time with the case notes. The CLI accepts a
+   local PDF; it does not discover or download one for this workflow.
+2. Put the PDF under a local working path such as `filings/issuer-rhp.pdf`. If a
+   separate official Price Band Notice is available, retain it unchanged under
+   a path such as `notices/issuer-price-band.pdf`. Do not substitute portal text
+   or a test fixture for an official document.
+3. Extract to a reviewable canonical file first. `--enrich` selects the strict
+   real-filing path; do not add `--allow-fixture-fallbacks`:
+
+   ```bash
+   python3 engine/tools/ipo_screen.py extract filings/issuer-rhp.pdf \
+       --enrich \
+       --notice notices/issuer-price-band.pdf \
+       --output build/issuer-canonical.json \
+       --mode preliminary
+   ```
+
+   Omit `--notice` when no applicable notice exists. The command prints the
+   document URI, source ID, content hash, page count, and extracted/verified/
+   unknown field counts. A non-zero exit is a refused extraction, not an
+   evaluation.
+4. Inspect `build/issuer-canonical.json` before scoring. At minimum confirm the
+   issuer/IPO identity, `_sources` hash and URI, issue dates and terms, financial
+   periods and reporting unit, and `_evidence` page/locator/quote entries. Review
+   `peers` against the Basis for Issue Price table. The official-filing extractor
+   currently emits P/E and justified P/B where its recognised layouts support
+   them; a table heading containing EV/EBITDA does not imply that value was
+   mapped. Names alone do not create valuation evidence. Missing dates or
+   multiples must remain `null`/absent, never zero or a copied current value.
+5. Run the reviewed canonical file with a pinned UTC instant and a durable local
+   store:
+
+   ```bash
+   python3 engine/tools/ipo_screen.py run build/issuer-canonical.json \
+       --mode preliminary \
+       --at 2026-10-28T12:00:00Z \
+       --store build/evaluations \
+       --workbook build/IPO_Screening_History.xlsx \
+       --verbose
+   ```
+
+   Replace the example instant with the actual evaluation instant. Use `final`
+   only at the lifecycle point described in §3.4. An `UNKNOWN`, stale,
+   incomparable or unverified item is an evidence outcome, not by itself an
+   extraction defect. Read the score range, confidence, knockout states and
+   warnings; then inspect the workbook's `Missing_Unverified`, `Evidence` and
+   `Peer_Snapshots` sheets.
+6. The command prints the evaluation ID. Its immutable directory is
+   `build/evaluations/<evaluation-id>/`. Review `evaluation.json`, `input.json`,
+   `evidence.json`, `market.json`, `peers.json`, `result.json` and
+   `manifest.json`. Run `verify --store build/evaluations`; use `replay` as in
+   §4.2 when reproducibility must be checked. Never edit these artifacts to fix
+   an extraction—correct the upstream input and create a new evaluation.
+
+Report a functional defect only when the filing bytes and an expected contract
+show a reproducible mismatch—for example, a named disclosed value is assigned
+to the wrong field, schema-valid canonical input is refused incorrectly, or an
+unchanged stored evaluation fails verification/replay. Record: engine commit,
+exact command and UTC instant, exit code, evaluation ID if one was written,
+source URL and PDF SHA-256/source ID, page/table/quote, expected versus actual
+canonical path/value, relevant warning, and the smallest reproduction that uses
+the same source bytes. Preserve the failing artifacts; redact credentials, but
+do not replace evidence with paraphrase. Missing disclosure, a correctly stale
+peer, an `INSUFFICIENT_DATA` verdict, or an unresolved knockout is not a defect
+unless the engine contradicts the filed evidence or its documented contract.
+
 ### 3.3 Run an evaluation
 
 **Pin the evaluation instant with `--at` whenever the result will be compared,
@@ -884,3 +962,58 @@ tier, including inexpensive cases colocated with integration tests.
 See [TEST_PERFORMANCE.md](TEST_PERFORMANCE.md) for the Pass-9 command, integrity
 checks, audited text-cache boundary and uncached control command, and
 [TEST_PERFORMANCE_RESULTS.md](TEST_PERFORMANCE_RESULTS.md) for measured results.
+
+---
+
+## 17. Opt-in closed-issue term lookup (A31)
+
+A31 is ratified, but historical exchange search remains **off by default**. This procedure is a
+read-only operator lookup; it does not enable a default source, write an evaluation, widen an
+allow-list, or authorize cache admission.
+
+### 17.1 Configure the historical listing
+
+Set `IPO_OFFICIAL_HISTORICAL_LISTINGS` to one or more comma-separated **HTTPS listing URLs**.
+Each URL must use the existing issuer-matched discovery allow-list (`DISCOVERY_HOSTS` in
+`engine/ipo_screening/issue_terms.py`). Archive hosts are valid only in this discovery pathway;
+they remain invalid as direct configured notice/Prospectus sources unless separately approved.
+
+```bash
+export IPO_OFFICIAL_HISTORICAL_LISTINGS='https://www.bseindia.com/markets/PublicIssues/IPOIssues?id=2&Type=P'
+```
+
+Leaving the variable unset or empty preserves the default: no historical listing is searched.
+Invalid scheme/host entries are rejected as configuration diagnostics without echoing the value.
+
+### 17.2 Execute the read-only lookup
+
+The filing-established open and close dates are mandatory identity inputs. Without both dates,
+a closed record is withheld as `IDENTITY_UNBOUND`; issuer name alone is never sufficient.
+
+```bash
+PYTHONPATH=engine python engine/tools/ipo_screen.py issue-terms \
+  --issuer 'Issuer Legal Name Limited' \
+  --open YYYY-MM-DD \
+  --close YYYY-MM-DD \
+  --fields price_band_low price_band_high lot_size \
+  --json
+```
+
+Exit codes: `0` = resolved, `1` = not resolved, `2` = usage error. The command writes no store
+and creates no evaluation.
+
+### 17.3 Acceptance and failure interpretation
+
+Accept a closed record only when the output establishes exact issuer match, the filing's bid
+window, exchange issue number/scrip identity, internally consistent identifiers, and any expected
+symbol/issue number supplied by the caller. Conflicts withhold; they never select a winner.
+
+- `historical` / `searched=False`: archive silence cannot establish `NOT_FOUND` or `UNPUBLISHED`.
+- `[TRANSPORT]`: source access failed; do not interpret it as non-publication.
+- configuration diagnostic: correct the variable; do not widen an allow-list as an operational fix.
+- `IDENTITY_UNBOUND`, `IDENTITY_INCOMPLETE`, `STALE_OR_DIFFERENT_ISSUE`, or
+  `IDENTITY_CONFLICT`: no admission.
+
+Live official-source retrieval still requires an environment with permitted HTTPS egress. A31
+ratification does not approve `listing.bseindia.com` or `nsearchives.nseindia.com` for direct
+`IPO_PRICE_BAND_NOTICE_URLS` / `IPO_PROSPECTUS_URLS`, and does not change cache policy.

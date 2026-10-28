@@ -1,5 +1,6 @@
 evidence/gmp-observations/** -text
 
 # Hash-pinned retained captures: never translate their recorded bytes on checkout.
+evidence/ipo-subscription/vnl-20261011/** -text
 evidence/market-observations/investorgain-tonbo-20261015/rendered-page-capture.md -text
 evidence/non-authoritative/paras-healthcare-issue-terms-20261024/source-captures/*.md -text

@@ -3,8 +3,8 @@
 - **Decision ID:** A32
 - **Title:** the builder must not supply a favourable constant for a capital-structure or governance field it did not read
 - **Record type:** **IMPLEMENTATION RECORD under an already-approved principle.** Per `handoff/decisions/CONVENTION.md` rule 4, the principle is A22/A23/Step-4-Area-B(i)'s ("missing evidence is UNKNOWN, never a favourable default" and "a quotation the engine wrote is not evidence"); this record states how that principle was applied to five builder fields, and what it cost two real filings. It creates no new policy, criterion, weight or threshold.
-- **Decision status:** **IMPLEMENTED 2026-10-26; FULL BACKEND SUITE EXECUTED; READY FOR RAMKI RATIFICATION (NOT RATIFIED).**
-- **Decision authority:** RAMKI. The principle applied here was approved in A22 (2026-10-20) and A23 (2026-10-21); ratification of this application is requested, not assumed.
+- **Decision status:** **APPROVED / RATIFIED BY RAMKI 2026-10-28; IMPLEMENTED 2026-10-26; FULL BACKEND SUITE EXECUTED.**
+- **Decision authority:** RAMKI. The principle was approved in A22 (2026-10-20) and A23 (2026-10-21); RAMKI explicitly ratified this application on 2026-10-28.
 - **Date:** 2026-10-26 (Asia/Calcutta); no decision time is asserted.
 - **Repository:** `ramkivs/ipo-screening-engine`
 - **Baseline identity:** branch `arena/79aac867-ipo-screening-engine`, from `main` `96379ab597524878582a7c6abfa131eec67a04b4`.
@@ -108,7 +108,7 @@ shares is not something a filing's silence can establish.
 
 ## 6. Unresolved dependencies
 
-1. **Ratification** of this application of A22/A23 (this record is not an approval).
+1. **RESOLVED 2026-10-28:** RAMKI ratified this application of A22/A23.
 2. **`large_holders_unlocked_early` and `discounted_allotments_18m_before_drhp` have no
    reader.** Whether an engine may ever establish them from a filing at all — for example
    from a lock-in table that lists which holders are released early — is a policy question
@@ -123,4 +123,5 @@ shares is not something a filing's silence can establish.
 ## 7. Implementation authority
 
 **Granted for this branch only, as the implementation of the approved A22/A23 principle**;
-**no authority is asserted over any scoring artefact.** Ratification by RAMKI is requested.
+**no authority is asserted over any scoring artefact.** RAMKI ratified the recorded application
+on 2026-10-28; that ratification does not enlarge this implementation scope.

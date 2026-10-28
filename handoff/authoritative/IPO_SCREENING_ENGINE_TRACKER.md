@@ -3590,3 +3590,337 @@ not a tier-gate candidate (tier gate run, passes).
 G-2 blocked (§4). G-3a, G-1, G-4 (A32 **not ratified**), A33 role recovery, A34 alternative C,
 and unrelated adapters remain out of scope and unstarted. A33 Alternative A and A34
 Alternative B remain **APPROVED**.
+
+---
+
+## Revision 35 — official-document cache-policy disposition and governance reconciliation — 2026-10-28
+
+**Documentation-only follow-through. No production code, tests, cache gate, TTL, status check,
+invalidation behaviour, resolver behaviour, or governance rule changed.** Full detail:
+`docs/investigation/OFFICIAL-DOCUMENT-DISCOVERY-DISPOSITION-2026-10-28.md` §8.
+
+### Disposition
+
+- `EXCHANGE_ISSUE_PAGE` cache writes **remain closed**. There is no demonstrated operational
+  need; configured providers are still inspected (a cache is evidence, not permission to skip
+  revalidation); no adequate post-close cache rule exists; and the default 168-hour TTL exceeds
+  the approximately three-day issue window. Revision 34's HTML read-path repair is valid but
+  does not authorize write admission. This is not a permanent prohibition.
+- `INVESTMENT_PLATFORM_PAGE` cache writes **remain closed** and its independent
+  `verified=False` restriction remains intact.
+- A future exchange-cache activation requires demonstrated operational need and an explicitly
+  authorized policy covering class-specific freshness/expiry, post-close serving, outage
+  availability versus revalidation, identity and issue-window binding, provenance and
+  verification, A30 conflict handling, and A31's pending-ratification relationship.
+- Alternative C (narrow, identity-bound caching) is a possible future option, **not approved**.
+  No TTL, post-close exception, or gate change is selected.
+
+### Authority boundaries preserved
+
+A30 rule 6 remains controlling: conflicts are reported and withheld, never first-wins or
+newest-wins. G-2 remains unresolved absent an applicable specimen or explicit owner decision;
+its completed search was not repeated. A31 remains implemented/submitted but **not ratified**,
+and is not treated as an approved cache precedent. Owner decisions remain necessary for a new
+post-close serving policy and for any outage strategy that trades source revalidation against
+availability. The existence of a disconnected cache path does not prove operational need.
+
+### Validation
+
+Documentation diff and whitespace checks only. Existing focused receipts and their stated scope
+are preserved; TLS handshake failures remain findings about the tested environment only. No
+live official-source verification is claimed. **FULL-SUITE REGRESSION TESTING NOT RUN.**
+
+---
+
+## Revision 36 — consolidated Gemini recommendations reconciled against the authoritative tree — 2026-10-28
+
+**Scope:** documentation/evidence reconciliation only. Full register:
+`docs/investigation/CONSOLIDATED-GEMINI-RECOMMENDATIONS-RECONCILIATION-2026-10-28.md`.
+Revision 35 and the existing cache disposition are preserved; no cache investigation was
+repeated and no production code, tests, config, schema, scoring, knockout, adapter, cache or
+resolver behavior changed.
+
+### Baseline and merged state
+
+Fresh fetch/inspection confirmed branch and `origin/main` are both `0a77bf95a3fa74101bd40d1137c4dd33badb5e87`
+(tree `2856c8d17f7ff63b98abce1ed270e244d8b8aa06`). PRs #13–#16 are merged at
+`2db28f2`, `4cc81a9`, `e7934b1`, and `0a77bf9`. The pre-existing local Revision 35 and
+official-discovery §8 changes were reviewed and retained.
+
+### Final recommendation statuses
+
+| ID | Status | Controlling result |
+|---|---|---|
+| G1 | **COMPLETE — VERIFIED** | staged orchestration and all six reproducibility identities/hashes already exist; no duplicate orchestrator |
+| G1A | **PARTIALLY COMPLETE** | exchange-demand normalization/provenance/assembly exist; acquisition and approved source/event/cutoff/licence semantics do not |
+| G1B | **PARTIALLY COMPLETE** | fail-closed peer snapshot/comparability contracts exist; live provider, licence and provider-specific normalization do not |
+| G2A | **PARTIALLY COMPLETE** | discovery contract and PR #16 correction merged; live verification externally blocked and G-2 unresolved |
+| G2B | **PARTIALLY COMPLETE** | demonstrated G-3 defect merged; G-3a has no production defect specimen; A32 remains unratified |
+| G3A | **COMPLETE — VERIFIED** | UNKNOWN scoring contract retained; Gemini's alternative formula rejected |
+| G3B | **COMPLETE — VERIFIED** | peer integrity and valid-only/fail-closed behavior retained |
+| G3C | **COMPLETE — VERIFIED** | K1–K6 tri-state behavior retained |
+
+### Priority result and boundaries
+
+P1 canonical/evidence architecture is complete; no integration-contract defect justified code.
+P0, P2 and P3 are partially complete because their implementations/reconciliation coexist with
+explicit residual decisions or external evidence gaps. P4 exchange demand and P5 peer financials
+remain blocked by provider/source/licensing/semantic decisions and source access; fabricating a
+client against no qualified bytes would not advance them. No independently executable code work
+remains behind those boundaries.
+
+A32 and A31 remain **not ratified**. A33 Alternative A and A34 Alternative B remain approved at
+their recorded boundaries. G-2 remains subject to A30 rule 6 absent a specimen and decision.
+G-3a remains unresolved without a demonstrated production counterexample. Retained Paras bytes
+are not promoted to independently verified official evidence. Prior TLS EOF findings remain
+specific to the tested environment.
+
+The older shorthand “`BaseConnectorAdapter.fetch` raises `NotImplementedError`” is corrected:
+the current base adapter has abstract `normalize`, which raises `NotImplementedError`; there is
+still no live acquisition client. The substantive acquisition-empty disposition is unchanged.
+
+### Validation
+
+Fresh Git/GitHub metadata inspection, authoritative-file review, complete diff review and
+`git diff --check`. Existing focused receipts were reused and are enumerated in the consolidated
+record; no code/test change justified rerunning them. **FULL-SUITE REGRESSION TESTING NOT RUN.**
+No PR, push, merge, commit, production activation, cache change or CI trigger was performed.
+
+---
+
+## Revision 37 — outstanding dependency qualification: retained demand evidence bounded; provider gates remain closed — 2026-10-28
+
+**Documentation-only targeted follow-through on Revision 36.** Details:
+`docs/investigation/CONSOLIDATED-GEMINI-RECOMMENDATIONS-RECONCILIATION-2026-10-28.md` §10.
+No consolidated investigation or cache assessment was repeated.
+
+### Exchange demand
+
+The retained VNL package supplies hash-matching JSON observations for issuer/issue identity,
+NSE-specific demand, separately labelled All Exchange demand, categories and display timestamps.
+It remains non-authoritative investigation evidence under A10: source qualification and
+implementation authority are not granted; BSE-native identity and All Exchange composition are
+not established; no licence/terms content is retained. No adapter was started.
+
+Qualification also found a transfer-integrity boundary: the retained HTML is 313,038 bytes /
+`6beb26dc…f5ce6`, not the manifest's 313,040 bytes / `2ae7009b…e78f2`; and the manifest's
+register hash describes its CRLF representation, not the LF checkout. The seven non-HTML JSON/JS payloads
+covered by the manifest match. No evidence file was altered. Recovering the manifest-matching
+HTML (or a governed transfer-record correction) is now an explicit evidence action, not a live
+source claim.
+
+### Peers and governance
+
+No candidate external peer-provider schema, representative history or applicable licence is
+retained; filing tables, fixtures and evaluation snapshots cannot qualify a provider. A31 remains
+pending ratification; A32 remains not ratified; their existing records already contain the
+requests, so none was duplicated. No G-2 specimen and no G-3a production counterexample appeared.
+
+### Exit conditions and validation
+
+Exchange-demand exit requires source-native capture provenance, applicable terms, exchange/All
+composition evidence and approved event/category/denominator/cutoff/outage/scoring semantics.
+Peer exit requires a versioned schema, representative history, definitions and terms, followed
+by provider/licence and comparability decisions. Validation: JSON parsing, SHA-256 comparison,
+governance/specimen checks, diff review and `git diff --check`. No code/tests/evidence/cache
+behavior changed. **FULL-SUITE REGRESSION TESTING NOT RUN.** No PR, push, merge, commit, CI
+trigger or production activation occurred.
+
+---
+
+## Revision 38 — VNL HTML discrepancy bounded to the pre-commit transfer path; exact bytes unrecovered — 2026-10-28
+
+Targeted follow-through only; consolidated investigation and cache policy were not reopened.
+Full evidence: `CONSOLIDATED-GEMINI-RECOMMENDATIONS-RECONCILIATION-2026-10-28.md` §§10.5–10.6.
+
+The manifest expects 313,040 bytes / full SHA-256
+`2ae7009b9f30c026c91a1d38a4b943f348ab3f275f0b1b5b971481a8f72e78f2`.
+The first and only Git version, source-evidence commit `951d77d4`, current `main`, GitHub content
+metadata and this checkout all agree on blob `21ea96b`: 313,038 bytes / full SHA-256
+`6beb26dc8acce2f9cd6620a761ec5d771da46b3214d220e6946bea37614f5ce6`.
+No earlier/candidate retained copy exists.
+
+No `.gitattributes` existed when the evidence was added; the current path is still not `-text`.
+The manifest's registered CRLF representation versus its committed LF blob proves line-ending
+transformation in the original transfer/add path. That makes two removed CR bytes in a
+mixed-ending HTML plausible, but does not prove their positions or recover the expected hash.
+Disposition: **checkout integrity verified; pre-commit byte recovery unresolved**. Evidence bytes
+were not changed. `.gitattributes` now applies `-text` to the VNL package so future checkouts
+preserve the committed bytes; this does not equate them with the missing original. Resolution
+requires either the custody-backed original matching the full manifest hash, or an owner-approved
+register correction preserving both identities and declaring the original unavailable.
+
+The permitted route yielded Git/GitHub history only—no new exchange bytes/terms or peer-provider
+schema/history/licence. A10 limits VNL data to distinct evidence/display use; NSE/BSE/All,
+category/denominator, event/cutoff, outage and scoring/Final decisions remain open. Peer provider
+and comparability qualification remain blocked. A31/A32 remain unratified; G-2/G-3a triggers are
+absent. No adapter work became executable.
+
+Validation: object/blob/history/attribute/config inspection, complete SHA-256 checks, retained-copy
+search, diff review and `git diff --check`. No code, test, evidence, cache or production behavior
+changed. **FULL-SUITE REGRESSION TESTING NOT RUN.** No commit, PR, push, merge or CI trigger.
+
+---
+
+## Revision 39 — VNL dual-identity amendment APPROVED and effective; source qualification remains evidence-blocked — 2026-10-28
+
+RAMKI explicitly **APPROVED** the amendment on 2026-10-28 under A1. The effective record in
+`evidence/ipo-subscription/A8-S_EVIDENCE_ACQUISITION_REGISTER.md` affects only
+`vnl-issue-information.html`: it preserves the unrecovered original-capture identity
+(313,040 bytes, `2ae7009b…e78f2`) and designates the first durable Git artifact
+(313,038 bytes, `6beb26dc…f5ce6`, blob `21ea96b`, commit `951d77d4`) as the retained repository
+artifact without claiming byte identity. The approval is evidence-bookkeeping authority only;
+it does not qualify a source or authorize a provider, adapter, scoring, `FINAL`, production or
+cache behavior.
+
+No new custody-backed original, source-native exchange capture, applicable provider terms,
+peer-provider schema or representative provider history appeared in the current worktree, and
+no new permitted external route became available. Exchange demand therefore remains blocked on
+source/terms, NSE-BSE-All composition and owner category/denominator/event/cutoff/outage/scoring
+semantics. Peer qualification remains blocked on authoritative schema/data/timestamps/definitions,
+terms and provider/comparability approval. No adapter work is authorized.
+
+A31/A32 remain unratified; no new G-2 specimen or G-3a production counterexample exists. Existing
+decision requests remain controlling and were not duplicated. Validation was documentation
+integrity review and `git diff --check`; no evidence bytes, production code, tests, cache gates or
+runtime behavior changed. **FULL-SUITE REGRESSION TESTING NOT RUN.** No commit, PR, push, merge or
+CI trigger.
+
+---
+
+## Revision 40 — A31 and A32 explicitly ratified by RAMKI — 2026-10-28
+
+RAMKI supplied explicit decisions: **A31 — APPROVE; A32 — APPROVE.** Existing decision records
+were reconciled in place; no duplicate request or decision record was created.
+
+- **A31 RATIFIED.** The approved scope is the opt-in, identity-bound use of closed exchange
+  records: exact issuer, filing-established bid window, exchange issue number/scrip identity,
+  internal consistency, conflict withholding, no-window/no-admission, and historical silence
+  never establishing `NOT_FOUND`/`UNPUBLISHED`. Ratification also confirms the associated A30
+  §5.6 frozen-core pin. It does not enable the path by default, widen an allow-list, decide the
+  configured-URL host question, resolve an issuer term, authorize an evaluation, or establish
+  cache policy.
+- **A32 RATIFIED.** The approved scope is the recorded application of A22/A23 evidence-or-UNKNOWN
+  to the five builder fields: strict real-filing input exists only when a reader establishes it;
+  otherwise dependent metrics remain UNKNOWN. Synthetic-template fallback remains intentional.
+  Ratification creates no criterion, weight, threshold, scoring, schema or historical-evaluation
+  authority and does not resolve the absent-reader or stated-basis items in A32 §6.
+- **A34 boundary preserved.** A34 did not ratify A32; A32's ratification is the separate explicit
+  2026-10-28 owner decision recorded here and in A32/A34.
+
+Documentation-only governance reconciliation. No production code, tests, evidence bytes,
+provider/source qualification, scoring, `FINAL`, cache or runtime behavior changed. Validation:
+status/authority diff review and `git diff --check`. **FULL-SUITE REGRESSION TESTING NOT RUN.**
+No commit, PR, push, merge or CI trigger.
+
+---
+
+## Revision 41 — ratified A31 operator path documented; restrictive runtime unchanged — 2026-10-28
+
+The independently executable post-ratification gap was operator documentation, not runtime code.
+`docs/RUNBOOK.md` §17 now records the existing opt-in `IPO_OFFICIAL_HISTORICAL_LISTINGS` path,
+HTTPS/discovery-host validation, filing-window identity requirement, read-only `issue-terms`
+command, exit codes, acceptance criteria and fail-closed interpretation.
+
+The runbook explicitly preserves: off-by-default search; no name-only admission; historical
+silence never proving non-publication; transport failure distinct from absence; no operational
+allow-list widening; no evaluation write; and no cache authority. The configured-notice host
+question and live HTTPS egress remain external/policy dependencies.
+
+A32 inspection found no unfinished work inside its ratified five-field application: strict-path
+defaults remain `None`, intentional synthetic-template fallbacks remain gated by
+`allow_fixture_fallbacks=True`, and the two unread fields remain outside implementation authority.
+No code or test changed. Exchange-demand and peer-provider work received no new permitted source
+artifact, so no qualification or adapter change was made.
+
+Validation: exact documentation diff review, static configuration/guard inspection and
+`git diff --check`. **FULL-SUITE REGRESSION TESTING NOT RUN.** No commit, PR, push, merge or CI
+trigger.
+
+---
+
+## Revision 42 — official RHP peer tables confirmed primary; paid provider selection closed for current need — 2026-10-28
+
+The peer-financial path was reconciled against implementation and retained specimens. Existing
+`DocumentExtractor` → `SectionExtractor.extract_peers` → canonical `peers` → classified/frozen
+`peers.json` already supplies the currently consumed issuer-disclosed peer multiples from official
+RHPs. Four observed layouts are implemented and previously focused-tested: R.K. Fashion, Vishal
+Nirmiti, Jio and Paras. Header-bound mapping, placeholder preservation, valuation-date handling,
+issuer-row exclusion and unrecognised-layout withholding remain fail-closed.
+
+No parser change was justified. The v1.5 peer contract cannot preserve face value, EPS, NAV/raw
+price, reporting period, row-level quotation/footnotes or per-value verification; adding them
+requires a separately authorized additive/versioned contract, not speculative parsing.
+
+The existing `--peers` JSON snapshot input and immutable `peers.json` persistence make a second
+local store unnecessary. The supplemental schema's declared `peer_data` block is not consumed by
+the enrichment engine. Neither route is approved as a manual scoring-evidence path: `--peers`
+does not gate admission on verification, the provenance-bearing supplemental route is unwired,
+and the peer schema lacks the distinctions above. No sample values or operator activation were
+added.
+
+**Provider disposition:** paid selection is **CLOSED — CURRENT DECISION** for the present
+personal-use requirement because the official filing path supplies currently consumed disclosed
+multiples. PF-01 EOD, PF-02 FMP and PF-03 Alpha Vantage are **DEFERRED**, not failed. PF-04 FMP
+plan/licence and PF-05 eligibility/sample access remain **NOT QUALIFIED** because no applicable
+terms or representative provenance-bound artifacts are retained. No purchase, provider selection,
+licence acceptance, API integration or portal scraping occurred. Reopen only for a named unmet
+metric with actual provider artifacts and terms.
+
+Full evidence and boundaries: consolidated reconciliation §10.8. Documentation-only change; no
+production code, schema, scoring, `FINAL`, provider authority or cache behavior changed.
+Validation: implementation/schema/test-source inspection, exact diff review and
+`git diff --check`. Existing focused receipts were reused; no tests were rerun because no
+executable code changed. **FULL-SUITE REGRESSION TESTING NOT RUN.** No commit, PR, push, merge or
+CI trigger.
+
+---
+
+## Revision 43 — real-filing operational evaluation procedure completed — 2026-10-28
+
+A fresh repository/remote inspection confirmed the active branch and `origin/main` at
+`0a77bf95a3fa74101bd40d1137c4dd33badb5e87`; merged PRs #13–#16 are present. Existing historical
+receipts include a then-final-main full backend run of 1,908/1,908 and later tree-specific
+focused/full runs. Revision 31 explicitly says the full backend suite was not run for PR #13's
+code change, so there is no retained full-suite receipt for the exact current `origin/main` tree.
+Those reports were inspected, not re-executed or represented as results from this dirty working
+tree.
+
+`docs/RUNBOOK.md` §3.2 now closes the practical real-filing gap with the existing CLI only: retain
+an unchanged manually obtained official PDF and source details; run strict `extract --enrich`
+without fixture fallbacks; inspect canonical identity, source hash, evidence, reporting unit and
+RHP-derived peers before scoring; run the reviewed file with a pinned UTC instant; interpret
+UNKNOWN/stale/incomparable/unverified states; locate and verify immutable artifacts; and record a
+source-byte-bound defect reproduction only for an actual contract mismatch. The runbook also makes
+explicit that `--peers` is not approved for manually entered scoring evidence and that an
+EV/EBITDA heading does not mean the official-filing extractor emitted that metric.
+
+No new filing was supplied, so no evaluation or store was created. No implementation, parser,
+schema, scoring, provider, exchange-demand, discovery, cache, source-authority or production
+admission behavior changed. Consolidated Gemini statuses remain unchanged. Validation was command/
+implementation cross-check, complete changed-file diff review and `git diff --check`; no test was
+rerun for this documentation-only correction. **FULL-SUITE REGRESSION TESTING NOT RUN IN THIS
+PASS.** No commit, PR, push, merge or CI trigger.
+
+---
+
+## Revision 44 — exact-tree full backend regression green; integration candidate ready — 2026-10-28
+
+The Revision 31 validation gap is closed. With `origin/main` and the production/test base at
+`0a77bf95a3fa74101bd40d1137c4dd33badb5e87`, the complete backend suite was run against this
+branch's integration candidate. Its working-tree delta contained documentation, governance/
+evidence records and `.gitattributes` only—no production code, test, schema, config, fixture or
+scoring file differed from that base.
+
+Command: `PYTHONPATH=engine .venv/bin/python -m pytest tests/ -q --durations=30`. Environment:
+CPython 3.11.2, pytest 9.1.1, dependencies from pinned `requirements.txt` in the ignored local
+`.venv`. Result: **2,238 collected; 2,238 passed; 0 failed; 0 skipped; exit 0; 25 Starlette
+deprecation warnings; 1,493.58 s (24m53s)**. No assertion was weakened and no correction was
+required. Durable receipt:
+`docs/test-results/FULL-BACKEND-REGRESSION-2026-10-28-a9216594.md`.
+
+This establishes full backend regression readiness for the current implementation plus the
+operational documentation candidate. It does not represent a new real-filing evaluation. No
+provider, exchange adapter, manual peer-data admission, cache, scoring, schema, source-authority or
+production behavior changed. The integration/merge outcome is recorded by the closeout revision
+that follows publication.

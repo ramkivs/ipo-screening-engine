@@ -1,9 +1,9 @@
 # A31 — Issue identity binding for closed exchange records
 
 - **Record ID:** A31
-- **Status:** **IMPLEMENTED UNDER THE STANDING PA (2026-10-24); SUBMITTED FOR RAMKI'S RATIFICATION**
-- **Decision authority:** RAMKI (standing PA for this workstream, 2026-10-24). Implementation performed by the agent within that authority.
-- **Decision date:** 2026-10-24 (Asia/Calcutta)
+- **Status:** **APPROVED / RATIFIED BY RAMKI 2026-10-28; IMPLEMENTED UNDER THE STANDING PA 2026-10-24**
+- **Decision authority:** RAMKI. Implementation was performed under the standing PA on 2026-10-24; RAMKI explicitly ratified A31 on 2026-10-28.
+- **Decision date:** 2026-10-24 (implementation record); ratified 2026-10-28 (Asia/Calcutta)
 - **Repository:** `ramkivs/ipo-screening-engine`
 - **Baseline:** branch `arena/07f3439f-ipo-screening-engine`, from `0cf9d54f96db2d897dcde62ce7b6fc09c7de4983`; `main` untouched at `01ba66c12ca1195fd7acbd287c3e39a019808094`
 - **Scope:** how a **closed** exchange listing record may be used to supply issue terms, and the issue-identity model that decides it.
@@ -74,7 +74,7 @@ Two ways to close it, and both are RAMKI's call, not the agent's:
 
 ## 7. Unresolved dependencies
 
-- RAMKI's ratification of this record and of the frozen-core pin (A30 §5.6).
+- **RESOLVED 2026-10-28:** RAMKI ratified this record and the associated frozen-core pin (A30 §5.6).
 - RAMKI's decision on the configured-URL allow-list (§5) if the discovery-followed route proves insufficient in practice.
 - Live resolution for the Paras filing still requires an environment with egress to the official hosts; this sandbox has none.
 

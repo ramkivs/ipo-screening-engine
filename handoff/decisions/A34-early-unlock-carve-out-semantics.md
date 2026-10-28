@@ -77,21 +77,20 @@ the reading-defects module. No real-filing positive is claimed.
 
 ### 0.3 Reconciliation with A32 — genuine governance-recording requirement
 
-A32 (`A32-builder-defaults-evidence-or-unknown.md`, status
-`READY FOR RAMKI RATIFICATION (NOT RATIFIED)`) removed the favourable `False`
-default for this field and, in §6.2, explicitly left open the policy question
+A32 (`A32-builder-defaults-evidence-or-unknown.md`, independently ratified by RAMKI on
+2026-10-28) removed the favourable `False` default for this field and, in §6.2,
+explicitly left open the policy question
 "whether an engine may ever establish [this field] from a filing at all".
 **A34 Alternative B is the criterion owner's approved answer to that policy
 question for this field**: an engine may establish it, but only from an
 evidenced release, never from a structurally different lock-in anchor.
 
-This does **not** retroactively ratify A32. The genuine governance-recording
-requirement that remains is:
+A34 did **not** retroactively ratify A32. A32 was later and independently ratified by RAMKI on
+2026-10-28. The governance distinction remains:
 
-1. **Record A32 as still `NOT RATIFIED`** wherever this decision is cited, and
-   keep its separate ratification as an open action for RAMKI. A34's approval is
-   an approval of the A34 semantic question, not an assertion that every
-   artefact covered by A32 has been ratified.
+1. **Record A32's independent 2026-10-28 ratification** wherever current status is stated.
+   A34's approval remains an approval of the A34 semantic question, not the source of A32's
+   ratification.
 2. **Do not treat A34 Alternative B as an unapproved proposal.** It is approved
    and implemented; documents that still call it PROPOSED are historical and
    are superseded by this §0.
@@ -184,7 +183,7 @@ early unlock".
 | `config/ipo-config.v1.5.0.json` → `lockin_bucket` | "intact: promoter lock-in in place and **no early unlock of large pre-IPO holders**; else weak" |
 | `handoff/authoritative/IPO_Screening_Engine_Specification_v1.5.md` §4.1 | lists "lock-in" as a required input; defines no criterion row |
 | **A32** (`handoff/decisions/A32-builder-defaults-evidence-or-unknown.md`) §6.2 | "`large_holders_unlocked_early` and `discounted_allotments_18m_before_drhp` have **no reader**. Whether an engine may ever establish them from a filing at all — for example from a lock-in table that lists which holders are released early — is a **policy question** (A21/A25 family), not an extractor improvement." |
-| **A32** status and §7 | "**READY FOR RAMKI RATIFICATION (NOT RATIFIED)**"; "Granted for this branch only … **no authority is asserted over any scoring artefact.** Ratification by RAMKI is requested." |
+| **A32** status and §7 | **RATIFIED BY RAMKI 2026-10-28**; implementation remains limited: “**no authority is asserted over any scoring artefact**,” and ratification does not enlarge scope. |
 
 The criterion's *concept* ("no early unlock of large holders") is in the specification.
 What is **not** settled anywhere is whether a Regulation 17(1)(c) carve-out is evidence of
@@ -273,9 +272,8 @@ the approval. **After §0:**
 ## 9. Remaining dependencies (updated 2026-10-27)
 
 1. **RESOLVED.** RAMKI approved Alternative B on 2026-10-27 (§0).
-2. **OPEN — genuine governance-recording requirement.** Ratification of A32 is
-   still outstanding (`NOT RATIFIED`). A34's approval does not ratify it; see
-   §0.3. This must remain visible in the tracker, not be silently absorbed.
+2. **RESOLVED 2026-10-28.** RAMKI independently ratified A32. A34's approval did not ratify
+   it; the separate authority and date remain visible in §0.3.
 3. **RESOLVED for this engine, not for the specification text.** The phrase "no
    early unlock of large holders" is applied as an *evidenced* test. Amending
    the v1.5 / v1.3 specification wording, if desired, is a separate
