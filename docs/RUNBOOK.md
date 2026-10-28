@@ -356,6 +356,42 @@ python3 engine/tools/ipo_screen.py project \
     --store build/evaluations --workbook build/IPO_Screening_History.xlsx
 ```
 
+### 4.4 Read-only post-run gap report
+
+Layer 1 remains the immutable automated evaluation. To create a separate Layer
+2A observational report for one explicitly selected evaluation:
+
+```bash
+python3 engine/tools/ipo_screen.py gap-report \
+  VISHAL-NIRMITI-LIMITED-20261005-120000Z-final-e84f8bc0 \
+  --store build/evaluations \
+  --output build/gap-reports/vishal-20261005.json
+```
+
+The command verifies the selected evaluation's result and artifact hashes before
+reading it. It refuses a missing identity, an integrity mismatch, an existing
+output path, or an output inside the immutable evaluation directory. The JSON
+copies only stored `missing_unverified` states and explanations, identifies a
+module and numeric effect only when the baseline explicitly establishes them,
+and marks unavailable reasons/provenance as undetermined rather than guessing.
+It performs no extraction, enrichment, evaluation, replay, cache access, or
+store write. The report has its own deterministic `report_hash`; it is not an
+evaluation artifact or source evidence.
+
+Layer 2B supplemental capture and Layer 2C secondary evaluation are not
+implemented. Before either can be considered, they require: (1) a versioned
+supplemental contract distinct from baseline input; (2) issuer and baseline
+evaluation binding; (3) per-value source, measurement date/reporting period,
+unit and provenance; (4) operator attestation distinguished from independent
+source verification; (5) category-specific eligibility rules; (6) rejection
+of incomplete, unverified, stale, incomparable or conflicting inputs where
+policy requires; (7) a separate supplemental-evaluation identity; (8) a
+reproducible link to both baseline and supplemental payload; (9) independent
+verification of supplemental and result artifacts; and (10) no baseline
+mutation or replacement. QIB/NII demand, unofficial GMP and peer financials
+need distinct source/semantic rules. A signature string, `verified_by` field,
+or official-looking note is not proof of authenticity or scoring eligibility.
+
 ---
 
 ## 5. Reading the workbook

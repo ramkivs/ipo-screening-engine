@@ -62,6 +62,7 @@ from ipo_screening.enrichment_engine import (  # noqa: E402
 )
 from ipo_screening.errors import EngineError  # noqa: E402
 from ipo_screening.evaluation import EvaluationStore  # noqa: E402
+from ipo_screening.gap_analysis import build_gap_report  # noqa: E402
 from ipo_screening.json_strict import load_strict_json, loads_strict_json  # noqa: E402
 from ipo_screening.excel import SHEET_ORDER, project  # noqa: E402
 from ipo_screening.extraction import DocumentExtractor  # noqa: E402
@@ -330,6 +331,40 @@ def cmd_verify(args: argparse.Namespace) -> int:
     print()
     print(f"{len(ids)} evaluation(s) checked, {failures} mismatch(es)")
     return EXIT_OK if failures == 0 else EXIT_AUDIT_MISMATCH
+
+
+def cmd_gap_report(args: argparse.Namespace) -> int:
+    store = EvaluationStore(args.store)
+    output = Path(args.output).resolve()
+    evaluation_dir = store.path_for(args.evaluation_id).resolve()
+    if output == evaluation_dir or evaluation_dir in output.parents:
+        print(
+            "error: gap report output must be outside the immutable evaluation directory",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+    if output.exists():
+        print(f"error: output already exists: {output}", file=sys.stderr)
+        return EXIT_USAGE
+
+    try:
+        report = build_gap_report(store, args.evaluation_id)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_AUDIT_MISMATCH
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("x", encoding="utf-8", newline="\n") as handle:
+        json.dump(report, handle, indent=2, sort_keys=True, ensure_ascii=False)
+        handle.write("\n")
+    print(f"evaluation        {args.evaluation_id}")
+    print(f"gaps              {report['summary']['gap_count']}")
+    print(f"report hash       {report['report_hash']}")
+    print(f"report            {output}")
+    return EXIT_OK
 
 
 def cmd_project(args: argparse.Namespace) -> int:
@@ -1346,6 +1381,16 @@ def build_parser() -> argparse.ArgumentParser:
     ver = sub.add_parser("verify", help="re-derive and check every stored artifact hash")
     ver.add_argument("--store", required=True)
     ver.set_defaults(func=cmd_verify)
+
+    gap = sub.add_parser(
+        "gap-report",
+        help="write a read-only gap analysis for one explicitly selected stored evaluation",
+    )
+    gap.add_argument("evaluation_id", help="exact persisted evaluation identity")
+    gap.add_argument("--store", required=True, help="evaluation store root")
+    gap.add_argument("--output", "-o", required=True,
+                     help="new JSON report path outside the immutable evaluation directory")
+    gap.set_defaults(func=cmd_gap_report)
 
     pro = sub.add_parser("project", help="rebuild the Excel workbook from the store")
     pro.add_argument("--store", required=True)

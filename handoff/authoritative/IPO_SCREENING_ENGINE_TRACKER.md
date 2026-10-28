@@ -3946,3 +3946,29 @@ event input, not unfinished engineering. Reopen implementation only for a source
 reproduction of an extraction/validation/evaluation defect, a verification/replay mismatch, or a
 separately qualified missing-data requirement. Existing RHP-first, UNKNOWN, tri-state, provider,
 exchange-demand, cache and source-authority boundaries remain unchanged.
+
+---
+
+## Revision 46 — Layer 2A read-only persisted-evaluation gap analysis — 2026-10-29
+
+Implemented the smallest separate observational layer over an explicitly selected immutable
+baseline. `ipo_screen gap-report <evaluation-id> --store <root> --output <new.json>` first verifies
+the selected record's result and manifest artifact hashes, then copies its persisted
+`missing_unverified` rows into deterministic structured JSON. It includes baseline identities and
+hashes, exact stored state/reason, criterion module and numeric points only when the baseline
+explicitly establishes them, global sources without falsely attributing them to a gap, explicit
+reason/provenance unavailability, bounded inspection guidance, and its own `report_hash`.
+
+The command refuses a missing identity, integrity mismatch, existing output, or output inside the
+immutable evaluation directory. It performs no extraction, enrichment, scoring, replay, cache
+access, evaluation-store write or baseline mutation. Layer 2B manual/external capture and Layer 2C
+secondary evaluation remain unimplemented and contract-gated. `docs/RUNBOOK.md` §4.4 records the
+CLI and the ten minimum future contract/admission/identity/verification boundaries; `--peers` and
+supplemental `peer_data` remain unqualified for scoring.
+
+Validation on CPython 3.11.2 / pytest 9.1.1: focused gap/CLI modules **23 passed**; full backend
+`PYTHONPATH=engine .venv/bin/python -m pytest tests/ -q --durations=30` **2,247 passed, 0 failed,
+0 skipped**, exit 0, 25 existing Starlette deprecation warnings, 1,209.07 s. Receipt:
+`docs/test-results/TWO-LAYER-GAP-ANALYSIS-2026-10-29.md`. No scoring formula, confidence,
+knockout, schema, provider, exchange acquisition, source authority, cache or baseline persistence
+behavior changed.
