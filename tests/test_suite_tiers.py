@@ -12,6 +12,11 @@ SYNTHETIC_EXCEPTIONS = {
     # Mentions the PDF router only to hand it a fake reader: every page in the
     # module is a literal string, so nothing is decoded.
     "test_reading_defects_20261026.py",
+    # Names `extract_from_pdf` and `_ingest_document_impl` only through
+    # `inspect.signature`/`inspect.getsource`, to prove the builder's fixture
+    # fallback is off by default and that the ingest path passes it explicitly.
+    # No filing is opened and no page is decoded.
+    "test_fail_closed_fixture_safeguard_20261028.py",
     "test_suite_tiers.py",  # this inventory guard itself
 }
 
