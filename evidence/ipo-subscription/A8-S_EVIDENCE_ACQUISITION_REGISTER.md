@@ -60,3 +60,80 @@ The A10 record identifies three distinct baselines:
 - Supporting branch `arena/01a10b42-ipo-screening-engine`: `951d77d4ae39422c232fd727be89551aeb868ab4`
 
 This reconciliation records provenance only. A10 remains approved for interim handling only; source qualification, implementation, Phase 1, and subscription scoring remain unauthorized.
+
+---
+
+## VNL HTML dual-identity amendment — APPROVED AND EFFECTIVE (2026-10-28)
+
+**Disposition:** **APPROVED by RAMKI and EFFECTIVE 2026-10-28 (Asia/Calcutta).** The explicit
+approval was supplied in the owner's execution directive titled “OWNER APPROVAL ALREADY
+GRANTED.” This amendment applies the prepared A1 disposition without rewriting the historical
+inventory entry above.
+
+### Exact affected record
+
+The affected inventory entry is only:
+
+`evidence/ipo-subscription/vnl-20261011/vnl-issue-information.html`
+
+No JSON/JavaScript payload identity, VNL value, A10 rule, source qualification, scoring rule or
+`FINAL` consequence is included in this amendment.
+
+### Competing byte identities and provenance
+
+| Identity | Bytes | SHA-256 | Provenance and status |
+|---|---:|---|---|
+| **Original-capture identity recorded by the transfer manifest/register** | 313,040 | `2ae7009b9f30c026c91a1d38a4b943f348ab3f275f0b1b5b971481a8f72e78f2` | Recorded in `SHA256-MANIFEST.json` and this register. The matching bytes have **not been recovered**, so this remains a historical capture assertion rather than a currently verifiable artifact. |
+| **First durable Git artifact** | 313,038 | `6beb26dc8acce2f9cd6620a761ec5d771da46b3214d220e6946bea37614f5ce6` | Git blob `21ea96b6f0f694d0a65076ce5bd4209c84558a7d`, introduced by source-evidence commit `951d77d4ae39422c232fd727be89551aeb868ab4`; current `main` and checkout carry the same bytes. Protected against future text conversion by `.gitattributes`. |
+
+The repository-history disposition is recorded in
+`docs/investigation/CONSOLIDATED-GEMINI-RECOMMENDATIONS-RECONCILIATION-2026-10-28.md`
+§10.5 and tracker Revision 38. It bounds the discrepancy to the pre-commit capture/transfer/add
+path. Line-ending transformation is evidenced for the manifest and is a plausible explanation
+for the two-byte HTML difference, but the missing bytes and their positions are unavailable; no
+cause is asserted as proved.
+
+### Approved owner disposition
+
+> Preserve the 313,040-byte / `2ae7009b…e78f2` identity as the **unrecovered
+> original-capture identity recorded by the transfer manifest**. Designate the 313,038-byte /
+> `6beb26dc…f5ce6` Git blob as the **durable retained repository artifact**, effective from
+> commit `951d77d4`. Do not state or imply that the durable Git artifact is byte-identical to the
+> original capture. Keep both identities visible and do not rewrite the original observation.
+
+**Decision authority:** RAMKI under A1. **Decision:** APPROVE. **Decision date:** 2026-10-28
+(Asia/Calcutta). **Authorization evidence:** the owner's explicit execution directive stating
+that the existing VNL dual-identity amendment is approved and must be applied. This approval is
+limited to evidence identity bookkeeping; it grants no source, provider, scoring, `FINAL`,
+adapter, production or cache authority.
+
+### Rationale
+
+- The original identity must remain visible because deleting it would erase the transfer
+  observation.
+- The Git identity is the only artifact whose bytes are durably available and reproducible.
+- Designating the Git blob as retained does not manufacture the missing original or conceal the
+  discrepancy.
+- The amendment changes evidence bookkeeping only. It cannot qualify NSE, establish a source
+  contract, or confer licensing/implementation authority.
+
+### Effective consequences
+
+1. Repository-byte integrity checks may use `6beb26dc…f5ce6` for the durable HTML artifact from
+   `951d77d4` onward.
+2. Historical capture-chain claims must continue to report the unrecovered
+   `2ae7009b…e78f2` identity and the pre-commit discrepancy.
+3. The HTML may support code-path and retained-page observations only with this limitation. It
+   cannot prove an unaltered source-to-capture chain, original responding host, retrieval
+   headers/time, applicable terms, BSE identity, All Exchange composition, final-event semantics,
+   or production/source qualification.
+4. The seven matching non-HTML manifest artifacts are unaffected.
+5. A later custody-backed recovery matching the full original hash must be preserved as a
+   separate artifact and reconciled; it must not silently replace the Git blob.
+
+### Continuing limitation
+
+Two identities remain reported: the original bytes are unavailable, and the Git blob is
+reproducible but not claimed capture-identical. The HTML remains non-authoritative investigation
+evidence. This approved bookkeeping disposition does not make the evidence screenable and does
+not authorize scoring, adapter, source-qualification or `FINAL` behavior.

@@ -3,7 +3,7 @@
 - **Decision ID:** A30
 - **Title:** a document is read under its own class, and a conflicting field is withheld rather than rejecting the document
 - **Record type:** **IMPLEMENTATION RECORD — no new policy, no new criterion, no scoring change.** Per `handoff/decisions/CONVENTION.md` rule 4, the approved text below is the correction contract that the investigation was authorised to implement; the analysis and residual risks are Arena's and are recorded, not decided.
-- **Decision status:** **IMPLEMENTED 2026-10-23; UPLOAD PATH CORRECTED AND VALIDATED 2026-10-24; FULL BACKEND SUITE GREEN 1772/1772 2026-10-24; FROZEN-CORE PIN VERIFIED — READY FOR RAMKI RATIFICATION (NOT RATIFIED) 2026-10-24** — see §5.4. Parser and upload paths were separately corrected and now agree on the real filing; the ingestion gate is correctly blocked on the two genuinely undisclosed terms. **FOCUSED AND WIDER REGRESSION EXECUTED AND GREEN 2026-10-24** (45/45 focused; 221/221 wider across nine modules, 0 skipped — §5). A controlled non-production ingestion was then run: it is **correctly blocked** on price band and bid lot, and it exposed a **separate defect in the upload extractor** (`issue.ofs` and `issue.close_date` unreachable there) recorded in §5.3 and left uncorrected by design. Full backend suite (~3 h) still unexecuted.
+- **Decision status:** **IMPLEMENTED 2026-10-23; UPLOAD PATH CORRECTED AND VALIDATED 2026-10-24; FULL BACKEND SUITE GREEN 1772/1772 2026-10-24; FROZEN-CORE PIN VERIFIED 2026-10-24 AND RATIFIED BY RAMKI 2026-10-28** — see §5.4. Parser and upload paths were separately corrected and now agree on the real filing; the ingestion gate is correctly blocked on the two genuinely undisclosed terms. **FOCUSED AND WIDER REGRESSION EXECUTED AND GREEN 2026-10-24** (45/45 focused; 221/221 wider across nine modules, 0 skipped — §5). A controlled non-production ingestion was then run: it is **correctly blocked** on price band and bid lot, and it exposed a **separate defect in the upload extractor** (`issue.ofs` and `issue.close_date` unreachable there) recorded in §5.3 and left uncorrected by design. Full backend suite (~3 h) still unexecuted.
 - **Decision authority:** RAMKI — 2026-10-23 investigation directive for the Paras Healthcare ingestion failure (general, issuer-independent correction; no hardcoding, no policy change).
 - **Decision date:** 2026-10-23 (Asia/Calcutta).
 - **Repository:** `ramkivs/ipo-screening-engine`
@@ -129,7 +129,7 @@ The pin this decision required (§5.5, defect 2) was checked independently again
 | Tamper detection | **caught** — append, mid-file class rename and a single-byte flip each yielded `False` for that file only; an unchanged control file yielded `True` |
 | Alteration reverted | **yes** — byte-identical restore, empty `git status`, empty diff, same blob at `HEAD`; nothing committed |
 
-**Status: VERIFIED — READY FOR RAMKI RATIFICATION.** The pin is technically sound and leaves no residue. **RAMKI has not ratified it**, and no part of this repository may state otherwise until he does. If ratification is withheld, the remedy is to revisit this decision's parser change — not to restore the stale pin.
+**Status: VERIFIED 2026-10-24; RATIFIED BY RAMKI 2026-10-28 with A31.** The pin is technically sound and leaves no residue. Ratification confirms the reviewed pin for the authorised parser correction; it does not enlarge A30/A31 scope, alter scoring, or authorize any cache or source-policy change.
 
 ### 5.7 The withheld fields — official evidence located, still not resolvable (2026-10-24)
 

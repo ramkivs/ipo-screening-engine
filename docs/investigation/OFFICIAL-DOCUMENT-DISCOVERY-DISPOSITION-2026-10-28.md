@@ -324,3 +324,73 @@ Focused only. **The full suite was not run.**
   `test_issue_terms_multisource`, `test_issue_terms_windows_retrieval`,
   `test_suite_tiers`, `test_jio_current_engine_result_20261027`.
 - Integrity gates: tier gate passes; Jio divergence is exactly the pinned 21 files.
+
+---
+
+## 8. Cache-policy assessment follow-through (2026-10-28)
+
+This section records the supported disposition of the completed cache-policy assessment. It
+does not reopen the source investigation, authorize implementation, or alter the correction in
+§1.
+
+### 8.1 Current disposition
+
+- **`EXCHANGE_ISSUE_PAGE` write gate remains closed.** The only production `put()` call admits
+  a single, raw-byte `PRICE_BAND_NOTICE`; it does not admit an exchange page. No demonstrated
+  operational need currently justifies broadening that gate. With no usable cache entry, the
+  resolver fetches configured providers; even when a fresh entry exists, the resolver still
+  inspects the configured providers, so the cache is evidence rather than permission to skip
+  revalidation. The cache has no adequate class-specific post-close rule, and its default
+  168-hour TTL exceeds the approximately three-day issue window.
+- The HTML cache **read-path** correction in §1 remains valid. Correctly reconstructing a
+  stored HTML snapshot does not authorize writing that class. This is a present disposition,
+  not a permanent prohibition.
+- **`INVESTMENT_PLATFORM_PAGE` remains closed.** Its independent corroboration restriction is
+  preserved: platform candidates remain `verified=False` and cannot satisfy readiness. No
+  admission or verification behaviour is authorized to change.
+- Operational need remains **unproven**. A disconnected or currently closed write path is not
+  itself evidence that caching is needed.
+
+### 8.2 Preconditions for any future exchange-cache activation
+
+Activation requires demonstrated operational need and an explicitly authorized policy. Before
+any gate change, that policy assessment must address:
+
+1. class-specific freshness and expiry;
+2. post-close serving behaviour;
+3. source unavailability and the availability-versus-revalidation trade-off;
+4. identity binding and issue-window validation;
+5. provenance and verification semantics;
+6. conflict handling under A30 rule 6; and
+7. the relationship to ratified A31, without treating A31 as cache-policy authority.
+
+**Alternative C — narrow, identity-bound caching — remains a possible future option, not an
+approved implementation.** This record selects no numeric TTL, creates no post-close exception,
+and authorizes no cache-gate change.
+
+### 8.3 Governance reconciliation and decision boundary
+
+- **Established — A30 rule 6:** conflicts are reported and the affected field is withheld;
+  neither first-wins nor newest-wins is permitted. This record adds no automatic supersession.
+- **Unresolved — G-2:** §4 remains authoritative. No applicable addendum/corrigendum specimen
+  or explicit owner decision establishes supersession semantics. The completed search is not
+  repeated here.
+- **Ratified — A31 (2026-10-28):** owner ratification confirms the implemented identity-bound
+  closed-record rule. A31 is not cache-policy authority and does not approve cache admission,
+  post-close serving or availability-versus-revalidation semantics.
+- **Owner decisions required:** an explicit post-close policy before cached evidence could be
+  served under a new closed-issue policy; and an explicit availability-versus-revalidation
+  policy before source verification may be traded for availability during an outage.
+
+Those items are owner-policy boundaries. The assessment's recommendation to keep both gates
+closed is supported by the current record, but it does not amend A30, ratify A31, resolve G-2,
+or choose the outstanding semantics.
+
+### 8.4 Evidence and validation scope preserved
+
+The call chain, opt-in `IPO_ISSUE_TERMS_CACHE_DIR` configuration, read/write distinction,
+post-close behaviour, conflict withholding, and focused test receipts remain as recorded above
+and in Revision 34. The tested environment's TLS handshake failures are environment-specific;
+they are not universal source-unavailability findings. No live official-source verification or
+production-readiness claim is made. No completed probe was rerun for this follow-through, and
+no full-suite regression test was run.
