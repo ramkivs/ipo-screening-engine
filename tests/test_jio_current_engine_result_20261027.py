@@ -68,6 +68,13 @@ DIVERGENT_ENGINE_FILES = frozenset(
         "engine/ipo_screening/aggregator_issue_terms.py",
         "engine/ipo_screening/canonical_input.py",
         "engine/ipo_screening/derived.py",
+        # 2026-10-28 (tracker Revision 33, G-3): the fail-closed fixture
+        # safeguard became provenance-based and its coverage complete. The
+        # change is confined to an enrichment-contract validator that no
+        # production path invokes, so it does not move the Jio result; the file
+        # diverges from the 2026-10-23 fingerprint all the same, and this pin is
+        # the record of exactly which files diverge.
+        "engine/ipo_screening/enrichment_contract.py",
         "engine/ipo_screening/excel.py",
         "engine/ipo_screening/extraction/builder.py",
         "engine/ipo_screening/extraction/extractor.py",
@@ -126,7 +133,7 @@ def test_published_record_engine_diverges_from_main():
             divergent.add(relative)
 
     assert divergent == DIVERGENT_ENGINE_FILES
-    assert len(divergent) == 20
+    assert len(divergent) == 21
 
 
 def test_published_record_still_says_insufficient_data():

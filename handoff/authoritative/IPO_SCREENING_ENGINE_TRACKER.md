@@ -3227,6 +3227,7 @@ never occur; labelled synthetic positives are retained.
 | `docs/investigation/PARAS-UNKNOWN-TRIAGE-2026-10-27.md` | §0 status update; §3 rewritten with three measured states |
 | `docs/investigation/LOCKIN-INSTITUTIONAL-CARVEOUT-GENERALITY-2026-10-27.md` | revision 2: approved rule, cross-issuer before/after, 28-test matrix, corpus limitation |
 | `docs/investigation/A33-A34-ISSUER-REPRODUCTION-2026-10-27.md` + `…/summary.json` | **new** — reproduction record with quotes, pages and before/after values |
+| `tests/test_jio_current_engine_result_20261027.py` | divergence pin 20 → 21: `enrichment_contract.py` now differs from the 2026-10-23 fingerprint; assertion strictness unchanged, reason recorded |
 | `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` | this revision |
 
 ### 6. Verification
@@ -3364,3 +3365,104 @@ no provider was integrated.
   `verify_v1_6_implementation()` PASS; `compileall` over `engine` and `tests` clean.
 - No A33/A34 semantics, weights, thresholds, bands, knockouts or evaluation records changed;
   golden hash and frozen core untouched.
+
+---
+
+## Revision 33 — G-3 resolved: the fail-closed fixture safeguard is enforced, provenance-based, and fully covered — 2026-10-28
+
+**Scope: one corrected validator, one new regression module, documentation. No scoring,
+threshold, weight, penalty, knockout, config, schema, canonical-field or `derived.py`
+change. A33/A34 and every evaluation outcome are unchanged.**
+
+### 1. Correcting a previous revision
+
+Revision 32 (and `docs/FINAL_REPORT.md` §L.5 before it) recorded
+`validate_fail_closed_unknown()` as having **no caller**. That was **wrong**: the call site is
+`enrichment_contract.py:296`, inside `validate_enrichment_contract()`, and the search that
+"found" none had excluded the defining file. The rule *is* wired at the enrichment-contract
+boundary (`validate_enrichment_contract` → `enforce_enrichment_contract`).
+
+What is true, and is the substance of G-3: **that boundary is exercised only by tests.** No
+production ingest path validates a supplemental enrichment document, and
+`EnrichmentEngine.assemble()` never calls the contract validator.
+
+### 2. Reachability — no test-only default can reach a real evaluation
+
+| Vector | Status |
+| --- | --- |
+| `CanonicalInputBuilder(allow_fixture_fallbacks=False)` — the default | closed; every constant is `X if flag else None` |
+| `DocumentExtractor.extract_from_pdf(..., allow_fixture_fallbacks=False)` — the default | closed |
+| `PresentationService._ingest_document_impl` | passes `allow_fixture_fallbacks=False` explicitly |
+| `supplemental=` on a production `assemble()` call | never passed |
+| locator-less notice value reaching canonical evidence | locator is synthesised, so never provenance-free |
+
+`allow_fixture_fallbacks=True` occurs in tests only. **Equivalent protection already existed**,
+so per the standing rule **no production gate was wired** — that would be an unjustified
+behaviour change.
+
+### 3. Defects confirmed and corrected
+
+**3.1 The issuer-name exemption was live.** `is_vishal = "VISHAL" in ipo_id` suppressed the
+warning for any issuer whose name contained `VISHAL` and raised it for every other issuer on an
+identical locator-less payload (measured: `VISHAL` → no finding; `PARAS` and no-`ipo_id` →
+finding). A provenance question was decided by a name. It was also pointless for its apparent
+purpose, because the reference payload already carries a locator. **Removed.**
+
+**3.2 Declared coverage exceeded implemented coverage.** `FORBIDDEN_FIXTURE_DEFAULTS` declared
+five constants; only `220` was checked. The rule is now driven by that mapping for the
+source-fact `price_band.*` entries, so **208, 220 and 68 are all enforced**.
+
+**3.3 The two remaining entries cannot be adjudicated here**, and are excluded with the reason
+in the source: `derived.post_issue_eps` is a `derivedValue` whose contract requires
+`is_derived`/`formula`/`dependencies` and has **no** `locator` field — "no locator" is its
+correct shape; `business.top5_customer_pct` has no `business` block in the artifact. Both remain
+guarded by `allow_fixture_fallbacks`.
+
+**3.4 The rule had no test at all.** `SUSPICIOUS_FIXTURE_DEFAULT_PRICE` was referenced by zero
+tests. The code is now `SUSPICIOUS_FIXTURE_DEFAULT_VALUE` (no consumer referenced the old
+name), severity stays WARNING so no document is rejected by it, and both `raw_value` and
+`normalized_value` slots are checked.
+
+### 4. Files
+
+| File | Change |
+| --- | --- |
+| `engine/ipo_screening/enrichment_contract.py` | **only engine change** — name exemption removed, rule driven by `FORBIDDEN_FIXTURE_DEFAULTS`, documented exclusions |
+| `tests/test_fail_closed_fixture_safeguard_20261028.py` | **new (23 tests)** — enforcement at the contract boundary, builder reachability, four-issuer provenance matrix, coverage, exclusions, legitimate-data preservation, semantics preservation |
+| `tests/test_suite_tiers.py` | module declared in `SYNTHETIC_EXCEPTIONS` with its reason (inspection only, nothing decoded) |
+| `docs/FINAL_REPORT.md` | §L.5 corrected again — the "no caller" statement replaced with the measured chain |
+| `docs/investigation/G3-FAIL-CLOSED-SAFEGUARD-DISPOSITION-2026-10-28.md` | **new** — full disposition |
+| `docs/investigation/ARCHITECTURE-RECONCILIATION-2026-10-28.md` | G-3 and its inventory row updated |
+| `tests/test_jio_current_engine_result_20261027.py` | divergence pin 20 → 21: `enrichment_contract.py` now differs from the 2026-10-23 fingerprint; assertion strictness unchanged, reason recorded |
+| `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` | this revision |
+
+### 5. Verification (this tree)
+
+- **23 passed** — the new module.
+- **48 passed** — `test_enrichment_contract` (13), `test_price_band_notice` (20),
+  `test_enrichment_engine` (15).
+- **8 passed** — `test_fixture_fallback_isolation` Tests A–H.
+- **80 passed** — the above plus the tier gate.
+- **199 passed** — scoring/UNKNOWN/knockout/golden/A33-A34 battery
+  (`test_core_semantics`, `test_overlays_knockouts`, `test_vishal_golden`,
+  `test_v16_implementation`, `test_validation_gates`,
+  `test_a34_issuer_reproduction_20261027`, `test_lockin_institutional_carveout`,
+  `test_seller_row_contract_20261028`).
+- **Full suite: 2232 passed, 0 failed, 0 skipped** (1505.7 s) — the 2209 baseline plus the
+  23 new tests.
+- Integrity: 4 schemas valid; `verify_frozen_core()` True; `verify_golden_result()` True;
+  `verify_v1_6_implementation()` PASS; `compileall` over `engine` and `tests` clean.
+- A33 and A34 decision records still read `APPROVED`; the Jio divergence pin now records 21
+  files (was 20) because this revision changed one engine file.
+
+### 6. Remaining governance question — G-3a
+
+> Should the supplemental-enrichment contract be enforced on a production ingest path — i.e.
+> should `EnrichmentEngine.assemble()` validate its `supplemental`/`price_band_notice` input
+> before use?
+
+Not decided here: it would change ingest behaviour and could reject documents currently
+accepted, and **no demonstrated defect requires it** (§2). It needs an owner decision; the
+evidence that would resolve it is a production enrichment document the contract rejects while
+the engine would otherwise accept it — no such specimen exists in the retained corpus. The rule
+itself is now correct and fully covered, so it is safe whenever enforcement is decided.

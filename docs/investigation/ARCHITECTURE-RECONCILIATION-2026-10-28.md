@@ -252,7 +252,7 @@ implemented · **NJ** investigated, no change justified · **PD** proven defect 
 | `ExchangeDemandAdapter` | **Contract-complete, acquisition-empty** | **II** | `OfficialSubscriptionAdapter`, `AnchorAllotmentAdapter`; `fetch` raises `NotImplementedError` | P5 |
 | Peer-financials provider | Same shape (`PeerMultipleAdapter`) | **II** | same | P6 |
 | Seller-row "absent ≠ zero" | Structurally guaranteed | **CV** | §D-1 + new `test_seller_row_contract_20261028.py` | protected |
-| `validate_fail_closed_unknown` | Dead code; doc corrected | **PD** (fixed) | §D-3 | done |
+| `validate_fail_closed_unknown` | Invoked by the contract validator; **name exemption removed, coverage completed** 2026-10-28 | **PD** (fixed) | §D-3; `G3-FAIL-CLOSED-SAFEGUARD-DISPOSITION-2026-10-28.md` | done |
 | Orchestration framework | Already the implemented shape | **NJ** | §1 | refused |
 
 ---
@@ -317,7 +317,7 @@ golden_result: True    v1_6: PASS      compileall (engine, tests): clean
 |---|---|---|---|
 | **G-1** | May a *specific* peer-financials / exchange-demand provider be adopted (which one, under what licence, storing what history), and who bears the redistribution restriction? | **OPEN** — no provider is authorised | Access to the provider's actual terms + an owner decision. Until then, no integration. |
 | **G-2** | If an addendum/corrigendum is ever ingested, does it *supersede* the RHP value for its field, or is it a same-class conflict to be withheld under A30 rule 6? | **OPEN — unobserved case** | One real addendum. Inventing a precedence rule without a specimen would be a fabricated semantic decision. |
-| **G-3** | Should `validate_fail_closed_unknown()` be wired into a gate, and if so is its fixture-leak rule provenance-based (locator absence) rather than issuer-name-based? | **OPEN** | An owner decision; it changes evaluation-visible findings. |
+| **G-3** | Should `validate_fail_closed_unknown()` be wired into a gate, and if so is its fixture-leak rule provenance-based (locator absence) rather than issuer-name-based? | **RESOLVED 2026-10-28, except G-3a** — see `G3-FAIL-CLOSED-SAFEGUARD-DISPOSITION-2026-10-28.md`. The rule was already invoked by `validate_enrichment_contract` (the "no caller" note in §D-3 was an imprecise search); it is now provenance-based, the issuer-name exemption is removed, and all three source-fact constants are enforced. **No gate was wired** — the builder's `allow_fixture_fallbacks=False` already closes the leak vector. Remaining: **G-3a**, whether to enforce the enrichment contract on a production ingest path (no defect requires it; needs an owner decision). |
 | **G-4** | A32 remains **not ratified** while A34 is approved and merged. | **OPEN — recording requirement only** | Separate ratification. A34 does **not** ratify A32 (recorded in A34 §0.3). |
 | **G-5** | A33's name/formula mismatch and role recovery; A34 alternative C (a structured carve-out field). | **OPEN — separately authorised** | Already scoped in the decision records; not touched here. |
 

@@ -411,34 +411,76 @@ def validate_source_derived_separation(payload: Mapping[str, Any]) -> List[Findi
 # --------------------------------------------------------------------------
 
 
+#: The ``FORBIDDEN_FIXTURE_DEFAULTS`` entries that this validator can actually
+#: adjudicate, because they are SOURCE FACTS in the supplemental-enrichment
+#: artifact and therefore carry a ``locator`` (``$defs.provenanceValue``).
+#:
+#: The other two entries cannot be checked here, and are deliberately not
+#: pretended to be:
+#:
+#: * ``derived.post_issue_eps`` — a ``$defs.derivedValue``, which by contract
+#:   must carry ``is_derived``/``formula``/``dependencies`` and has **no**
+#:   ``locator`` field. "No locator" is therefore its correct shape, not a
+#:   provenance failure; flagging it would make every honest derivation look
+#:   suspicious. Its protection is the arithmetic derivation itself plus
+#:   ``extraction/builder.py::allow_fixture_fallbacks``.
+#: * ``business.top5_customer_pct`` — the enrichment artifact has **no**
+#:   ``business`` block, so the path cannot occur in this document at all. Its
+#:   protection is ``allow_fixture_fallbacks`` at the builder boundary.
+_FIXTURE_CHECKED_PREFIX = "price_band."
+
+
 def validate_fail_closed_unknown(payload: Mapping[str, Any]) -> List[Finding]:
     """Verify that forbidden test-fixture defaults were not injected as defaults.
 
-    Ensures that values like 208, 220, 68, 9.46, 85.33 do not silently appear
-    without verified document provenance (e.g. Vishal Nirmiti fixture leak).
+    A value is reported only when it equals a declared fixture constant **and**
+    the entry carries no ``locator``. The locator is the provenance evidence that
+    the number came from a document; the rule is therefore provenance-based.
+
+    Deliberately *not* keyed on the issuer. An earlier version suppressed the
+    check for any ``ipo_id`` containing the substring ``VISHAL``, which made a
+    provenance question depend on a name: the same locator-less value passed for
+    one issuer and failed for every other. A real filing is free to disclose
+    208/220/68 — that is why the value alone is never the signal, and why a
+    located value passes for every issuer.
+
+    Coverage is driven by ``FORBIDDEN_FIXTURE_DEFAULTS`` rather than by a
+    hard-coded constant, so the declared contract and the implemented check
+    cannot drift apart again. See ``_FIXTURE_CHECKED_PREFIX`` for the two
+    entries this artifact cannot adjudicate.
     """
     findings: List[Finding] = []
 
-    # If ipo_id is NOT Vishal Nirmiti, inspect for suspicious fixture copies
-    ipo_id = str(payload.get("ipo_id", "")).upper()
-    is_vishal = "VISHAL" in ipo_id
+    price_band = payload.get("price_band")
+    if not isinstance(price_band, Mapping):
+        return findings
 
-    price_band = payload.get("price_band") or {}
-    if isinstance(price_band, Mapping) and not is_vishal:
-        pb_high = price_band.get("price_band_high")
-        if isinstance(pb_high, Mapping):
-            val = pb_high.get("raw_value")
-            loc = pb_high.get("locator")
-            if val == 220 and not loc:
-                findings.append(
-                    Finding(
-                        code="SUSPICIOUS_FIXTURE_DEFAULT_PRICE",
-                        message="price_band_high has value 220 without a document locator; possible fixture default leak",
-                        severity=SEVERITY_WARNING,
-                        scope="fail_closed_validation",
-                        location="price_band.price_band_high",
-                    )
-                )
+    for path, forbidden in FORBIDDEN_FIXTURE_DEFAULTS.items():
+        if not path.startswith(_FIXTURE_CHECKED_PREFIX):
+            continue
+        field_name = path[len(_FIXTURE_CHECKED_PREFIX):]
+        entry = price_band.get(field_name)
+        if not isinstance(entry, Mapping):
+            continue
+        # A leak may populate either the raw or the normalised slot.
+        if entry.get("raw_value") != forbidden and entry.get("normalized_value") != forbidden:
+            continue
+        if entry.get("locator"):
+            continue  # provenance present: a genuine disclosure may equal the constant
+        findings.append(
+            Finding(
+                code="SUSPICIOUS_FIXTURE_DEFAULT_VALUE",
+                message=(
+                    f"{path} equals the reference fixture value {forbidden} and carries no "
+                    "document locator, so its provenance cannot be established; possible "
+                    "fixture default leak"
+                ),
+                severity=SEVERITY_WARNING,
+                scope="fail_closed_validation",
+                location=path,
+                detail={"forbidden_value": forbidden, "field": path},
+            )
+        )
 
     return findings
 
