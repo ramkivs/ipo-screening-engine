@@ -3466,3 +3466,127 @@ accepted, and **no demonstrated defect requires it** (§2). It needs an owner de
 evidence that would resolve it is a production enrichment document the contract rejects while
 the engine would otherwise accept it — no such specimen exists in the retained corpus. The rule
 itself is now correct and fully covered, so it is safe whenever enforcement is decided.
+
+---
+
+## Revision 34 — discovery path mapped end to end; the exchange page that vanished on re-read; G-2 blocked on evidence — 2026-10-28
+
+### 1. What this pass was for
+
+Advance the official-document discovery workstream (G-2) on top of G-3, and map the existing
+discovery path across the ten dimensions the work order named — without a second discovery
+implementation, without issuer-specific exceptions, and without inventing a precedence rule
+the contract does not contain. Full disposition:
+`docs/investigation/OFFICIAL-DOCUMENT-DISCOVERY-DISPOSITION-2026-10-28.md`.
+
+### 2. The defect found while mapping dimension 9
+
+`NoticeSnapshotCache.get` implemented A30 rule 1 ("re-read a document under its own class") for
+the Prospectus and the RHP only. The two HTML classes fell through to the notice path, which
+refuses HTML **by class**, so both read back as `None`:
+
+> `EXCHANGE_ISSUE_PAGE` and `INVESTMENT_PLATFORM_PAGE` snapshots returned `(None, False)`.
+
+The exchange issue page is the document the discovery path exists to find. **Fix:** a
+`_HTML_TERM_CLASSES` frozenset and one dispatch branch to `ExchangeIssuePageParser`, with the
+**stored class re-asserted** on the result. The re-assertion is the authority boundary: the
+parser always labels its own output `EXCHANGE_ISSUE_PAGE`, so without it a platform snapshot
+would return labelled an official exchange publication. Identical values on a platform never
+make it official.
+
+**Reach, stated precisely:** `put()` has no production caller today; `get()` is wired into
+`IssueTermsResolver.resolve` whenever `IPO_ISSUE_TERMS_CACHE_DIR` is set. This is a correctness
+repair on a **wired read path whose write side is not yet populated in production** — not a
+data loss observed in the field. It is a defect all the same: the first `put()` caller loses
+every exchange-page snapshot on re-read.
+
+### 3. The fake-listing defense, confirmed on a real page
+
+The pre-2026-10-18 rule (marker substrings over the whole document) produced a false
+`NOT_FOUND`, hence a false `UNPUBLISHED`. It was previously tested against authored fixtures
+only. This pass ran it against `evidence/ipo-subscription/vnl-20261011/vnl-issue-information.html`
+— a **genuine retained** NSE issue-information response:
+
+| probe | result |
+| --- | --- |
+| `_classify_listing` | `empty` |
+| `_has_issue_entries` | `False` |
+| `_issue_records` | `0` |
+| contains `price band` / `issue information` chrome | **True** (a marker rule would have said `ok`) |
+
+The defense holds on real exchange output, not only on the fixture written to test it. The same
+page is a clean extraction-failure specimen: the issuer is recovered
+(`NAL Academy Limited`, `EXCHANGE_ISSUE_PAGE`) and **no terms** are produced, because it states
+none. Identification without manufacture.
+
+### 4. G-2 — BLOCKED, recorded, not coded
+
+Searched: `find` for `*addend*|*corrigend*|*errata*|*amendment*` across the whole tree
+(excluding `.venv`) → **0 hits**; all 12 retained PDFs enumerated, none an addendum;
+`grep` for `precedence|supersed` over `engine/ipo_screening` → only the source-class precedence
+in `connectors/coordinator.py`, the `PBN > Supplemental > RHP` class order at
+`enrichment_engine.py:565`, and `lifecycle.py`. **None addresses a later document revising an
+earlier one.**
+
+No specimen was fabricated and described as an issuer document. No universal precedence rule
+was invented: later-supersedes-earlier, same-class-conflict, field-wise-latest-wins and
+source-class-rank are all plausible and mutually inconsistent. The engine's existing behaviour —
+withhold on conflict, never first-wins, never last-wins — is the defensible resting state, and
+is why G-2 blocks nothing else.
+
+**Owner-supplied evidence required:** (1) one real addendum/corrigendum, or a later exchange
+notice revising a band/lot/date, with publication timestamp, issue identity, the revised field
+quoted, and the class of both documents; (2) an explicit statement whether it **supersedes**,
+**supplements** or merely **conflicts**, and on what recorded basis; (3) the tie-break when the
+later document is of *lower* authority than the earlier one — otherwise the platform rule
+("a platform never confers authority") will resolve it by accident.
+
+### 5. Source feasibility
+
+Per-source table in §5 of the disposition. Content requests this pass, not DNS:
+
+```
+bseindia.com IPOIssues / api.bseindia.com GetPublicIssue / nseindia.com api /
+sebi.gov.in   -> TLS/SSL connection has been closed (EOF)   (all four)
+```
+
+No source is claimed verified from this sandbox, and no reachability claim is made from
+connectivity. **Blocking limitation:** live official retrieval cannot be exercised here at all;
+every live-source claim is either a code-path claim with injected bytes or a claim about a
+**retained capture**.
+
+### 6. Files
+
+| File | Change |
+| --- | --- |
+| `engine/ipo_screening/issue_terms.py` | **only engine change** — `_HTML_TERM_CLASSES` + one `get()` dispatch branch re-asserting the stored class (+22 lines) |
+| `tests/test_notice_cache_html_classes.py` | **new (6 tests)** |
+| `docs/investigation/OFFICIAL-DOCUMENT-DISCOVERY-DISPOSITION-2026-10-28.md` | **new** — full disposition |
+| `docs/investigation/ARCHITECTURE-RECONCILIATION-2026-10-28.md` | G-2 row updated |
+| `handoff/authoritative/IPO_SCREENING_ENGINE_TRACKER.md` | this revision |
+
+**Not changed:** the Jio divergence pin stays **21** — `issue_terms.py` was *already* a member
+of `DIVERGENT_ENGINE_FILES`, so the set and the exact-equality assertion are untouched. This was
+**verified by running the pin**, not assumed; an earlier expectation that it would move 21→22
+was wrong. `SYNTHETIC_EXCEPTIONS` unchanged — the new module names no PDF/ingest module and is
+not a tier-gate candidate (tier gate run, passes).
+
+### 7. Verification — focused only
+
+- **6 passed** — `tests/test_notice_cache_html_classes.py`.
+- **5 of 6 fail with the engine fix reverted** (the sixth, metadata recording, was already
+  satisfied by `put()`) — the tests are load-bearing, not vacuous.
+- **122 passed, 0 failed, 0 skipped** in 128.65 s — `test_notice_cache_html_classes`,
+  `test_notice_cache_document_class`, `test_official_discovery`,
+  `test_automatic_official_issue_discovery`, `test_issue_terms_multisource`,
+  `test_issue_terms_windows_retrieval`, `test_suite_tiers`,
+  `test_jio_current_engine_result_20261027`.
+- Integrity: tier gate passes; Jio divergence exactly the pinned 21 files.
+
+**FULL-SUITE REGRESSION TESTING NOT RUN** — pending the user's explicit approval.
+
+### 8. Governance unchanged
+
+G-2 blocked (§4). G-3a, G-1, G-4 (A32 **not ratified**), A33 role recovery, A34 alternative C,
+and unrelated adapters remain out of scope and unstarted. A33 Alternative A and A34
+Alternative B remain **APPROVED**.
