@@ -3924,3 +3924,25 @@ operational documentation candidate. It does not represent a new real-filing eva
 provider, exchange adapter, manual peer-data admission, cache, scoring, schema, source-authority or
 production behavior changed. The integration/merge outcome is recorded by the closeout revision
 that follows publication.
+
+---
+
+## Revision 45 — PR #17 integration gate green; operational readiness complete — 2026-10-28
+
+Commit `8ad4c2518aac9b714e55c8f3ddfcfd0ff848d51e` published the Revision 35–44
+reconciliation and operational-readiness documentation as PR #17 against `main`. GitHub Actions
+run `40738214229`, job `122992409309`, completed **SUCCESS** in 22m43s: backend **2,238 tests,
+0 errors, 0 failures, 0 skipped**; frontend, schema/integrity, compileall, and clean-tree/diff checks
+all passed. The only annotation affecting dependencies is GitHub's Node 20 action-runtime
+deprecation notice; it is not a product test failure.
+
+PR #17 was mergeable with no review requirement reported by GitHub and its sole reported check was
+green. The post-publication tracker commit itself is documentation-only; the PR merge and resulting
+`origin/main` identity are independently verified in the closeout report because a commit cannot
+truthfully contain the hash of the future merge that incorporates it.
+
+**Operational-readiness decision: READY for event-driven personal use.** A real filing remains an
+event input, not unfinished engineering. Reopen implementation only for a source-byte-bound
+reproduction of an extraction/validation/evaluation defect, a verification/replay mismatch, or a
+separately qualified missing-data requirement. Existing RHP-first, UNKNOWN, tri-state, provider,
+exchange-demand, cache and source-authority boundaries remain unchanged.
