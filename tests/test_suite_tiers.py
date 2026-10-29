@@ -20,6 +20,9 @@ SYNTHETIC_EXCEPTIONS = {
     # Uses tiny synthetic bytes named exchange.pdf to exercise Layer 2B artifact
     # hashing; no parser opens or decodes the file.
     "test_supplemental_data.py",
+    # Uses tiny in-memory multipart bytes to test workbench upload validation;
+    # no PDF parser opens or decodes them.
+    "test_secondary_scenario_workbench.py",
     "test_suite_tiers.py",  # this inventory guard itself
 }
 
