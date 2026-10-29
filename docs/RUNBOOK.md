@@ -516,7 +516,15 @@ value truth. The scenario form is always operator-badged. JSON clients can use
 `POST /api/v1/scenario/evaluate` with operator assertions; both routes invoke
 the same backend modules and isolated stores as the CLI. Use this only as a
 local, single-user workbench; it provides no authentication or production
-deployment boundary.
+deployment boundary. Workbench request failures return structured
+`{"error": ..., "detail": ...}` JSON. Unexpected failures are logged with full
+Python tracebacks under logger `ipo_screening.workbench`; inspect server stderr
+when diagnosing a 500.
+
+Pull requests run the targeted API/UI/CLI suite plus frontend, schema/integrity,
+compile and clean-diff checks. The complete backend regression is deliberately
+reserved for the nightly schedule or an explicit `workflow_dispatch` with
+`scope=full`; ordinary PR iteration must not trigger it.
 
 ---
 

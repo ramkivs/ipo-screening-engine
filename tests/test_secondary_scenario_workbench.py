@@ -57,3 +57,29 @@ def test_secondary_evaluate_api_runs_engine_and_returns_lineage(monkeypatch,tmp_
 
 def test_scenario_evaluate_api_badges_operator_assumptions(monkeypatch,tmp_path):
  dashboard,client=_dashboard(monkeypatch,tmp_path);response=client.post('/api/v1/scenario/evaluate',json={'target_id':EID,'operator_id':'api-test','peer_assertions':[{'peer_name':'Asserted Peer','pe':20,'as_of':'2026-10-23','points_delta':2,'justification':'scenario only'}],'qualitative_assertions':[{'criterion':'moat','rating':'HIGH','points_delta':3,'justification':'scenario only'}]});assert response.status_code==200;body=response.json();assert body['outcome']=='SCENARIO_STORED';assert body['scenario']['badge']=='[OPERATOR_ASSUMPTION]';assert all(x['badge']=='[OPERATOR_ASSUMPTION]' for x in body['scenario']['attribution'])
+
+
+def test_api_validation_returns_structured_400(monkeypatch,tmp_path):
+ dashboard,client=_dashboard(monkeypatch,tmp_path);response=client.post('/api/v1/secondary/evaluate',json={'baseline_id':EID});assert response.status_code==400;body=response.json();assert body['error']=='RequestValidationError';assert 'supplemental_id' in body['detail']
+
+
+def test_secondary_api_logs_traceback_and_returns_structured_500(monkeypatch,tmp_path,caplog):
+ dashboard,client=_dashboard(monkeypatch,tmp_path)
+ def explode(*args,**kwargs): raise RuntimeError('diagnostic boom')
+ monkeypatch.setattr(dashboard,'build_secondary',explode)
+ with caplog.at_level('ERROR',logger='ipo_screening.workbench'):
+  response=client.post('/api/v1/secondary/evaluate',json={'baseline_id':EID,'supplemental_id':'SUPP-0123456789abcdef'})
+ assert response.status_code==500;assert response.json()=={'error':'RuntimeError','detail':'diagnostic boom'};assert 'Secondary evaluation failed' in caplog.text;assert 'Traceback' in caplog.text
+
+
+def test_upload_and_form_errors_are_structured(monkeypatch,tmp_path):
+ dashboard,client=_dashboard(monkeypatch,tmp_path)
+ empty=client.post('/api/hash',files={'evidence':('empty.pdf',b'')});assert empty.status_code==400;assert empty.json()['error']=='EvidenceUploadError'
+ missing=client.post('/actions/inject-rescore',data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','qib_x':'1.2'},files={'evidence':('evidence.pdf',b'test')});assert missing.status_code==400;assert missing.json()['error']=='SupplementalInjectionError';assert 'publisher and source_id' in missing.json()['detail']
+
+
+def test_multipart_injection_accepts_spooled_upload_and_rescores(monkeypatch,tmp_path):
+ dashboard,client=_dashboard(monkeypatch,tmp_path)
+ response=client.post('/actions/inject-rescore',data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'SYNTHETIC-UPLOAD','qib_x':'12.34'},files={'evidence':('demand evidence.pdf',b'synthetic demand artifact')})
+ assert response.status_code==200;assert 'SUPPLEMENTAL_STORAGE_ACCEPTED' in response.text;assert 'SEC-' in response.text
+ assert any((tmp_path/'supp'/EID).glob('*/supplemental_payload.json'));assert any((tmp_path/'sec'/EID).glob('*/secondary_evaluation.json'))
