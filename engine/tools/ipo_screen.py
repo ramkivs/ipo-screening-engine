@@ -76,6 +76,16 @@ from ipo_screening.supplemental_data import (  # noqa: E402
     store_payload,
     validate_payload,
 )
+from ipo_screening.secondary_evaluation import (  # noqa: E402
+    build_secondary,
+    store_secondary,
+    verify_secondary,
+)
+from ipo_screening.operator_scenario import (  # noqa: E402
+    evaluate_scenario,
+    scenario_template,
+    store_scenario,
+)
 from ipo_screening.version import (  # noqa: E402
     DEFAULT_CONFIG_PATH,
     SPEC_VERSION,
@@ -420,6 +430,66 @@ def cmd_supplemental_inject(args: argparse.Namespace) -> int:
     for error in validation.errors:
         print(f"  {error}")
     return EXIT_OK if outcome in ("SUPPLEMENTAL_STORAGE_ACCEPTED", "EXACT_DUPLICATE") else EXIT_REFUSED
+
+
+def cmd_secondary_evaluate(args: argparse.Namespace) -> int:
+    document = build_secondary(args.baseline_id, EvaluationStore(args.store), Path(args.supp_store), args.supplemental_id)
+    outcome, target = store_secondary(document, Path(args.sec_store), EvaluationStore(args.store))
+    print(f"outcome           {outcome}")
+    print(f"secondary id      {document['secondary_evaluation_id']}")
+    print(f"secondary hash    {document['canonical_secondary_hash']}")
+    print(f"score             {document['baseline']['score']} -> {document['secondary']['score']}")
+    print(f"secondary path    {target.resolve()}")
+    return EXIT_OK
+
+
+def cmd_secondary_verify(args: argparse.Namespace) -> int:
+    path = Path(args.secondary_evaluation_path)
+    document = load_strict_json(path)
+    result = verify_secondary(document)
+    print(f"valid             {result['valid']}")
+    print(f"secondary hash    {result['canonical_secondary_hash']}")
+    for error in result["errors"]: print(f"  {error}")
+    return EXIT_OK if result["valid"] else EXIT_AUDIT_MISMATCH
+
+
+def cmd_secondary_replay(args: argparse.Namespace) -> int:
+    matches = list(Path(args.sec_store).glob(f"*/{args.secondary_evaluation_id}/secondary_evaluation.json"))
+    if len(matches) != 1:
+        print(f"error: expected one stored secondary evaluation; found {len(matches)}", file=sys.stderr)
+        return EXIT_USAGE
+    stored = load_strict_json(matches[0])
+    replayed = build_secondary(stored["baseline_evaluation_id"], EvaluationStore(args.store), Path(args.supp_store), stored["supplemental_payload_id"])
+    match = replayed == stored
+    print(f"secondary id      {args.secondary_evaluation_id}")
+    print(f"stored hash       {stored['canonical_secondary_hash']}")
+    print(f"recomputed        {replayed['canonical_secondary_hash']}")
+    print(f"match             {match}")
+    return EXIT_OK if match else EXIT_AUDIT_MISMATCH
+
+
+def cmd_scenario_init(args: argparse.Namespace) -> int:
+    path = _write_new_json(args.output, scenario_template(args.target_id))
+    print(f"target            {args.target_id}")
+    print(f"template          {path.resolve()}")
+    print("attribution       [OPERATOR_ASSUMPTION]")
+    return EXIT_OK
+
+
+def cmd_scenario_evaluate(args: argparse.Namespace) -> int:
+    path = Path(args.scenario_file)
+    payload = load_strict_json(path)
+    if payload.get("target_id") != args.target_id:
+        print("error: scenario target does not match the explicit target id", file=sys.stderr)
+        return EXIT_REFUSED
+    result = evaluate_scenario(payload, EvaluationStore(args.store), Path(args.sec_store))
+    outcome, target = store_scenario(payload, result, Path(args.op_store), EvaluationStore(args.store))
+    print(f"outcome           {outcome}")
+    print(f"scenario id       {result['scenario_id']}")
+    print(f"score             {result['base']['score']} -> {result['scenario']['score']}")
+    print(f"scenario path     {target.resolve()}")
+    print("attribution       [OPERATOR_ASSUMPTION]")
+    return EXIT_OK
 
 
 def cmd_project(args: argparse.Namespace) -> int:
@@ -1463,6 +1533,38 @@ def build_parser() -> argparse.ArgumentParser:
     supp_inject.add_argument("--store", required=True)
     supp_inject.add_argument("--supp-store", required=True)
     supp_inject.set_defaults(func=cmd_supplemental_inject)
+
+    secondary = sub.add_parser("secondary-evaluate", help="create an isolated Layer 2C evaluation")
+    secondary.add_argument("baseline_id")
+    secondary.add_argument("--store", required=True)
+    secondary.add_argument("--supp-store", required=True)
+    secondary.add_argument("--supplemental-id", required=True)
+    secondary.add_argument("--sec-store", required=True)
+    secondary.set_defaults(func=cmd_secondary_evaluate)
+
+    secondary_verify = sub.add_parser("secondary-verify", help="verify one Layer 2C evaluation file")
+    secondary_verify.add_argument("secondary_evaluation_path")
+    secondary_verify.set_defaults(func=cmd_secondary_verify)
+
+    secondary_replay = sub.add_parser("secondary-replay", help="recompute a stored Layer 2C evaluation")
+    secondary_replay.add_argument("secondary_evaluation_id")
+    secondary_replay.add_argument("--store", required=True)
+    secondary_replay.add_argument("--supp-store", required=True)
+    secondary_replay.add_argument("--sec-store", required=True)
+    secondary_replay.set_defaults(func=cmd_secondary_replay)
+
+    scenario_init = sub.add_parser("scenario-init", help="create an isolated Layer 3 scenario template")
+    scenario_init.add_argument("target_id")
+    scenario_init.add_argument("--output", "-o", required=True)
+    scenario_init.set_defaults(func=cmd_scenario_init)
+
+    scenario_eval = sub.add_parser("scenario-evaluate", help="evaluate operator assumptions without changing governed results")
+    scenario_eval.add_argument("target_id")
+    scenario_eval.add_argument("--scenario-file", required=True)
+    scenario_eval.add_argument("--store", required=True)
+    scenario_eval.add_argument("--sec-store", required=True)
+    scenario_eval.add_argument("--op-store", required=True)
+    scenario_eval.set_defaults(func=cmd_scenario_evaluate)
 
     pro = sub.add_parser("project", help="rebuild the Excel workbook from the store")
     pro.add_argument("--store", required=True)

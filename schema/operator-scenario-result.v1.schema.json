@@ -1,0 +1,11 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema","$id":"operator-scenario-result.v1.schema.json","type":"object","additionalProperties":false,
+ "required":["contract_name","contract_version","scenario_id","target_id","baseline_evaluation_id","target_layer","input_scenario_hash","base","scenario","module_breakdown","attribution","badge","canonical_result_hash"],
+ "properties":{
+  "contract_name":{"const":"IPO_LAYER_3_SCENARIO_RESULT"},"contract_version":{"const":"1.0"},"scenario_id":{"type":"string","pattern":"^SCN-[0-9a-f]{16}$"},"target_id":{"type":"string"},"baseline_evaluation_id":{"type":"string"},"target_layer":{"enum":["LAYER_1_BASE","ENRICHED_LAYER_2C"]},"input_scenario_hash":{"$ref":"#/$defs/hash"},"canonical_result_hash":{"$ref":"#/$defs/hash"},"badge":{"const":"[OPERATOR_ASSUMPTION]"},
+  "base":{"$ref":"#/$defs/view"},"scenario":{"$ref":"#/$defs/view"},
+  "module_breakdown":{"type":"array","minItems":6,"maxItems":6,"items":{"type":"object","additionalProperties":false,"required":["module_id","base_points","scenario_points","cap","cap_applied"],"properties":{"module_id":{"enum":["A","B","C","D","E","F"]},"base_points":{"type":"number"},"scenario_points":{"type":"number"},"cap":{"type":"number"},"cap_applied":{"type":"boolean"}}}},
+  "attribution":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["badge","module_id","label","requested_delta","applied_delta"],"properties":{"badge":{"const":"[OPERATOR_ASSUMPTION]"},"module_id":{"enum":["B","E"]},"label":{"type":"string"},"requested_delta":{"type":"number"},"applied_delta":{"type":"number"}}}}
+ },
+ "$defs":{"hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},"view":{"type":"object","additionalProperties":false,"required":["score","verdict","confidence","knockout_status"],"properties":{"score":{"type":"number","minimum":0,"maximum":100},"verdict":{"type":"string"},"confidence":{"type":"string"},"knockout_status":{"type":"string"}}}}
+}

@@ -449,6 +449,70 @@ to baseline plus payload, deterministic verification/replay, and explicit
 rules for conflicts, staleness, comparability, confidence and verdict effects.
 It must never mutate or replace Layer 1.
 
+### 4.6 Layer 2C governed secondary evaluation
+
+Layer 2C creates a separate, replayable evaluation. It never writes into the
+Layer 1 store. Admission is limited to accepted Layer 2B entries for
+`market.subscription.{qib_x,nii_x,retail_x,overall_x}` whose local artifact
+hash was verified and whose observation falls inside the baseline issue's
+bidding window. The unchanged core engine recomputes the result and enforces
+its normal module caps.
+
+```bash
+python3 engine/tools/ipo_screen.py secondary-evaluate <baseline-id> \
+  --store build/evaluations --supp-store build/supplemental-store \
+  --supplemental-id SUPP-... --sec-store build/secondary-store
+python3 engine/tools/ipo_screen.py secondary-verify \
+  build/secondary-store/<baseline-id>/SEC-.../secondary_evaluation.json
+python3 engine/tools/ipo_screen.py secondary-replay SEC-... \
+  --store build/evaluations --supp-store build/supplemental-store \
+  --sec-store build/secondary-store
+```
+
+The secondary artifact binds the exact baseline result/binding and exact
+supplemental identity/hash, reports baseline and secondary realities, and has
+its own canonical hash. Hash verification proves identity and integrity, not
+publisher authenticity or value truth.
+
+### 4.7 Layer 3 operator scenarios
+
+Layer 3 is expressly non-governed scenario analysis. Peer P/E assertions can
+adjust only Module B and qualitative assertions can adjust only Module E;
+normal module caps and the 0–100 total bound remain enforced. Every attribution
+is badged `[OPERATOR_ASSUMPTION]`. Scenarios cannot mutate or replace either
+Layer 1 or Layer 2C.
+
+```bash
+python3 engine/tools/ipo_screen.py scenario-init <baseline-or-secondary-id> \
+  --output build/scenario.json
+# Complete the assertions, then canonicalize it with finalize_scenario().
+python3 engine/tools/ipo_screen.py scenario-evaluate <target-id> \
+  --scenario-file build/scenario.json --store build/evaluations \
+  --sec-store build/secondary-store --op-store build/operator-store
+```
+
+Scenario outputs are stored under
+`<op-store>/<baseline-id>/<scenario-id>/`. They are not evidence and are never
+admitted back into governed scoring.
+
+### 4.8 Local dual-reality workbench
+
+Run the local FastAPI dashboard with explicit store roots:
+
+```bash
+IPO_EVALUATION_STORE=build/evaluations \
+IPO_WORKBENCH_ROOT=build/workbench \
+PYTHONPATH=engine python3 engine/tools/ui_dashboard.py
+```
+
+Open `http://localhost:8000`. The explorer presents Layer 1, Layer 2C and
+operator-scenario realities separately. The bidding form hashes an uploaded
+local artifact before Layer 2B admission and Layer 2C recomputation. Uploading
+and attesting to bytes does not authenticate a publisher or establish value
+truth. The scenario form is always operator-badged. Use this only as a local,
+single-user workbench; it provides no authentication or production deployment
+boundary.
+
 ---
 
 ## 5. Reading the workbook
