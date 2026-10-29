@@ -3997,3 +3997,15 @@ Validation: focused **36 passed**. First full run exposed only the new synthetic
 tier declaration (2,258 passed / 1 inventory failure); corrected without product/test weakening.
 Final full backend **2,259 passed, 0 failed, 0 skipped**, exit 0, 25 existing warnings, 1,351.45 s.
 Receipt: `docs/test-results/LAYER-2B-SUPPLEMENTAL-DATA-2026-10-29.md`.
+
+---
+
+## Revision 48 — Layer 2C secondary engine, Layer 3 scenarios, and local dual-reality workbench — 2026-10-29
+
+Layer 2C is now implemented as a separate deterministic engine over an exact verified Layer 1 baseline and an accepted Layer 2B payload. Scoring admission is restricted to the four subscription fields in the Layer 2B registry, requires local artifact-hash verification and an observation inside the baseline bidding window, and invokes the unchanged core evaluator. The versioned secondary contract binds baseline result/binding and supplemental ID/hash, records baseline-versus-secondary module attribution and caps, and has isolated immutable storage plus independent verify/replay commands. It does not overwrite or replace Layer 1.
+
+Layer 3 is now an explicitly non-governed scenario overlay. User-asserted peer P/E adjustments affect only Module B; qualitative assumptions affect only Module E. Module and total caps, confidence, and knockout status remain enforced. Payloads and results are isolated from governed stores, canonically hashed, and every point attribution carries `[OPERATOR_ASSUMPTION]`.
+
+The local FastAPI workbench provides evaluation selection, day 1/2/3 bidding inputs, automatic uploaded-file SHA-256 display, Layer 2B injection plus Layer 2C recomputation, operator scenarios, three-reality comparison cards, attribution badges, and hash lineage. It is documented as local single-user tooling without authentication or production authority.
+
+Validation on the implemented tree: focused **35 passed**; complete backend **2,267 passed, 0 failed, 0 skipped, 25 warnings in 1625.84s**; frontend **93 passed**; all schemas, frozen core, golden result, inactive v1.6, compileall, and diff checks passed. Operational Jio acceptance produced baseline `37.0/AVOID/Low`, secondary `39.0/AVOID/Low` with only Module F `+2`, and an operator scenario score `48.0` whose verdict remained `AVOID` because the baseline knockout remains triggered. Secondary verify/replay passed. Before/after Layer 1 byte inventories were identical (`ec4e2634…`), and post-operation Layer 1 verify/replay passed. Detailed receipt: `docs/test-results/LAYER-2C-LAYER-3-WORKBENCH-2026-10-29.md`.

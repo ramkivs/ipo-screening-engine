@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "secondary-evaluation.v1.schema.json",
+  "title": "Layer 2C governed secondary evaluation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_name","contract_version","secondary_evaluation_id","baseline_evaluation_id","baseline_result_hash","baseline_binding","supplemental_payload_id","supplemental_payload_hash","evaluated_at","admitted_fields","baseline","secondary","module_breakdown","secondary_result_hash","scoring_profile","canonical_secondary_hash"],
+  "properties": {
+    "contract_name":{"const":"IPO_LAYER_2C_SECONDARY_EVALUATION"},"contract_version":{"const":"1.0"},
+    "secondary_evaluation_id":{"type":"string","pattern":"^SEC-[0-9a-f]{16}$"},
+    "baseline_evaluation_id":{"type":"string","minLength":1},
+    "baseline_result_hash":{"$ref":"#/$defs/hash"},"baseline_binding":{"$ref":"#/$defs/hash"},
+    "supplemental_payload_id":{"type":"string","pattern":"^SUPP-[0-9a-f]{16}$"},
+    "supplemental_payload_hash":{"$ref":"#/$defs/hash"},"evaluated_at":{"type":"string","format":"date-time"},
+    "admitted_fields":{"type":"array","minItems":1,"uniqueItems":true,"items":{"enum":["market.subscription.qib_x","market.subscription.nii_x","market.subscription.retail_x","market.subscription.overall_x"]}},
+    "baseline":{"$ref":"#/$defs/result"},"secondary":{"$ref":"#/$defs/result"},
+    "module_breakdown":{"type":"array","minItems":6,"maxItems":6,"items":{"type":"object","additionalProperties":false,"required":["module_id","baseline_points","secondary_points","delta","cap","cap_applied"],"properties":{"module_id":{"enum":["A","B","C","D","E","F"]},"baseline_points":{"type":"number"},"secondary_points":{"type":"number"},"delta":{"type":"number"},"cap":{"type":"number"},"cap_applied":{"type":"boolean"}}}},
+    "secondary_result_hash":{"$ref":"#/$defs/hash"},"scoring_profile":{"const":"CORE_ENGINE_UNCHANGED"},"canonical_secondary_hash":{"$ref":"#/$defs/hash"}
+  },
+  "$defs":{"hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},"result":{"type":"object","additionalProperties":false,"required":["score","verdict","confidence","knockout_status"],"properties":{"score":{"type":"number"},"verdict":{"type":"string"},"confidence":{"type":"string"},"knockout_status":{"type":"string"}}}}
+}
