@@ -4015,3 +4015,9 @@ Validation on the implemented tree: focused **35 passed**; complete backend **2,
 ## Revision 49 — Layer 2C/Layer 3 web API and `/workbench` wiring — 2026-10-29
 
 The local FastAPI workbench now exposes first-class JSON routes `POST /api/v1/secondary/evaluate` and `POST /api/v1/scenario/evaluate`. Both call the existing governed backend modules and isolated stores directly; they do not duplicate scoring logic or write to Layer 1. `/workbench` serves the day 1/2/3 subscription/evidence form, operator peer and qualitative assertion form, and triple-reality Layer 1/2C/3 cards with attribution badges and hash lineage. Focused API/UI/CLI regression: **24 passed**, one non-fatal dependency deprecation warning.
+
+---
+
+## Revision 50 — Dual-Reality Workbench embedded in the existing frontend — 2026-10-29
+
+The existing Executive Dashboard frontend now has a visible **Dual-Reality Workbench** navigation tab. The tab renders the Layer 2C/Layer 3 workbench in a same-origin iframe at `/workbench/`; the presentation FastAPI application configures it against the exact active evaluation store and an isolated sibling workbench store. Existing loopback and same-origin POST guards explicitly cover only the mounted workbench's governed hash, injection, secondary, and scenario actions. The standalone workbench remains available, but users no longer need to discover or launch a separate UI. Focused backend integration **32 passed** and frontend **94 passed**; compileall and diff checks passed.

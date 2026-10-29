@@ -103,6 +103,16 @@ test('App - Zero Score Calculation Invariant: source files contain no arithmetic
   assert.equal(apiJs.includes('API_KEY'), false);
 });
 
+test('App - existing frontend exposes embedded Dual-Reality Workbench tab', () => {
+  const appJs = fs.readFileSync(path.resolve(__dirname, '../app.js'), 'utf8');
+  const indexHtml = fs.readFileSync(path.resolve(__dirname, '../index.html'), 'utf8');
+  assert.ok(indexHtml.includes('id="nav-workbench"'));
+  assert.ok(indexHtml.includes('id="workbench-frame"'));
+  assert.ok(indexHtml.includes('Dual-Reality Workbench'));
+  assert.ok(appJs.includes("segments[0] === 'workbench'"));
+  assert.ok(appJs.includes("frame.setAttribute('src', '../workbench/')"));
+});
+
 test('App - Governance Invariant: no policy activation or modification controls in frontend', () => {
   const appJsPath = path.resolve(__dirname, '../app.js');
   const indexHtmlPath = path.resolve(__dirname, '../index.html');

@@ -73,6 +73,8 @@ export class App {
       this.renderCalibrationView();
     } else if (segments[0] === 'ingest' || segments[0] === 'upload') {
       this.renderIngestView();
+    } else if (segments[0] === 'workbench') {
+      this.renderWorkbench();
     } else if (segments[0] === 'ipos' && segments[1]) {
       this.renderIpoDetail(segments[1]);
     } else {
@@ -3378,6 +3380,14 @@ export class App {
   // --------------------------------------------------------------------------
   // IPO Ingestion & Deterministic Evaluation Workflow (UI-7)
   // --------------------------------------------------------------------------
+
+  renderWorkbench() {
+    this.setViewActive('workbench-view');
+    const frame = document.getElementById('workbench-frame');
+    if (frame && !frame.getAttribute('src')) {
+      frame.setAttribute('src', '../workbench/');
+    }
+  }
 
   renderIngestView() {
     this.setViewActive('ingest-view');
