@@ -555,7 +555,12 @@ class CanonicalInputBuilder:
         # was structurally UNKNOWN for every builder-based evaluation.  The
         # key is added only when the input/extraction establishes it, so the
         # absent case remains UNKNOWN (and the golden input is unchanged).
-        for optional_key in ("auditor_or_cfo_exit_2y",):
+        for optional_key in (
+            "auditor_or_cfo_exit_2y",
+            "promoter_pledged_shares_pct",
+            "pre_issue_promoter_holding_pct",
+            "professionally_managed_without_identifiable_promoters",
+        ):
             if optional_key in gov_base:
                 gov[optional_key] = gov_base[optional_key]
             else:

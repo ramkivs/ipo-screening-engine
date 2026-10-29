@@ -70,6 +70,20 @@ ELIGIBILITY_REGISTRY.update({
         "gap_category": "FINANCIAL", "gap_item": "net_working_capital_pct_revenue",
         "source_types": ("OFFICIAL_FILING",), "minimum": None, "recordable": True, "scoring_eligible": True,
     },
+    "governance.promoter_pledged_shares_pct": {
+        "category": "GOVERNANCE", "type": "number", "unit": "PERCENT", "currency": None,
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "GOVERNANCE", "gap_item": "promoter_pledged_shares_pct",
+        "source_types": ("OFFICIAL_FILING",), "minimum": 0, "maximum": 100,
+        "recordable": True, "scoring_eligible": True,
+    },
+    "governance.pre_issue_promoter_holding_pct": {
+        "category": "GOVERNANCE", "type": "number", "unit": "PERCENT", "currency": None,
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "GOVERNANCE", "gap_item": "pre_issue_promoter_holding_pct",
+        "source_types": ("OFFICIAL_FILING",), "minimum": 0, "maximum": 100,
+        "recordable": True, "scoring_eligible": True,
+    },
 })
 
 @dataclass(frozen=True)
@@ -207,6 +221,8 @@ def validate_payload(payload: Mapping[str, Any], store: EvaluationStore, *, payl
             errors.append(f"{prefix} VALUE_ARRAY must contain exactly three FY observations")
         elif rule.get("minimum") is not None and any(item < rule["minimum"] for item in values):
             errors.append(f"{prefix} VALUE_RANGE must be >= {rule['minimum']}")
+        elif rule.get("maximum") is not None and any(item > rule["maximum"] for item in values):
+            errors.append(f"{prefix} VALUE_RANGE must be <= {rule['maximum']}")
         if entry.get("category") != rule["category"] or entry.get("unit") != rule["unit"] or entry.get("currency") != rule["currency"]:
             errors.append(f"{prefix} SEMANTIC_METADATA_MISMATCH")
         if rule["requires_observation_time"] and not entry.get("observation_time"):

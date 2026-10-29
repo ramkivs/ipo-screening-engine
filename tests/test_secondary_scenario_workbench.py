@@ -107,6 +107,18 @@ def test_financial_health_overrides_flow_through_workbench_secondary_evaluation(
  assert module_a['secondary_points'] < module_a['baseline_points']
 
 
+def test_governance_overrides_flow_through_workbench_secondary_evaluation(monkeypatch,tmp_path):
+ dashboard,client=_dashboard(monkeypatch,tmp_path)
+ response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST FILING','source_id':'GOVERNANCE-OVERRIDE','promoter_pledged_shares_pct':'100','pre_issue_promoter_holding_pct':'10'},files={'evidence':('governance.pdf',b'synthetic governance artifact')})
+ assert response.status_code==200,response.text
+ secondary_path=next((tmp_path/'sec'/EID).glob('*/secondary_evaluation.json'))
+ secondary=json.loads(secondary_path.read_text())
+ assert set(secondary['admitted_fields'])=={'governance.promoter_pledged_shares_pct','governance.pre_issue_promoter_holding_pct'}
+ module_d=next(item for item in secondary['module_breakdown'] if item['module_id']=='D')
+ assert module_d['secondary_points'] < module_d['baseline_points']
+ assert 0 <= module_d['secondary_points'] <= module_d['cap']
+
+
 def test_upload_creates_missing_workspace_tree_and_rejects_stale_id(monkeypatch,tmp_path):
  workspace=tmp_path/'missing'/'nested'/'workbench';dashboard,client=_dashboard(monkeypatch,workspace)
  response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'ACTIVE-WORKSPACE','qib_x':'12.34'},files={'evidence':('active.pdf',b'active workspace artifact')})

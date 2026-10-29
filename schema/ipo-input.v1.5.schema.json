@@ -639,6 +639,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "promoter_pledged_shares_pct": {
+          "type": ["number", "null"], "minimum": 0, "maximum": 100
+        },
+        "pre_issue_promoter_holding_pct": {
+          "type": ["number", "null"], "minimum": 0, "maximum": 100
+        },
+        "professionally_managed_without_identifiable_promoters": {
+          "type": ["boolean", "null"],
+          "description": "Explicit filing classification used only to exempt the low pre-issue promoter holding check."
+        },
         "auditor_name": {
           "type": [
             "string",
