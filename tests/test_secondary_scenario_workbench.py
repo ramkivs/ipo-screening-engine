@@ -52,6 +52,15 @@ def _dashboard(monkeypatch,tmp_path,supp=None):
 def test_workbench_explorer_and_badges(monkeypatch,tmp_path):
  dashboard,client=_dashboard(monkeypatch,tmp_path);page=client.get('/workbench');assert page.status_code==200;assert 'Day 1' in page.text and 'Day 2' in page.text and 'Day 3' in page.text;assert '[LAYER_1_BASE]' in page.text and '[ENRICHED_LAYER_2C]' in page.text and '[OPERATOR_ASSUMPTION]' in page.text;data=client.get('/api/evaluations').json();assert any(x['id']==EID for x in data);hashed=client.post('/api/hash',files={'evidence':('x.txt',b'abc')}).json();assert hashed['sha256']==hashlib.sha256(b'abc').hexdigest()
 
+
+def test_workbench_ui_recovers_inline_and_validates_cached_evaluation(monkeypatch,tmp_path):
+ _,client=_dashboard(monkeypatch,tmp_path);page=client.get('/workbench').text
+ assert 'Dismiss error' in page and "sessionStorage.getItem(SESSION_KEY)" in page
+ assert "ids.includes(cached)?cached:ids[0]" in page
+ assert "if(!response.ok)throw new Error(body.detail" in page
+ assert "event.preventDefault();clearError()" in page
+ assert "saveSession({evaluation_id:baseline,[successKind]:body})" in page
+
 def test_secondary_evaluate_api_runs_engine_and_returns_lineage(monkeypatch,tmp_path):
  payload,supp=accepted_payload(tmp_path);dashboard,client=_dashboard(monkeypatch,tmp_path,supp);response=client.post('/api/v1/secondary/evaluate',json={'baseline_id':EID,'supplemental_id':payload['supplemental_payload_id']});assert response.status_code==200;body=response.json();assert body['outcome']=='SECONDARY_EVALUATION_STORED';assert body['secondary']['baseline_result_hash']=='0fde1451c1ea3ee61e6178d48908e8bffe12a943ba21f42f993429d11af9fb44';assert body['secondary']['supplemental_payload_hash']==payload['canonical_payload_hash']
 
@@ -80,6 +89,6 @@ def test_upload_and_form_errors_are_structured(monkeypatch,tmp_path):
 
 def test_multipart_injection_accepts_spooled_upload_and_rescores(monkeypatch,tmp_path):
  dashboard,client=_dashboard(monkeypatch,tmp_path)
- response=client.post('/actions/inject-rescore',data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'SYNTHETIC-UPLOAD','qib_x':'12.34'},files={'evidence':('demand evidence.pdf',b'synthetic demand artifact')})
- assert response.status_code==200;assert 'SUPPLEMENTAL_STORAGE_ACCEPTED' in response.text;assert 'SEC-' in response.text
+ response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'SYNTHETIC-UPLOAD','qib_x':'12.34'},files={'evidence':('demand evidence.pdf',b'synthetic demand artifact')})
+ assert response.status_code==200;body=response.json();assert 'SUPPLEMENTAL_STORAGE_ACCEPTED' in body['detail'];assert body['evaluation_id']==EID;assert body['supplemental_id'].startswith('SUPP-');assert body['secondary_id'].startswith('SEC-')
  assert any((tmp_path/'supp'/EID).glob('*/supplemental_payload.json'));assert any((tmp_path/'sec'/EID).glob('*/secondary_evaluation.json'))
