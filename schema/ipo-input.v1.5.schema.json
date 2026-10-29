@@ -515,6 +515,14 @@
         "net_working_capital_pct_revenue": {
           "$ref": "#/$defs/pct"
         },
+        "top_customer_revenue_pct": {
+          "type": ["number", "null"], "minimum": 0, "maximum": 100,
+          "description": "Percentage of total revenue contributed by the single largest customer."
+        },
+        "loss_making_segments_present": {
+          "type": ["boolean", "null"],
+          "description": "Whether the filing discloses material loss-making operating segments or key product lines."
+        },
         "adjusted_metrics_unreconciled": {
           "type": [
             "boolean",

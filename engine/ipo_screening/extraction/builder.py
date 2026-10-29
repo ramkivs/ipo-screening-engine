@@ -426,6 +426,7 @@ class CanonicalInputBuilder:
         for name in (
             "operating_cash_flow_3yr_cumulative", "net_income_3yr_cumulative",
             "trade_receivables_days", "net_working_capital_pct_revenue",
+            "top_customer_revenue_pct", "loss_making_segments_present",
         ):
             value = fin_base.get(name) if name in fin_base else self._get_field(f"financials.{name}", None)
             if value is not None:
