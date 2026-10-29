@@ -5,7 +5,7 @@ import hashlib, html, json, logging, os, sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -107,11 +107,32 @@ def _records():
 
 def _page(message=""):
  options="".join(f'<option value="{html.escape(r["id"])}">{html.escape(r["company"] or r["id"])}</option>' for r in _records())
- return f'''<!doctype html><html><head><title>IPO Workbench</title><style>body{{font:15px system-ui;max-width:1200px;margin:auto;padding:2rem}}section{{border:1px solid #ccc;padding:1rem;margin:1rem 0}}.badge{{font-weight:bold;color:#174}}.realities{{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}}.card{{border:2px solid #174;padding:1rem;white-space:pre-wrap}}input,select,textarea{{margin:.3rem;padding:.4rem}}table{{border-collapse:collapse}}td,th{{border:1px solid #ccc;padding:.4rem}}</style></head><body><h1>IPO Dual-Reality Workbench</h1><p>{html.escape(message)}</p>
-<section><h2>Evaluation Explorer <span class="badge">[LAYER_1_BASE]</span></h2><select id="evaluation">{options}</select><button onclick="explore()">Compare</button><div id="comparison" class="realities"></div></section>
-<section><h2>Live Bidding <span class="badge">[ENRICHED_LAYER_2C]</span></h2><form action="actions/inject-rescore" method="post" enctype="multipart/form-data"><select name="baseline_id">{options}</select><select name="bidding_day"><option value="DAY_1">Day 1</option><option value="DAY_2">Day 2</option><option value="DAY_3">Day 3</option></select><input name="qib_x" type="number" step="any" placeholder="QIB x"><input name="nii_x" type="number" step="any" placeholder="NII x"><input name="retail_x" type="number" step="any" placeholder="Retail x"><input name="overall_x" type="number" step="any" placeholder="Overall x"><input name="observation_time" placeholder="2026-10-29T12:00:00Z" required><input name="publisher" placeholder="Publisher" required><input name="source_id" placeholder="Source ID" required><input id="evidence" name="evidence" type="file" required><output id="evidenceHash"></output><button>Inject &amp; Rescore</button></form></section>
-<section><h2>Scenario Builder <span class="badge">[OPERATOR_ASSUMPTION]</span></h2><form action="actions/scenario" method="post"><select name="target_id">{options}</select><input name="peer_name" placeholder="Peer"><input name="peer_pe" type="number" step="any" placeholder="Peer P/E"><input name="peer_delta" type="number" step="any" value="0"><select name="rating"><option>LOW</option><option>MEDIUM</option><option>HIGH</option></select><input name="qualitative_delta" type="number" step="any" value="0"><textarea name="justification" required>Operator scenario only</textarea><button>Apply Scenario</button></form></section>
-<footer>Lineage always displays exact baseline, supplemental, secondary, and scenario SHA-256 identities. Operator assertions never alter governed records.</footer><script>async function explore(){{let id=document.getElementById('evaluation').value,d=await(await fetch('api/comparison/'+encodeURIComponent(id))).json(),c=document.getElementById('comparison');c.innerHTML=`<div class="card"><b>[LAYER_1_BASE]</b><br>${{JSON.stringify(d.baseline,null,2)}}</div><div class="card"><b>[ENRICHED_LAYER_2C]</b><br>${{JSON.stringify(d.enriched,null,2)}}</div><div class="card"><b>[OPERATOR_ASSUMPTION]</b><br>${{JSON.stringify(d.scenarios,null,2)}}</div>`}}document.getElementById('evidence').addEventListener('change',async(e)=>{{let f=e.target.files[0];if(!f)return;let b=new FormData();b.append('evidence',f);let r=await(await fetch('api/hash',{{method:'POST',body:b}})).json();document.getElementById('evidenceHash').textContent='SHA-256 '+r.sha256}})</script></body></html>'''
+ return rf'''<!doctype html><html><head><title>IPO Workbench</title><style>body{{font:15px system-ui;max-width:1200px;margin:auto;padding:2rem}}section{{border:1px solid #ccc;padding:1rem;margin:1rem 0}}.badge{{font-weight:bold;color:#174}}.realities{{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}}.card{{border:2px solid #174;padding:1rem;white-space:pre-wrap}}input,select,textarea{{margin:.3rem;padding:.4rem}}table{{border-collapse:collapse}}td,th{{border:1px solid #ccc;padding:.4rem}}#workbench-status{{padding:.8rem;margin:1rem 0;border-radius:.25rem}}#workbench-status:empty{{display:none}}#workbench-status.error{{display:block;background:#fff1f1;border:1px solid #b42318;color:#7a271a}}#workbench-status.success{{display:block;background:#ecfdf3;border:1px solid #067647;color:#05603a}}#dismiss-error{{display:none;margin-left:.5rem}}#dismiss-error.visible{{display:inline-block}}</style></head><body><h1>IPO Dual-Reality Workbench</h1><p>{html.escape(message)}</p>
+<div id="workbench-status" role="alert" aria-live="polite"></div><button id="dismiss-error" type="button">Dismiss error</button>
+<section><h2>Evaluation Explorer <span class="badge">[LAYER_1_BASE]</span></h2><select id="evaluation">{options}</select><button id="compare-button" type="button">Compare</button><div id="comparison" class="realities"></div></section>
+<section><h2>Live Bidding <span class="badge">[ENRICHED_LAYER_2C]</span></h2><form id="inject-form" action="actions/inject-rescore" method="post" enctype="multipart/form-data"><select name="baseline_id">{options}</select><select name="bidding_day"><option value="DAY_1">Day 1</option><option value="DAY_2">Day 2</option><option value="DAY_3">Day 3</option></select><input name="qib_x" type="number" step="any" placeholder="QIB x"><input name="nii_x" type="number" step="any" placeholder="NII x"><input name="retail_x" type="number" step="any" placeholder="Retail x"><input name="overall_x" type="number" step="any" placeholder="Overall x"><input name="observation_time" placeholder="2026-10-29T12:00:00Z" required><input name="publisher" placeholder="Publisher" required><input name="source_id" placeholder="Source ID" required><input id="evidence" name="evidence" type="file" required><output id="evidenceHash"></output><button>Inject &amp; Rescore</button></form></section>
+<section><h2>Scenario Builder <span class="badge">[OPERATOR_ASSUMPTION]</span></h2><form id="scenario-form" action="actions/scenario" method="post"><select name="target_id">{options}</select><input name="peer_name" placeholder="Peer"><input name="peer_pe" type="number" step="any" placeholder="Peer P/E"><input name="peer_delta" type="number" step="any" value="0"><select name="rating"><option>LOW</option><option>MEDIUM</option><option>HIGH</option></select><input name="qualitative_delta" type="number" step="any" value="0"><textarea name="justification" required>Operator scenario only</textarea><button>Apply Scenario</button></form></section>
+<footer>Lineage always displays exact baseline, supplemental, secondary, and scenario SHA-256 identities. Operator assertions never alter governed records.</footer>
+<script>
+const SESSION_KEY='ipo.workbench.session.v1';
+const statusBox=document.getElementById('workbench-status'),dismiss=document.getElementById('dismiss-error');
+function readSession(){{try{{return JSON.parse(sessionStorage.getItem(SESSION_KEY)||'{{}}')}}catch(_e){{return {{}}}}}}
+function saveSession(patch){{const value={{...readSession(),...patch}};sessionStorage.setItem(SESSION_KEY,JSON.stringify(value));return value}}
+function clearError(){{statusBox.textContent='';statusBox.className='';dismiss.classList.remove('visible')}}
+function showStatus(detail,kind='error'){{statusBox.textContent=detail;statusBox.className=kind;dismiss.classList.toggle('visible',kind==='error')}}
+dismiss.addEventListener('click',clearError);
+function setActiveEvaluation(id){{if(!id)return;document.querySelectorAll('select[name="baseline_id"],select[name="target_id"],#evaluation').forEach(el=>{{if([...el.options].some(o=>o.value===id))el.value=id}});saveSession({{evaluation_id:id}})}}
+async function parseResponse(response){{const type=response.headers.get('content-type')||'';let body;if(type.includes('json'))body=await response.json();else body={{detail:(await response.text()).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim()}};if(!response.ok)throw new Error(body.detail||body.error||`Request failed (${{response.status}})`);return body}}
+async function refreshContext(){{try{{const response=await fetch('api/evaluations');const rows=await parseResponse(response);const ids=rows.map(x=>x.id);const session=readSession(),cached=session.evaluation_id;const active=ids.includes(cached)?cached:ids[0];if(active){{setActiveEvaluation(active);if(session.injection?.evaluation_id===active)showStatus(session.injection.detail||'Previous injection restored.','success')}}else showStatus('No evaluations are available in the active evaluation store.')}}catch(error){{showStatus(error.message)}}}}
+async function explore(){{clearError();try{{const id=document.getElementById('evaluation').value;setActiveEvaluation(id);const d=await parseResponse(await fetch('api/comparison/'+encodeURIComponent(id))),c=document.getElementById('comparison');c.innerHTML=`<div class="card"><b>[LAYER_1_BASE]</b><br>${{JSON.stringify(d.baseline,null,2)}}</div><div class="card"><b>[ENRICHED_LAYER_2C]</b><br>${{JSON.stringify(d.enriched,null,2)}}</div><div class="card"><b>[OPERATOR_ASSUMPTION]</b><br>${{JSON.stringify(d.scenarios,null,2)}}</div>`}}catch(error){{showStatus(error.message)}}}}
+document.getElementById('compare-button').addEventListener('click',explore);
+document.getElementById('evaluation').addEventListener('change',e=>setActiveEvaluation(e.target.value));
+async function submitForm(event,successKind){{event.preventDefault();clearError();const form=event.currentTarget;const baseline=new FormData(form).get(successKind==='injection'?'baseline_id':'target_id');try{{const response=await fetch(form.action,{{method:'POST',body:new FormData(form),headers:{{'X-Workbench-Request':'fetch'}}}});const body=await parseResponse(response);setActiveEvaluation(baseline);saveSession({{evaluation_id:baseline,[successKind]:body}});showStatus(body.detail||`${{successKind}} succeeded.`,'success');if(successKind==='injection')await explore()}}catch(error){{showStatus(error.message)}}}}
+document.getElementById('inject-form').addEventListener('submit',e=>submitForm(e,'injection'));
+document.getElementById('scenario-form').addEventListener('submit',e=>submitForm(e,'scenario'));
+document.getElementById('evidence').addEventListener('change',async e=>{{const f=e.target.files[0];if(!f)return;clearError();try{{const b=new FormData();b.append('evidence',f);const r=await parseResponse(await fetch('api/hash',{{method:'POST',body:b}}));document.getElementById('evidenceHash').textContent='SHA-256 '+r.sha256}}catch(error){{showStatus(error.message)}}}});
+refreshContext();
+</script></body></html>'''
 
 @app.get("/",response_class=HTMLResponse)
 @app.get("/workbench",response_class=HTMLResponse)
@@ -179,7 +200,7 @@ async def hash_file(evidence:UploadFile=File(...)):
 
 @app.post("/actions/inject-rescore",response_class=HTMLResponse)
 async def inject_rescore(
- baseline_id:str=Form(...),bidding_day:str=Form(...),observation_time:str=Form(...),
+ request:Request,baseline_id:str=Form(...),bidding_day:str=Form(...),observation_time:str=Form(...),
  publisher:str|None=Form(None),source_id:str|None=Form(None),evidence:UploadFile=File(...),
  qib_x:float|None=Form(None),nii_x:float|None=Form(None),
  retail_x:float|None=Form(None),overall_x:float|None=Form(None),
@@ -211,7 +232,10 @@ async def inject_rescore(
   if not validation.accepted: return _error("SupplementalInjectionError","; ".join(validation.errors),400)
   secondary=build_secondary(baseline_id,EvaluationStore(L1),SUPP,payload["supplemental_payload_id"])
   sec_out,_=store_secondary(secondary,SEC,EvaluationStore(L1))
-  return _page(f"{outcome}; {sec_out}; {secondary['secondary_evaluation_id']} hash {secondary['canonical_secondary_hash']}")
+  detail=f"{outcome}; {sec_out}; {secondary['secondary_evaluation_id']} hash {secondary['canonical_secondary_hash']}"
+  if request.headers.get("x-workbench-request")=="fetch":
+   return JSONResponse({"detail":detail,"evaluation_id":baseline_id,"supplemental_id":payload["supplemental_payload_id"],"secondary_id":secondary["secondary_evaluation_id"]})
+  return _page(detail)
  except (ValueError,FileNotFoundError) as exc:
   logger.info("Supplemental injection rejected: %s",exc)
   return _error("SupplementalInjectionError",str(exc),400)
@@ -220,7 +244,7 @@ async def inject_rescore(
   return _error(type(exc).__name__,str(exc),500)
 
 @app.post("/actions/scenario",response_class=HTMLResponse)
-def apply_scenario(target_id:str=Form(...),peer_name:str=Form(""),peer_pe:float|None=Form(None),peer_delta:float=Form(0),rating:str=Form("LOW"),qualitative_delta:float=Form(0),justification:str=Form(...)):
+def apply_scenario(request:Request,target_id:str=Form(...),peer_name:str=Form(""),peer_pe:float|None=Form(None),peer_delta:float=Form(0),rating:str=Form("LOW"),qualitative_delta:float=Form(0),justification:str=Form(...)):
  try:
   peer_name=peer_name.strip();justification=justification.strip()
   if not justification: raise ValueError("scenario justification is required")
@@ -230,7 +254,10 @@ def apply_scenario(target_id:str=Form(...),peer_name:str=Form(""),peer_pe:float|
   payload["qualitative_assertions"]=[{"criterion":"moat","rating":rating,"points_delta":qualitative_delta,"justification":justification}]
   payload=finalize_scenario(payload);result=evaluate_scenario(payload,EvaluationStore(L1),SEC)
   outcome,_=store_scenario(payload,result,OP,EvaluationStore(L1))
-  return _page(f"{outcome}; {result['scenario_id']} hash {result['canonical_result_hash']}")
+  detail=f"{outcome}; {result['scenario_id']} hash {result['canonical_result_hash']}"
+  if request.headers.get("x-workbench-request")=="fetch":
+   return JSONResponse({"detail":detail,"evaluation_id":target_id,"scenario_id":result["scenario_id"]})
+  return _page(detail)
  except (ValueError,FileNotFoundError) as exc:
   logger.info("Scenario form rejected: %s",exc)
   return _error("ScenarioEvaluationError",str(exc),400)
