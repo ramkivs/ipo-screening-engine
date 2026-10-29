@@ -505,13 +505,16 @@ IPO_WORKBENCH_ROOT=build/workbench \
 PYTHONPATH=engine python3 engine/tools/ui_dashboard.py
 ```
 
-Open `http://localhost:8000`. The explorer presents Layer 1, Layer 2C and
-operator-scenario realities separately. The bidding form hashes an uploaded
-local artifact before Layer 2B admission and Layer 2C recomputation. Uploading
-and attesting to bytes does not authenticate a publisher or establish value
-truth. The scenario form is always operator-badged. Use this only as a local,
-single-user workbench; it provides no authentication or production deployment
-boundary.
+Open `http://localhost:8000/workbench`. The explorer presents Layer 1, Layer
+2C and operator-scenario realities separately. The bidding form hashes an
+uploaded local artifact before Layer 2B admission and Layer 2C recomputation.
+Uploading and attesting to bytes does not authenticate a publisher or establish
+value truth. The scenario form is always operator-badged. JSON clients can use
+`POST /api/v1/secondary/evaluate` with an accepted supplemental ID and
+`POST /api/v1/scenario/evaluate` with operator assertions; both routes invoke
+the same backend modules and isolated stores as the CLI. Use this only as a
+local, single-user workbench; it provides no authentication or production
+deployment boundary.
 
 ---
 

@@ -45,6 +45,15 @@ def test_scenario_target_must_exist(tmp_path):
  p=scenario_template('missing');p.update(created_at='2026-10-29T12:00:00Z',operator_id='tester');p=finalize_scenario(p)
  with pytest.raises(FileNotFoundError):evaluate_scenario(p,EvaluationStore(JIO),tmp_path/'secondary')
 
+def _dashboard(monkeypatch,tmp_path,supp=None):
+ import engine.tools.ui_dashboard as dashboard
+ monkeypatch.setattr(dashboard,'L1',JIO);monkeypatch.setattr(dashboard,'ROOT',tmp_path);monkeypatch.setattr(dashboard,'SUPP',supp or tmp_path/'supp');monkeypatch.setattr(dashboard,'SEC',tmp_path/'sec');monkeypatch.setattr(dashboard,'OP',tmp_path/'op');return dashboard,TestClient(dashboard.app)
+
 def test_workbench_explorer_and_badges(monkeypatch,tmp_path):
- import importlib,engine.tools.ui_dashboard as dashboard
- monkeypatch.setattr(dashboard,'L1',JIO);monkeypatch.setattr(dashboard,'ROOT',tmp_path);monkeypatch.setattr(dashboard,'SUPP',tmp_path/'supp');monkeypatch.setattr(dashboard,'SEC',tmp_path/'sec');monkeypatch.setattr(dashboard,'OP',tmp_path/'op');client=TestClient(dashboard.app);page=client.get('/');assert page.status_code==200;assert '[LAYER_1_BASE]' in page.text and '[ENRICHED_LAYER_2C]' in page.text and '[OPERATOR_ASSUMPTION]' in page.text;data=client.get('/api/evaluations').json();assert any(x['id']==EID for x in data);hashed=client.post('/api/hash',files={'evidence':('x.txt',b'abc')}).json();assert hashed['sha256']==hashlib.sha256(b'abc').hexdigest()
+ dashboard,client=_dashboard(monkeypatch,tmp_path);page=client.get('/workbench');assert page.status_code==200;assert 'Day 1' in page.text and 'Day 2' in page.text and 'Day 3' in page.text;assert '[LAYER_1_BASE]' in page.text and '[ENRICHED_LAYER_2C]' in page.text and '[OPERATOR_ASSUMPTION]' in page.text;data=client.get('/api/evaluations').json();assert any(x['id']==EID for x in data);hashed=client.post('/api/hash',files={'evidence':('x.txt',b'abc')}).json();assert hashed['sha256']==hashlib.sha256(b'abc').hexdigest()
+
+def test_secondary_evaluate_api_runs_engine_and_returns_lineage(monkeypatch,tmp_path):
+ payload,supp=accepted_payload(tmp_path);dashboard,client=_dashboard(monkeypatch,tmp_path,supp);response=client.post('/api/v1/secondary/evaluate',json={'baseline_id':EID,'supplemental_id':payload['supplemental_payload_id']});assert response.status_code==200;body=response.json();assert body['outcome']=='SECONDARY_EVALUATION_STORED';assert body['secondary']['baseline_result_hash']=='0fde1451c1ea3ee61e6178d48908e8bffe12a943ba21f42f993429d11af9fb44';assert body['secondary']['supplemental_payload_hash']==payload['canonical_payload_hash']
+
+def test_scenario_evaluate_api_badges_operator_assumptions(monkeypatch,tmp_path):
+ dashboard,client=_dashboard(monkeypatch,tmp_path);response=client.post('/api/v1/scenario/evaluate',json={'target_id':EID,'operator_id':'api-test','peer_assertions':[{'peer_name':'Asserted Peer','pe':20,'as_of':'2026-10-23','points_delta':2,'justification':'scenario only'}],'qualitative_assertions':[{'criterion':'moat','rating':'HIGH','points_delta':3,'justification':'scenario only'}]});assert response.status_code==200;body=response.json();assert body['outcome']=='SCENARIO_STORED';assert body['scenario']['badge']=='[OPERATOR_ASSUMPTION]';assert all(x['badge']=='[OPERATOR_ASSUMPTION]' for x in body['scenario']['attribution'])

@@ -4009,3 +4009,9 @@ Layer 3 is now an explicitly non-governed scenario overlay. User-asserted peer P
 The local FastAPI workbench provides evaluation selection, day 1/2/3 bidding inputs, automatic uploaded-file SHA-256 display, Layer 2B injection plus Layer 2C recomputation, operator scenarios, three-reality comparison cards, attribution badges, and hash lineage. It is documented as local single-user tooling without authentication or production authority.
 
 Validation on the implemented tree: focused **35 passed**; complete backend **2,267 passed, 0 failed, 0 skipped, 25 warnings in 1625.84s**; frontend **93 passed**; all schemas, frozen core, golden result, inactive v1.6, compileall, and diff checks passed. Operational Jio acceptance produced baseline `37.0/AVOID/Low`, secondary `39.0/AVOID/Low` with only Module F `+2`, and an operator scenario score `48.0` whose verdict remained `AVOID` because the baseline knockout remains triggered. Secondary verify/replay passed. Before/after Layer 1 byte inventories were identical (`ec4e2634…`), and post-operation Layer 1 verify/replay passed. Detailed receipt: `docs/test-results/LAYER-2C-LAYER-3-WORKBENCH-2026-10-29.md`.
+
+---
+
+## Revision 49 — Layer 2C/Layer 3 web API and `/workbench` wiring — 2026-10-29
+
+The local FastAPI workbench now exposes first-class JSON routes `POST /api/v1/secondary/evaluate` and `POST /api/v1/scenario/evaluate`. Both call the existing governed backend modules and isolated stores directly; they do not duplicate scoring logic or write to Layer 1. `/workbench` serves the day 1/2/3 subscription/evidence form, operator peer and qualitative assertion form, and triple-reality Layer 1/2C/3 cards with attribution badges and hash lineage. Focused API/UI/CLI regression: **24 passed**, one non-fatal dependency deprecation warning.

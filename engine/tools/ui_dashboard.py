@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 if __package__ in (None,""): sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from ipo_screening.evaluation import EvaluationStore
@@ -18,6 +19,39 @@ ROOT=Path(os.environ.get("IPO_WORKBENCH_ROOT","build/workbench")).resolve()
 L1=Path(os.environ.get("IPO_EVALUATION_STORE","build/evaluations")).resolve()
 SUPP=ROOT/"supplemental"; SEC=ROOT/"secondary"; OP=ROOT/"operator"; UPLOAD=ROOT/"uploads"
 app=FastAPI(title="IPO Dual-Reality Workbench",version="1.0",docs_url="/api/docs")
+
+
+class SecondaryEvaluateRequest(BaseModel):
+ model_config=ConfigDict(extra="forbid")
+ baseline_id:str=Field(min_length=1)
+ supplemental_id:str=Field(pattern=r"^SUPP-[0-9a-f]{16}$")
+
+
+class PeerAssertionRequest(BaseModel):
+ model_config=ConfigDict(extra="forbid")
+ peer_name:str=Field(min_length=1)
+ pe:float=Field(gt=0)
+ as_of:str
+ points_delta:float=Field(ge=-20,le=20)
+ justification:str=Field(min_length=1)
+
+
+class QualitativeAssertionRequest(BaseModel):
+ model_config=ConfigDict(extra="forbid")
+ criterion:str
+ rating:str
+ points_delta:float=Field(ge=-15,le=15)
+ justification:str=Field(min_length=1)
+
+
+class ScenarioEvaluateRequest(BaseModel):
+ model_config=ConfigDict(extra="forbid")
+ target_id:str=Field(min_length=1)
+ operator_id:str=Field(min_length=1)
+ peer_assertions:list[PeerAssertionRequest]=Field(default_factory=list)
+ qualitative_assertions:list[QualitativeAssertionRequest]=Field(default_factory=list)
+ limitations:list[str]=Field(default_factory=lambda:["[OPERATOR_ASSUMPTION] User-asserted scenario; not verified evidence."])
+
 
 def _records():
  store=EvaluationStore(L1); out=[]
@@ -34,7 +68,36 @@ def _page(message=""):
 <footer>Lineage always displays exact baseline, supplemental, secondary, and scenario SHA-256 identities. Operator assertions never alter governed records.</footer><script>async function explore(){{let id=document.getElementById('evaluation').value,d=await(await fetch('/api/comparison/'+encodeURIComponent(id))).json(),c=document.getElementById('comparison');c.innerHTML=`<div class="card"><b>[LAYER_1_BASE]</b><br>${{JSON.stringify(d.baseline,null,2)}}</div><div class="card"><b>[ENRICHED_LAYER_2C]</b><br>${{JSON.stringify(d.enriched,null,2)}}</div><div class="card"><b>[OPERATOR_ASSUMPTION]</b><br>${{JSON.stringify(d.scenarios,null,2)}}</div>`}}document.getElementById('evidence').addEventListener('change',async(e)=>{{let f=e.target.files[0];if(!f)return;let b=new FormData();b.append('evidence',f);let r=await(await fetch('/api/hash',{{method:'POST',body:b}})).json();document.getElementById('evidenceHash').textContent='SHA-256 '+r.sha256}})</script></body></html>'''
 
 @app.get("/",response_class=HTMLResponse)
+@app.get("/workbench",response_class=HTMLResponse)
 def index(): return _page()
+
+
+@app.post("/api/v1/secondary/evaluate")
+def api_secondary_evaluate(request:SecondaryEvaluateRequest):
+ try:
+  secondary=build_secondary(request.baseline_id,EvaluationStore(L1),SUPP,request.supplemental_id)
+  outcome,path=store_secondary(secondary,SEC,EvaluationStore(L1))
+ except FileNotFoundError as exc:
+  raise HTTPException(404,str(exc)) from exc
+ except ValueError as exc:
+  raise HTTPException(400,str(exc)) from exc
+ return {"outcome":outcome,"path":str(path),"secondary":secondary}
+
+
+@app.post("/api/v1/scenario/evaluate")
+def api_scenario_evaluate(request:ScenarioEvaluateRequest):
+ payload=scenario_template(request.target_id)
+ payload.update({"created_at":datetime.now(timezone.utc).isoformat(),"operator_id":request.operator_id,"peer_assertions":[x.model_dump() for x in request.peer_assertions],"qualitative_assertions":[x.model_dump() for x in request.qualitative_assertions],"limitations":request.limitations})
+ payload=finalize_scenario(payload)
+ try:
+  result=evaluate_scenario(payload,EvaluationStore(L1),SEC)
+  outcome,path=store_scenario(payload,result,OP,EvaluationStore(L1))
+ except FileNotFoundError as exc:
+  raise HTTPException(404,str(exc)) from exc
+ except ValueError as exc:
+  raise HTTPException(400,str(exc)) from exc
+ return {"outcome":outcome,"path":str(path),"scenario_payload":payload,"scenario":result}
+
 
 @app.get("/api/evaluations")
 def evaluations(): return _records()
