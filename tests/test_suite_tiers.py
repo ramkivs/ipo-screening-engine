@@ -17,6 +17,9 @@ SYNTHETIC_EXCEPTIONS = {
     # fallback is off by default and that the ingest path passes it explicitly.
     # No filing is opened and no page is decoded.
     "test_fail_closed_fixture_safeguard_20261028.py",
+    # Uses tiny synthetic bytes named exchange.pdf to exercise Layer 2B artifact
+    # hashing; no parser opens or decodes the file.
+    "test_supplemental_data.py",
     "test_suite_tiers.py",  # this inventory guard itself
 }
 

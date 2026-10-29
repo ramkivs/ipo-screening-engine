@@ -36,7 +36,10 @@ def cli(*args: str, expect: int = 0) -> subprocess.CompletedProcess:
 
 def test_cli_help_lists_every_command():
     out = cli("--help").stdout
-    for command in ("run", "replay", "verify", "gap-report", "project", "check-config"):
+    for command in (
+        "run", "replay", "verify", "gap-report", "supplemental-init",
+        "supplemental-validate", "supplemental-inject", "project", "check-config",
+    ):
         assert command in out
 
 
