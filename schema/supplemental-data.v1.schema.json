@@ -23,7 +23,7 @@
         "properties": {
           "target": {"type": "string", "minLength": 1},
           "category": {"type": "string", "minLength": 1},
-          "value": {"type": ["number", "string", "boolean", "null"]},
+          "value": {"type": ["number", "string", "boolean", "array", "null"], "items": {"type": "number"}},
           "unit": {"type": ["string", "null"]},
           "currency": {"type": ["string", "null"]},
           "reporting_period": {"type": ["string", "null"]},

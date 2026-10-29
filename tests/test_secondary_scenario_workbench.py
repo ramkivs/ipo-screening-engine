@@ -24,7 +24,7 @@ def test_secondary_is_deterministic_capped_and_baseline_immutable(tmp_path):
 def test_secondary_rejects_non_whitelisted_stored_target(tmp_path):
  payload,supp=accepted_payload(tmp_path); directory=next((supp/EID).iterdir()); payload['entries'][0]['target']='business.moat_rating'; from ipo_screening.supplemental_data import payload_hash
  h=payload_hash(payload);payload['canonical_payload_hash']=h;payload['supplemental_payload_id']='SUPP-'+h[:16];(directory/'supplemental_payload.json').write_text(json.dumps(payload));m=json.loads((directory/'supplemental_manifest.json').read_text());m['payload_hash']=h;(directory/'supplemental_manifest.json').write_text(json.dumps(m))
- with pytest.raises(ValueError,match='whitelisted'):build_secondary(EID,EvaluationStore(JIO),supp,payload['supplemental_payload_id'])
+ with pytest.raises(ValueError,match='governed'):build_secondary(EID,EvaluationStore(JIO),supp,payload['supplemental_payload_id'])
 
 def test_secondary_rejects_out_of_window_observation(tmp_path):
  payload,supp=accepted_payload(tmp_path);directory=next((supp/EID).iterdir());payload['entries'][0]['observation_time']='2026-10-27T14:50:00Z';from ipo_screening.supplemental_data import payload_hash
@@ -94,6 +94,17 @@ def test_multipart_injection_accepts_spooled_upload_and_rescores(monkeypatch,tmp
  assert any((tmp_path/'supp'/EID).glob('*/supplemental_payload.json'));assert any((tmp_path/'sec'/EID).glob('*/secondary_evaluation.json'))
  assert any((tmp_path/'uploads'/EID).glob('*-demand evidence.pdf'))
  assert any((tmp_path/'payloads'/EID).glob('SUPP-*.json'))
+
+
+def test_financial_health_overrides_flow_through_workbench_secondary_evaluation(monkeypatch,tmp_path):
+ dashboard,client=_dashboard(monkeypatch,tmp_path)
+ response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST FILING','source_id':'FINANCIAL-OVERRIDE','operating_cash_flow_3yr_cumulative':'100','net_income_3yr_cumulative':'300','trade_receivables_days':'150','net_working_capital_pct_revenue':'60'},files={'evidence':('financials.pdf',b'synthetic financial artifact')})
+ assert response.status_code==200,response.text
+ secondary_path=next((tmp_path/'sec'/EID).glob('*/secondary_evaluation.json'))
+ secondary=json.loads(secondary_path.read_text())
+ assert set(secondary['admitted_fields'])=={'financials.operating_cash_flow_3yr_cumulative','financials.net_income_3yr_cumulative','financials.trade_receivables_days','financials.net_working_capital_pct_revenue'}
+ module_a=next(item for item in secondary['module_breakdown'] if item['module_id']=='A')
+ assert module_a['secondary_points'] < module_a['baseline_points']
 
 
 def test_upload_creates_missing_workspace_tree_and_rejects_stale_id(monkeypatch,tmp_path):
