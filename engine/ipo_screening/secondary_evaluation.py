@@ -16,6 +16,7 @@ from .evaluation import EvaluationStore
 from .financial_health import FINANCIAL_HEALTH_TARGETS, financial_health_metrics, with_financial_health_extension
 from .governance_extension import GOVERNANCE_EXTENSION_TARGETS, governance_extension_metrics, with_governance_extension
 from .segment_risk_extension import SEGMENT_RISK_TARGETS, segment_risk_metrics, with_segment_risk_extension
+from .regulatory_risk_extension import REGULATORY_RISK_TARGETS, regulatory_risk_metrics, with_regulatory_risk_extension
 from .hashing import sha256_of
 from .pipeline import evaluate, load_config
 from .supplemental_data import ELIGIBILITY_REGISTRY, baseline_binding, payload_hash
@@ -90,7 +91,7 @@ def build_secondary(baseline_id: str, store: EvaluationStore, supp_root: Path, s
     entries = payload.get("entries") or []
     targets = [str(e.get("target")) for e in entries]
     if not entries or len(targets) != len(set(targets)) or any(t not in WHITELIST for t in targets):
-        raise ValueError("Layer 2C admits only unique governed subscription, financial-health, segment-risk, or governance targets")
+        raise ValueError("Layer 2C admits only unique governed subscription, financial-health, segment-risk, regulatory-risk, or governance targets")
     if any((e.get("verification") or {}).get("status") != "SOURCE_ARTIFACT_HASH_VERIFIED" for e in entries):
         raise ValueError("Layer 2C requires SOURCE_ARTIFACT_HASH_VERIFIED entries")
 
@@ -123,12 +124,15 @@ def build_secondary(baseline_id: str, store: EvaluationStore, supp_root: Path, s
     financial_extension = any(target in FINANCIAL_HEALTH_TARGETS for target in targets)
     governance_extension = any(target in GOVERNANCE_EXTENSION_TARGETS for target in targets)
     segment_extension = any(target in SEGMENT_RISK_TARGETS for target in targets)
+    regulatory_extension = any(target in REGULATORY_RISK_TARGETS for target in targets)
     if financial_extension:
         scoring_config = with_financial_health_extension(scoring_config)
     if governance_extension:
         scoring_config = with_governance_extension(scoring_config)
     if segment_extension:
         scoring_config = with_segment_risk_extension(scoring_config)
+    if regulatory_extension:
+        scoring_config = with_regulatory_risk_extension(scoring_config)
     with ExitStack() as extensions:
         if financial_extension:
             extensions.enter_context(financial_health_metrics())
@@ -136,6 +140,8 @@ def build_secondary(baseline_id: str, store: EvaluationStore, supp_root: Path, s
             extensions.enter_context(governance_extension_metrics())
         if segment_extension:
             extensions.enter_context(segment_risk_metrics())
+        if regulatory_extension:
+            extensions.enter_context(regulatory_risk_metrics())
         outcome = evaluate(raw, scoring_config, mode=str(baseline["evaluation_mode"]).lower(), evaluation_datetime=moment)
     enriched = outcome.record.to_dict()
     before_modules, after_modules = _module_map(baseline), _module_map(enriched)

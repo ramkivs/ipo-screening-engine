@@ -924,6 +924,19 @@
         }
       }
     },
+    "risks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contingent_liabilities_pct_net_worth": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "material_regulatory_disputes_present": {
+          "type": ["boolean", "null"]
+        }
+      }
+    },
     "peers": {
       "type": "array",
       "description": "Genuine comparable companies. An empty array is permitted (D-PEER-1) and means no peer data is available: peer-relative metrics resolve UNKNOWN. Synthetic placeholder peers must never be inserted to satisfy this field.",

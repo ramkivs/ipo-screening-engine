@@ -55,6 +55,7 @@ jobs:
                 tests/test_working_capital_extension.py
                 tests/test_governance_extension.py
                 tests/test_segment_risk_extension.py
+                tests/test_regulatory_risk_extension.py
                 tests/test_presentation_api.py
                 tests/test_cli.py
                 tests/test_suite_tiers.py

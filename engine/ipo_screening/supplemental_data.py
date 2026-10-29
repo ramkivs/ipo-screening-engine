@@ -84,6 +84,20 @@ ELIGIBILITY_REGISTRY.update({
         "source_types": ("OFFICIAL_FILING",), "minimum": None,
         "recordable": True, "scoring_eligible": True,
     },
+    "risks.contingent_liabilities_pct_net_worth": {
+        "category": "REGULATORY_RISK", "type": "number", "unit": "PERCENT", "currency": None,
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "RISK", "gap_item": "contingent_liabilities_pct_net_worth",
+        "source_types": ("OFFICIAL_FILING",), "minimum": 0,
+        "recordable": True, "scoring_eligible": True,
+    },
+    "risks.material_regulatory_disputes_present": {
+        "category": "REGULATORY_RISK", "type": "boolean", "unit": None, "currency": None,
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "RISK", "gap_item": "material_regulatory_disputes_present",
+        "source_types": ("OFFICIAL_FILING",), "minimum": None,
+        "recordable": True, "scoring_eligible": True,
+    },
     "governance.promoter_pledged_shares_pct": {
         "category": "GOVERNANCE", "type": "number", "unit": "PERCENT", "currency": None,
         "requires_observation_time": False, "requires_gap": False,

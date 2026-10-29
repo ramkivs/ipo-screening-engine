@@ -80,6 +80,7 @@ class CanonicalInputBuilder:
             "use_of_proceeds": self._build_use_of_proceeds(),
             "governance": self._build_governance(),
             "business": self._build_business(),
+            "risks": self._build_risks(),
             "peers": peers_list,
         }
 
@@ -401,6 +402,15 @@ class CanonicalInputBuilder:
             res["ofs_sellers"] = self._get_field("issue.ofs_sellers")
 
         return res
+
+    def _build_risks(self) -> Dict[str, Any]:
+        base = self.base.get("risks", {})
+        result: Dict[str, Any] = {}
+        for name in ("contingent_liabilities_pct_net_worth", "material_regulatory_disputes_present"):
+            value = base.get(name) if name in base else self._get_field(f"risks.{name}", None)
+            if value is not None:
+                result[name] = value
+        return result
 
     def _build_financials(self) -> Dict[str, Any]:
         fin_base = self.base.get("financials", {})

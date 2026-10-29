@@ -64,7 +64,9 @@
         },
         "allOf": [
           {"if": {"properties": {"target": {"const": "financials.top_customer_revenue_pct"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "number", "minimum": 0, "maximum": 100}}}},
-          {"if": {"properties": {"target": {"const": "financials.loss_making_segments_present"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "boolean"}}}}
+          {"if": {"properties": {"target": {"const": "financials.loss_making_segments_present"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "boolean"}}}},
+          {"if": {"properties": {"target": {"const": "risks.contingent_liabilities_pct_net_worth"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "number", "minimum": 0}}}},
+          {"if": {"properties": {"target": {"const": "risks.material_regulatory_disputes_present"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "boolean"}}}}
         ]
       }
     }
