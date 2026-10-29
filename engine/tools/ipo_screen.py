@@ -45,6 +45,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Mapping
 from urllib.parse import urlparse
 
 if __package__ in (None, ""):  # allow `python3 engine/tools/ipo_screen.py`
@@ -70,6 +71,11 @@ from ipo_screening.extraction.price_band_notice import (  # noqa: E402
     PriceBandNoticeParser,
 )
 from ipo_screening.pipeline import load_config, replay  # noqa: E402
+from ipo_screening.supplemental_data import (  # noqa: E402
+    initialize_template,
+    store_payload,
+    validate_payload,
+)
 from ipo_screening.version import (  # noqa: E402
     DEFAULT_CONFIG_PATH,
     SPEC_VERSION,
@@ -365,6 +371,55 @@ def cmd_gap_report(args: argparse.Namespace) -> int:
     print(f"report hash       {report['report_hash']}")
     print(f"report            {output}")
     return EXIT_OK
+
+
+def _write_new_json(path_text: str, payload: Mapping[str, Any]) -> Path:
+    path = Path(path_text)
+    if path.exists():
+        raise FileExistsError(f"output already exists: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8", newline="\n") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True, ensure_ascii=False)
+        handle.write("\n")
+    return path
+
+
+def cmd_supplemental_init(args: argparse.Namespace) -> int:
+    template = initialize_template(EvaluationStore(args.store), args.evaluation_id)
+    path = _write_new_json(args.output, template)
+    print(f"evaluation        {args.evaluation_id}")
+    print(f"eligible entries  {len(template['entries'])}")
+    print(f"excluded gaps     {len(template['template_metadata']['excluded_gaps'])}")
+    print(f"template          {path.resolve()}")
+    print("scoring           NOT_GRANTED")
+    return EXIT_OK
+
+
+def cmd_supplemental_validate(args: argparse.Namespace) -> int:
+    path = Path(args.payload)
+    payload = load_strict_json(path)
+    result = validate_payload(payload, EvaluationStore(args.store), payload_base=path.parent)
+    print(f"outcome           {result.outcome}")
+    print(f"payload hash      {result.payload_hash}")
+    print("scoring           NOT_GRANTED")
+    for error in result.errors:
+        print(f"  {error}")
+    return EXIT_OK if result.accepted else EXIT_REFUSED
+
+
+def cmd_supplemental_inject(args: argparse.Namespace) -> int:
+    path = Path(args.payload)
+    payload = load_strict_json(path)
+    outcome, target, validation = store_payload(
+        payload, EvaluationStore(args.store), Path(args.supp_store), payload_base=path.parent
+    )
+    print(f"outcome           {outcome}")
+    print(f"payload hash      {validation.payload_hash}")
+    print(f"supplemental path {target.resolve()}")
+    print("scoring           NOT_GRANTED")
+    for error in validation.errors:
+        print(f"  {error}")
+    return EXIT_OK if outcome in ("SUPPLEMENTAL_STORAGE_ACCEPTED", "EXACT_DUPLICATE") else EXIT_REFUSED
 
 
 def cmd_project(args: argparse.Namespace) -> int:
@@ -1392,6 +1447,23 @@ def build_parser() -> argparse.ArgumentParser:
                      help="new JSON report path outside the immutable evaluation directory")
     gap.set_defaults(func=cmd_gap_report)
 
+    supp_init = sub.add_parser("supplemental-init", help="create a Layer 2B template for one verified baseline")
+    supp_init.add_argument("evaluation_id")
+    supp_init.add_argument("--store", required=True)
+    supp_init.add_argument("--output", "-o", required=True)
+    supp_init.set_defaults(func=cmd_supplemental_init)
+
+    supp_validate = sub.add_parser("supplemental-validate", help="validate a completed Layer 2B payload without storing it")
+    supp_validate.add_argument("payload")
+    supp_validate.add_argument("--store", required=True)
+    supp_validate.set_defaults(func=cmd_supplemental_validate)
+
+    supp_inject = sub.add_parser("supplemental-inject", help="admit a valid payload to the isolated Layer 2B store")
+    supp_inject.add_argument("payload")
+    supp_inject.add_argument("--store", required=True)
+    supp_inject.add_argument("--supp-store", required=True)
+    supp_inject.set_defaults(func=cmd_supplemental_inject)
+
     pro = sub.add_parser("project", help="rebuild the Excel workbook from the store")
     pro.add_argument("--store", required=True)
     pro.add_argument("--workbook", required=True)
@@ -1584,7 +1656,7 @@ def main(argv: list[str] | None = None) -> int:
             location = f" [{finding.location}]" if finding.location else ""
             print(f"  {finding.code}{location}: {finding.message}", file=sys.stderr)
         return EXIT_REFUSED
-    except (ValueError, FileNotFoundError, json.JSONDecodeError) as exc:
+    except (ValueError, FileNotFoundError, FileExistsError, json.JSONDecodeError) as exc:
         safe_msg = sanitize_credentials(str(exc))
         print(f"error: {safe_msg}", file=sys.stderr)
         return EXIT_REFUSED

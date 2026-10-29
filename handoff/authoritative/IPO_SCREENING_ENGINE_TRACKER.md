@@ -3972,3 +3972,28 @@ Validation on CPython 3.11.2 / pytest 9.1.1: focused gap/CLI modules **23 passed
 `docs/test-results/TWO-LAYER-GAP-ANALYSIS-2026-10-29.md`. No scoring formula, confidence,
 knockout, schema, provider, exchange acquisition, source authority, cache or baseline persistence
 behavior changed.
+
+---
+
+## Revision 47 — Layer 2B governed supplemental capture and isolated immutable storage — 2026-10-29
+
+Implemented contract `IPO_LAYER_2B_SUPPLEMENTAL_DATA` v1.0 with strict JSON schema, exact verified
+Layer 1 binding, deterministic payload identity, a narrow field registry, source-artifact hashing,
+operator attestation distinct from source verification, and an isolated immutable supplemental
+store. Initial eligibility is deliberately limited to non-negative QIB/NII/retail/overall
+subscription multiples for a baseline `MARKET/subscription` gap when the exact Layer 1 value is
+not already established. Unit `MULTIPLE_X`, observation timestamp, official-exchange source
+metadata, local artifact/hash and locator are mandatory. No entry is scoring-eligible.
+
+Commands: `supplemental-init`, `supplemental-validate`, and `supplemental-inject`. Every command
+selects/reverifies the exact baseline; injection reruns all gates. The binding hashes profile,
+evaluation ID, IPO ID, result hash and sorted manifest artifact hashes. Storage is
+`<supp-store>/<evaluation-id>/<payload-hash>/`, atomic and no-overwrite. Exact duplicates are
+reported; differing values for an existing target conflict-reject; normalized/symlink paths into
+Layer 1 are refused. Layer 1 artifacts, inventory, verify/replay and scoring are unchanged. Layer
+2C remains unimplemented.
+
+Validation: focused **36 passed**. First full run exposed only the new synthetic module's omitted
+tier declaration (2,258 passed / 1 inventory failure); corrected without product/test weakening.
+Final full backend **2,259 passed, 0 failed, 0 skipped**, exit 0, 25 existing warnings, 1,351.45 s.
+Receipt: `docs/test-results/LAYER-2B-SUPPLEMENTAL-DATA-2026-10-29.md`.

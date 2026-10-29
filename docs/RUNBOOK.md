@@ -392,6 +392,63 @@ mutation or replacement. QIB/NII demand, unofficial GMP and peer financials
 need distinct source/semantic rules. A signature string, `verified_by` field,
 or official-looking note is not proof of authenticity or scoring eligibility.
 
+### 4.5 Layer 2B supplemental capture and isolated storage
+
+Layer 2B records narrowly eligible information without changing or rescoring the
+Layer 1 baseline. The initial v1.0 registry supports only non-negative QIB, NII,
+retail and overall subscription multiples when the selected baseline has a
+`MARKET / subscription` gap and the exact Layer 1 target is not already known.
+It requires unit `MULTIPLE_X`, an observation timestamp, an official-exchange
+document, a locally available artifact and matching SHA-256, precise locator,
+and operator attestation. Artifact-hash verification proves only which bytes
+were inspected; it does not prove that the claimed value appears there.
+
+Generate a baseline-bound template:
+
+```bash
+python3 engine/tools/ipo_screen.py supplemental-init <evaluation-id> \
+  --store build/evaluations --output build/supplemental/template.json
+```
+
+Complete only eligible entries, remove unused entries and the informational
+`template_metadata` block, provide the required metadata, and set `created_at`.
+The canonical payload hash is the engine's
+canonical SHA-256 over the complete payload after removing
+`canonical_payload_hash` and `supplemental_payload_id`; the ID is
+`SUPP-` plus the first 16 lowercase hex characters. Validate without writing:
+
+```bash
+python3 engine/tools/ipo_screen.py supplemental-validate \
+  build/supplemental/payload.json --store build/evaluations
+```
+
+Admit to a separate immutable store only after validation:
+
+```bash
+python3 engine/tools/ipo_screen.py supplemental-inject \
+  build/supplemental/payload.json --store build/evaluations \
+  --supp-store build/supplemental-store
+```
+
+The baseline binding is canonical SHA-256 of an object containing profile
+`ipo-layer2b-baseline-binding/1.0`, exact evaluation ID, IPO ID, result hash,
+and the manifest's artifact digest inventory sorted by artifact name. All gates
+are rerun immediately before storage. Accepted records are stored under
+`<supp-store>/<evaluation-id>/<payload-hash>/` as `supplemental_payload.json`
+and `supplemental_manifest.json`. Exact duplicates are reported without an
+overwrite; a different value for an already stored target is conflict-rejected.
+Invalid payloads create no accepted directory. Normalized and symlinked paths
+inside Layer 1 are refused.
+
+`SUPPLEMENTAL_STORAGE_ACCEPTED` means only that the v1.0 contract, baseline,
+registry, metadata and artifact-hash gates passed. Per-entry `UNVERIFIED`,
+`OPERATOR_ATTESTED`, and `SOURCE_ARTIFACT_HASH_VERIFIED` remain distinct, and
+none grants scoring eligibility. Layer 2C remains unimplemented: it still needs
+category-specific scoring admission, an independently identified result bound
+to baseline plus payload, deterministic verification/replay, and explicit
+rules for conflicts, staleness, comparability, confidence and verdict effects.
+It must never mutate or replace Layer 1.
+
 ---
 
 ## 5. Reading the workbook
