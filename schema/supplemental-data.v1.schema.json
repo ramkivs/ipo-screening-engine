@@ -61,7 +61,11 @@
             }
           },
           "limitations": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
-        }
+        },
+        "allOf": [
+          {"if": {"properties": {"target": {"const": "financials.top_customer_revenue_pct"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "number", "minimum": 0, "maximum": 100}}}},
+          {"if": {"properties": {"target": {"const": "financials.loss_making_segments_present"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "boolean"}}}}
+        ]
       }
     }
   }

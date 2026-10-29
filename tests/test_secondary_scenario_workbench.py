@@ -107,6 +107,18 @@ def test_financial_health_overrides_flow_through_workbench_secondary_evaluation(
  assert module_a['secondary_points'] < module_a['baseline_points']
 
 
+def test_segment_risk_overrides_flow_through_workbench_secondary_evaluation(monkeypatch,tmp_path):
+ dashboard,client=_dashboard(monkeypatch,tmp_path)
+ response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST FILING','source_id':'SEGMENT-RISK-OVERRIDE','top_customer_revenue_pct':'55','loss_making_segments_present':'true'},files={'evidence':('segments.pdf',b'synthetic segment risk artifact')})
+ assert response.status_code==200,response.text
+ secondary_path=next((tmp_path/'sec'/EID).glob('*/secondary_evaluation.json'))
+ secondary=json.loads(secondary_path.read_text())
+ assert set(secondary['admitted_fields'])=={'financials.top_customer_revenue_pct','financials.loss_making_segments_present'}
+ module_a=next(item for item in secondary['module_breakdown'] if item['module_id']=='A')
+ assert module_a['secondary_points'] == max(0,module_a['baseline_points']-6)
+ assert 0 <= module_a['secondary_points'] <= module_a['cap']
+
+
 def test_governance_overrides_flow_through_workbench_secondary_evaluation(monkeypatch,tmp_path):
  dashboard,client=_dashboard(monkeypatch,tmp_path)
  response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST FILING','source_id':'GOVERNANCE-OVERRIDE','promoter_pledged_shares_pct':'100','pre_issue_promoter_holding_pct':'10'},files={'evidence':('governance.pdf',b'synthetic governance artifact')})

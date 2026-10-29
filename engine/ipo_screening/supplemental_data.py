@@ -70,6 +70,20 @@ ELIGIBILITY_REGISTRY.update({
         "gap_category": "FINANCIAL", "gap_item": "net_working_capital_pct_revenue",
         "source_types": ("OFFICIAL_FILING",), "minimum": None, "recordable": True, "scoring_eligible": True,
     },
+    "financials.top_customer_revenue_pct": {
+        "category": "SEGMENT_RISK", "type": "number", "unit": "PERCENT", "currency": None,
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "FINANCIAL", "gap_item": "top_customer_revenue_pct",
+        "source_types": ("OFFICIAL_FILING",), "minimum": 0, "maximum": 100,
+        "recordable": True, "scoring_eligible": True,
+    },
+    "financials.loss_making_segments_present": {
+        "category": "SEGMENT_RISK", "type": "boolean", "unit": None, "currency": None,
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "FINANCIAL", "gap_item": "loss_making_segments_present",
+        "source_types": ("OFFICIAL_FILING",), "minimum": None,
+        "recordable": True, "scoring_eligible": True,
+    },
     "governance.promoter_pledged_shares_pct": {
         "category": "GOVERNANCE", "type": "number", "unit": "PERCENT", "currency": None,
         "requires_observation_time": False, "requires_gap": False,
@@ -215,7 +229,10 @@ def validate_payload(payload: Mapping[str, Any], store: EvaluationStore, *, payl
             errors.append(f"{prefix} TARGET_ALREADY_ESTABLISHED_IN_LAYER1")
         value = entry.get("value")
         values = value if isinstance(value, list) else [value]
-        if (rule["type"] != "number_or_array" and isinstance(value, list)) or not values or any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in values):
+        if rule["type"] == "boolean":
+            if not isinstance(value, bool):
+                errors.append(f"{prefix} VALUE_TYPE must be boolean")
+        elif (rule["type"] != "number_or_array" and isinstance(value, list)) or not values or any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in values):
             errors.append(f"{prefix} VALUE_TYPE must be number" + (" or numeric array" if rule["type"] == "number_or_array" else ""))
         elif isinstance(value, list) and len(value) != 3:
             errors.append(f"{prefix} VALUE_ARRAY must contain exactly three FY observations")
