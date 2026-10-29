@@ -47,7 +47,7 @@ def test_scenario_target_must_exist(tmp_path):
 
 def _dashboard(monkeypatch,tmp_path,supp=None):
  import engine.tools.ui_dashboard as dashboard
- monkeypatch.setattr(dashboard,'L1',JIO);monkeypatch.setattr(dashboard,'ROOT',tmp_path);monkeypatch.setattr(dashboard,'SUPP',supp or tmp_path/'supp');monkeypatch.setattr(dashboard,'SEC',tmp_path/'sec');monkeypatch.setattr(dashboard,'OP',tmp_path/'op');return dashboard,TestClient(dashboard.app)
+ monkeypatch.setattr(dashboard,'L1',JIO);monkeypatch.setattr(dashboard,'ROOT',tmp_path);monkeypatch.setattr(dashboard,'SUPP',supp or tmp_path/'supp');monkeypatch.setattr(dashboard,'SEC',tmp_path/'sec');monkeypatch.setattr(dashboard,'OP',tmp_path/'op');monkeypatch.setattr(dashboard,'UPLOAD',tmp_path/'uploads');return dashboard,TestClient(dashboard.app)
 
 def test_workbench_explorer_and_badges(monkeypatch,tmp_path):
  dashboard,client=_dashboard(monkeypatch,tmp_path);page=client.get('/workbench');assert page.status_code==200;assert 'Day 1' in page.text and 'Day 2' in page.text and 'Day 3' in page.text;assert '[LAYER_1_BASE]' in page.text and '[ENRICHED_LAYER_2C]' in page.text and '[OPERATOR_ASSUMPTION]' in page.text;data=client.get('/api/evaluations').json();assert any(x['id']==EID for x in data);hashed=client.post('/api/hash',files={'evidence':('x.txt',b'abc')}).json();assert hashed['sha256']==hashlib.sha256(b'abc').hexdigest()
@@ -92,3 +92,16 @@ def test_multipart_injection_accepts_spooled_upload_and_rescores(monkeypatch,tmp
  response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'SYNTHETIC-UPLOAD','qib_x':'12.34'},files={'evidence':('demand evidence.pdf',b'synthetic demand artifact')})
  assert response.status_code==200;body=response.json();assert 'SUPPLEMENTAL_STORAGE_ACCEPTED' in body['detail'];assert body['evaluation_id']==EID;assert body['supplemental_id'].startswith('SUPP-');assert body['secondary_id'].startswith('SEC-')
  assert any((tmp_path/'supp'/EID).glob('*/supplemental_payload.json'));assert any((tmp_path/'sec'/EID).glob('*/secondary_evaluation.json'))
+ assert any((tmp_path/'uploads'/EID).glob('*-demand evidence.pdf'))
+ assert any((tmp_path/'payloads'/EID).glob('SUPP-*.json'))
+
+
+def test_upload_creates_missing_workspace_tree_and_rejects_stale_id(monkeypatch,tmp_path):
+ workspace=tmp_path/'missing'/'nested'/'workbench';dashboard,client=_dashboard(monkeypatch,workspace)
+ response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'ACTIVE-WORKSPACE','qib_x':'12.34'},files={'evidence':('active.pdf',b'active workspace artifact')})
+ assert response.status_code==200
+ assert any((workspace/'uploads'/EID).glob('*-active.pdf'))
+ assert (workspace/'supp'/EID).is_dir() and (workspace/'sec'/EID).is_dir()
+ stale=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':'STALE-EVALUATION-FROM-OLD-PATH','bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'STALE','qib_x':'1'},files={'evidence':('stale.pdf',b'must not be stored')})
+ assert stale.status_code==400;assert 'not in active store' in stale.json()['detail']
+ assert not list((workspace/'uploads').rglob('*stale.pdf'))

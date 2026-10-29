@@ -45,11 +45,31 @@ async def unhandled_error_handler(_,exc:Exception):
  return _error(type(exc).__name__,str(exc) or "Unexpected workbench failure",500)
 
 
+def _ensure_parent(target: str | Path) -> Path:
+ """Create a target's complete parent tree before any Windows-safe write."""
+ path=Path(target)
+ os.makedirs(path.parent,exist_ok=True)
+ return path
+
+
+def _ensure_workbench_dirs() -> None:
+ for directory in (ROOT,SUPP,SEC,OP,UPLOAD): os.makedirs(directory,exist_ok=True)
+
+
 def configure_workbench(evaluation_store: str | Path, workbench_root: str | Path) -> None:
- """Point the embedded single-user workbench at its host API's stores."""
+ """Point the workbench only at the evaluation store selected by its host API."""
  global L1, ROOT, SUPP, SEC, OP, UPLOAD
  L1=Path(evaluation_store).resolve();ROOT=Path(workbench_root).resolve()
  SUPP=ROOT/"supplemental";SEC=ROOT/"secondary";OP=ROOT/"operator";UPLOAD=ROOT/"uploads"
+ _ensure_workbench_dirs()
+
+
+def _resolve_evaluation_id(evaluation_id: str) -> str:
+ """Reject stale IDs instead of searching historical or hardcoded stores."""
+ requested=(evaluation_id or "").strip()
+ if not requested or requested not in EvaluationStore(L1).list_evaluations():
+  raise FileNotFoundError(f"Evaluation {requested or '<empty>'} is not in active store {L1}")
+ return requested
 
 
 class SecondaryEvaluateRequest(BaseModel):
@@ -142,7 +162,9 @@ def index(): return _page()
 @app.post("/api/v1/secondary/evaluate")
 def api_secondary_evaluate(request:SecondaryEvaluateRequest):
  try:
-  secondary=build_secondary(request.baseline_id,EvaluationStore(L1),SUPP,request.supplemental_id)
+  baseline_id=_resolve_evaluation_id(request.baseline_id)
+  _ensure_workbench_dirs()
+  secondary=build_secondary(baseline_id,EvaluationStore(L1),SUPP,request.supplemental_id)
   outcome,path=store_secondary(secondary,SEC,EvaluationStore(L1))
  except FileNotFoundError as exc:
   raise HTTPException(404,str(exc)) from exc
@@ -158,7 +180,9 @@ def api_secondary_evaluate(request:SecondaryEvaluateRequest):
 @app.post("/api/v1/scenario/evaluate")
 def api_scenario_evaluate(request:ScenarioEvaluateRequest):
  try:
-  payload=scenario_template(request.target_id)
+  target_id=_resolve_evaluation_id(request.target_id)
+  _ensure_workbench_dirs()
+  payload=scenario_template(target_id)
   payload.update({"created_at":datetime.now(timezone.utc).isoformat(),"operator_id":request.operator_id,"peer_assertions":[x.model_dump() for x in request.peer_assertions],"qualitative_assertions":[x.model_dump() for x in request.qualitative_assertions],"limitations":request.limitations})
   payload=finalize_scenario(payload)
   result=evaluate_scenario(payload,EvaluationStore(L1),SEC)
@@ -179,8 +203,9 @@ def evaluations(): return _records()
 
 @app.get("/api/comparison/{baseline_id}")
 def comparison(baseline_id:str):
+ try: baseline_id=_resolve_evaluation_id(baseline_id)
+ except FileNotFoundError as exc: raise HTTPException(404,str(exc)) from exc
  base=next((x for x in _records() if x["id"]==baseline_id),None)
- if not base: raise HTTPException(404,"baseline not found")
  enriched=[]
  for p in SEC.glob(f"{baseline_id}/*/secondary_evaluation.json"): enriched.append(json.loads(p.read_text()))
  scenarios=[]
@@ -206,6 +231,8 @@ async def inject_rescore(
  retail_x:float|None=Form(None),overall_x:float|None=Form(None),
 ):
  try:
+  baseline_id=_resolve_evaluation_id(baseline_id)
+  _ensure_workbench_dirs()
   publisher=(publisher or "").strip();source_id=(source_id or "").strip()
   if not publisher or not source_id: raise ValueError("publisher and source_id are required")
   observed=datetime.fromisoformat(observation_time.replace("Z","+00:00"))
@@ -213,8 +240,8 @@ async def inject_rescore(
   filename,data=await _read_upload(evidence)
   values={"qib_x":qib_x,"nii_x":nii_x,"retail_x":retail_x,"overall_x":overall_x}
   if all(value is None for value in values.values()): raise ValueError("at least one subscription multiplier is required")
-  UPLOAD.mkdir(parents=True,exist_ok=True);digest=hashlib.sha256(data).hexdigest()
-  artifact=UPLOAD/f"{digest}-{filename}"
+  digest=hashlib.sha256(data).hexdigest()
+  artifact=_ensure_parent(UPLOAD/baseline_id/f"{digest}-{filename}")
   if not artifact.exists(): artifact.write_bytes(data)
   template=initialize_template(EvaluationStore(L1),baseline_id);entries=[]
   for entry in template["entries"]:
@@ -226,7 +253,7 @@ async def inject_rescore(
    entry["verification"]={"status":"SOURCE_ARTIFACT_HASH_VERIFIED","procedure_note":"Workbench verified only the uploaded local bytes."}
    entry["limitations"]=["Storage is not publisher authenticity, value truth, or scoring eligibility."];entries.append(entry)
   template["entries"]=entries;template["created_at"]=datetime.now(timezone.utc).isoformat();payload=finalize_payload(template)
-  ROOT.mkdir(parents=True,exist_ok=True);payload_path=ROOT/f"{payload['supplemental_payload_id']}.json"
+  payload_path=_ensure_parent(ROOT/"payloads"/baseline_id/f"{payload['supplemental_payload_id']}.json")
   if not payload_path.exists(): payload_path.write_text(json.dumps(payload,indent=2,sort_keys=True)+"\n")
   outcome,_,validation=store_payload(payload,EvaluationStore(L1),SUPP,payload_base=ROOT)
   if not validation.accepted: return _error("SupplementalInjectionError","; ".join(validation.errors),400)
@@ -246,6 +273,8 @@ async def inject_rescore(
 @app.post("/actions/scenario",response_class=HTMLResponse)
 def apply_scenario(request:Request,target_id:str=Form(...),peer_name:str=Form(""),peer_pe:float|None=Form(None),peer_delta:float=Form(0),rating:str=Form("LOW"),qualitative_delta:float=Form(0),justification:str=Form(...)):
  try:
+  target_id=_resolve_evaluation_id(target_id)
+  _ensure_workbench_dirs()
   peer_name=peer_name.strip();justification=justification.strip()
   if not justification: raise ValueError("scenario justification is required")
   if bool(peer_name)!=(peer_pe is not None): raise ValueError("peer_name and peer_pe must be supplied together")
