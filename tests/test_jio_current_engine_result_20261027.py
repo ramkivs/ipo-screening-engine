@@ -90,6 +90,9 @@ DIVERGENT_ENGINE_FILES = frozenset(
         "engine/ipo_screening/issue_terms.py",
         "engine/ipo_screening/official_issue_sources.py",
         "engine/ipo_screening/post_listing/v16_implementation.py",
+        # Revision 50 embeds the isolated Layer 2C/Layer 3 workbench in the
+        # presentation host; this UI routing change cannot affect Jio scoring.
+        "engine/ipo_screening/presentation/api.py",
         "engine/ipo_screening/semantic_validation.py",
         "engine/tools/ipo_screen.py",
     }
@@ -133,7 +136,7 @@ def test_published_record_engine_diverges_from_main():
             divergent.add(relative)
 
     assert divergent == DIVERGENT_ENGINE_FILES
-    assert len(divergent) == 21
+    assert len(divergent) == 22
 
 
 def test_published_record_still_says_insufficient_data():
