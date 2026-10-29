@@ -423,6 +423,13 @@ class CanonicalInputBuilder:
         # present in the input/extraction was previously lost here (the
         # penalty could never be evaluated).  Only carried when established,
         # so an absent value stays absent (UNKNOWN), never defaulted.
+        for name in (
+            "operating_cash_flow_3yr_cumulative", "net_income_3yr_cumulative",
+            "trade_receivables_days", "net_working_capital_pct_revenue",
+        ):
+            value = fin_base.get(name) if name in fin_base else self._get_field(f"financials.{name}", None)
+            if value is not None:
+                result[name] = value
         if "adjusted_metrics_unreconciled" in fin_base:
             result["adjusted_metrics_unreconciled"] = fin_base["adjusted_metrics_unreconciled"]
         else:

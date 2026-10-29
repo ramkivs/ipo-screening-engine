@@ -45,6 +45,32 @@ ELIGIBILITY_REGISTRY: Dict[str, Dict[str, Any]] = {
         "market.subscription.overall_x",
     )
 }
+ELIGIBILITY_REGISTRY.update({
+    "financials.operating_cash_flow_3yr_cumulative": {
+        "category": "FINANCIAL_HEALTH", "type": "number_or_array", "unit": "REPORTING_UNIT",
+        "currency": "INR", "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "FINANCIAL", "gap_item": "operating_cash_flow_3yr_cumulative",
+        "source_types": ("OFFICIAL_FILING",), "minimum": None, "recordable": True, "scoring_eligible": True,
+    },
+    "financials.net_income_3yr_cumulative": {
+        "category": "FINANCIAL_HEALTH", "type": "number_or_array", "unit": "REPORTING_UNIT",
+        "currency": "INR", "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "FINANCIAL", "gap_item": "net_income_3yr_cumulative",
+        "source_types": ("OFFICIAL_FILING",), "minimum": None, "recordable": True, "scoring_eligible": True,
+    },
+    "financials.trade_receivables_days": {
+        "category": "FINANCIAL_HEALTH", "type": "number", "unit": "DAYS", "currency": None,
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "FINANCIAL", "gap_item": "trade_receivables_days",
+        "source_types": ("OFFICIAL_FILING",), "minimum": 0, "recordable": True, "scoring_eligible": True,
+    },
+    "financials.net_working_capital_pct_revenue": {
+        "category": "FINANCIAL_HEALTH", "type": "number", "unit": "PERCENT", "currency": None,
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "FINANCIAL", "gap_item": "net_working_capital_pct_revenue",
+        "source_types": ("OFFICIAL_FILING",), "minimum": None, "recordable": True, "scoring_eligible": True,
+    },
+})
 
 @dataclass(frozen=True)
 class SupplementalValidation:
@@ -101,18 +127,26 @@ def initialize_template(store: EvaluationStore, evaluation_id: str) -> Dict[str,
     gaps = {(g.get("category"), g.get("item")) for g in record.get("missing_unverified") or []}
     entries = []
     excluded = []
+    snapshot = record.get("input_snapshot") or {}
+    raw_input: Any = snapshot.get("input", snapshot) if isinstance(snapshot, Mapping) else {}
     for target, rule in sorted(ELIGIBILITY_REGISTRY.items()):
-        if (rule["gap_category"], rule["gap_item"]) not in gaps:
+        existing: Any = raw_input
+        for part in target.split("."):
+            existing = existing.get(part) if isinstance(existing, Mapping) else None
+        if existing is not None:
+            excluded.append({"target": target, "reason": "value is already established in Layer 1"})
+            continue
+        if rule.get("requires_gap", True) and (rule["gap_category"], rule["gap_item"]) not in gaps:
             excluded.append({"target": target, "reason": "baseline does not establish the required eligible gap"})
             continue
         entries.append({
             "target": target, "category": rule["category"], "value": None,
             "unit": rule["unit"], "currency": rule["currency"],
             "reporting_period": None, "observation_time": None,
-            "source": {"source_type": "OFFICIAL_EXCHANGE_DOCUMENT", "source_id": "", "title": "", "publisher": "", "publication_date": "", "official_url": None, "artifact_ref": "", "artifact_sha256": "", "locator": ""},
+            "source": {"source_type": rule["source_types"][0], "source_id": "", "title": "", "publisher": "", "publication_date": "", "official_url": None, "artifact_ref": "", "artifact_sha256": "", "locator": ""},
             "operator_attestation": {"operator_id": "", "attested_at": "", "statement": ""},
             "verification": {"status": "UNVERIFIED", "procedure_note": "Storage acceptance is not source or value verification."},
-            "limitations": ["Not scoring-eligible; cited artifact must be checked before admission."],
+            "limitations": ["Storage acceptance alone does not prove source authenticity, value truth, or scoring admission."],
         })
     # Gap rows outside the explicit registry are visible but never made fillable.
     supported_gap = {(r["gap_category"], r["gap_item"]) for r in ELIGIBILITY_REGISTRY.values()}
@@ -156,7 +190,7 @@ def validate_payload(payload: Mapping[str, Any], store: EvaluationStore, *, payl
         if not rule:
             errors.append(f"{prefix} UNSUPPORTED_TARGET {target!r}")
             continue
-        if (rule["gap_category"], rule["gap_item"]) not in gaps:
+        if rule.get("requires_gap", True) and (rule["gap_category"], rule["gap_item"]) not in gaps:
             errors.append(f"{prefix} TARGET_NOT_A_BASELINE_GAP")
         parts = str(target).split(".")
         snapshot = record.get("input_snapshot") or {}
@@ -166,9 +200,12 @@ def validate_payload(payload: Mapping[str, Any], store: EvaluationStore, *, payl
         if existing is not None:
             errors.append(f"{prefix} TARGET_ALREADY_ESTABLISHED_IN_LAYER1")
         value = entry.get("value")
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            errors.append(f"{prefix} VALUE_TYPE must be number")
-        elif value < rule["minimum"]:
+        values = value if isinstance(value, list) else [value]
+        if (rule["type"] != "number_or_array" and isinstance(value, list)) or not values or any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in values):
+            errors.append(f"{prefix} VALUE_TYPE must be number" + (" or numeric array" if rule["type"] == "number_or_array" else ""))
+        elif isinstance(value, list) and len(value) != 3:
+            errors.append(f"{prefix} VALUE_ARRAY must contain exactly three FY observations")
+        elif rule.get("minimum") is not None and any(item < rule["minimum"] for item in values):
             errors.append(f"{prefix} VALUE_RANGE must be >= {rule['minimum']}")
         if entry.get("category") != rule["category"] or entry.get("unit") != rule["unit"] or entry.get("currency") != rule["currency"]:
             errors.append(f"{prefix} SEMANTIC_METADATA_MISMATCH")

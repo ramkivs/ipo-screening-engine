@@ -12,6 +12,7 @@ from typing import Any, Dict, Mapping, Tuple
 from jsonschema import Draft202012Validator
 
 from .evaluation import EvaluationStore
+from .financial_health import FINANCIAL_HEALTH_TARGETS, financial_health_metrics, with_financial_health_extension
 from .hashing import sha256_of
 from .pipeline import evaluate, load_config
 from .supplemental_data import ELIGIBILITY_REGISTRY, baseline_binding, payload_hash
@@ -86,7 +87,7 @@ def build_secondary(baseline_id: str, store: EvaluationStore, supp_root: Path, s
     entries = payload.get("entries") or []
     targets = [str(e.get("target")) for e in entries]
     if not entries or len(targets) != len(set(targets)) or any(t not in WHITELIST for t in targets):
-        raise ValueError("Layer 2C admits only unique whitelisted subscription targets")
+        raise ValueError("Layer 2C admits only unique governed subscription or financial-health targets")
     if any((e.get("verification") or {}).get("status") != "SOURCE_ARTIFACT_HASH_VERIFIED" for e in entries):
         raise ValueError("Layer 2C requires SOURCE_ARTIFACT_HASH_VERIFIED entries")
 
@@ -104,11 +105,22 @@ def build_secondary(baseline_id: str, store: EvaluationStore, supp_root: Path, s
     observation_date = at_text[:10]
     if not issue.get("open_date") or not issue.get("close_date") or not (str(issue["open_date"]) <= observation_date <= str(issue["close_date"])):
         raise ValueError("supplemental observation is outside the baseline bidding window")
-    values = {e["target"].rsplit(".", 1)[1]: e["value"] for e in entries}
-    values.update({"as_of": at_text, "source_id": payload["supplemental_payload_id"]})
-    raw.setdefault("market", {})["subscription"] = values
+    demand_values = {e["target"].rsplit(".", 1)[1]: e["value"] for e in entries if str(e["target"]).startswith("market.subscription.")}
+    if demand_values:
+        demand_values.update({"as_of": at_text, "source_id": payload["supplemental_payload_id"]})
+        raw.setdefault("market", {})["subscription"] = demand_values
+    financial_values = {e["target"].rsplit(".", 1)[1]: e["value"] for e in entries if str(e["target"]).startswith("financials.")}
+    if financial_values:
+        raw.setdefault("financials", {}).update(financial_values)
     moment = datetime.fromisoformat(at_text.replace("Z", "+00:00")).astimezone(timezone.utc)
-    outcome = evaluate(raw, load_config(), mode=str(baseline["evaluation_mode"]).lower(), evaluation_datetime=moment)
+    scoring_config = load_config()
+    financial_extension = any(target in FINANCIAL_HEALTH_TARGETS for target in targets)
+    if financial_extension:
+        scoring_config = with_financial_health_extension(scoring_config)
+        with financial_health_metrics():
+            outcome = evaluate(raw, scoring_config, mode=str(baseline["evaluation_mode"]).lower(), evaluation_datetime=moment)
+    else:
+        outcome = evaluate(raw, scoring_config, mode=str(baseline["evaluation_mode"]).lower(), evaluation_datetime=moment)
     enriched = outcome.record.to_dict()
     before_modules, after_modules = _module_map(baseline), _module_map(enriched)
     breakdown = []
