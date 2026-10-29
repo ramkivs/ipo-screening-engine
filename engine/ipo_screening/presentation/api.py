@@ -738,7 +738,14 @@ def create_app(service: Optional[PresentationService] = None) -> FastAPI:
                 and bool(segments[3])
                 and segments[4] in {"archive", "unarchive", "make-active"}
             )
-            if request.method != "POST" or not (is_ingest or is_lifecycle_action):
+            is_workbench_action = normalized_path in {
+                "/workbench/api/hash",
+                "/workbench/api/v1/secondary/evaluate",
+                "/workbench/api/v1/scenario/evaluate",
+                "/workbench/actions/inject-rescore",
+                "/workbench/actions/scenario",
+            }
+            if request.method != "POST" or not (is_ingest or is_lifecycle_action or is_workbench_action):
                 return JSONResponse(
                     status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
                     content={
@@ -812,6 +819,18 @@ def create_app(service: Optional[PresentationService] = None) -> FastAPI:
 
     router = create_router(service)
     app.include_router(router)
+
+    # Embed the governed Layer 2C / Layer 3 workbench in the existing UI host.
+    # The sub-application shares the exact evaluation store selected by this
+    # presentation service while keeping supplemental/secondary/operator bytes
+    # in a sibling isolated workbench directory.
+    from tools import ui_dashboard as workbench
+
+    workbench.configure_workbench(
+        service.config.store_root,
+        Path(service.config.store_root).resolve().parent / "workbench",
+    )
+    app.mount("/workbench", workbench.app, name="workbench")
 
     # Mount UI-2 frontend presentation layer if present
     frontend_dir = Path(__file__).resolve().parent.parent.parent.parent / "frontend"

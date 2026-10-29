@@ -569,6 +569,22 @@ def test_nonexistent_resources_return_404(populated_env):
     assert res4.json()["code"] == "PROPOSAL_NOT_FOUND"
 
 
+def test_existing_frontend_embeds_dual_reality_workbench(populated_env):
+    client = populated_env["client"]
+
+    index = client.get("/ui/")
+    assert index.status_code == 200
+    assert 'id="nav-workbench"' in index.text
+    assert 'id="workbench-frame"' in index.text
+
+    workbench = client.get("/workbench/")
+    assert workbench.status_code == 200
+    assert "IPO Dual-Reality Workbench" in workbench.text
+    assert "[LAYER_1_BASE]" in workbench.text
+    assert "[ENRICHED_LAYER_2C]" in workbench.text
+    assert "[OPERATOR_ASSUMPTION]" in workbench.text
+
+
 def test_pagination_beyond_available_data(populated_env):
     """Page 2 on 1-item universe returns empty items list."""
     client = populated_env["client"]

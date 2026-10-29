@@ -505,8 +505,10 @@ IPO_WORKBENCH_ROOT=build/workbench \
 PYTHONPATH=engine python3 engine/tools/ui_dashboard.py
 ```
 
-Open `http://localhost:8000/workbench`. The explorer presents Layer 1, Layer
-2C and operator-scenario realities separately. The bidding form hashes an
+Open `http://localhost:8000/ui/` and select **Dual-Reality Workbench** in the
+main navigation; the same embedded view is directly available at
+`http://localhost:8000/workbench/`. The explorer presents Layer 1, Layer 2C and
+operator-scenario realities separately. The bidding form hashes an
 uploaded local artifact before Layer 2B admission and Layer 2C recomputation.
 Uploading and attesting to bytes does not authenticate a publisher or establish
 value truth. The scenario form is always operator-badged. JSON clients can use

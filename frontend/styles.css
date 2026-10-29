@@ -2102,3 +2102,17 @@ table.data-table tbody tr:last-child td {
 .activity-details summary { cursor: pointer; color: var(--text-muted); font-size: 0.75rem; }
 .activity-details pre { white-space: pre-wrap; word-break: break-word; font-size: 0.72rem; background: var(--bg-surface); padding: 6px; border-radius: 4px; }
 .activity-summary { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px; font-size: 0.82rem; display: flex; flex-direction: column; gap: 4px; }
+
+/* Embedded Layer 2C / Layer 3 workbench */
+#workbench-view {
+  padding: 0;
+  max-width: none;
+}
+
+.workbench-frame {
+  display: block;
+  width: 100%;
+  min-height: calc(100vh - 120px);
+  border: 0;
+  background: var(--bg-surface);
+}
