@@ -63,7 +63,10 @@ def test_workbench_ui_starts_blank_and_hydrates_explicit_selection(monkeypatch,t
  assert "event.preventDefault();clearError()" in page
  assert "saveSession({evaluation_id:baseline,[successKind]:body})" in page
  assert "const input=data.input||(data.input_snapshot?.input)||data.input_snapshot||data" in page
- assert "hydrateFormState(input)" in page
+ assert "hydrateFormState(input);await explore(identifier)" in page
+ assert "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindWorkbench" in page
+ assert "document.body.dataset.workbenchReady='true'" in page
+ assert "bidding_day:'DAY_1',rating:'LOW',peer_delta:'0',qualitative_delta:'0'" in page
  assert "fetch('/api/v1/evaluations')" in page
  assert "const rows=Array.isArray(data)?data:(data.items||data.evaluations||[])" in page
  assert "const ids=rows.map(x=>x.evaluation_id||x.id).filter(Boolean)" in page

@@ -44,6 +44,9 @@ export class ApiClient {
         headers: {
           'Accept': 'application/json',
         },
+        signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+          ? AbortSignal.timeout(15000)
+          : undefined,
       });
     } catch (networkErr) {
       throw new ApiError(0, 'NETWORK_ERROR', `Network failure: ${networkErr.message}`);

@@ -4144,11 +4144,18 @@ export class App {
   }
 }
 
-// Auto-initialize when loaded in browser
+// Auto-initialize whether the module loads before or after DOMContentLoaded.
 if (typeof window !== 'undefined' && document.getElementById('app')) {
-  window.addEventListener('DOMContentLoaded', () => {
+  const initialize = () => {
+    if (window.__IPO_APP__) return;
     const app = new App();
     app.init();
     window.__IPO_APP__ = app;
-  });
+    document.getElementById('app')?.setAttribute('data-app-ready', 'true');
+  };
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', initialize, { once: true });
+  } else {
+    initialize();
+  }
 }
