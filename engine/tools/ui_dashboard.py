@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Local single-user workbench for Layers 1, 2B/2C and operator scenarios."""
 from __future__ import annotations
-import hashlib, html, json, logging, os, sys
+import copy, hashlib, html, json, logging, os, sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
@@ -173,10 +173,15 @@ function showStatus(detail,kind='error'){{statusBox.textContent=detail;statusBox
 dismiss.addEventListener('click',clearError);
 function setActiveEvaluation(id){{if(!id)return;document.querySelectorAll('select[name="baseline_id"],select[name="target_id"],#evaluation').forEach(el=>{{if([...el.options].some(o=>o.value===id))el.value=id}});saveSession({{evaluation_id:id}})}}
 async function parseResponse(response){{const type=response.headers.get('content-type')||'';let body;if(type.includes('json'))body=await response.json();else body={{detail:(await response.text()).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim()}};if(!response.ok)throw new Error(body.detail||body.error||`Request failed (${{response.status}})`);return body}}
-async function refreshContext(){{try{{const response=await fetch('api/evaluations');const rows=await parseResponse(response);const ids=rows.map(x=>x.id);const session=readSession(),cached=session.evaluation_id;const active=ids.includes(cached)?cached:ids[0];if(active){{setActiveEvaluation(active);if(session.injection?.evaluation_id===active)showStatus(session.injection.detail||'Previous injection restored.','success')}}else showStatus('No evaluations are available in the active evaluation store.')}}catch(error){{showStatus(error.message)}}}}
+const CONTROL_PATHS={{qib_x:'market.subscription.qib_x',nii_x:'market.subscription.nii_x',retail_x:'market.subscription.retail_x',overall_x:'market.subscription.overall_x',observation_time:'market.subscription.as_of',source_id:'market.subscription.source_id',operating_cash_flow_3yr_cumulative:'financials.operating_cash_flow_3yr_cumulative',net_income_3yr_cumulative:'financials.net_income_3yr_cumulative',trade_receivables_days:'financials.trade_receivables_days',net_working_capital_pct_revenue:'financials.net_working_capital_pct_revenue',top_customer_revenue_pct:'financials.top_customer_revenue_pct',loss_making_segments_present:'financials.loss_making_segments_present',promoter_pledged_shares_pct:'governance.promoter_pledged_shares_pct',pre_issue_promoter_holding_pct:'governance.pre_issue_promoter_holding_pct',contingent_liabilities_pct_net_worth:'risks.contingent_liabilities_pct_net_worth',material_regulatory_disputes_present:'risks.material_regulatory_disputes_present'}};
+function valueAt(root,path){{return path.split('.').reduce((value,key)=>value&&typeof value==='object'?value[key]:undefined,root)}}
+function hydrateFormState(input){{document.querySelectorAll('#inject-form [name],#scenario-form [name]').forEach(control=>{{if(['baseline_id','target_id','evidence'].includes(control.name))return;const path=CONTROL_PATHS[control.name]||control.name;const value=valueAt(input,path);if(value===undefined||value===null||Array.isArray(value)||typeof value==='object')return;control.value=typeof value==='boolean'?String(value):String(value)}})}}
+async function loadEvaluation(identifier){{if(!identifier)return;const data=await parseResponse(await fetch('api/evaluations/'+encodeURIComponent(identifier)+'/input'));setActiveEvaluation(identifier);hydrateFormState(data.input);return data}}
+async function refreshContext(){{try{{const response=await fetch('api/evaluations');const rows=await parseResponse(response);const ids=rows.map(x=>x.id);const session=readSession(),cached=session.evaluation_id;const active=ids.includes(cached)?cached:ids[0];if(active){{await loadEvaluation(active);if(session.injection?.evaluation_id===active)showStatus(session.injection.detail||'Previous injection restored.','success')}}else showStatus('No evaluations are available in the active evaluation store.')}}catch(error){{showStatus(error.message)}}}}
 async function explore(){{clearError();try{{const id=document.getElementById('evaluation').value;setActiveEvaluation(id);const d=await parseResponse(await fetch('api/comparison/'+encodeURIComponent(id))),c=document.getElementById('comparison');c.innerHTML=`<div class="card"><b>[LAYER_1_BASE]</b><br>${{JSON.stringify(d.baseline,null,2)}}</div><div class="card"><b>[ENRICHED_LAYER_2C]</b><br>${{JSON.stringify(d.enriched,null,2)}}</div><div class="card"><b>[OPERATOR_ASSUMPTION]</b><br>${{JSON.stringify(d.scenarios,null,2)}}</div>`}}catch(error){{showStatus(error.message)}}}}
 document.getElementById('compare-button').addEventListener('click',explore);
-document.getElementById('evaluation').addEventListener('change',e=>setActiveEvaluation(e.target.value));
+document.getElementById('evaluation').addEventListener('change',e=>loadEvaluation(e.target.value).catch(error=>showStatus(error.message)));
+document.querySelector('select[name="baseline_id"]').addEventListener('change',e=>loadEvaluation(e.target.value).catch(error=>showStatus(error.message)));
 async function submitForm(event,successKind){{event.preventDefault();clearError();const form=event.currentTarget;const baseline=new FormData(form).get(successKind==='injection'?'baseline_id':'target_id');try{{const response=await fetch(form.action,{{method:'POST',body:new FormData(form),headers:{{'X-Workbench-Request':'fetch'}}}});const body=await parseResponse(response);setActiveEvaluation(baseline);saveSession({{evaluation_id:baseline,[successKind]:body}});showStatus(body.detail||`${{successKind}} succeeded.`,'success');if(successKind==='injection')await explore()}}catch(error){{showStatus(error.message)}}}}
 document.getElementById('inject-form').addEventListener('submit',e=>submitForm(e,'injection'));
 document.getElementById('scenario-form').addEventListener('submit',e=>submitForm(e,'scenario'));
@@ -230,6 +235,21 @@ def api_scenario_evaluate(request:ScenarioEvaluateRequest):
 
 @app.get("/api/evaluations")
 def evaluations(): return _records()
+
+@app.get("/api/evaluations/{evaluation_id}/input")
+def evaluation_input(evaluation_id:str):
+ try: evaluation_id=_resolve_evaluation_id(evaluation_id)
+ except FileNotFoundError as exc: raise HTTPException(404,str(exc)) from exc
+ record=EvaluationStore(L1).read_full(evaluation_id)
+ snapshot=record.get("input_snapshot") or {}
+ raw=copy.deepcopy(snapshot.get("input",snapshot) if isinstance(snapshot,dict) else {})
+ for section in ("financials","governance","market","risks"): raw.setdefault(section,{})
+ for block in (record.get("market_snapshot") or {}).get("blocks",[]):
+  name=block.get("block");values=block.get("values")
+  if name and isinstance(values,dict) and values:
+   raw["market"].setdefault(name,{}).update(values)
+   if block.get("as_of"): raw["market"][name]["as_of"]=block["as_of"]
+ return {"evaluation_id":evaluation_id,"input":raw}
 
 @app.get("/api/comparison/{baseline_id}")
 def comparison(baseline_id:str):

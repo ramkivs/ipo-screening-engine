@@ -60,6 +60,21 @@ def test_workbench_ui_recovers_inline_and_validates_cached_evaluation(monkeypatc
  assert "if(!response.ok)throw new Error(body.detail" in page
  assert "event.preventDefault();clearError()" in page
  assert "saveSession({evaluation_id:baseline,[successKind]:body})" in page
+ assert "await loadEvaluation(active)" in page
+ assert "hydrateFormState(data.input)" in page
+ assert "financials.top_customer_revenue_pct" in page and "risks.contingent_liabilities_pct_net_worth" in page
+
+
+def test_workbench_initial_evaluation_payload_exposes_nested_hydration_state(monkeypatch,tmp_path):
+ _,client=_dashboard(monkeypatch,tmp_path)
+ response=client.get(f'/api/evaluations/{EID}/input')
+ assert response.status_code==200
+ body=response.json();assert body['evaluation_id']==EID
+ raw=body['input']
+ assert all(section in raw for section in ('financials','governance','market'))
+ assert isinstance(raw['financials'],dict) and isinstance(raw['governance'],dict)
+ missing=client.get('/api/evaluations/NOT-A-REAL-EVALUATION/input')
+ assert missing.status_code==404
 
 def test_secondary_evaluate_api_runs_engine_and_returns_lineage(monkeypatch,tmp_path):
  payload,supp=accepted_payload(tmp_path);dashboard,client=_dashboard(monkeypatch,tmp_path,supp);response=client.post('/api/v1/secondary/evaluate',json={'baseline_id':EID,'supplemental_id':payload['supplemental_payload_id']});assert response.status_code==200;body=response.json();assert body['outcome']=='SECONDARY_EVALUATION_STORED';assert body['secondary']['baseline_result_hash']=='0fde1451c1ea3ee61e6178d48908e8bffe12a943ba21f42f993429d11af9fb44';assert body['secondary']['supplemental_payload_hash']==payload['canonical_payload_hash']
