@@ -62,6 +62,12 @@ def test_workbench_ui_recovers_inline_and_validates_cached_evaluation(monkeypatc
  assert "saveSession({evaluation_id:baseline,[successKind]:body})" in page
  assert "await loadEvaluation(active)" in page
  assert "hydrateFormState(data.input)" in page
+ assert "fetch('/api/evaluations')" in page
+ assert "fetch('/api/evaluations/'+encodeURIComponent(identifier)+'/input')" in page
+ assert "fetch('/api/comparison/'+encodeURIComponent(id))" in page
+ assert "fetch('/api/hash'" in page
+ assert "fetch('api/" not in page
+ assert 'action="/actions/inject-rescore"' in page and 'action="/actions/scenario"' in page
  assert "financials.top_customer_revenue_pct" in page and "risks.contingent_liabilities_pct_net_worth" in page
 
 
