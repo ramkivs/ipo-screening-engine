@@ -370,14 +370,18 @@ def test_get_evaluation_detail_preserves_golden_scorecard(populated_env):
     assert sum(modules.values()) == 38.0
 
 
-def test_get_evaluation_input_matches_detail_contract(populated_env):
-    """Workbench hydration endpoint returns the selected evaluation detail."""
+def test_get_evaluation_input_returns_canonical_hydration_payload(populated_env):
+    """Workbench hydration endpoint returns canonical input, not scorecard detail."""
     client = populated_env["client"]
     final_id = populated_env["final"].record.evaluation_id
-    detail = client.get(f"/api/v1/evaluations/{final_id}")
     hydrated = client.get(f"/api/v1/evaluations/{final_id}/input")
     assert hydrated.status_code == 200
-    assert hydrated.json() == detail.json()
+    payload = hydrated.json()
+    assert payload["evaluation_id"] == final_id
+    assert payload["input"]["ipo_id"] == "VISHAL-NIRMITI-LIMITED"
+    assert payload["input"]["financials"]
+    assert payload["input"]["governance"]
+    assert "score" not in payload["input"]
 
 
 def test_get_nonexistent_evaluation(populated_env):

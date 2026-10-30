@@ -194,7 +194,7 @@ def create_router(service: PresentationService) -> APIRouter:
 
     @router.get("/evaluations/{evaluation_id}/input", tags=["Evaluations"])
     def get_evaluation_input(evaluation_id: str) -> Dict[str, Any]:
-        res = service.get_evaluation_detail(evaluation_id)
+        res = service.get_evaluation_input(evaluation_id)
         if not res:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
