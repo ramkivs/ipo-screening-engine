@@ -383,6 +383,14 @@ def test_get_evaluation_input_returns_canonical_hydration_payload(populated_env)
     assert payload["input"]["governance"]
     assert "score" not in payload["input"]
 
+    comparison = client.get(f"/api/v1/comparison/{final_id}")
+    assert comparison.status_code == 200
+    comparison_payload = comparison.json()
+    assert comparison_payload["baseline"]["evaluation_id"] == final_id
+    assert comparison_payload["baseline"]["badge"] == "[LAYER_1_BASE]"
+    assert comparison_payload["enriched"] == []
+    assert comparison_payload["scenarios"] == []
+
 
 def test_get_nonexistent_evaluation(populated_env):
     """GET /api/v1/evaluations/{unknown} returns 404."""
@@ -393,6 +401,9 @@ def test_get_nonexistent_evaluation(populated_env):
     input_res = client.get("/api/v1/evaluations/eval_9999999999999999/input")
     assert input_res.status_code == 404
     assert input_res.json()["code"] == "EVALUATION_NOT_FOUND"
+    comparison_res = client.get("/api/v1/comparison/eval_9999999999999999")
+    assert comparison_res.status_code == 404
+    assert comparison_res.json()["code"] == "EVALUATION_NOT_FOUND"
 
 
 # -----------------------------------------------------------------------------

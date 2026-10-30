@@ -40,7 +40,8 @@ def _wait_for_server(port: int, process: subprocess.Popen[str]) -> None:
 
 
 @pytest.mark.parametrize("workbench_path", ["/workbench", "/workbench/"])
-def test_workbench_starts_blank_then_hydrates_explicit_selection(tmp_path, golden_input, config, workbench_path):
+@pytest.mark.parametrize("comparison_mode", ["available", "404"])
+def test_workbench_starts_blank_then_hydrates_explicit_selection(tmp_path, golden_input, config, workbench_path, comparison_mode):
     document = copy.deepcopy(golden_input)
     document["financials"].update({
         "operating_cash_flow_3yr_cumulative": 100,
@@ -84,13 +85,15 @@ def test_workbench_starts_blank_then_hydrates_explicit_selection(tmp_path, golde
     try:
         _wait_for_server(port, process)
         browser = subprocess.run(
-            ["node", str(BROWSER_CHECK), f"http://127.0.0.1:{port}{workbench_path}", evaluation_id],
+            ["node", str(BROWSER_CHECK), f"http://127.0.0.1:{port}{workbench_path}", evaluation_id, comparison_mode],
             cwd=ROOT, capture_output=True, text=True, timeout=30,
         )
         assert browser.returncode == 0, f"Browser hydration failed:\n{browser.stdout}\n{browser.stderr}"
         report = json.loads(browser.stdout.strip().splitlines()[-1])
         assert report["controls"] == 27
         assert report["hydrated"] == 21
+        assert report["comparisonMode"] == comparison_mode
+        assert report["cards"] == (0 if comparison_mode == "404" else 3)
         assert report["requests"][:3] == [
             "/api/v1/evaluations",
             f"/api/v1/evaluations/{evaluation_id}/input",

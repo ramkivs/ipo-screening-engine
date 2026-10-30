@@ -1,8 +1,8 @@
 import { JSDOM, VirtualConsole } from 'jsdom';
 import assert from 'node:assert/strict';
 
-const [url, evaluationId] = process.argv.slice(2);
-if (!url || !evaluationId) throw new Error('usage: node workbench-hydration.browser.mjs URL EVALUATION_ID');
+const [url, evaluationId, comparisonMode = 'available'] = process.argv.slice(2);
+if (!url || !evaluationId) throw new Error('usage: node workbench-hydration.browser.mjs URL EVALUATION_ID [available|404]');
 
 const requests = [];
 const errors = [];
@@ -19,6 +19,9 @@ const dom = await JSDOM.fromURL(url, {
     window.fetch = async (resource, options) => {
       const absolute = new URL(typeof resource === 'string' ? resource : resource.url, window.location.href).href;
       requests.push(absolute);
+      if (comparisonMode === '404' && new URL(absolute).pathname.startsWith('/api/v1/comparison/')) {
+        return new Response(JSON.stringify({ detail: 'comparison unavailable' }), { status: 404, headers: { 'content-type': 'application/json' } });
+      }
       const response = await globalThis.fetch(absolute, options);
       if (new URL(absolute).pathname === '/api/v1/evaluations') {
         const rows = await response.json();
@@ -51,7 +54,8 @@ assert.deepEqual(requests.map(request => new URL(request).pathname), ['/api/v1/e
 const evaluation = document.querySelector('#evaluation');
 evaluation.value = evaluationId;
 evaluation.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
-while (document.querySelector('[name="qib_x"]')?.value !== '25' || document.querySelector('#comparison').children.length !== 3) {
+const expectedCards = comparisonMode === '404' ? 0 : 3;
+while (document.querySelector('[name="qib_x"]')?.value !== '25' || document.querySelector('#comparison').children.length !== expectedCards || requests.filter(request => new URL(request).pathname.startsWith('/api/v1/comparison/')).length !== 1) {
   if (Date.now() > deadline) throw new Error(`hydration timed out; requests=${JSON.stringify(requests)} status=${document.querySelector('#workbench-status')?.textContent}`);
   await new Promise(resolve => setTimeout(resolve, 25));
 }
@@ -60,6 +64,8 @@ assert.equal(document.body.dataset.workbenchReady, 'true');
 assert.equal(document.querySelector('#evaluation').value, evaluationId);
 assert.equal(document.querySelector('[name="baseline_id"]').value, evaluationId);
 assert.equal(document.querySelector('[name="target_id"]').value, evaluationId);
+assert.equal(controls.every(control => control.dataset.hydrated === 'true'), true, 'all 27 controls must complete the hydration pass');
+assert.equal(document.querySelector('#comparison').children.length, expectedCards);
 
 const expected = {
   bidding_day: 'DAY_1', observation_time: '2026-10-05T11:00:00Z', source_id: 'BROWSER-E2E',
@@ -86,4 +92,4 @@ assert.deepEqual(errors, []);
 assert.equal(document.querySelector('#workbench-status').classList.contains('error'), false);
 
 dom.window.close();
-console.log(JSON.stringify({ controls: 27, hydrated: Object.keys(expected).length, requests: paths }));
+console.log(JSON.stringify({ controls: 27, hydrated: Object.keys(expected).length, comparisonMode, cards: expectedCards, requests: paths }));

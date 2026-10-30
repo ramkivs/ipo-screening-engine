@@ -458,6 +458,37 @@ class PresentationService:
                     raw["market"][name]["as_of"] = block["as_of"]
         return {"evaluation_id": evaluation_id, "input": raw}
 
+    def get_evaluation_comparison(self, evaluation_id: str) -> Optional[Dict[str, Any]]:
+        """Project baseline and isolated Workbench outcomes without mutating them."""
+        detail = self.get_evaluation_detail(evaluation_id)
+        if detail is None:
+            return None
+        root = Path(self.config.store_root).resolve().parent / "workbench"
+
+        def _read(pattern: str) -> List[Dict[str, Any]]:
+            values: List[Dict[str, Any]] = []
+            for path in sorted(root.glob(pattern)):
+                try:
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if isinstance(payload, dict):
+                    values.append(payload)
+            return values
+
+        baseline = detail.model_dump() if hasattr(detail, "model_dump") else detail
+        return {
+            "baseline": {"badge": "[LAYER_1_BASE]", **baseline},
+            "enriched": [
+                {"badge": "[ENRICHED_LAYER_2C]", **item}
+                for item in _read(f"secondary/{evaluation_id}/*/secondary_evaluation.json")
+            ],
+            "scenarios": [
+                {"badge": "[OPERATOR_ASSUMPTION]", **item}
+                for item in _read(f"operator/{evaluation_id}/*/scenario_result.json")
+            ],
+        }
+
     def get_evaluation_detail(self, evaluation_id: str) -> Optional[EvaluationDetail]:
         """Retrieve full scorecard detail for an evaluation."""
         if not self.eval_store.exists(evaluation_id):
