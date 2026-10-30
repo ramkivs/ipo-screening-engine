@@ -63,6 +63,8 @@ def test_workbench_ui_recovers_inline_and_validates_cached_evaluation(monkeypatc
  assert "await loadEvaluation(active)" in page
  assert "hydrateFormState(data.input)" in page
  assert "fetch('/api/v1/evaluations')" in page
+ assert "const rows=Array.isArray(data)?data:(data.items||data.evaluations||[])" in page
+ assert "const ids=rows.map(x=>x.id)" in page
  assert "fetch('/api/v1/evaluations/'+encodeURIComponent(identifier)+'/input')" in page
  assert "fetch('/api/v1/comparison/'+encodeURIComponent(id))" in page
  assert "fetch('/api/v1/hash'" in page
