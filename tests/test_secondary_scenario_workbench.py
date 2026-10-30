@@ -62,10 +62,10 @@ def test_workbench_ui_recovers_inline_and_validates_cached_evaluation(monkeypatc
  assert "saveSession({evaluation_id:baseline,[successKind]:body})" in page
  assert "await loadEvaluation(active)" in page
  assert "hydrateFormState(data.input)" in page
- assert "fetch('/api/evaluations')" in page
- assert "fetch('/api/evaluations/'+encodeURIComponent(identifier)+'/input')" in page
- assert "fetch('/api/comparison/'+encodeURIComponent(id))" in page
- assert "fetch('/api/hash'" in page
+ assert "fetch('/api/v1/evaluations')" in page
+ assert "fetch('/api/v1/evaluations/'+encodeURIComponent(identifier)+'/input')" in page
+ assert "fetch('/api/v1/comparison/'+encodeURIComponent(id))" in page
+ assert "fetch('/api/v1/hash'" in page
  assert "fetch('api/" not in page
  assert 'action="/actions/inject-rescore"' in page and 'action="/actions/scenario"' in page
  assert "financials.top_customer_revenue_pct" in page and "risks.contingent_liabilities_pct_net_worth" in page
@@ -73,13 +73,13 @@ def test_workbench_ui_recovers_inline_and_validates_cached_evaluation(monkeypatc
 
 def test_workbench_initial_evaluation_payload_exposes_nested_hydration_state(monkeypatch,tmp_path):
  _,client=_dashboard(monkeypatch,tmp_path)
- response=client.get(f'/api/evaluations/{EID}/input')
+ response=client.get(f'/api/v1/evaluations/{EID}/input')
  assert response.status_code==200
  body=response.json();assert body['evaluation_id']==EID
  raw=body['input']
  assert all(section in raw for section in ('financials','governance','market'))
  assert isinstance(raw['financials'],dict) and isinstance(raw['governance'],dict)
- missing=client.get('/api/evaluations/NOT-A-REAL-EVALUATION/input')
+ missing=client.get('/api/v1/evaluations/NOT-A-REAL-EVALUATION/input')
  assert missing.status_code==404
 
 def test_secondary_evaluate_api_runs_engine_and_returns_lineage(monkeypatch,tmp_path):
