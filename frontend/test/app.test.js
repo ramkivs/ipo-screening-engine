@@ -111,6 +111,10 @@ test('App - existing frontend exposes embedded Dual-Reality Workbench tab', () =
   assert.ok(indexHtml.includes('Dual-Reality Workbench'));
   assert.ok(appJs.includes("segments[0] === 'workbench'"));
   assert.ok(appJs.includes("frame.setAttribute('src', '../workbench/')"));
+  assert.ok(appJs.includes("document.readyState === 'loading'"));
+  assert.ok(appJs.includes("data-app-ready"));
+  assert.equal(indexHtml.includes('Initializing scorecard...'), false);
+  assert.equal(indexHtml.includes('Initializing directory...'), false);
 });
 
 test('App - Governance Invariant: no policy activation or modification controls in frontend', () => {

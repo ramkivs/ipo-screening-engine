@@ -90,10 +90,11 @@ def test_workbench_starts_blank_then_hydrates_explicit_selection(tmp_path, golde
         assert browser.returncode == 0, f"Browser hydration failed:\n{browser.stdout}\n{browser.stderr}"
         report = json.loads(browser.stdout.strip().splitlines()[-1])
         assert report["controls"] == 27
-        assert report["hydrated"] == 14
-        assert report["requests"][:2] == [
+        assert report["hydrated"] == 21
+        assert report["requests"][:3] == [
             "/api/v1/evaluations",
             f"/api/v1/evaluations/{evaluation_id}/input",
+            f"/api/v1/comparison/{evaluation_id}",
         ]
     finally:
         process.terminate()
