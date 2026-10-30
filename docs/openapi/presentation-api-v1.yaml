@@ -220,6 +220,31 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+  /evaluations/{evaluation_id}/input:
+    get:
+      summary: Retrieve evaluation detail for Workbench form hydration
+      operationId: getEvaluationInput
+      tags: [Evaluations]
+      parameters:
+        - name: evaluation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Evaluation detail used to hydrate the Workbench form
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationDetail'
+        '404':
+          description: Evaluation identifier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
   /evaluations/{evaluation_id}/evidence:
     get:
       summary: Retrieve evidence registry and citations for an evaluation

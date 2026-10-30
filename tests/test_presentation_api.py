@@ -193,6 +193,7 @@ def test_openapi_contract_file_is_valid_and_complete():
         "/ipos/{ipo_id}/history",
         "/evaluations",
         "/evaluations/{evaluation_id}",
+        "/evaluations/{evaluation_id}/input",
         "/evaluations/{evaluation_id}/evidence",
         "/evidence/{evidence_id}",
         "/evaluations/{evaluation_id}/post-listing",
@@ -369,12 +370,25 @@ def test_get_evaluation_detail_preserves_golden_scorecard(populated_env):
     assert sum(modules.values()) == 38.0
 
 
+def test_get_evaluation_input_matches_detail_contract(populated_env):
+    """Workbench hydration endpoint returns the selected evaluation detail."""
+    client = populated_env["client"]
+    final_id = populated_env["final"].record.evaluation_id
+    detail = client.get(f"/api/v1/evaluations/{final_id}")
+    hydrated = client.get(f"/api/v1/evaluations/{final_id}/input")
+    assert hydrated.status_code == 200
+    assert hydrated.json() == detail.json()
+
+
 def test_get_nonexistent_evaluation(populated_env):
     """GET /api/v1/evaluations/{unknown} returns 404."""
     client = populated_env["client"]
     res = client.get("/api/v1/evaluations/eval_9999999999999999")
     assert res.status_code == 404
     assert res.json()["code"] == "EVALUATION_NOT_FOUND"
+    input_res = client.get("/api/v1/evaluations/eval_9999999999999999/input")
+    assert input_res.status_code == 404
+    assert input_res.json()["code"] == "EVALUATION_NOT_FOUND"
 
 
 # -----------------------------------------------------------------------------

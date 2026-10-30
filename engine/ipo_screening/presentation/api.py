@@ -192,6 +192,16 @@ def create_router(service: PresentationService) -> APIRouter:
             )
         return res
 
+    @router.get("/evaluations/{evaluation_id}/input", tags=["Evaluations"])
+    def get_evaluation_input(evaluation_id: str) -> Dict[str, Any]:
+        res = service.get_evaluation_detail(evaluation_id)
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Not Found", "message": f"Evaluation '{evaluation_id}' not found in store", "code": "EVALUATION_NOT_FOUND"},
+            )
+        return res.model_dump() if hasattr(res, "model_dump") else res
+
     # -------------------------------------------------------------------------
     # 6.6 Evidence
     # -------------------------------------------------------------------------
