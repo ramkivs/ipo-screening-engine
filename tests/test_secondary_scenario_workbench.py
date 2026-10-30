@@ -63,18 +63,21 @@ def test_workbench_ui_starts_blank_and_hydrates_explicit_selection(monkeypatch,t
  assert "event.preventDefault();clearError()" in page
  assert "saveSession({evaluation_id:baseline,[successKind]:body})" in page
  assert "const input=data.input||(data.input_snapshot?.input)||data.input_snapshot||data" in page
- assert "hydrateFormState(input);await explore(identifier)" in page
+ assert "hydrateFormState(input);try{await explore(identifier)}catch(error)" in page
+ assert "Comparison unavailable; form hydration completed." in page
+ assert "control.dataset.hydrated='true'" in page
+ assert "method:'GET',headers:{'Accept':'application/json'}" in page
  assert "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindWorkbench" in page
  assert "document.body.dataset.workbenchReady='true'" in page
  assert "bidding_day:'DAY_1',rating:'LOW',peer_delta:'0',qualitative_delta:'0'" in page
- assert "fetch('/api/v1/evaluations')" in page
+ assert "fetch('/api/v1/evaluations',{method:'GET'" in page
  assert "const rows=Array.isArray(data)?data:(data.items||data.evaluations||[])" in page
  assert "const ids=rows.map(x=>x.evaluation_id||x.id).filter(Boolean)" in page
- assert "fetch('/api/v1/evaluations/'+encodeURIComponent(identifier)+'/input')" in page
- assert "fetch('/api/v1/comparison/'+encodeURIComponent(id))" in page
+ assert "fetch('/api/v1/evaluations/'+encodeURIComponent(identifier)+'/input',{method:'GET'" in page
+ assert "fetch('/api/v1/comparison/'+encodeURIComponent(id),{method:'GET'" in page
  assert "fetch('/api/v1/hash'" in page
  assert "fetch('api/" not in page
- assert 'action="/actions/inject-rescore"' in page and 'action="/actions/scenario"' in page
+ assert 'action="actions/inject-rescore"' in page and 'action="actions/scenario"' in page
  assert "financials.top_customer_revenue_pct" in page and "risks.contingent_liabilities_pct_net_worth" in page
 
 
