@@ -40,7 +40,7 @@ def _wait_for_server(port: int, process: subprocess.Popen[str]) -> None:
 
 
 @pytest.mark.parametrize("workbench_path", ["/workbench", "/workbench/"])
-def test_default_company_hydrates_in_browser_without_console_or_network_errors(tmp_path, golden_input, config, workbench_path):
+def test_workbench_starts_blank_then_hydrates_explicit_selection(tmp_path, golden_input, config, workbench_path):
     document = copy.deepcopy(golden_input)
     document["financials"].update({
         "operating_cash_flow_3yr_cumulative": 100,

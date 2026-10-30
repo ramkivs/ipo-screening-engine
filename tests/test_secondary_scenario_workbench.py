@@ -53,18 +53,20 @@ def test_workbench_explorer_and_badges(monkeypatch,tmp_path):
  dashboard,client=_dashboard(monkeypatch,tmp_path);page=client.get('/workbench');assert page.status_code==200;assert 'Day 1' in page.text and 'Day 2' in page.text and 'Day 3' in page.text;assert '[LAYER_1_BASE]' in page.text and '[ENRICHED_LAYER_2C]' in page.text and '[OPERATOR_ASSUMPTION]' in page.text;data=client.get('/api/evaluations').json();assert any(x['id']==EID for x in data);hashed=client.post('/api/hash',files={'evidence':('x.txt',b'abc')}).json();assert hashed['sha256']==hashlib.sha256(b'abc').hexdigest()
 
 
-def test_workbench_ui_recovers_inline_and_validates_cached_evaluation(monkeypatch,tmp_path):
+def test_workbench_ui_starts_blank_and_hydrates_explicit_selection(monkeypatch,tmp_path):
  _,client=_dashboard(monkeypatch,tmp_path);page=client.get('/workbench').text
  assert 'Dismiss error' in page and "sessionStorage.getItem(SESSION_KEY)" in page
- assert "ids.includes(cached)?cached:ids[0]" in page
+ assert page.count('<option value="">-- Select an Evaluation --</option>') == 3
+ assert "ids.includes(cached)?cached:ids[0]" not in page
+ assert "await loadEvaluation(active)" not in page
  assert "if(!response.ok)throw new Error(body.detail" in page
  assert "event.preventDefault();clearError()" in page
  assert "saveSession({evaluation_id:baseline,[successKind]:body})" in page
- assert "await loadEvaluation(active)" in page
- assert "hydrateFormState(data.input)" in page
+ assert "const input=data.input||(data.input_snapshot?.input)||data.input_snapshot||data" in page
+ assert "hydrateFormState(input)" in page
  assert "fetch('/api/v1/evaluations')" in page
  assert "const rows=Array.isArray(data)?data:(data.items||data.evaluations||[])" in page
- assert "const ids=rows.map(x=>x.id||x.evaluation_id)" in page
+ assert "const ids=rows.map(x=>x.evaluation_id||x.id).filter(Boolean)" in page
  assert "fetch('/api/v1/evaluations/'+encodeURIComponent(identifier)+'/input')" in page
  assert "fetch('/api/v1/comparison/'+encodeURIComponent(id))" in page
  assert "fetch('/api/v1/hash'" in page

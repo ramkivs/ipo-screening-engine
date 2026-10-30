@@ -8,6 +8,7 @@ changes screening configuration.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -433,6 +434,29 @@ class PresentationService:
             page_size=page_size,
             pages=pages,
         )
+
+    def get_evaluation_input(self, evaluation_id: str) -> Optional[Dict[str, Any]]:
+        """Return the persisted canonical input used to hydrate the Workbench."""
+        if not self.eval_store.exists(evaluation_id):
+            return None
+        try:
+            rec = self.eval_store.read_full(evaluation_id)
+        except Exception:
+            return None
+
+        snapshot = rec.get("input_snapshot") or {}
+        canonical = snapshot.get("input", snapshot) if isinstance(snapshot, dict) else {}
+        raw = copy.deepcopy(canonical) if isinstance(canonical, dict) else {}
+        for section in ("financials", "governance", "market", "risks"):
+            raw.setdefault(section, {})
+        for block in (rec.get("market_snapshot") or {}).get("blocks", []):
+            name = block.get("block")
+            values = block.get("values")
+            if name and isinstance(values, dict) and values:
+                raw["market"].setdefault(name, {}).update(copy.deepcopy(values))
+                if block.get("as_of"):
+                    raw["market"][name]["as_of"] = block["as_of"]
+        return {"evaluation_id": evaluation_id, "input": raw}
 
     def get_evaluation_detail(self, evaluation_id: str) -> Optional[EvaluationDetail]:
         """Retrieve full scorecard detail for an evaluation."""

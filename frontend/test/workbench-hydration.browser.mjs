@@ -16,10 +16,16 @@ const dom = await JSDOM.fromURL(url, {
   pretendToBeVisual: true,
   virtualConsole,
   beforeParse(window) {
-    window.fetch = (resource, options) => {
+    window.fetch = async (resource, options) => {
       const absolute = new URL(typeof resource === 'string' ? resource : resource.url, window.location.href).href;
       requests.push(absolute);
-      return globalThis.fetch(absolute, options);
+      const response = await globalThis.fetch(absolute, options);
+      if (new URL(absolute).pathname === '/api/v1/evaluations') {
+        const rows = await response.json();
+        const items = rows.map(({ id, ...row }) => ({ ...row, evaluation_id: id }));
+        return new Response(JSON.stringify({ items }), { status: response.status, headers: { 'content-type': 'application/json' } });
+      }
+      return response;
     };
     window.FormData = globalThis.FormData;
   },
@@ -27,12 +33,29 @@ const dom = await JSDOM.fromURL(url, {
 
 const { document } = dom.window;
 const deadline = Date.now() + 5000;
+while (!requests.some(request => new URL(request).pathname === '/api/v1/evaluations')) {
+  if (Date.now() > deadline) throw new Error('evaluation list request timed out');
+  await new Promise(resolve => setTimeout(resolve, 25));
+}
+await new Promise(resolve => setTimeout(resolve, 25));
+
+const controls = [...document.querySelectorAll('#inject-form [name],#scenario-form [name]')];
+assert.equal(controls.length, 27);
+assert.equal(document.querySelector('#evaluation').value, '');
+assert.equal(document.querySelector('[name="baseline_id"]').value, '');
+assert.equal(document.querySelector('[name="target_id"]').value, '');
+assert.equal(document.querySelector('#comparison').children.length, 0);
+assert.equal(controls.every(control => control.value === ''), true, 'all form controls must start blank');
+assert.deepEqual(requests.map(request => new URL(request).pathname), ['/api/v1/evaluations']);
+
+const evaluation = document.querySelector('#evaluation');
+evaluation.value = evaluationId;
+evaluation.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
 while (document.querySelector('[name="qib_x"]')?.value !== '25') {
   if (Date.now() > deadline) throw new Error(`hydration timed out; requests=${JSON.stringify(requests)} status=${document.querySelector('#workbench-status')?.textContent}`);
   await new Promise(resolve => setTimeout(resolve, 25));
 }
 
-assert.equal(document.querySelectorAll('#inject-form [name],#scenario-form [name]').length, 27);
 assert.equal(document.querySelector('#evaluation').value, evaluationId);
 assert.equal(document.querySelector('[name="baseline_id"]').value, evaluationId);
 assert.equal(document.querySelector('[name="target_id"]').value, evaluationId);
