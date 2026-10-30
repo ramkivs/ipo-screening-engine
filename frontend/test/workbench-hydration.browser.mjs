@@ -47,7 +47,7 @@ while (!requests.some(request => new URL(request).pathname === '/api/v1/evaluati
 await new Promise(resolve => setTimeout(resolve, 25));
 
 const controls = [...document.querySelectorAll('#inject-form [name],#scenario-form [name]')];
-assert.equal(controls.length, 27);
+assert.equal(controls.length, 30);
 assert.equal(document.querySelector('#evaluation').value, '');
 assert.equal(document.querySelector('[name="baseline_id"]').value, '');
 assert.equal(document.querySelector('[name="target_id"]').value, '');
@@ -68,7 +68,7 @@ assert.equal(document.body.dataset.workbenchReady, 'true');
 assert.equal(document.querySelector('#evaluation').value, evaluationId);
 assert.equal(document.querySelector('[name="baseline_id"]').value, evaluationId);
 assert.equal(document.querySelector('[name="target_id"]').value, evaluationId);
-assert.equal(controls.every(control => control.dataset.hydrated === 'true'), true, 'all 27 controls must complete the hydration pass');
+assert.equal(controls.every(control => control.dataset.hydrated === 'true'), true, 'all 30 controls must complete the hydration pass');
 assert.equal(document.querySelector('#comparison').children.length, expectedCards);
 
 const expected = {
@@ -108,4 +108,4 @@ assert.deepEqual(errors, []);
 assert.equal(document.querySelector('#workbench-status').classList.contains('error'), false);
 
 dom.window.close();
-console.log(JSON.stringify({ controls: 27, hydrated: Object.keys(expected).length, comparisonMode, cards: expectedCards, requests: paths }));
+console.log(JSON.stringify({ controls: 30, hydrated: Object.keys(expected).length, comparisonMode, cards: expectedCards, requests: paths }));

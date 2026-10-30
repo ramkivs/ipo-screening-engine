@@ -90,7 +90,7 @@ def test_workbench_starts_blank_then_hydrates_explicit_selection(tmp_path, golde
         )
         assert browser.returncode == 0, f"Browser hydration failed:\n{browser.stdout}\n{browser.stderr}"
         report = json.loads(browser.stdout.strip().splitlines()[-1])
-        assert report["controls"] == 27
+        assert report["controls"] == 30
         assert report["hydrated"] == 21
         assert report["comparisonMode"] == comparison_mode
         assert report["cards"] == (0 if comparison_mode == "404" else 3)
