@@ -65,6 +65,10 @@ def _score_view(record: Mapping[str, Any]) -> Dict[str, Any]:
         "verdict": str(verdict.get("verdict") or score.get("verdict")),
         "confidence": str(confidence.get("level") or score.get("confidence")),
         "knockout_status": str((record.get("knockouts") or {}).get("status") or "UNKNOWN"),
+        "knockouts": [
+            {"rule_id": str(item.get("rule_id")), "state": str(item.get("state"))}
+            for item in ((record.get("knockouts") or {}).get("results") or [])
+        ],
     }
 
 
@@ -119,7 +123,20 @@ def build_secondary(baseline_id: str, store: EvaluationStore, supp_root: Path, s
     governance_values = {e["target"].rsplit(".", 1)[1]: e["value"] for e in entries if str(e["target"]).startswith("governance.")}
     if governance_values:
         raw.setdefault("governance", {}).update(governance_values)
-    risk_values = {e["target"].rsplit(".", 1)[1]: e["value"] for e in entries if str(e["target"]).startswith("risks.")}
+    # The governed Workbench names guardrail assertions under risks, while the
+    # frozen Layer 1 metrics retain their canonical governance/financial paths.
+    guardrail_values = {str(e["target"]): e["value"] for e in entries}
+    if "risks.going_concern_uncertainty" in guardrail_values:
+        raw.setdefault("governance", {})["going_concern_uncertainty"] = guardrail_values["risks.going_concern_uncertainty"]
+    if "risks.contingent_liab_unquantified" in guardrail_values:
+        raw.setdefault("financials", {})["contingent_liabilities_unquantified"] = guardrail_values["risks.contingent_liab_unquantified"]
+    if "governance.promoter_pledged_shares_pct" in guardrail_values:
+        raw.setdefault("capital_structure", {})["promoter_pledge_pct"] = guardrail_values["governance.promoter_pledged_shares_pct"]
+    risk_values = {
+        e["target"].rsplit(".", 1)[1]: e["value"] for e in entries
+        if str(e["target"]).startswith("risks.")
+        and e["target"] not in {"risks.going_concern_uncertainty", "risks.contingent_liab_unquantified"}
+    }
     if risk_values:
         raw.setdefault("risks", {}).update(risk_values)
     moment = datetime.fromisoformat(at_text.replace("Z", "+00:00")).astimezone(timezone.utc)

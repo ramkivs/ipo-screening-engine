@@ -1,5 +1,6 @@
 from __future__ import annotations
 import copy, hashlib, json
+from datetime import datetime, timezone
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
@@ -7,6 +8,7 @@ from ipo_screening.evaluation import EvaluationStore
 from ipo_screening.supplemental_data import finalize_payload, initialize_template, store_payload
 from ipo_screening.secondary_evaluation import build_secondary, store_secondary, verify_secondary, MODULE_CAPS
 from ipo_screening.operator_scenario import scenario_template, finalize_scenario, evaluate_scenario, store_scenario
+from ipo_screening.pipeline import evaluate
 
 ROOT=Path(__file__).resolve().parents[1]
 JIO=ROOT/'docs/investigation/jio-current-engine-probe-20261027/evaluations'
@@ -166,6 +168,41 @@ def test_workbench_recalculation_revises_target_without_conflicting_target(monke
  assert module_a['secondary_points']==module_a['baseline_points']
  assert module_a['delta']==0
  assert len(list((tmp_path/'supp'/EID).glob('*/supplemental_payload.json')))==2
+
+
+def test_layer2c_guardrail_overrides_clear_all_knockouts_without_mutating_baseline(monkeypatch,tmp_path,golden_input,config):
+ document=copy.deepcopy(golden_input)
+ document['governance'].update(going_concern_uncertainty=None,sebi_ed_action_active=None,rpt_pct_of_revenue_growth=0)
+ document['financials']['contingent_liabilities_unquantified']=None
+ document['capital_structure']['promoter_pledge_pct']=30
+ store=EvaluationStore(tmp_path/'baseline')
+ baseline=evaluate(document,config,mode='final',evaluation_datetime=datetime(2026,10,5,12,tzinfo=timezone.utc),store=store).record
+ baseline_id=baseline.evaluation_id
+ baseline_bytes={p.name:p.read_bytes() for p in store.path_for(baseline_id).iterdir() if p.is_file()}
+ dashboard,client=_dashboard(monkeypatch,tmp_path)
+ monkeypatch.setattr(dashboard,'L1',store.root)
+ response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={
+  'baseline_id':baseline_id,'bidding_day':'DAY_3','observation_time':'2026-10-05T11:00:00Z',
+  'publisher':'SYNTHETIC TEST FILING','source_id':'GUARDRAIL-OVERRIDE','qib_x':'70.55',
+     'top_customer_revenue_pct':'0.5','going_concern_uncertainty':'false',
+     'contingent_liab_unquantified':'false','promoter_pledged_shares_pct':'0',
+     'sebi_ed_action_active':'false',
+ },files={'evidence':('guardrails.pdf',b'synthetic guardrail test evidence')})
+ assert response.status_code==200,response.text
+ secondary_path=tmp_path/'sec'/baseline_id/response.json()['secondary_id']/'secondary_evaluation.json'
+ secondary=json.loads(secondary_path.read_text())
+ states={item['rule_id']:item['state'] for item in secondary['secondary']['knockouts']}
+ assert states=={f'K{i}':'CLEAR' for i in range(1,7)}
+ assert secondary['baseline']['knockout_status'] in {'TRIGGERED','UNVERIFIED'}
+ assert secondary['secondary']['knockout_status']=='CLEAR'
+ # The controlled Vishal fixture is intentionally not used to fabricate Jio's
+ # expected score; this test proves only that the knockout cap is removed.
+ assert set(secondary['admitted_fields'])=={
+      'financials.top_customer_revenue_pct','risks.going_concern_uncertainty',
+      'risks.contingent_liab_unquantified','governance.promoter_pledged_shares_pct',
+      'governance.sebi_ed_action_active',
+ }
+ assert baseline_bytes=={p.name:p.read_bytes() for p in store.path_for(baseline_id).iterdir() if p.is_file()}
 
 
 def test_regulatory_risk_overrides_flow_through_workbench_secondary_evaluation(monkeypatch,tmp_path):

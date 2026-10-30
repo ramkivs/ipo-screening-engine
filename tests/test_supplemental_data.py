@@ -36,7 +36,9 @@ def test_template_is_bound_and_only_registry_gaps_are_fillable(baseline,tmp_path
     store,eid=baseline; t=initialize_template(store,eid)
     rec=store.read_full(eid); manifest=store.read_artifact(eid,'manifest')
     assert t['baseline_binding']==baseline_binding(rec,manifest)
-    assert {e['target'] for e in t['entries']}==set(ELIGIBILITY_REGISTRY)
+    # The golden baseline already explicitly supplies this guardrail; templates
+    # expose only genuine gaps, not fields that merely happen to be eligible.
+    assert {e['target'] for e in t['entries']}==set(ELIGIBILITY_REGISTRY)-{'governance.sebi_ed_action_active'}
     assert t['template_metadata']['excluded_gaps']
     assert t['template_metadata']['scoring_eligibility']=='NOT_GRANTED'
 

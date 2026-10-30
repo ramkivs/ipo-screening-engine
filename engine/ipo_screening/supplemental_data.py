@@ -84,6 +84,27 @@ ELIGIBILITY_REGISTRY.update({
         "source_types": ("OFFICIAL_FILING",), "minimum": None,
         "recordable": True, "scoring_eligible": True,
     },
+    "risks.going_concern_uncertainty": {
+        "category": "KNOCKOUT_GUARDRAIL", "type": "boolean", "unit": None, "currency": None,
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "GOVERNANCE", "gap_item": "going_concern_uncertainty",
+        "source_types": ("OFFICIAL_FILING",), "minimum": None,
+        "recordable": True, "scoring_eligible": True,
+    },
+    "risks.contingent_liab_unquantified": {
+        "category": "KNOCKOUT_GUARDRAIL", "type": "boolean", "unit": None, "currency": None,
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "FINANCIAL", "gap_item": "contingent_liab_unquantified",
+        "source_types": ("OFFICIAL_FILING",), "minimum": None,
+        "recordable": True, "scoring_eligible": True,
+    },
+    "governance.sebi_ed_action_active": {
+        "category": "KNOCKOUT_GUARDRAIL", "type": "boolean", "unit": None, "currency": None,
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "GOVERNANCE", "gap_item": "sebi_ed_action_active",
+        "source_types": ("OFFICIAL_FILING",), "minimum": None,
+        "recordable": True, "scoring_eligible": True,
+    },
     "risks.contingent_liabilities_pct_net_worth": {
         "category": "REGULATORY_RISK", "type": "number", "unit": "PERCENT", "currency": None,
         "requires_observation_time": False, "requires_gap": False,
