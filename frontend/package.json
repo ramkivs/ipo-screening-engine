@@ -6,7 +6,16 @@
   "scripts": {
     "test": "node --test test/*.test.js"
   },
-  "keywords": ["ipo", "screening", "finance", "presentation", "read-only"],
+  "keywords": [
+    "ipo",
+    "screening",
+    "finance",
+    "presentation",
+    "read-only"
+  ],
   "author": "Ramki",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
 }
