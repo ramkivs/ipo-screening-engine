@@ -18,6 +18,7 @@
     "baseline",
     "secondary",
     "module_breakdown",
+    "inspection",
     "secondary_result_hash",
     "scoring_profile",
     "canonical_secondary_hash"
@@ -149,6 +150,135 @@
     },
     "canonical_secondary_hash": {
       "$ref": "#/$defs/hash"
+    },
+    "inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completeness_pct",
+        "confidence",
+        "modules"
+      ],
+      "properties": {
+        "completeness_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "modules": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "module_id",
+              "name",
+              "baseline_points",
+              "secondary_points",
+              "cap",
+              "delta",
+              "cap_applied",
+              "criteria"
+            ],
+            "properties": {
+              "module_id": {
+                "enum": [
+                  "A",
+                  "B",
+                  "C",
+                  "D",
+                  "E",
+                  "F"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "baseline_points": {
+                "type": "number"
+              },
+              "secondary_points": {
+                "type": "number"
+              },
+              "cap": {
+                "type": "number"
+              },
+              "delta": {
+                "type": "number"
+              },
+              "cap_applied": {
+                "type": "boolean"
+              },
+              "criteria": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "criterion_id",
+                    "label",
+                    "metric",
+                    "baseline_value",
+                    "secondary_value",
+                    "score",
+                    "max",
+                    "state",
+                    "explanation"
+                  ],
+                  "properties": {
+                    "criterion_id": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "metric": {
+                      "type": "string"
+                    },
+                    "baseline_value": {
+                      "type": [
+                        "number",
+                        "string",
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "secondary_value": {
+                      "type": [
+                        "number",
+                        "string",
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "score": {
+                      "type": "number"
+                    },
+                    "max": {
+                      "type": "number"
+                    },
+                    "state": {
+                      "enum": [
+                        "SCORED",
+                        "UNKNOWN",
+                        "CAPPED"
+                      ]
+                    },
+                    "explanation": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "$defs": {

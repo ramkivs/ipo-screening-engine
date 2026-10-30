@@ -7,6 +7,16 @@ if (!url || !evaluationId) throw new Error('usage: node workbench-hydration.brow
 const requests = [];
 const submissions = [];
 const errors = [];
+const moduleNames = ['Financial Quality', 'Valuation', 'Proceeds & Lock-in', 'Governance', 'Business & Moat', 'Market Context'];
+const syntheticSecondary = {
+  secondary: { score: 82, verdict: 'SUBSCRIBE', confidence: 'High', knockout_status: 'CLEAR', knockouts: Array.from({ length: 6 }, (_, i) => ({ rule_id: `K${i + 1}`, state: 'CLEAR' })) },
+  inspection: { completeness_pct: 96, confidence: 'High', modules: moduleNames.map((name, index) => ({
+    module_id: String.fromCharCode(65 + index), name, baseline_points: 0,
+    secondary_points: [20, 16, 15, 12, 15, 10][index], cap: [25, 20, 15, 15, 15, 10][index],
+    delta: [20, 16, 15, 12, 15, 10][index], cap_applied: [2, 4, 5].includes(index),
+    criteria: [{ criterion_id: `criterion_${index}`, label: `${name} criterion`, metric: `metric_${index}`, baseline_value: null, secondary_value: 'strong', score: 5, max: 5, state: index === 4 ? 'CAPPED' : 'SCORED', explanation: 'Matched governed test rule.' }],
+  })) },
+};
 const virtualConsole = new VirtualConsole();
 virtualConsole.on('jsdomError', error => errors.push(String(error)));
 virtualConsole.on('error', (...args) => errors.push(args.join(' ')));
@@ -26,6 +36,9 @@ const dom = await JSDOM.fromURL(url, {
       }
       if (comparisonMode === '404' && new URL(absolute).pathname.startsWith('/api/v1/comparison/')) {
         return new Response(JSON.stringify({ detail: 'comparison unavailable' }), { status: 404, headers: { 'content-type': 'application/json' } });
+      }
+      if (submissions.length && new URL(absolute).pathname.startsWith('/api/v1/comparison/')) {
+        return new Response(JSON.stringify({ baseline: { badge: '[LAYER_1_BASE]' }, enriched: [syntheticSecondary], scenarios: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       const response = await globalThis.fetch(absolute, options);
       if (new URL(absolute).pathname === '/api/v1/evaluations') {
@@ -105,6 +118,24 @@ assert.equal(submissions[0].top_customer_revenue_pct, '0.5');
 assert.equal(submissions[0].net_income_3yr_cumulative, undefined, 'unchanged hydrated targets must not be duplicated');
 assert.equal(submissions[0].qib_x, undefined, 'unchanged market targets must not be duplicated');
 for (const [name, value] of Object.entries(moduleOverrides)) assert.equal(submissions[0][name], value, `${name} was not serialized`);
+if (comparisonMode === 'available') {
+  while (document.querySelectorAll('.module-accordion').length !== 6) {
+    if (Date.now() > submissionDeadline) throw new Error('module accordion did not populate after recalculation');
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  assert.equal(document.querySelector('.secondary-summary')?.textContent.includes('82.0'), true);
+  assert.equal(document.querySelector('.verdict-badge')?.textContent, 'SUBSCRIBE');
+  assert.equal(document.querySelectorAll('.ko-pill.clear').length, 6);
+  const capped = [...document.querySelectorAll('.module-accordion')].filter(item => item.querySelector('.cap-label')).map(item => item.dataset.module);
+  assert.deepEqual(capped, ['C', 'E', 'F']);
+  const moduleE = document.querySelector('.module-accordion[data-module="E"]');
+  assert.equal(moduleE.open, false);
+  moduleE.querySelector('summary').click();
+  assert.equal(moduleE.open, true);
+  assert.equal(moduleE.querySelector('.criteria-table tbody')?.textContent.includes('Business & Moat criterion'), true);
+  assert.equal(moduleE.querySelector('.state-pill')?.textContent, 'CAPPED');
+  assert.equal(moduleE.querySelector('tbody')?.textContent.includes('Matched governed test rule.'), true);
+}
 
 const paths = requests.map(request => new URL(request).pathname);
 assert.deepEqual(paths.slice(0, 3), [

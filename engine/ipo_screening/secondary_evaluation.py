@@ -77,6 +77,49 @@ def _module_map(record: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
     return {str(m["module_id"]): m for m in (record.get("score") or {}).get("modules", [])}
 
 
+def _inspection(baseline: Mapping[str, Any], enriched: Mapping[str, Any]) -> Dict[str, Any]:
+    before_modules, after_modules = _module_map(baseline), _module_map(enriched)
+    modules = []
+    for module_id in MODULE_CAPS:
+        before = before_modules.get(module_id, {})
+        after = after_modules.get(module_id, {})
+        before_criteria = {str(item.get("criterion_id")): item for item in before.get("criteria", [])}
+        raw_points = sum(float(item.get("score", 0)) for item in after.get("criteria", []))
+        module_score = float(after.get("score", 0))
+        capped = raw_points > module_score or module_score >= MODULE_CAPS[module_id]
+        criteria = []
+        for item in after.get("criteria", []):
+            prior = before_criteria.get(str(item.get("criterion_id")), {})
+            state = str(item.get("state") or "UNKNOWN")
+            if state not in {"SCORED", "UNKNOWN"}:
+                state = "UNKNOWN"
+            if capped and state == "SCORED" and raw_points > module_score:
+                state = "CAPPED"
+            criteria.append({
+                "criterion_id": str(item.get("criterion_id")),
+                "label": str(item.get("label") or item.get("criterion_id")),
+                "metric": str(item.get("metric") or ""),
+                "baseline_value": prior.get("value"),
+                "secondary_value": item.get("value"),
+                "score": float(item.get("score", 0)),
+                "max": float(item.get("max", 0)),
+                "state": state,
+                "explanation": str(item.get("reason") or item.get("formula") or "No rule explanation recorded."),
+            })
+        modules.append({
+            "module_id": module_id, "name": str(after.get("name") or before.get("name") or module_id),
+            "baseline_points": float(before.get("score", 0)), "secondary_points": module_score,
+            "cap": MODULE_CAPS[module_id], "delta": module_score-float(before.get("score", 0)),
+            "cap_applied": capped, "criteria": criteria,
+        })
+    confidence = enriched.get("confidence") or {}
+    return {
+        "completeness_pct": float(confidence.get("completeness_pct", 0)),
+        "confidence": str(confidence.get("level") or "UNKNOWN"),
+        "modules": modules,
+    }
+
+
 def _subject(document: Mapping[str, Any]) -> Dict[str, Any]:
     out = copy.deepcopy(dict(document))
     out.pop("canonical_secondary_hash", None)
@@ -185,7 +228,7 @@ def build_secondary(baseline_id: str, store: EvaluationStore, supp_root: Path, s
         "supplemental_payload_hash": payload["canonical_payload_hash"],
         "evaluated_at": at_text, "admitted_fields": targets,
         "baseline": _score_view(baseline), "secondary": _score_view(enriched),
-        "module_breakdown": breakdown,
+        "module_breakdown": breakdown, "inspection": _inspection(baseline, enriched),
         "secondary_result_hash": enriched["result_hash"],
         "scoring_profile": "CORE_ENGINE_UNCHANGED", "canonical_secondary_hash": None,
     }
