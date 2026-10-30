@@ -176,16 +176,16 @@ async function parseResponse(response){{const type=response.headers.get('content
 const CONTROL_PATHS={{qib_x:'market.subscription.qib_x',nii_x:'market.subscription.nii_x',retail_x:'market.subscription.retail_x',overall_x:'market.subscription.overall_x',observation_time:'market.subscription.as_of',source_id:'market.subscription.source_id',operating_cash_flow_3yr_cumulative:'financials.operating_cash_flow_3yr_cumulative',net_income_3yr_cumulative:'financials.net_income_3yr_cumulative',trade_receivables_days:'financials.trade_receivables_days',net_working_capital_pct_revenue:'financials.net_working_capital_pct_revenue',top_customer_revenue_pct:'financials.top_customer_revenue_pct',loss_making_segments_present:'financials.loss_making_segments_present',promoter_pledged_shares_pct:'governance.promoter_pledged_shares_pct',pre_issue_promoter_holding_pct:'governance.pre_issue_promoter_holding_pct',contingent_liabilities_pct_net_worth:'risks.contingent_liabilities_pct_net_worth',material_regulatory_disputes_present:'risks.material_regulatory_disputes_present'}};
 function valueAt(root,path){{return path.split('.').reduce((value,key)=>value&&typeof value==='object'?value[key]:undefined,root)}}
 function hydrateFormState(input){{document.querySelectorAll('#inject-form [name],#scenario-form [name]').forEach(control=>{{if(['baseline_id','target_id','evidence'].includes(control.name))return;const path=CONTROL_PATHS[control.name]||control.name;const value=valueAt(input,path);if(value===undefined||value===null||Array.isArray(value)||typeof value==='object')return;control.value=typeof value==='boolean'?String(value):String(value)}})}}
-async function loadEvaluation(identifier){{if(!identifier)return;const data=await parseResponse(await fetch('/api/evaluations/'+encodeURIComponent(identifier)+'/input'));setActiveEvaluation(identifier);hydrateFormState(data.input);return data}}
-async function refreshContext(){{try{{const response=await fetch('/api/evaluations');const rows=await parseResponse(response);const ids=rows.map(x=>x.id);const session=readSession(),cached=session.evaluation_id;const active=ids.includes(cached)?cached:ids[0];if(active){{await loadEvaluation(active);if(session.injection?.evaluation_id===active)showStatus(session.injection.detail||'Previous injection restored.','success')}}else showStatus('No evaluations are available in the active evaluation store.')}}catch(error){{showStatus(error.message)}}}}
-async function explore(){{clearError();try{{const id=document.getElementById('evaluation').value;setActiveEvaluation(id);const d=await parseResponse(await fetch('/api/comparison/'+encodeURIComponent(id))),c=document.getElementById('comparison');c.innerHTML=`<div class="card"><b>[LAYER_1_BASE]</b><br>${{JSON.stringify(d.baseline,null,2)}}</div><div class="card"><b>[ENRICHED_LAYER_2C]</b><br>${{JSON.stringify(d.enriched,null,2)}}</div><div class="card"><b>[OPERATOR_ASSUMPTION]</b><br>${{JSON.stringify(d.scenarios,null,2)}}</div>`}}catch(error){{showStatus(error.message)}}}}
+async function loadEvaluation(identifier){{if(!identifier)return;const data=await parseResponse(await fetch('/api/v1/evaluations/'+encodeURIComponent(identifier)+'/input'));setActiveEvaluation(identifier);hydrateFormState(data.input);return data}}
+async function refreshContext(){{try{{const response=await fetch('/api/v1/evaluations');const rows=await parseResponse(response);const ids=rows.map(x=>x.id);const session=readSession(),cached=session.evaluation_id;const active=ids.includes(cached)?cached:ids[0];if(active){{await loadEvaluation(active);if(session.injection?.evaluation_id===active)showStatus(session.injection.detail||'Previous injection restored.','success')}}else showStatus('No evaluations are available in the active evaluation store.')}}catch(error){{showStatus(error.message)}}}}
+async function explore(){{clearError();try{{const id=document.getElementById('evaluation').value;setActiveEvaluation(id);const d=await parseResponse(await fetch('/api/v1/comparison/'+encodeURIComponent(id))),c=document.getElementById('comparison');c.innerHTML=`<div class="card"><b>[LAYER_1_BASE]</b><br>${{JSON.stringify(d.baseline,null,2)}}</div><div class="card"><b>[ENRICHED_LAYER_2C]</b><br>${{JSON.stringify(d.enriched,null,2)}}</div><div class="card"><b>[OPERATOR_ASSUMPTION]</b><br>${{JSON.stringify(d.scenarios,null,2)}}</div>`}}catch(error){{showStatus(error.message)}}}}
 document.getElementById('compare-button').addEventListener('click',explore);
 document.getElementById('evaluation').addEventListener('change',e=>loadEvaluation(e.target.value).catch(error=>showStatus(error.message)));
 document.querySelector('select[name="baseline_id"]').addEventListener('change',e=>loadEvaluation(e.target.value).catch(error=>showStatus(error.message)));
 async function submitForm(event,successKind){{event.preventDefault();clearError();const form=event.currentTarget;const baseline=new FormData(form).get(successKind==='injection'?'baseline_id':'target_id');try{{const response=await fetch(form.action,{{method:'POST',body:new FormData(form),headers:{{'X-Workbench-Request':'fetch'}}}});const body=await parseResponse(response);setActiveEvaluation(baseline);saveSession({{evaluation_id:baseline,[successKind]:body}});showStatus(body.detail||`${{successKind}} succeeded.`,'success');if(successKind==='injection')await explore()}}catch(error){{showStatus(error.message)}}}}
 document.getElementById('inject-form').addEventListener('submit',e=>submitForm(e,'injection'));
 document.getElementById('scenario-form').addEventListener('submit',e=>submitForm(e,'scenario'));
-document.getElementById('evidence').addEventListener('change',async e=>{{const f=e.target.files[0];if(!f)return;clearError();try{{const b=new FormData();b.append('evidence',f);const r=await parseResponse(await fetch('/api/hash',{{method:'POST',body:b}}));document.getElementById('evidenceHash').textContent='SHA-256 '+r.sha256}}catch(error){{showStatus(error.message)}}}});
+document.getElementById('evidence').addEventListener('change',async e=>{{const f=e.target.files[0];if(!f)return;clearError();try{{const b=new FormData();b.append('evidence',f);const r=await parseResponse(await fetch('/api/v1/hash',{{method:'POST',body:b}}));document.getElementById('evidenceHash').textContent='SHA-256 '+r.sha256}}catch(error){{showStatus(error.message)}}}});
 refreshContext();
 </script></body></html>'''
 
@@ -234,9 +234,11 @@ def api_scenario_evaluate(request:ScenarioEvaluateRequest):
 
 
 @app.get("/api/evaluations")
+@app.get("/api/v1/evaluations")
 def evaluations(): return _records()
 
 @app.get("/api/evaluations/{evaluation_id}/input")
+@app.get("/api/v1/evaluations/{evaluation_id}/input")
 def evaluation_input(evaluation_id:str):
  try: evaluation_id=_resolve_evaluation_id(evaluation_id)
  except FileNotFoundError as exc: raise HTTPException(404,str(exc)) from exc
@@ -252,6 +254,7 @@ def evaluation_input(evaluation_id:str):
  return {"evaluation_id":evaluation_id,"input":raw}
 
 @app.get("/api/comparison/{baseline_id}")
+@app.get("/api/v1/comparison/{baseline_id}")
 def comparison(baseline_id:str):
  try: baseline_id=_resolve_evaluation_id(baseline_id)
  except FileNotFoundError as exc: raise HTTPException(404,str(exc)) from exc
@@ -263,6 +266,7 @@ def comparison(baseline_id:str):
  return {"baseline":{"badge":"[LAYER_1_BASE]",**base},"enriched":[{"badge":"[ENRICHED_LAYER_2C]",**x} for x in enriched],"scenarios":[{"badge":"[OPERATOR_ASSUMPTION]",**x} for x in scenarios]}
 
 @app.post("/api/hash")
+@app.post("/api/v1/hash")
 async def hash_file(evidence:UploadFile=File(...)):
  try:
   filename,data=await _read_upload(evidence)
