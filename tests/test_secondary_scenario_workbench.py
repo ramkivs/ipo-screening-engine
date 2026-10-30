@@ -24,7 +24,7 @@ def test_secondary_is_deterministic_capped_and_baseline_immutable(tmp_path):
  before={p.name:p.read_bytes() for p in (JIO/EID).iterdir() if p.is_file()}; payload,supp=accepted_payload(tmp_path); doc=build_secondary(EID,EvaluationStore(JIO),supp,payload['supplemental_payload_id']); assert doc['baseline']['score']==37.0; assert doc['secondary']['score']==39.0; assert doc['admitted_fields']==['market.subscription.qib_x']; assert all(m['secondary_points']<=MODULE_CAPS[m['module_id']] for m in doc['module_breakdown']); assert verify_secondary(doc)['valid']; outcome,path=store_secondary(doc,tmp_path/'secondary'); assert outcome=='SECONDARY_EVALUATION_STORED'; assert build_secondary(EID,EvaluationStore(JIO),supp,payload['supplemental_payload_id'])==doc; assert before=={p.name:p.read_bytes() for p in (JIO/EID).iterdir() if p.is_file()}
 
 def test_secondary_rejects_non_whitelisted_stored_target(tmp_path):
- payload,supp=accepted_payload(tmp_path); directory=next((supp/EID).iterdir()); payload['entries'][0]['target']='business.moat_rating'; from ipo_screening.supplemental_data import payload_hash
+ payload,supp=accepted_payload(tmp_path); directory=next((supp/EID).iterdir()); payload['entries'][0]['target']='business.unapproved_rating'; from ipo_screening.supplemental_data import payload_hash
  h=payload_hash(payload);payload['canonical_payload_hash']=h;payload['supplemental_payload_id']='SUPP-'+h[:16];(directory/'supplemental_payload.json').write_text(json.dumps(payload));m=json.loads((directory/'supplemental_manifest.json').read_text());m['payload_hash']=h;(directory/'supplemental_manifest.json').write_text(json.dumps(m))
  with pytest.raises(ValueError,match='governed'):build_secondary(EID,EvaluationStore(JIO),supp,payload['supplemental_payload_id'])
 
@@ -187,6 +187,9 @@ def test_layer2c_guardrail_overrides_clear_all_knockouts_without_mutating_baseli
      'top_customer_revenue_pct':'0.5','going_concern_uncertainty':'false',
      'contingent_liab_unquantified':'false','promoter_pledged_shares_pct':'0',
      'sebi_ed_action_active':'false',
+     'industry_cagr_pct':'15','moat_rating':'leader_with_moat','top5_concentration_pct':'10','visibility_rating':'strong',
+     'use_of_proceeds_bucket':'growth','lockin_bucket':'intact','second_multiple_premium_pct':'-10','sector_ipo_relative':'cheaper',
+     'anchor_bucket':'reputed','gmp_bucket':'strong','market_regime_bucket':'supportive',
  },files={'evidence':('guardrails.pdf',b'synthetic guardrail test evidence')})
  assert response.status_code==200,response.text
  secondary_path=tmp_path/'sec'/baseline_id/response.json()['secondary_id']/'secondary_evaluation.json'
@@ -195,12 +198,17 @@ def test_layer2c_guardrail_overrides_clear_all_knockouts_without_mutating_baseli
  assert states=={f'K{i}':'CLEAR' for i in range(1,7)}
  assert secondary['baseline']['knockout_status'] in {'TRIGGERED','UNVERIFIED'}
  assert secondary['secondary']['knockout_status']=='CLEAR'
- # The controlled Vishal fixture is intentionally not used to fabricate Jio's
- # expected score; this test proves only that the knockout cap is removed.
+ assert secondary['secondary']['score']>40
+ module_deltas={item['module_id']:item['delta'] for item in secondary['module_breakdown']}
+ assert all(module_deltas[module]>0 for module in ('B','C','E','F'))
  assert set(secondary['admitted_fields'])=={
       'financials.top_customer_revenue_pct','risks.going_concern_uncertainty',
       'risks.contingent_liab_unquantified','governance.promoter_pledged_shares_pct',
       'governance.sebi_ed_action_active',
+      'business.industry_cagr_pct','business.moat_rating','business.top5_concentration_pct','business.visibility_rating',
+      'issue.use_of_proceeds_bucket','capital_structure.lockin_bucket',
+      'valuation.second_multiple_premium_pct','valuation.sector_ipo_relative',
+      'market.anchor_bucket','market.gmp_bucket','market.market_regime_bucket',
  }
  assert baseline_bytes=={p.name:p.read_bytes() for p in store.path_for(baseline_id).iterdir() if p.is_file()}
 

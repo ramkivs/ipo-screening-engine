@@ -59,10 +59,18 @@ def test_workbench_starts_blank_then_hydrates_explicit_selection(tmp_path, golde
         "contingent_liabilities_pct_net_worth": 50,
         "material_regulatory_disputes_present": True,
     }
-    document["market"] = {"subscription": {
-        "qib_x": 25, "nii_x": 12, "retail_x": 8, "overall_x": 15,
-        "as_of": "2026-10-05T11:00:00Z", "source_id": "BROWSER-E2E",
-    }}
+    document["business"].update({
+        "industry_cagr_pct": 15, "moat_rating": "strong_niche",
+        "top5_customer_pct": 20, "visibility_rating": "strong",
+    })
+    document["market"] = {
+        "subscription": {
+            "qib_x": 25, "nii_x": 12, "retail_x": 8, "overall_x": 15,
+            "as_of": "2026-10-05T11:00:00Z", "source_id": "BROWSER-E2E",
+        },
+        "anchor": {"quality": "reputed"}, "gmp": {"trend": "strong"},
+        "regime": {"nifty_trend": "supportive"},
+    }
     store = EvaluationStore(tmp_path / "build/evaluations")
     outcome = evaluate(
         document, config, mode="final",
@@ -90,8 +98,8 @@ def test_workbench_starts_blank_then_hydrates_explicit_selection(tmp_path, golde
         )
         assert browser.returncode == 0, f"Browser hydration failed:\n{browser.stdout}\n{browser.stderr}"
         report = json.loads(browser.stdout.strip().splitlines()[-1])
-        assert report["controls"] == 30
-        assert report["hydrated"] == 21
+        assert report["controls"] == 41
+        assert report["hydrated"] == 28
         assert report["comparisonMode"] == comparison_mode
         assert report["cards"] == (0 if comparison_mode == "404" else 3)
         assert report["requests"][:3] == [
