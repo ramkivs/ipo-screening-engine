@@ -8,7 +8,7 @@ from conftest import ENGINE_ROOT, GOLDEN_DIR, REPO_ROOT
 CLI=ENGINE_ROOT/'tools'/'ipo_screen.py'
 from ipo_screening.evaluation import EvaluationStore
 from ipo_screening.pipeline import evaluate, load_config, replay
-from ipo_screening.supplemental_data import initialize_template, finalize_payload, validate_payload, store_payload, baseline_binding
+from ipo_screening.supplemental_data import ELIGIBILITY_REGISTRY, initialize_template, finalize_payload, validate_payload, store_payload, baseline_binding
 
 @pytest.fixture
 def baseline(tmp_path):
@@ -36,7 +36,7 @@ def test_template_is_bound_and_only_registry_gaps_are_fillable(baseline,tmp_path
     store,eid=baseline; t=initialize_template(store,eid)
     rec=store.read_full(eid); manifest=store.read_artifact(eid,'manifest')
     assert t['baseline_binding']==baseline_binding(rec,manifest)
-    assert {e['target'] for e in t['entries']}=={'market.subscription.qib_x','market.subscription.nii_x','market.subscription.retail_x','market.subscription.overall_x'}
+    assert {e['target'] for e in t['entries']}==set(ELIGIBILITY_REGISTRY)
     assert t['template_metadata']['excluded_gaps']
     assert t['template_metadata']['scoring_eligibility']=='NOT_GRANTED'
 
@@ -87,7 +87,13 @@ def test_established_stale_layer1_value_cannot_be_overwritten(tmp_path):
     doc=json.loads((GOLDEN_DIR/'input.json').read_text())
     store=EvaluationStore(tmp_path/'stale-evaluations')
     out=evaluate(doc,load_config(),mode='final',evaluation_datetime=datetime(2026,12,5,12,tzinfo=timezone.utc),store=store)
-    p,_=completed_payload(store,out.record.evaluation_id,tmp_path)
+    stale_id=out.record.evaluation_id
+    assert 'market.subscription.qib_x' not in {e['target'] for e in initialize_template(store,stale_id)['entries']}
+    clean=deepcopy(doc);clean['market']['subscription']={}
+    clean_out=evaluate(clean,load_config(),mode='final',evaluation_datetime=datetime(2026,12,6,12,tzinfo=timezone.utc),store=store)
+    p,_=completed_payload(store,clean_out.record.evaluation_id,tmp_path)
+    stale_record=store.read_full(stale_id);stale_manifest=store.read_artifact(stale_id,'manifest')
+    p['evaluation_id']=stale_id;p['baseline_binding']=baseline_binding(stale_record,stale_manifest);p=finalize_payload(p)
     result=validate_payload(p,store,payload_base=tmp_path)
     assert not result.accepted
     assert any('TARGET_ALREADY_ESTABLISHED_IN_LAYER1' in e for e in result.errors)
@@ -129,7 +135,7 @@ def test_cli_init_validate_and_inject_are_separate(baseline,tmp_path):
     init=subprocess.run([sys.executable,str(CLI),'supplemental-init',eid,'--store',str(store.root),'--output',str(template_path)],cwd=REPO_ROOT,capture_output=True,text=True)
     assert init.returncode==0 and template_path.is_file() and 'scoring           NOT_GRANTED' in init.stdout
     template=json.loads(template_path.read_text()); evidence=tmp_path/'exchange.pdf'; evidence.write_bytes(b'official-test-artifact')
-    entry=template['entries'][0]; entry.update(value=1.5,observation_time='2026-10-05T11:00:00Z')
+    entry=next(e for e in template['entries'] if e['target']=='market.subscription.qib_x'); entry.update(value=1.5,observation_time='2026-10-05T11:00:00Z')
     entry['source'].update(source_id='EX-1',title='Notice',publisher='Exchange',publication_date='2026-10-05',official_url='https://example.invalid/n',artifact_ref=evidence.name,artifact_sha256=hashlib.sha256(evidence.read_bytes()).hexdigest(),locator='Table 1')
     entry['operator_attestation']={'operator_id':'owner','attested_at':'2026-10-05T12:00:00Z','statement':'Transcribed from identified artifact.'}
     entry['verification']={'status':'SOURCE_ARTIFACT_HASH_VERIFIED','procedure_note':'Artifact hash only; value authenticity not established.'}
