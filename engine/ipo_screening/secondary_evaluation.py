@@ -119,6 +119,9 @@ def build_secondary(baseline_id: str, store: EvaluationStore, supp_root: Path, s
     governance_values = {e["target"].rsplit(".", 1)[1]: e["value"] for e in entries if str(e["target"]).startswith("governance.")}
     if governance_values:
         raw.setdefault("governance", {}).update(governance_values)
+    risk_values = {e["target"].rsplit(".", 1)[1]: e["value"] for e in entries if str(e["target"]).startswith("risks.")}
+    if risk_values:
+        raw.setdefault("risks", {}).update(risk_values)
     moment = datetime.fromisoformat(at_text.replace("Z", "+00:00")).astimezone(timezone.utc)
     scoring_config = load_config()
     financial_extension = any(target in FINANCIAL_HEALTH_TARGETS for target in targets)

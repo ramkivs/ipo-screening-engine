@@ -143,6 +143,61 @@ def test_governance_overrides_flow_through_workbench_secondary_evaluation(monkey
  assert 0 <= module_d['secondary_points'] <= module_d['cap']
 
 
+def test_multimodule_layer2c_e2e_is_capped_immutable_and_lineage_complete(monkeypatch,tmp_path):
+ baseline_dir=JIO/EID
+ baseline_before={path.name:path.read_bytes() for path in baseline_dir.iterdir() if path.is_file()}
+ frozen_before={name:(ROOT/'engine/ipo_screening'/name).read_bytes() for name in ('derived.py','scoring.py')}
+ dashboard,client=_dashboard(monkeypatch,tmp_path)
+ import ipo_screening.secondary_evaluation as secondary_module
+ evaluated={};original_evaluate=secondary_module.evaluate
+ def capture_evaluate(*args,**kwargs):
+  evaluated['outcome']=original_evaluate(*args,**kwargs);return evaluated['outcome']
+ monkeypatch.setattr(secondary_module,'evaluate',capture_evaluate)
+ immutable_root=tmp_path/'build/evaluations'
+ monkeypatch.setattr(dashboard,'SUPP',immutable_root/'supplemental')
+ monkeypatch.setattr(dashboard,'SEC',immutable_root/'secondary')
+ response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={
+  'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z',
+  'publisher':'SYNTHETIC E2E RHP','source_id':'MULTI-MODULE-E2E',
+  'operating_cash_flow_3yr_cumulative':'100','net_income_3yr_cumulative':'300',
+  'trade_receivables_days':'100','top_customer_revenue_pct':'55',
+  'promoter_pledged_shares_pct':'30','contingent_liabilities_pct_net_worth':'50',
+  'material_regulatory_disputes_present':'true','qib_x':'25','nii_x':'12','retail_x':'8',
+ },files={'evidence':('multi-module-rhp.pdf',b'synthetic integrated E2E evidence; not an authenticity claim')})
+ assert response.status_code==200,response.text
+ body=response.json();secondary_path=immutable_root/'secondary'/EID/body['secondary_id']/'secondary_evaluation.json'
+ assert secondary_path.is_file()
+ secondary=json.loads(secondary_path.read_text())
+ expected_fields={
+  'financials.operating_cash_flow_3yr_cumulative','financials.net_income_3yr_cumulative',
+  'financials.trade_receivables_days','financials.top_customer_revenue_pct',
+  'governance.promoter_pledged_shares_pct','risks.contingent_liabilities_pct_net_worth',
+  'risks.material_regulatory_disputes_present','market.subscription.qib_x',
+  'market.subscription.nii_x','market.subscription.retail_x',
+ }
+ assert set(secondary['admitted_fields'])==expected_fields
+ modules={item['module_id']:item for item in secondary['module_breakdown']}
+ assert modules['A']['delta']==-11 and modules['A']['secondary_points']==6
+ assert modules['D']['delta']==-4 and modules['D']['secondary_points']==5
+ assert modules['E']['secondary_points']==0 and modules['E']['delta']==0  # -8 is clamped by the zero floor.
+ assert modules['F']['delta']==3 and modules['F']['secondary_points']==3
+ criteria={item.criterion_id:item.score for module in evaluated['outcome'].score.modules for item in module.criteria}
+ assert criteria['cash_flow_quality_penalty']==-5
+ assert criteria['dso_over_60_penalty']==-1 and criteria['dso_over_90_penalty']==-1
+ assert criteria['top_customer_above_50_penalty']==-4
+ assert criteria['promoter_pledge_25_to_50_penalty']==-4
+ assert criteria['contingent_liabilities_above_25_penalty']==-5
+ assert criteria['material_regulatory_disputes_penalty']==-3
+ assert all(0<=item['secondary_points']<=item['cap']==MODULE_CAPS[item['module_id']] for item in modules.values())
+ assert secondary['baseline_result_hash']==json.loads((baseline_dir/'result.json').read_text())['result_hash']
+ assert secondary['scoring_profile']=='CORE_ENGINE_UNCHANGED'
+ assert secondary['supplemental_payload_id'].startswith('SUPP-') and len(secondary['supplemental_payload_hash'])==64
+ assert secondary['secondary_evaluation_id']==body['secondary_id'] and verify_secondary(secondary)['valid']
+ assert store_secondary(secondary,immutable_root/'secondary',EvaluationStore(JIO))[0]=='EXACT_DUPLICATE'
+ assert baseline_before=={path.name:path.read_bytes() for path in baseline_dir.iterdir() if path.is_file()}
+ assert frozen_before=={name:(ROOT/'engine/ipo_screening'/name).read_bytes() for name in frozen_before}
+
+
 def test_upload_creates_missing_workspace_tree_and_rejects_stale_id(monkeypatch,tmp_path):
  workspace=tmp_path/'missing'/'nested'/'workbench';dashboard,client=_dashboard(monkeypatch,workspace)
  response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'ACTIVE-WORKSPACE','qib_x':'12.34'},files={'evidence':('active.pdf',b'active workspace artifact')})
