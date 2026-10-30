@@ -5,6 +5,7 @@ const [url, evaluationId, comparisonMode = 'available'] = process.argv.slice(2);
 if (!url || !evaluationId) throw new Error('usage: node workbench-hydration.browser.mjs URL EVALUATION_ID [available|404]');
 
 const requests = [];
+const submissions = [];
 const errors = [];
 const virtualConsole = new VirtualConsole();
 virtualConsole.on('jsdomError', error => errors.push(String(error)));
@@ -17,8 +18,12 @@ const dom = await JSDOM.fromURL(url, {
   virtualConsole,
   beforeParse(window) {
     window.fetch = async (resource, options) => {
-      const absolute = new URL(typeof resource === 'string' ? resource : resource.url, window.location.href).href;
+      const absolute = new URL(typeof resource === 'string' ? resource : (resource.url || resource.href), window.location.href).href;
       requests.push(absolute);
+      if (options?.method === 'POST' && new URL(absolute).pathname.endsWith('/actions/inject-rescore')) {
+        submissions.push(Object.fromEntries(options.body.entries()));
+        return new Response(JSON.stringify({ detail: 'recalculation succeeded', evaluation_id: evaluationId }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
       if (comparisonMode === '404' && new URL(absolute).pathname.startsWith('/api/v1/comparison/')) {
         return new Response(JSON.stringify({ detail: 'comparison unavailable' }), { status: 404, headers: { 'content-type': 'application/json' } });
       }
@@ -30,7 +35,6 @@ const dom = await JSDOM.fromURL(url, {
       }
       return response;
     };
-    window.FormData = globalThis.FormData;
   },
 });
 
@@ -80,6 +84,18 @@ const expected = {
 for (const [name, value] of Object.entries(expected)) {
   assert.equal(document.querySelector(`[name="${name}"]`)?.value, value, `${name} was not hydrated`);
 }
+
+document.querySelector('[name="top_customer_revenue_pct"]').value = '0.5';
+document.querySelector('[name="publisher"]').value = 'TEST PUBLISHER';
+document.querySelector('#inject-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+const submissionDeadline = Date.now() + 5000;
+while (submissions.length !== 1) {
+  if (Date.now() > submissionDeadline) throw new Error(`recalculation submission timed out; status=${document.querySelector('#workbench-status')?.textContent}; errors=${JSON.stringify(errors)}; requests=${JSON.stringify(requests)}`);
+  await new Promise(resolve => setTimeout(resolve, 25));
+}
+assert.equal(submissions[0].top_customer_revenue_pct, '0.5');
+assert.equal(submissions[0].net_income_3yr_cumulative, undefined, 'unchanged hydrated targets must not be duplicated');
+assert.equal(submissions[0].qib_x, undefined, 'unchanged market targets must not be duplicated');
 
 const paths = requests.map(request => new URL(request).pathname);
 assert.deepEqual(paths.slice(0, 3), [
