@@ -135,6 +135,39 @@ ELIGIBILITY_REGISTRY.update({
     },
 })
 
+# Existing score inputs that may be asserted from an identified filing or
+# market artifact for the isolated Layer 2C reality. They never mutate Layer 1.
+for _target, _category, _type, _minimum, _maximum in (
+    ("business.industry_cagr_pct", "BUSINESS_MOAT", "number", 0, None),
+    ("business.moat_rating", "BUSINESS_MOAT", "string", None, None),
+    ("business.top5_concentration_pct", "BUSINESS_MOAT", "number", 0, 100),
+    ("business.visibility_rating", "BUSINESS_MOAT", "string", None, None),
+    ("valuation.second_multiple_premium_pct", "PEER_VALUATION", "number", None, None),
+    ("valuation.sector_ipo_relative", "PEER_VALUATION", "string", None, None),
+    ("issue.use_of_proceeds_bucket", "PROCEEDS_LOCKIN", "string", None, None),
+    ("capital_structure.lockin_bucket", "PROCEEDS_LOCKIN", "string", None, None),
+    ("market.anchor_bucket", "MARKET_CONTEXT", "string", None, None),
+    ("market.gmp_bucket", "MARKET_CONTEXT", "string", None, None),
+    ("market.market_regime_bucket", "MARKET_CONTEXT", "string", None, None),
+):
+    ELIGIBILITY_REGISTRY[_target] = {
+        "category": _category, "type": _type, "unit": "PERCENT" if _type == "number" else None,
+        "currency": None, "requires_observation_time": False, "requires_gap": False,
+        "gap_category": _category, "gap_item": _target.rsplit(".", 1)[1],
+        "source_types": (("OFFICIAL_EXCHANGE_DOCUMENT", "OFFICIAL_FILING") if _category == "MARKET_CONTEXT" else ("OFFICIAL_FILING",)),
+        "minimum": _minimum, "maximum": _maximum,
+        "recordable": True, "scoring_eligible": True,
+    }
+
+ELIGIBILITY_REGISTRY["business.moat_rating"]["choices"] = ("leader_with_moat", "strong_niche", "follower", "commoditised")
+ELIGIBILITY_REGISTRY["business.visibility_rating"]["choices"] = ("strong", "moderate", "none")
+ELIGIBILITY_REGISTRY["valuation.sector_ipo_relative"]["choices"] = ("cheaper", "in_line", "richer")
+ELIGIBILITY_REGISTRY["issue.use_of_proceeds_bucket"]["choices"] = ("growth", "mixed_ok", "debt_heavy", "blind_heavy")
+ELIGIBILITY_REGISTRY["capital_structure.lockin_bucket"]["choices"] = ("intact", "weak")
+ELIGIBILITY_REGISTRY["market.anchor_bucket"]["choices"] = ("reputed", "mixed", "unknown")
+ELIGIBILITY_REGISTRY["market.gmp_bucket"]["choices"] = ("strong", "flat", "falling")
+ELIGIBILITY_REGISTRY["market.market_regime_bucket"]["choices"] = ("supportive", "neutral", "weak")
+
 @dataclass(frozen=True)
 class SupplementalValidation:
     accepted: bool
@@ -267,6 +300,9 @@ def validate_payload(payload: Mapping[str, Any], store: EvaluationStore, *, payl
         if rule["type"] == "boolean":
             if not isinstance(value, bool):
                 errors.append(f"{prefix} VALUE_TYPE must be boolean")
+        elif rule["type"] == "string":
+            if not isinstance(value, str) or value not in rule.get("choices", ()):
+                errors.append(f"{prefix} VALUE_ENUM must be one of {rule.get('choices', ())}")
         elif (rule["type"] != "number_or_array" and isinstance(value, list)) or not values or any(isinstance(item, bool) or not isinstance(item, (int, float)) for item in values):
             errors.append(f"{prefix} VALUE_TYPE must be number" + (" or numeric array" if rule["type"] == "number_or_array" else ""))
         elif isinstance(value, list) and len(value) != 3:

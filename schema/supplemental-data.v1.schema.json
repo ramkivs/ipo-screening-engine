@@ -4,72 +4,617 @@
   "title": "Layer 2B supplemental data payload v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["contract_name", "contract_version", "evaluation_id", "ipo_id", "company_name", "baseline_binding", "supplemental_payload_id", "created_at", "canonical_payload_hash", "entries"],
+  "required": [
+    "contract_name",
+    "contract_version",
+    "evaluation_id",
+    "ipo_id",
+    "company_name",
+    "baseline_binding",
+    "supplemental_payload_id",
+    "created_at",
+    "canonical_payload_hash",
+    "entries"
+  ],
   "properties": {
-    "contract_name": {"const": "IPO_LAYER_2B_SUPPLEMENTAL_DATA"},
-    "contract_version": {"const": "1.0"},
-    "evaluation_id": {"type": "string", "minLength": 1},
-    "ipo_id": {"type": "string", "minLength": 1},
-    "company_name": {"type": "string", "minLength": 1},
-    "baseline_binding": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "supplemental_payload_id": {"type": ["string", "null"], "pattern": "^SUPP-[0-9a-f]{16}$"},
-    "created_at": {"type": "string", "format": "date-time"},
-    "canonical_payload_hash": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "contract_name": {
+      "const": "IPO_LAYER_2B_SUPPLEMENTAL_DATA"
+    },
+    "contract_version": {
+      "const": "1.0"
+    },
+    "evaluation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ipo_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "company_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseline_binding": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "supplemental_payload_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^SUPP-[0-9a-f]{16}$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "canonical_payload_hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
     "entries": {
-      "type": "array", "minItems": 1, "uniqueItems": true,
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
       "items": {
-        "type": "object", "additionalProperties": false,
-        "required": ["target", "category", "value", "unit", "currency", "reporting_period", "observation_time", "source", "operator_attestation", "verification", "limitations"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target",
+          "category",
+          "value",
+          "unit",
+          "currency",
+          "reporting_period",
+          "observation_time",
+          "source",
+          "operator_attestation",
+          "verification",
+          "limitations"
+        ],
         "properties": {
-          "target": {"type": "string", "minLength": 1},
-          "category": {"type": "string", "minLength": 1},
-          "value": {"type": ["number", "string", "boolean", "array", "null"], "items": {"type": "number"}},
-          "unit": {"type": ["string", "null"]},
-          "currency": {"type": ["string", "null"]},
-          "reporting_period": {"type": ["string", "null"]},
-          "observation_time": {"type": ["string", "null"], "format": "date-time"},
+          "target": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": [
+              "number",
+              "string",
+              "boolean",
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "number"
+            }
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reporting_period": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "observation_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
           "source": {
-            "type": "object", "additionalProperties": false,
-            "required": ["source_type", "source_id", "title", "publisher", "publication_date", "official_url", "artifact_ref", "artifact_sha256", "locator"],
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_type",
+              "source_id",
+              "title",
+              "publisher",
+              "publication_date",
+              "official_url",
+              "artifact_ref",
+              "artifact_sha256",
+              "locator"
+            ],
             "properties": {
-              "source_type": {"enum": ["OFFICIAL_EXCHANGE_DOCUMENT", "OFFICIAL_FILING"]},
-              "source_id": {"type": "string", "minLength": 1},
-              "title": {"type": "string", "minLength": 1},
-              "publisher": {"type": "string", "minLength": 1},
-              "publication_date": {"type": "string", "format": "date"},
-              "official_url": {"type": ["string", "null"], "format": "uri"},
-              "artifact_ref": {"type": "string", "minLength": 1},
-              "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-              "locator": {"type": "string", "minLength": 1}
+              "source_type": {
+                "enum": [
+                  "OFFICIAL_EXCHANGE_DOCUMENT",
+                  "OFFICIAL_FILING"
+                ]
+              },
+              "source_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "publisher": {
+                "type": "string",
+                "minLength": 1
+              },
+              "publication_date": {
+                "type": "string",
+                "format": "date"
+              },
+              "official_url": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uri"
+              },
+              "artifact_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "artifact_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           },
           "operator_attestation": {
-            "type": "object", "additionalProperties": false,
-            "required": ["operator_id", "attested_at", "statement"],
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operator_id",
+              "attested_at",
+              "statement"
+            ],
             "properties": {
-              "operator_id": {"type": "string", "minLength": 1},
-              "attested_at": {"type": "string", "format": "date-time"},
-              "statement": {"type": "string", "minLength": 1}
+              "operator_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "attested_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "statement": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           },
           "verification": {
-            "type": "object", "additionalProperties": false,
-            "required": ["status", "procedure_note"],
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "procedure_note"
+            ],
             "properties": {
-              "status": {"enum": ["SOURCE_ARTIFACT_HASH_VERIFIED", "OPERATOR_ATTESTED", "UNVERIFIED"]},
-              "procedure_note": {"type": "string", "minLength": 1}
+              "status": {
+                "enum": [
+                  "SOURCE_ARTIFACT_HASH_VERIFIED",
+                  "OPERATOR_ATTESTED",
+                  "UNVERIFIED"
+                ]
+              },
+              "procedure_note": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           },
-          "limitations": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
         },
         "allOf": [
-          {"if": {"properties": {"target": {"const": "financials.top_customer_revenue_pct"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "number", "minimum": 0, "maximum": 100}}}},
-          {"if": {"properties": {"target": {"const": "financials.loss_making_segments_present"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "boolean"}}}},
-          {"if": {"properties": {"target": {"const": "risks.contingent_liabilities_pct_net_worth"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "number", "minimum": 0}}}},
-          {"if": {"properties": {"target": {"const": "risks.material_regulatory_disputes_present"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "boolean"}}}},
-          {"if": {"properties": {"target": {"const": "risks.going_concern_uncertainty"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "boolean"}}}},
-          {"if": {"properties": {"target": {"const": "risks.contingent_liab_unquantified"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "boolean"}}}},
-          {"if": {"properties": {"target": {"const": "governance.sebi_ed_action_active"}}, "required": ["target"]}, "then": {"properties": {"value": {"type": "boolean"}}}}
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "financials.top_customer_revenue_pct"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "financials.loss_making_segments_present"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "risks.contingent_liabilities_pct_net_worth"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "risks.material_regulatory_disputes_present"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "risks.going_concern_uncertainty"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "risks.contingent_liab_unquantified"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "governance.sebi_ed_action_active"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "business.industry_cagr_pct"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "business.top5_concentration_pct"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "valuation.second_multiple_premium_pct"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "business.moat_rating"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "enum": [
+                    "leader_with_moat",
+                    "strong_niche",
+                    "follower",
+                    "commoditised"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "business.visibility_rating"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "enum": [
+                    "strong",
+                    "moderate",
+                    "none"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "valuation.sector_ipo_relative"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "enum": [
+                    "cheaper",
+                    "in_line",
+                    "richer"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "issue.use_of_proceeds_bucket"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "enum": [
+                    "growth",
+                    "mixed_ok",
+                    "debt_heavy",
+                    "blind_heavy"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "capital_structure.lockin_bucket"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "enum": [
+                    "intact",
+                    "weak"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "market.anchor_bucket"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "enum": [
+                    "reputed",
+                    "mixed",
+                    "unknown"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "market.gmp_bucket"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "enum": [
+                    "strong",
+                    "flat",
+                    "falling"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "target": {
+                  "const": "market.market_regime_bucket"
+                }
+              },
+              "required": [
+                "target"
+              ]
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "enum": [
+                    "supportive",
+                    "neutral",
+                    "weak"
+                  ]
+                }
+              }
+            }
+          }
         ]
       }
     }

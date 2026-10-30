@@ -20,6 +20,7 @@ from .regulatory_risk_extension import REGULATORY_RISK_TARGETS, regulatory_risk_
 from .hashing import sha256_of
 from .pipeline import evaluate, load_config
 from .supplemental_data import ELIGIBILITY_REGISTRY, baseline_binding, payload_hash
+from .score_input_overrides import SCORE_OVERRIDE_TARGETS, score_override_metrics
 
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "secondary-evaluation.v1.schema.json"
 WHITELIST = frozenset(ELIGIBILITY_REGISTRY)
@@ -153,7 +154,10 @@ def build_secondary(baseline_id: str, store: EvaluationStore, supp_root: Path, s
         scoring_config = with_segment_risk_extension(scoring_config)
     if regulatory_extension:
         scoring_config = with_regulatory_risk_extension(scoring_config)
+    score_overrides = {str(e["target"]): e["value"] for e in entries if e["target"] in SCORE_OVERRIDE_TARGETS}
     with ExitStack() as extensions:
+        if score_overrides:
+            extensions.enter_context(score_override_metrics(score_overrides))
         if financial_extension:
             extensions.enter_context(financial_health_metrics())
         if governance_extension:
