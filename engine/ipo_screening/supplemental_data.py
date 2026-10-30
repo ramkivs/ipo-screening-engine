@@ -164,7 +164,7 @@ def _schema_errors(payload: Mapping[str, Any]) -> List[str]:
     return [f"SCHEMA {'.'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}" for e in sorted(validator.iter_errors(payload), key=lambda e: list(e.absolute_path))]
 
 
-def initialize_template(store: EvaluationStore, evaluation_id: str) -> Dict[str, Any]:
+def initialize_template(store: EvaluationStore, evaluation_id: str, *, allow_layer1_overrides: bool = False) -> Dict[str, Any]:
     record, manifest = _verified_baseline(store, evaluation_id)
     gaps = {(g.get("category"), g.get("item")) for g in record.get("missing_unverified") or []}
     entries = []
@@ -175,7 +175,7 @@ def initialize_template(store: EvaluationStore, evaluation_id: str) -> Dict[str,
         existing: Any = raw_input
         for part in target.split("."):
             existing = existing.get(part) if isinstance(existing, Mapping) else None
-        if existing is not None:
+        if existing is not None and not allow_layer1_overrides:
             excluded.append({"target": target, "reason": "value is already established in Layer 1"})
             continue
         if rule.get("requires_gap", True) and (rule["gap_category"], rule["gap_item"]) not in gaps:
@@ -206,7 +206,7 @@ def initialize_template(store: EvaluationStore, evaluation_id: str) -> Dict[str,
     }
 
 
-def validate_payload(payload: Mapping[str, Any], store: EvaluationStore, *, payload_base: Path) -> SupplementalValidation:
+def validate_payload(payload: Mapping[str, Any], store: EvaluationStore, *, payload_base: Path, allow_layer1_overrides: bool = False) -> SupplementalValidation:
     errors = _schema_errors(payload)
     evaluation_id = str(payload.get("evaluation_id") or "")
     try:
@@ -239,7 +239,7 @@ def validate_payload(payload: Mapping[str, Any], store: EvaluationStore, *, payl
         existing: Any = snapshot.get("input", snapshot) if isinstance(snapshot, Mapping) else None
         for part in parts:
             existing = existing.get(part) if isinstance(existing, Mapping) else None
-        if existing is not None:
+        if existing is not None and not allow_layer1_overrides:
             errors.append(f"{prefix} TARGET_ALREADY_ESTABLISHED_IN_LAYER1")
         value = entry.get("value")
         values = value if isinstance(value, list) else [value]
@@ -293,8 +293,11 @@ def finalize_payload(template: Mapping[str, Any]) -> Dict[str, Any]:
     return payload
 
 
-def store_payload(payload: Mapping[str, Any], store: EvaluationStore, supp_root: Path, *, payload_base: Path) -> Tuple[str, Path, SupplementalValidation]:
-    validation = validate_payload(payload, store, payload_base=payload_base)
+def store_payload(
+    payload: Mapping[str, Any], store: EvaluationStore, supp_root: Path, *, payload_base: Path,
+    allow_layer1_overrides: bool = False, allow_target_revisions: bool = False,
+) -> Tuple[str, Path, SupplementalValidation]:
+    validation = validate_payload(payload, store, payload_base=payload_base, allow_layer1_overrides=allow_layer1_overrides)
     if not validation.accepted:
         return "CONTRACT_REJECTED", supp_root, validation
     evaluation_dir = store.path_for(str(payload["evaluation_id"])).resolve()
@@ -323,7 +326,7 @@ def store_payload(payload: Mapping[str, Any], store: EvaluationStore, supp_root:
         prior = json.loads(candidate.read_text(encoding="utf-8"))
         prior_values = {e["target"]: e["value"] for e in prior.get("entries", [])}
         conflicts = sorted(k for k in incoming.keys() & prior_values.keys() if incoming[k] != prior_values[k])
-        if conflicts:
+        if conflicts and not allow_target_revisions:
             return "CONFLICT_REJECTED", target, SupplementalValidation(False, "CONTRACT_REJECTED", tuple(f"CONFLICTING_TARGET {k}" for k in conflicts))
 
     manifest = {

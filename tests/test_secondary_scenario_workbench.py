@@ -61,11 +61,12 @@ def test_workbench_ui_starts_blank_and_hydrates_explicit_selection(monkeypatch,t
  assert "await loadEvaluation(active)" not in page
  assert "if(!response.ok)throw new Error(body.detail" in page
  assert "event.preventDefault();clearError()" in page
- assert "saveSession({evaluation_id:baseline,[successKind]:body})" in page
+ assert "saveSession({evaluation_id:baseline,[successKind]:responseBody})" in page
  assert "const input=data.input||(data.input_snapshot?.input)||data.input_snapshot||data" in page
  assert "hydrateFormState(input);try{await explore(identifier)}catch(error)" in page
  assert "Comparison unavailable; form hydration completed." in page
  assert "control.dataset.hydrated='true'" in page
+ assert "control.value===hydratedControlValues[name])body.delete(name)" in page
  assert "method:'GET',headers:{'Accept':'application/json'}" in page
  assert "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindWorkbench" in page
  assert "document.body.dataset.workbenchReady='true'" in page
@@ -148,6 +149,23 @@ def test_segment_risk_overrides_flow_through_workbench_secondary_evaluation(monk
  module_a=next(item for item in secondary['module_breakdown'] if item['module_id']=='A')
  assert module_a['secondary_points'] == max(0,module_a['baseline_points']-6)
  assert 0 <= module_a['secondary_points'] <= module_a['cap']
+
+
+def test_workbench_recalculation_revises_target_without_conflicting_target(monkeypatch,tmp_path):
+ dashboard,client=_dashboard(monkeypatch,tmp_path)
+ common={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST FILING'}
+ first=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={**common,'source_id':'CUSTOMER-CONCENTRATION-1','top_customer_revenue_pct':'55'},files={'evidence':('first.pdf',b'synthetic first concentration observation')})
+ assert first.status_code==200,first.text
+ revised=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={**common,'source_id':'CUSTOMER-CONCENTRATION-2','top_customer_revenue_pct':'0.5'},files={'evidence':('revised.pdf',b'synthetic revised concentration observation')})
+ assert revised.status_code==200,revised.text
+ assert 'CONFLICTING_TARGET' not in revised.text
+ secondary_path=tmp_path/'sec'/EID/revised.json()['secondary_id']/'secondary_evaluation.json'
+ secondary=json.loads(secondary_path.read_text())
+ module_a=next(item for item in secondary['module_breakdown'] if item['module_id']=='A')
+ assert secondary['admitted_fields']==['financials.top_customer_revenue_pct']
+ assert module_a['secondary_points']==module_a['baseline_points']
+ assert module_a['delta']==0
+ assert len(list((tmp_path/'supp'/EID).glob('*/supplemental_payload.json')))==2
 
 
 def test_regulatory_risk_overrides_flow_through_workbench_secondary_evaluation(monkeypatch,tmp_path):
