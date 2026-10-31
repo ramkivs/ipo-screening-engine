@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 if __package__ in (None,""): sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from ipo_screening.evaluation import EvaluationStore
 from ipo_screening.supplemental_data import finalize_payload, initialize_template, store_payload
-from ipo_screening.secondary_evaluation import build_secondary, store_secondary
+from ipo_screening.secondary_evaluation import build_secondary, store_secondary, evaluation_inspection
 from ipo_screening.operator_scenario import evaluate_scenario, finalize_scenario, scenario_template, store_scenario
 
 ROOT=Path(os.environ.get("IPO_WORKBENCH_ROOT","build/workbench")).resolve()
@@ -198,17 +198,19 @@ async function refreshContext(){{try{{const response=await fetch('/api/v1/evalua
 function escapeHtml(value){{return String(value??'—').replace(/[&<>"']/g,ch=>({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]))}}
 function formatValue(value){{return value===undefined||value===null?'—':(typeof value==='number'?String(Math.round(value*100)/100):String(value))}}
 function signed(value){{const number=Number(value||0);return `${{number>=0?'+':''}}${{number.toFixed(1)}}`}}
-function ModuleBreakdownAccordion(secondary){{
- const inspection=secondary.inspection||{{modules:[],completeness_pct:0,confidence:secondary.secondary?.confidence||'UNKNOWN'}};
- const result=secondary.secondary||{{}};
+function ModuleBreakdownAccordion(payload,reality='secondary'){{
+ const inspection=payload.inspection||{{modules:[],completeness_pct:0,confidence:payload.secondary?.confidence||'UNKNOWN'}};
+ const result=payload.secondary||{{}};
+ const isBaseline=reality==='baseline',realityLabel=isBaseline?'[LAYER_1_BASE]':'[ENRICHED_LAYER_2C]',valueLabel=isBaseline?'Layer 1':'Layer 2C';
  const knockouts=(result.knockouts||[]).map(item=>`<button type="button" class="ko-pill ${{String(item.state).toLowerCase()}}" title="Knockout ${{escapeHtml(item.rule_id)}} is ${{escapeHtml(item.state)}}">${{escapeHtml(item.rule_id)}} ${{escapeHtml(item.state)}}</button>`).join('');
  const modules=(inspection.modules||[]).map(module=>{{
   const rows=(module.criteria||[]).map(item=>`<tr><td><b>${{escapeHtml(item.label)}}</b><br><code>${{escapeHtml(item.metric)}}</code></td><td>${{escapeHtml(formatValue(item.baseline_value))}}</td><td>${{escapeHtml(formatValue(item.secondary_value))}}</td><td>${{Number(item.score).toFixed(1)}} / ${{Number(item.max).toFixed(1)}}</td><td><span class="state-pill ${{String(item.state).toLowerCase()}}">${{escapeHtml(item.state)}}</span></td><td>${{escapeHtml(item.explanation)}}</td></tr>`).join('');
-  return `<details class="module-accordion" data-module="${{escapeHtml(module.module_id)}}"><summary>Module ${{escapeHtml(module.module_id)}}: ${{escapeHtml(module.name)}} — ${{Number(module.secondary_points).toFixed(1)}} / ${{Number(module.cap).toFixed(0)}} (Delta: ${{signed(module.delta)}}) ${{module.cap_applied?'<span class="cap-label">[CAP APPLIED]</span>':''}}</summary><table class="criteria-table"><thead><tr><th>Criterion &amp; metric</th><th>Baseline</th><th>Layer 2C</th><th>Score / max</th><th>State</th><th>Rule explanation</th></tr></thead><tbody>${{rows||'<tr><td colspan="6">No criterion details recorded.</td></tr>'}}</tbody></table></details>`
+  return `<details class="module-accordion" data-reality="${{reality}}" data-module="${{escapeHtml(module.module_id)}}"><summary>Module ${{escapeHtml(module.module_id)}}: ${{escapeHtml(module.name)}} — ${{Number(module.secondary_points).toFixed(1)}} / ${{Number(module.cap).toFixed(0)}} (Delta: ${{signed(module.delta)}}) ${{module.cap_applied?'<span class="cap-label">[CAP APPLIED]</span>':''}}</summary><table class="criteria-table"><thead><tr><th>Criterion &amp; metric</th><th>Baseline</th><th>${{valueLabel}}</th><th>Score / max</th><th>State</th><th>Rule explanation</th></tr></thead><tbody>${{rows||'<tr><td colspan="6">No criterion details recorded.</td></tr>'}}</tbody></table></details>`
  }}).join('');
- return `<div class="secondary-panel"><div class="secondary-summary"><b>[ENRICHED_LAYER_2C]</b><span>Score <strong>${{Number(result.score||0).toFixed(1)}}</strong></span><span class="verdict-badge">${{escapeHtml(result.verdict||'UNKNOWN')}}</span><span>Completeness <strong>${{Number(inspection.completeness_pct||0).toFixed(1)}}%</strong></span><span>Confidence <strong>${{escapeHtml(inspection.confidence)}}</strong></span><div class="ko-list">${{knockouts}}</div></div>${{modules}}</div>`
+ return `<section class="secondary-panel module-breakdown ${{isBaseline?'baseline-breakdown':'secondary-breakdown'}}" data-reality="${{reality}}"><div class="secondary-summary"><b>${{realityLabel}}</b><span>Score <strong>${{Number(result.score||0).toFixed(1)}}</strong></span><span class="verdict-badge">${{escapeHtml(result.verdict||'UNKNOWN')}}</span><span>Completeness <strong>${{Number(inspection.completeness_pct||0).toFixed(1)}}%</strong></span><span>Confidence <strong>${{escapeHtml(inspection.confidence)}}</strong></span><div class="ko-list">${{knockouts}}</div></div>${{modules||'<p>No module inspection details are available.</p>'}}</section>`
 }}
-function renderComparison(d){{const c=document.getElementById('comparison'),latest=(d.enriched||[]).at(-1);c.innerHTML=`<div class="card"><b>[LAYER_1_BASE]</b><br>${{escapeHtml(JSON.stringify(d.baseline||{{}},null,2))}}</div>${{latest?ModuleBreakdownAccordion(latest):'<div class="card secondary-panel"><b>[ENRICHED_LAYER_2C]</b><br>No secondary recalculation yet.</div>'}}<div class="card"><b>[OPERATOR_ASSUMPTION]</b><br>${{escapeHtml(JSON.stringify(d.scenarios||[],null,2))}}</div>`}}
+function bindAccordionState(root){{root.querySelectorAll('.module-accordion').forEach((details,index)=>{{const summary=details.querySelector('summary'),body=details.querySelector('.criteria-table');if(!summary)return;const id=`module-detail-${{details.dataset.reality}}-${{details.dataset.module}}-${{index}}`;if(body)body.id=id;summary.setAttribute('aria-controls',id);summary.setAttribute('aria-expanded',String(details.open));details.addEventListener('toggle',()=>summary.setAttribute('aria-expanded',String(details.open)))}})}}
+function renderComparison(d){{const c=document.getElementById('comparison'),latest=(d.enriched||[]).at(-1);c.innerHTML=`${{ModuleBreakdownAccordion(d.baseline||{{}},'baseline')}}${{latest?ModuleBreakdownAccordion(latest,'secondary'):'<section class="secondary-panel secondary-breakdown"><b>[ENRICHED_LAYER_2C]</b><p>No secondary recalculation yet.</p></section>'}}<div class="card"><b>[OPERATOR_ASSUMPTION]</b><br>${{escapeHtml(JSON.stringify(d.scenarios||[],null,2))}}</div>`;bindAccordionState(c)}}
 async function explore(identifier){{clearError();const id=typeof identifier==='string'?identifier:document.getElementById('evaluation').value;if(!id)return;setActiveEvaluation(id);const d=await parseResponse(await fetch('/api/v1/comparison/'+encodeURIComponent(id),{{method:'GET',headers:{{'Accept':'application/json'}}}}));renderComparison(d);return d}}
 function bindWorkbench(){{document.getElementById('compare-button').addEventListener('click',()=>explore().catch(error=>showStatus(error.message)));document.getElementById('evaluation').addEventListener('change',e=>loadEvaluation(e.target.value).catch(error=>showStatus(error.message)));document.querySelector('select[name="baseline_id"]').addEventListener('change',e=>loadEvaluation(e.target.value).catch(error=>showStatus(error.message)));
 function submissionData(form,successKind){{const body=new FormData(form);if(successKind==='injection')Object.keys(CONTROL_PATHS).forEach(name=>{{const control=form.elements.namedItem(name);if(control&&control.value===hydratedControlValues[name])body.delete(name)}});return body}}
@@ -288,9 +290,20 @@ def evaluation_input(evaluation_id:str):
 def comparison(baseline_id:str):
  try: baseline_id=_resolve_evaluation_id(baseline_id)
  except FileNotFoundError as exc: raise HTTPException(404,str(exc)) from exc
- base=next((x for x in _records() if x["id"]==baseline_id),None)
+ baseline_record=EvaluationStore(L1).read_full(baseline_id)
+ base={"badge":"[LAYER_1_BASE]",**evaluation_inspection(baseline_record)}
  enriched=[]
- for p in SEC.glob(f"{baseline_id}/*/secondary_evaluation.json"): enriched.append(json.loads(p.read_text()))
+ for p in SEC.glob(f"{baseline_id}/*/secondary_evaluation.json"):
+  item=json.loads(p.read_text())
+  # Records created before inspection details existed still receive module
+  # headers from their governed breakdown instead of rendering an empty panel.
+  if not (item.get("inspection") or {}).get("modules"):
+   item["inspection"]={
+    "completeness_pct":0,"confidence":str((item.get("secondary") or {}).get("confidence") or "UNKNOWN"),
+    "modules":[{"module_id":m["module_id"],"name":m["module_id"],"baseline_points":m["baseline_points"],"secondary_points":m["secondary_points"],"cap":m["cap"],"delta":m["delta"],"cap_applied":m["cap_applied"],"criteria":[]} for m in item.get("module_breakdown",[])],
+   }
+  enriched.append(item)
+ enriched.sort(key=lambda item:(str(item.get("evaluated_at") or ""),str(item.get("secondary_evaluation_id") or "")))
  scenarios=[]
  for p in OP.glob(f"{baseline_id}/*/scenario_result.json"): scenarios.append(json.loads(p.read_text()))
  return {"baseline":{"badge":"[LAYER_1_BASE]",**base},"enriched":[{"badge":"[ENRICHED_LAYER_2C]",**x} for x in enriched],"scenarios":[{"badge":"[OPERATOR_ASSUMPTION]",**x} for x in scenarios]}
