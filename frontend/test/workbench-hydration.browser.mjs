@@ -21,8 +21,10 @@ const withCriterionKey = (module, key, criteria = module.criteria) => {
   return { ...summary, [key]: criteria };
 };
 const syntheticSecondary = {
-  secondary: { score: 70.5, verdict: 'VERDICT_UNCERTAIN', confidence: 'High', completeness_pct: 96, knockout_status: 'CLEAR', knockouts: Array.from({ length: 6 }, (_, i) => ({ rule_id: `K${i + 1}`, state: 'CLEAR' })) },
-  module_breakdown: syntheticModules.map((module, index) => withCriterionKey(module, ['criteria', 'criterion_details', 'inspection', 'items', 'rules', 'breakdown'][index], index === 2 ? { criteria: module.criteria } : module.criteria)),
+  secondary: { score: 70.5, verdict: 'VERDICT_UNCERTAIN', confidence: 'High', completeness_pct: 0.95, knockout_status: 'CLEAR', knockouts: Array.from({ length: 6 }, (_, i) => ({ rule_id: `K${i + 1}`, state: 'CLEAR' })) },
+  module_breakdown: syntheticModules.map(({ criteria: _criteria, ...module }) => module),
+  inspection: syntheticModules.slice(0, 5).map(module => ({ module_id: module.module_id, criteria: module.criteria })),
+  items: syntheticModules[5].criteria.map(item => ({ ...item, module_id: 'F' })),
 };
 const upgradedSecondary = {
   ...syntheticSecondary,
@@ -31,7 +33,7 @@ const upgradedSecondary = {
 };
 const syntheticBaseline = {
   score: { final_score: 37, completeness: { percentage: 62 }, confidence: 'Low', modules: syntheticModules.map((module, index) => withCriterionKey({ module_id: module.module_id, name: module.name, score: module.baseline_points, max: module.cap, criteria: module.criteria }, ['criteria', 'breakdown', 'items', 'criteria', 'breakdown', 'items'][index], module.criteria.map(item => ({ ...item, value: item.baseline_value })))) },
-  verdict: { verdict: 'AVOID' }, confidence: { completeness_pct: 62, level: 'Low' },
+  verdict: { verdict: 'AVOID' }, completeness_pct: 0.62, confidence: { level: 'Low' },
   knockouts: { results: Array.from({ length: 6 }, (_, i) => ({ rule_id: `K${i + 1}`, state: i === 1 ? 'TRIGGERED' : 'CLEAR' })) },
 };
 const virtualConsole = new VirtualConsole();
@@ -108,6 +110,7 @@ if (comparisonMode === 'available') {
   assert.equal(document.querySelector('.baseline-breakdown .secondary-summary')?.textContent.includes('62.0%'), true);
   assert.equal(document.querySelector('.baseline-breakdown .secondary-summary')?.textContent.includes('Low'), true);
   assert.equal(document.querySelector('.secondary-breakdown .secondary-summary')?.textContent.includes('70.5'), true);
+  assert.equal(document.querySelector('.secondary-breakdown .secondary-summary')?.textContent.includes('95.0%'), true);
   assert.equal(document.querySelector('.secondary-breakdown .verdict-badge')?.textContent, 'VERDICT_UNCERTAIN');
 }
 
