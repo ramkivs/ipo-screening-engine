@@ -338,31 +338,26 @@ def evaluation_input(evaluation_id:str):
    if block.get("as_of"): raw["market"][name]["as_of"]=block["as_of"]
  return {"evaluation_id":evaluation_id,"input":raw}
 
-def _restore_legacy_secondary_inspection(item:dict[str,Any],baseline_id:str)->dict[str,Any]:
- """Rebuild presentation details omitted by early Layer 2C stored records.
+def _reconstruct_secondary_inspection(item:dict[str,Any],baseline_id:str)->dict[str,Any]|None:
+ """Return hash-bound presentation inspection for one secondary record.
 
- The rebuild is accepted only when its baseline, supplemental, and resulting
- evaluation hashes match the immutable stored record.  It is presentation-only:
- neither the Layer 1 nor Layer 2C stores are modified.
+ Each record is replayed and checked independently.  No persisted document is
+ mutated; callers explicitly merge the returned inspection into their response.
  """
- inspection=item.get("inspection") or {}
- if inspection.get("modules"):
-  return item
  supplemental_id=str(item.get("supplemental_payload_id") or "")
  if not supplemental_id:
-  return item
+  return None
  try:
   rebuilt=build_secondary(baseline_id,EvaluationStore(L1),SUPP,supplemental_id)
   bindings=("baseline_result_hash","supplemental_payload_hash","secondary_result_hash")
   if any(not item.get(key) or rebuilt.get(key)!=item.get(key) for key in bindings):
-   logger.warning("Refusing legacy inspection rebuild for %s: lineage mismatch",item.get("secondary_evaluation_id"))
-   return item
-  restored=copy.deepcopy(item)
-  restored["inspection"]=rebuilt["inspection"]
-  return restored
+   logger.warning("Refusing inspection reconstruction for %s: lineage mismatch",item.get("secondary_evaluation_id"))
+   return None
+  inspection=rebuilt.get("inspection")
+  return copy.deepcopy(inspection) if isinstance(inspection,dict) else None
  except Exception:
-  logger.exception("Could not rebuild legacy inspection for %s",item.get("secondary_evaluation_id"))
-  return item
+  logger.exception("Could not reconstruct inspection for %s",item.get("secondary_evaluation_id"))
+  return None
 
 
 @app.get("/api/comparison/{baseline_id}")
@@ -374,10 +369,16 @@ def comparison(baseline_id:str):
  base={"badge":"[LAYER_1_BASE]",**evaluation_inspection(baseline_record)}
  enriched=[]
  for p in SEC.glob(f"{baseline_id}/*/secondary_evaluation.json"):
-  item=_restore_legacy_secondary_inspection(json.loads(p.read_text()),baseline_id)
-  # If lineage material needed for a safe rebuild is unavailable, retain the
-  # historical summary rather than inventing criterion details.
-  if not (item.get("inspection") or {}).get("modules"):
+  stored=json.loads(p.read_text())
+  item=copy.deepcopy(stored)
+  reconstructed=_reconstruct_secondary_inspection(stored,baseline_id)
+  if reconstructed is not None:
+   # Response shaping is explicit: the validated reconstruction, rather than
+   # the summary-only stored object, is what reaches JSON serialization.
+   item["inspection"]=reconstructed
+  else:
+   # Fail closed for this item only; another scenario's valid reconstruction
+   # must not be discarded because this item's lineage cannot be established.
    item["inspection"]={
     "completeness_pct":0,"confidence":str((item.get("secondary") or {}).get("confidence") or "UNKNOWN"),
     "modules":[{"module_id":m["module_id"],"name":m["module_id"],"baseline_points":m["baseline_points"],"secondary_points":m["secondary_points"],"cap":m["cap"],"delta":m["delta"],"cap_applied":m["cap_applied"],"criteria":[]} for m in item.get("module_breakdown",[])],

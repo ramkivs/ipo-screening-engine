@@ -14,11 +14,11 @@ ROOT=Path(__file__).resolve().parents[1]
 JIO=ROOT/'docs/investigation/jio-current-engine-probe-20261027/evaluations'
 EID='JIO-PLATFORMS-LIMITED-20261027-145236Z-final-0fde1451'
 
-def accepted_payload(tmp_path:Path):
- store=EvaluationStore(JIO); template=initialize_template(store,EID); artifact=tmp_path/'exchange.txt'; artifact.write_text('synthetic test only: QIB 12.34x\n'); digest=hashlib.sha256(artifact.read_bytes()).hexdigest(); entry=next(e for e in template['entries'] if e['target']=='market.subscription.qib_x'); template['entries']=[entry]; template['created_at']='2026-10-23T14:50:00Z'; entry.update(value=12.34,observation_time='2026-10-23T14:50:00Z',reporting_period='FINAL_DAY')
+def accepted_payload(tmp_path:Path,qib_x:float=12.34):
+ store=EvaluationStore(JIO); template=initialize_template(store,EID); artifact=tmp_path/'exchange.txt'; artifact.write_text(f'synthetic test only: QIB {qib_x}x\n'); digest=hashlib.sha256(artifact.read_bytes()).hexdigest(); entry=next(e for e in template['entries'] if e['target']=='market.subscription.qib_x'); template['entries']=[entry]; template['created_at']='2026-10-23T14:50:00Z'; entry.update(value=qib_x,observation_time='2026-10-23T14:50:00Z',reporting_period='FINAL_DAY')
  entry['source'].update(source_id='TEST',title='Synthetic test artifact',publisher='SYNTHETIC NOT A PUBLISHER',publication_date='2026-10-23',artifact_ref='exchange.txt',artifact_sha256=digest,locator='line 1')
  entry['operator_attestation']={'operator_id':'test','attested_at':'2026-10-23T14:51:00Z','statement':'Test-only bytes; no authenticity claim.'};entry['verification']={'status':'SOURCE_ARTIFACT_HASH_VERIFIED','procedure_note':'Only local bytes matched.'};entry['limitations']=['Synthetic test only; not scoring evidence.']
- payload=finalize_payload(template); supp=tmp_path/'supp'; outcome,path,val=store_payload(payload,store,supp,payload_base=tmp_path); assert outcome=='SUPPLEMENTAL_STORAGE_ACCEPTED'; return payload,supp
+ payload=finalize_payload(template); supp=tmp_path/'supp'; outcome,path,val=store_payload(payload,store,supp,payload_base=tmp_path,allow_target_revisions=True); assert outcome=='SUPPLEMENTAL_STORAGE_ACCEPTED'; return payload,supp
 
 def test_secondary_is_deterministic_capped_and_baseline_immutable(tmp_path):
  before={p.name:p.read_bytes() for p in (JIO/EID).iterdir() if p.is_file()}; payload,supp=accepted_payload(tmp_path); doc=build_secondary(EID,EvaluationStore(JIO),supp,payload['supplemental_payload_id']); assert doc['baseline']['score']==37.0; assert doc['secondary']['score']==39.0; assert doc['admitted_fields']==['market.subscription.qib_x']; assert all(m['secondary_points']<=MODULE_CAPS[m['module_id']] for m in doc['module_breakdown']); assert verify_secondary(doc)['valid']; outcome,path=store_secondary(doc,tmp_path/'secondary'); assert outcome=='SECONDARY_EVALUATION_STORED'; assert build_secondary(EID,EvaluationStore(JIO),supp,payload['supplemental_payload_id'])==doc; assert before=={p.name:p.read_bytes() for p in (JIO/EID).iterdir() if p.is_file()}
@@ -55,13 +55,17 @@ def test_workbench_explorer_and_badges(monkeypatch,tmp_path):
  dashboard,client=_dashboard(monkeypatch,tmp_path);page=client.get('/workbench');assert page.status_code==200;assert 'Day 1' in page.text and 'Day 2' in page.text and 'Day 3' in page.text;assert '[LAYER_1_BASE]' in page.text and '[ENRICHED_LAYER_2C]' in page.text and '[OPERATOR_ASSUMPTION]' in page.text;data=client.get('/api/evaluations').json();assert any(x['id']==EID for x in data);hashed=client.post('/api/hash',files={'evidence':('x.txt',b'abc')}).json();assert hashed['sha256']==hashlib.sha256(b'abc').hexdigest()
 
 
-def test_comparison_restores_hash_bound_legacy_secondary_inspection(monkeypatch,tmp_path):
- payload,supp=accepted_payload(tmp_path);full=build_secondary(EID,EvaluationStore(JIO),supp,payload['supplemental_payload_id'])
- legacy=copy.deepcopy(full);legacy.pop('inspection');directory=tmp_path/'sec'/EID/full['secondary_evaluation_id'];directory.mkdir(parents=True);(directory/'secondary_evaluation.json').write_text(json.dumps(legacy))
- _,client=_dashboard(monkeypatch,tmp_path,supp);response=client.get(f'/api/v1/comparison/{EID}');assert response.status_code==200
- restored=response.json()['enriched'][0]['inspection'];assert restored['completeness_pct']==full['inspection']['completeness_pct'];assert len(restored['modules'])==6;assert all(module['criteria'] for module in restored['modules'])
- # The compatibility read must never rewrite the immutable historical record.
- assert 'inspection' not in json.loads((directory/'secondary_evaluation.json').read_text())
+def test_comparison_serializes_five_independently_bound_legacy_inspections(monkeypatch,tmp_path):
+ expected={};stored_paths=[];supp=tmp_path/'supp'
+ for index in range(5):
+  payload,supp=accepted_payload(tmp_path,12.34+index);full=build_secondary(EID,EvaluationStore(JIO),supp,payload['supplemental_payload_id'])
+  legacy=copy.deepcopy(full);legacy.pop('inspection');directory=tmp_path/'sec'/EID/f"scenario-{index}-{full['secondary_evaluation_id']}";directory.mkdir(parents=True);path=directory/'secondary_evaluation.json';path.write_text(json.dumps(legacy));stored_paths.append(path);expected[full['supplemental_payload_id']]=full['inspection']
+ before={path:path.read_bytes() for path in stored_paths};_,client=_dashboard(monkeypatch,tmp_path,supp);response=client.get(f'/api/v1/comparison/{EID}');assert response.status_code==200
+ enriched=response.json()['enriched'];assert len(enriched)==5
+ for item in enriched:
+  restored=item['inspection'];assert restored==expected[item['supplemental_payload_id']];assert restored['completeness_pct']>0;assert len(restored['modules'])==6;assert all(module['criteria'] for module in restored['modules'])
+ # Response reconstruction must perform zero writes to immutable history.
+ assert before=={path:path.read_bytes() for path in stored_paths}
 
 
 def test_workbench_ui_starts_blank_and_hydrates_explicit_selection(monkeypatch,tmp_path):
