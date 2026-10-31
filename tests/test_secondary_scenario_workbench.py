@@ -55,6 +55,15 @@ def test_workbench_explorer_and_badges(monkeypatch,tmp_path):
  dashboard,client=_dashboard(monkeypatch,tmp_path);page=client.get('/workbench');assert page.status_code==200;assert 'Day 1' in page.text and 'Day 2' in page.text and 'Day 3' in page.text;assert '[LAYER_1_BASE]' in page.text and '[ENRICHED_LAYER_2C]' in page.text and '[OPERATOR_ASSUMPTION]' in page.text;data=client.get('/api/evaluations').json();assert any(x['id']==EID for x in data);hashed=client.post('/api/hash',files={'evidence':('x.txt',b'abc')}).json();assert hashed['sha256']==hashlib.sha256(b'abc').hexdigest()
 
 
+def test_comparison_restores_hash_bound_legacy_secondary_inspection(monkeypatch,tmp_path):
+ payload,supp=accepted_payload(tmp_path);full=build_secondary(EID,EvaluationStore(JIO),supp,payload['supplemental_payload_id'])
+ legacy=copy.deepcopy(full);legacy.pop('inspection');directory=tmp_path/'sec'/EID/full['secondary_evaluation_id'];directory.mkdir(parents=True);(directory/'secondary_evaluation.json').write_text(json.dumps(legacy))
+ _,client=_dashboard(monkeypatch,tmp_path,supp);response=client.get(f'/api/v1/comparison/{EID}');assert response.status_code==200
+ restored=response.json()['enriched'][0]['inspection'];assert restored['completeness_pct']==full['inspection']['completeness_pct'];assert len(restored['modules'])==6;assert all(module['criteria'] for module in restored['modules'])
+ # The compatibility read must never rewrite the immutable historical record.
+ assert 'inspection' not in json.loads((directory/'secondary_evaluation.json').read_text())
+
+
 def test_workbench_ui_starts_blank_and_hydrates_explicit_selection(monkeypatch,tmp_path):
  _,client=_dashboard(monkeypatch,tmp_path);page=client.get('/workbench').text
  assert 'Dismiss error' in page and "sessionStorage.getItem(SESSION_KEY)" in page
