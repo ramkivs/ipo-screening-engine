@@ -37,6 +37,7 @@ from ..lifecycle import (
     VISIBILITY_STATE_VISIBLE,
 )
 from ..pipeline import evaluate, load_config
+from ..secondary_evaluation import build_secondary
 from ..post_listing.models import PostListingObservation
 from ..post_listing.storage import list_observations
 from ..post_listing.v16_implementation import (
@@ -476,11 +477,41 @@ class PresentationService:
                     values.append(payload)
             return values
 
+        def _enriched_item(stored: Dict[str, Any]) -> Dict[str, Any]:
+            """Attach independently hash-validated inspection to the serialized item."""
+            item = copy.deepcopy(stored)
+            supplemental_id = str(stored.get("supplemental_payload_id") or "")
+            try:
+                rebuilt = build_secondary(
+                    evaluation_id,
+                    self.eval_store,
+                    root / "supplemental",
+                    supplemental_id,
+                )
+                bindings = (
+                    "baseline_result_hash",
+                    "supplemental_payload_hash",
+                    "secondary_result_hash",
+                )
+                valid = bool(supplemental_id) and all(
+                    stored.get(key) and rebuilt.get(key) == stored.get(key)
+                    for key in bindings
+                )
+                inspection = rebuilt.get("inspection") if valid else None
+                if isinstance(inspection, dict):
+                    item["inspection"] = copy.deepcopy(inspection)
+                else:
+                    item.pop("inspection", None)
+            except Exception:
+                # Fail closed for this item without suppressing valid siblings.
+                item.pop("inspection", None)
+            return {"badge": "[ENRICHED_LAYER_2C]", **item}
+
         baseline = detail.model_dump() if hasattr(detail, "model_dump") else detail
         return {
             "baseline": {"badge": "[LAYER_1_BASE]", **baseline},
             "enriched": [
-                {"badge": "[ENRICHED_LAYER_2C]", **item}
+                _enriched_item(item)
                 for item in _read(f"secondary/{evaluation_id}/*/secondary_evaluation.json")
             ],
             "scenarios": [
