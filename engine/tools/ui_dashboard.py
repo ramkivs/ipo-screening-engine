@@ -338,6 +338,33 @@ def evaluation_input(evaluation_id:str):
    if block.get("as_of"): raw["market"][name]["as_of"]=block["as_of"]
  return {"evaluation_id":evaluation_id,"input":raw}
 
+def _restore_legacy_secondary_inspection(item:dict[str,Any],baseline_id:str)->dict[str,Any]:
+ """Rebuild presentation details omitted by early Layer 2C stored records.
+
+ The rebuild is accepted only when its baseline, supplemental, and resulting
+ evaluation hashes match the immutable stored record.  It is presentation-only:
+ neither the Layer 1 nor Layer 2C stores are modified.
+ """
+ inspection=item.get("inspection") or {}
+ if inspection.get("modules"):
+  return item
+ supplemental_id=str(item.get("supplemental_payload_id") or "")
+ if not supplemental_id:
+  return item
+ try:
+  rebuilt=build_secondary(baseline_id,EvaluationStore(L1),SUPP,supplemental_id)
+  bindings=("baseline_result_hash","supplemental_payload_hash","secondary_result_hash")
+  if any(not item.get(key) or rebuilt.get(key)!=item.get(key) for key in bindings):
+   logger.warning("Refusing legacy inspection rebuild for %s: lineage mismatch",item.get("secondary_evaluation_id"))
+   return item
+  restored=copy.deepcopy(item)
+  restored["inspection"]=rebuilt["inspection"]
+  return restored
+ except Exception:
+  logger.exception("Could not rebuild legacy inspection for %s",item.get("secondary_evaluation_id"))
+  return item
+
+
 @app.get("/api/comparison/{baseline_id}")
 @app.get("/api/v1/comparison/{baseline_id}")
 def comparison(baseline_id:str):
@@ -347,9 +374,9 @@ def comparison(baseline_id:str):
  base={"badge":"[LAYER_1_BASE]",**evaluation_inspection(baseline_record)}
  enriched=[]
  for p in SEC.glob(f"{baseline_id}/*/secondary_evaluation.json"):
-  item=json.loads(p.read_text())
-  # Records created before inspection details existed still receive module
-  # headers from their governed breakdown instead of rendering an empty panel.
+  item=_restore_legacy_secondary_inspection(json.loads(p.read_text()),baseline_id)
+  # If lineage material needed for a safe rebuild is unavailable, retain the
+  # historical summary rather than inventing criterion details.
   if not (item.get("inspection") or {}).get("modules"):
    item["inspection"]={
     "completeness_pct":0,"confidence":str((item.get("secondary") or {}).get("confidence") or "UNKNOWN"),
