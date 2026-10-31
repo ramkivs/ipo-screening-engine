@@ -8,18 +8,22 @@ const requests = [];
 const submissions = [];
 const errors = [];
 const moduleNames = ['Financial Quality', 'Valuation', 'Proceeds & Lock-in', 'Governance', 'Business & Moat', 'Market Context'];
+const syntheticModules = moduleNames.map((name, index) => ({
+  module_id: String.fromCharCode(65 + index), name, baseline_points: 0,
+  secondary_points: [20, 16, 15, 12, 15, 10][index], cap: [25, 20, 15, 15, 15, 10][index],
+  delta: [20, 16, 15, 12, 15, 10][index], cap_applied: [2, 4, 5].includes(index),
+  criteria: [{ criterion_id: `criterion_${index}`, label: `${name} criterion`, metric: `metric_${index}`, baseline_value: null, secondary_value: 'strong', score: 5, max: 5, state: index === 4 ? 'CAPPED' : 'SCORED', explanation: 'Matched governed test rule.' }],
+}));
+// These deliberately use the raw production shapes that previously tripped the
+// empty-state fallback: Layer 1 score.modules and Layer 2C module_breakdown.
 const syntheticSecondary = {
-  secondary: { score: 82, verdict: 'SUBSCRIBE', confidence: 'High', knockout_status: 'CLEAR', knockouts: Array.from({ length: 6 }, (_, i) => ({ rule_id: `K${i + 1}`, state: 'CLEAR' })) },
-  inspection: { completeness_pct: 96, confidence: 'High', modules: moduleNames.map((name, index) => ({
-    module_id: String.fromCharCode(65 + index), name, baseline_points: 0,
-    secondary_points: [20, 16, 15, 12, 15, 10][index], cap: [25, 20, 15, 15, 15, 10][index],
-    delta: [20, 16, 15, 12, 15, 10][index], cap_applied: [2, 4, 5].includes(index),
-    criteria: [{ criterion_id: `criterion_${index}`, label: `${name} criterion`, metric: `metric_${index}`, baseline_value: null, secondary_value: 'strong', score: 5, max: 5, state: index === 4 ? 'CAPPED' : 'SCORED', explanation: 'Matched governed test rule.' }],
-  })) },
+  secondary: { score: 70.5, verdict: 'VERDICT_UNCERTAIN', confidence: 'High', completeness_pct: 96, knockout_status: 'CLEAR', knockouts: Array.from({ length: 6 }, (_, i) => ({ rule_id: `K${i + 1}`, state: 'CLEAR' })) },
+  module_breakdown: syntheticModules,
 };
 const syntheticBaseline = {
-  secondary: { score: 40, verdict: 'VERDICT_UNCERTAIN', confidence: 'Medium', knockout_status: 'CLEAR', knockouts: Array.from({ length: 6 }, (_, i) => ({ rule_id: `K${i + 1}`, state: 'CLEAR' })) },
-  inspection: { completeness_pct: 70, confidence: 'Medium', modules: syntheticSecondary.inspection.modules.map(module => ({ ...module, secondary_points: module.baseline_points, delta: 0, cap_applied: false, criteria: module.criteria.map(item => ({ ...item, secondary_value: item.baseline_value, state: 'UNKNOWN' })) })) },
+  score: { final_score: 37, modules: syntheticModules.map(module => ({ module_id: module.module_id, name: module.name, score: module.baseline_points, max: module.cap, criteria: module.criteria.map(item => ({ ...item, value: item.baseline_value })) })) },
+  verdict: { verdict: 'AVOID' }, confidence: { completeness_pct: 62, level: 'Low' },
+  knockouts: { results: Array.from({ length: 6 }, (_, i) => ({ rule_id: `K${i + 1}`, state: i === 1 ? 'TRIGGERED' : 'CLEAR' })) },
 };
 const virtualConsole = new VirtualConsole();
 virtualConsole.on('jsdomError', error => errors.push(String(error)));
@@ -133,9 +137,14 @@ if (comparisonMode === 'available') {
   }
   assert.equal(document.querySelectorAll('.baseline-breakdown .module-accordion').length, 6);
   assert.equal(document.querySelectorAll('.secondary-breakdown .module-accordion').length, 6);
-  assert.equal(document.querySelector('.secondary-breakdown .secondary-summary')?.textContent.includes('82.0'), true);
-  assert.equal(document.querySelector('.secondary-breakdown .verdict-badge')?.textContent, 'SUBSCRIBE');
+  assert.equal(document.querySelector('.baseline-breakdown .secondary-summary')?.textContent.includes('37.0'), true);
+  assert.equal(document.querySelector('.baseline-breakdown .verdict-badge')?.textContent, 'AVOID');
+  assert.equal(document.querySelector('.baseline-breakdown .secondary-summary')?.textContent.includes('62.0%'), true);
+  assert.equal(document.querySelector('.baseline-breakdown .secondary-summary')?.textContent.includes('Low'), true);
+  assert.equal(document.querySelector('.secondary-breakdown .secondary-summary')?.textContent.includes('70.5'), true);
+  assert.equal(document.querySelector('.secondary-breakdown .verdict-badge')?.textContent, 'VERDICT_UNCERTAIN');
   assert.equal(document.querySelectorAll('.secondary-breakdown .ko-pill.clear').length, 6);
+  assert.equal(document.querySelector('#comparison').textContent.includes('No module inspection details are available'), false);
   const capped = [...document.querySelectorAll('.secondary-breakdown .module-accordion')].filter(item => item.querySelector('.cap-label')).map(item => item.dataset.module);
   assert.deepEqual(capped, ['C', 'E', 'F']);
   const moduleE = document.querySelector('.secondary-breakdown .module-accordion[data-module="E"]');

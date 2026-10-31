@@ -198,9 +198,41 @@ async function refreshContext(){{try{{const response=await fetch('/api/v1/evalua
 function escapeHtml(value){{return String(value??'—').replace(/[&<>"']/g,ch=>({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[ch]))}}
 function formatValue(value){{return value===undefined||value===null?'—':(typeof value==='number'?String(Math.round(value*100)/100):String(value))}}
 function signed(value){{const number=Number(value||0);return `${{number>=0?'+':''}}${{number.toFixed(1)}}`}}
+const MODULE_NAMES={{A:'Financial Quality',B:'Valuation',C:'Proceeds & Lock-in',D:'Governance',E:'Business & Moat',F:'Market Context'}};
+function extractModuleBreakdown(evaluation){{
+ const root=evaluation?.record||evaluation?.evaluation||evaluation||{{}},secondary=root.secondary||{{}};
+ const candidates=[root.inspection?.modules,secondary.inspection?.modules,root.score?.modules,secondary.score?.modules,root.module_breakdown,secondary.module_breakdown,secondary.modules];
+ const source=candidates.find(value=>Array.isArray(value)&&value.length)||[];
+ return source.map((module,index)=>{{
+  const id=String(module.module_id||module.id||String.fromCharCode(65+index));
+  const criteria=Array.isArray(module.criteria)?module.criteria:[];
+  return {{
+   module_id:id,name:String(module.name||MODULE_NAMES[id]||id),
+   baseline_points:Number(module.baseline_points??module.score??0),
+   secondary_points:Number(module.secondary_points??module.score??0),
+   cap:Number(module.cap??module.max??0),delta:Number(module.delta??0),
+   cap_applied:Boolean(module.cap_applied??(Number(module.score??0)>=Number(module.max??Infinity))),
+   criteria:criteria.map(item=>({{
+    criterion_id:String(item.criterion_id||item.id||''),label:String(item.label||item.criterion_id||item.id||''),metric:String(item.metric||item.metric_key||''),
+    baseline_value:item.baseline_value??item.value??null,secondary_value:item.secondary_value??item.value??null,
+    score:Number(item.score??0),max:Number(item.max??0),state:String(item.state||'UNKNOWN'),
+    explanation:String(item.explanation||item.reason||item.formula||'No rule explanation recorded.'),
+   }})),
+  }}
+ }})
+}}
+function normalizeEvaluation(evaluation,reality){{
+ const root=evaluation?.record||evaluation?.evaluation||evaluation||{{}},secondary=root.secondary||{{}},scoreObject=root.score&&typeof root.score==='object'?root.score:{{}},secondaryScore=secondary.score&&typeof secondary.score==='object'?secondary.score:{{}};
+ const score=Number(secondary.score?.final_score??secondary.score??scoreObject.final_score??root.final_score??root.result?.score??0);
+ const verdictValue=secondary.verdict??secondaryScore.verdict??root.verdict?.verdict??root.verdict??scoreObject.verdict??'UNKNOWN';
+ const confidenceObject=root.confidence&&typeof root.confidence==='object'?root.confidence:{{}},confidence=String(secondary.confidence??secondaryScore.confidence??confidenceObject.level??root.confidence??'UNKNOWN');
+ const completeness=Number(root.inspection?.completeness_pct??secondary.inspection?.completeness_pct??confidenceObject.completeness_pct??secondary.completeness_pct??0);
+ const knockoutSource=secondary.knockouts??root.knockouts?.results??root.knockouts??[];
+ const knockouts=Array.isArray(knockoutSource)?knockoutSource.map(item=>({{rule_id:String(item.rule_id||item.id||''),state:String(item.state||'UNVERIFIED')}})):[];
+ return {{result:{{score,verdict:String(verdictValue),confidence,knockouts}},inspection:{{modules:extractModuleBreakdown(root),completeness_pct:completeness,confidence}},reality}}
+}}
 function ModuleBreakdownAccordion(payload,reality='secondary'){{
- const inspection=payload.inspection||{{modules:[],completeness_pct:0,confidence:payload.secondary?.confidence||'UNKNOWN'}};
- const result=payload.secondary||{{}};
+ const normalized=normalizeEvaluation(payload,reality),inspection=normalized.inspection,result=normalized.result;
  const isBaseline=reality==='baseline',realityLabel=isBaseline?'[LAYER_1_BASE]':'[ENRICHED_LAYER_2C]',valueLabel=isBaseline?'Layer 1':'Layer 2C';
  const knockouts=(result.knockouts||[]).map(item=>`<button type="button" class="ko-pill ${{String(item.state).toLowerCase()}}" title="Knockout ${{escapeHtml(item.rule_id)}} is ${{escapeHtml(item.state)}}">${{escapeHtml(item.rule_id)}} ${{escapeHtml(item.state)}}</button>`).join('');
  const modules=(inspection.modules||[]).map(module=>{{
