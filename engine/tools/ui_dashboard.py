@@ -208,12 +208,17 @@ function evaluationRoot(evaluation){{
 }}
 function extractModuleBreakdown(evaluation){{
  const root=evaluationRoot(evaluation),secondary=root.secondary||{{}};
- const candidates=[root.inspection?.modules,secondary.inspection?.modules,root.score?.modules,secondary.score?.modules,root.module_breakdown,secondary.module_breakdown,secondary.modules];
- const source=candidates.find(value=>Array.isArray(value)&&value.length)||[];
- return source.map((module,index)=>{{
-  const id=String(module.module_id||module.id||String.fromCharCode(65+index));
-  const criterionCandidates=[module.criteria,module.criterion_details,module.breakdown,module.items,module.rules,module.inspection?.criteria,module.inspection?.items];
-  const criteria=criterionCandidates.find(value=>Array.isArray(value)&&value.length)||[];
+ const moduleArrays=[root.inspection?.modules,Array.isArray(root.inspection)?root.inspection:null,secondary.inspection?.modules,Array.isArray(secondary.inspection)?secondary.inspection:null,root.score?.modules,secondary.score?.modules,root.module_breakdown,secondary.module_breakdown,secondary.modules];
+ const sources=moduleArrays.filter(value=>Array.isArray(value)&&value.length);
+ const looseItems=[root.items,secondary.items].filter(value=>Array.isArray(value)).flat();
+ const ids=new Set();
+ sources.forEach(source=>source.forEach((module,index)=>ids.add(String(module.module_id||module.module||module.id||String.fromCharCode(65+index)))));
+ looseItems.forEach(item=>{{if(item.module_id||item.module)ids.add(String(item.module_id||item.module))}});
+ return [...ids].sort().map((id,index)=>{{
+  const records=sources.flatMap(source=>source.filter((module,sourceIndex)=>String(module.module_id||module.module||module.id||String.fromCharCode(65+sourceIndex))===id));
+  const module=Object.assign({{}},...records);
+  const criterionArrays=records.flatMap(record=>[record.criteria,record.criterion_details,record.breakdown,record.items,record.rules,record.inspection?.criteria,record.inspection?.items]).filter(value=>Array.isArray(value)&&value.length);
+  const criteria=criterionArrays[0]||looseItems.filter(item=>String(item.module_id||item.module||'')===id);
   return {{
    module_id:id,name:String(module.name||module.module_name||MODULE_NAMES[id]||id),
    baseline_points:Number(module.baseline_points??module.baseline_score??module.score??module.points??0),
@@ -241,8 +246,8 @@ function normalizeEvaluation(evaluation,reality){{
  const verdictValue=scalarVerdict(secondary.verdict)??secondaryScore.verdict??scalarVerdict(root.verdict)??scoreObject.verdict??'UNKNOWN';
  const confidenceObject=root.confidence&&typeof root.confidence==='object'?root.confidence:{{}},scalarConfidence=value=>value&&typeof value==='object'?(value.level??value.rating??value.confidence):value;
  const confidence=String(scalarConfidence(secondary.confidence)??secondaryScore.confidence??scalarConfidence(root.confidence)??scalarConfidence(root.score?.confidence)??'UNKNOWN');
- const percentage=value=>typeof value==='number'?value:(value&&typeof value==='object'?(value.completeness_pct??value.pct??value.percentage??value.value):undefined);
- const completeness=Number(root.inspection?.completeness_pct??secondary.inspection?.completeness_pct??percentage(root.completeness)??percentage(secondary.completeness)??percentage(scoreObject.completeness)??confidenceObject.completeness_pct??0);
+ const percentage=value=>{{const raw=typeof value==='number'?value:(value&&typeof value==='object'?(value.completeness_pct??value.pct??value.percentage??value.value):undefined);if(raw===undefined||raw===null)return undefined;const number=Number(raw);return Number.isFinite(number)&&number>=0&&number<=1?number*100:number}};
+ const completeness=Number(percentage(root.inspection?.completeness_pct)??percentage(secondary.inspection?.completeness_pct)??percentage(root.completeness_pct)??percentage(secondary.completeness_pct)??percentage(root.completeness_score)??percentage(secondary.completeness_score)??percentage(root.completeness)??percentage(secondary.completeness)??percentage(scoreObject.completeness_pct)??percentage(secondaryScore.completeness_pct)??percentage(scoreObject.completeness)??percentage(confidenceObject.completeness_pct)??0);
  const knockoutSource=secondary.knockouts??root.knockouts?.results??root.knockouts??[];
  const knockouts=Array.isArray(knockoutSource)?knockoutSource.map(item=>({{rule_id:String(item.rule_id||item.id||''),state:String(item.state||'UNVERIFIED')}})):[];
  return {{result:{{score,verdict:String(verdictValue),confidence,knockouts}},inspection:{{modules:extractModuleBreakdown(root),completeness_pct:completeness,confidence}},reality}}
