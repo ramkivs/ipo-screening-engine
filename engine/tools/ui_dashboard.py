@@ -199,34 +199,50 @@ function escapeHtml(value){{return String(value??'—').replace(/[&<>"']/g,ch=>(
 function formatValue(value){{return value===undefined||value===null?'—':(typeof value==='number'?String(Math.round(value*100)/100):String(value))}}
 function signed(value){{const number=Number(value||0);return `${{number>=0?'+':''}}${{number.toFixed(1)}}`}}
 const MODULE_NAMES={{A:'Financial Quality',B:'Valuation',C:'Proceeds & Lock-in',D:'Governance',E:'Business & Moat',F:'Market Context'}};
+function evaluationRoot(evaluation){{
+ if(!evaluation||typeof evaluation!=='object')return {{}};
+ if(evaluation.score||evaluation.module_breakdown||evaluation.inspection||evaluation.secondary)return evaluation;
+ if(evaluation.evaluation&&(evaluation.evaluation.score||evaluation.evaluation.module_breakdown))return evaluation.evaluation;
+ if(evaluation.record&&(evaluation.record.score||evaluation.record.module_breakdown))return evaluation.record;
+ return evaluation;
+}}
 function extractModuleBreakdown(evaluation){{
- const root=evaluation?.record||evaluation?.evaluation||evaluation||{{}},secondary=root.secondary||{{}};
+ const root=evaluationRoot(evaluation),secondary=root.secondary||{{}};
  const candidates=[root.inspection?.modules,secondary.inspection?.modules,root.score?.modules,secondary.score?.modules,root.module_breakdown,secondary.module_breakdown,secondary.modules];
  const source=candidates.find(value=>Array.isArray(value)&&value.length)||[];
  return source.map((module,index)=>{{
   const id=String(module.module_id||module.id||String.fromCharCode(65+index));
-  const criteria=Array.isArray(module.criteria)?module.criteria:[];
+  const criterionCandidates=[module.criteria,module.criterion_details,module.breakdown,module.items,module.rules,module.inspection?.criteria,module.inspection?.items];
+  const criteria=criterionCandidates.find(value=>Array.isArray(value)&&value.length)||[];
   return {{
-   module_id:id,name:String(module.name||MODULE_NAMES[id]||id),
-   baseline_points:Number(module.baseline_points??module.score??0),
-   secondary_points:Number(module.secondary_points??module.score??0),
-   cap:Number(module.cap??module.max??0),delta:Number(module.delta??0),
-   cap_applied:Boolean(module.cap_applied??(Number(module.score??0)>=Number(module.max??Infinity))),
-   criteria:criteria.map(item=>({{
-    criterion_id:String(item.criterion_id||item.id||''),label:String(item.label||item.criterion_id||item.id||''),metric:String(item.metric||item.metric_key||''),
-    baseline_value:item.baseline_value??item.value??null,secondary_value:item.secondary_value??item.value??null,
-    score:Number(item.score??0),max:Number(item.max??0),state:String(item.state||'UNKNOWN'),
-    explanation:String(item.explanation||item.reason||item.formula||'No rule explanation recorded.'),
-   }})),
+   module_id:id,name:String(module.name||module.module_name||MODULE_NAMES[id]||id),
+   baseline_points:Number(module.baseline_points??module.baseline_score??module.score??module.points??0),
+   secondary_points:Number(module.secondary_points??module.secondary_score??module.score??module.points??0),
+   cap:Number(module.cap??module.max??module.max_points??0),delta:Number(module.delta??module.points_delta??0),
+   cap_applied:Boolean(module.cap_applied??module.capped??(Number(module.score??module.points??0)>=Number(module.max??module.max_points??Infinity))),
+   criteria:criteria.map(item=>{{
+    const rawState=String(item.state||item.status||((item.score??item.points_awarded??item.points)!=null?'SCORED':'UNKNOWN')).toUpperCase();
+    const state=rawState==='CAPPED'?'CAPPED':rawState==='SCORED'?'SCORED':'UNKNOWN';
+    return {{
+     criterion_id:String(item.criterion_id||item.id||item.rule_id||''),label:String(item.label||item.name||item.criterion_label||item.criterion_id||item.id||item.rule_id||''),metric:String(item.metric||item.metric_key||item.key||item.metric_id||''),
+     baseline_value:item.baseline_value??item.raw_baseline_value??item.before_value??item.value??null,secondary_value:item.secondary_value??item.override_value??item.layer2c_value??item.after_value??item.value??null,
+     score:Number(item.score??item.points_awarded??item.points??0),max:Number(item.max??item.max_points??item.points_max??0),state,
+     explanation:String(item.explanation||item.rule_explanation||item.reason||item.formula||item.description||'No rule explanation recorded.'),
+    }}
+   }}),
   }}
  }})
 }}
 function normalizeEvaluation(evaluation,reality){{
- const root=evaluation?.record||evaluation?.evaluation||evaluation||{{}},secondary=root.secondary||{{}},scoreObject=root.score&&typeof root.score==='object'?root.score:{{}},secondaryScore=secondary.score&&typeof secondary.score==='object'?secondary.score:{{}};
- const score=Number(secondary.score?.final_score??secondary.score??scoreObject.final_score??root.final_score??root.result?.score??0);
- const verdictValue=secondary.verdict??secondaryScore.verdict??root.verdict?.verdict??root.verdict??scoreObject.verdict??'UNKNOWN';
- const confidenceObject=root.confidence&&typeof root.confidence==='object'?root.confidence:{{}},confidence=String(secondary.confidence??secondaryScore.confidence??confidenceObject.level??root.confidence??'UNKNOWN');
- const completeness=Number(root.inspection?.completeness_pct??secondary.inspection?.completeness_pct??confidenceObject.completeness_pct??secondary.completeness_pct??0);
+ const root=evaluationRoot(evaluation),secondary=root.secondary||{{}},scoreObject=root.score&&typeof root.score==='object'?root.score:{{}},secondaryScore=secondary.score&&typeof secondary.score==='object'?secondary.score:{{}};
+ const scalarScore=value=>typeof value==='number'?value:(value&&typeof value==='object'?value.final_score??value.score:undefined);
+ const score=Number(scalarScore(secondary.score)??scalarScore(root.score)??root.final_score??root.result?.score??0);
+ const scalarVerdict=value=>value&&typeof value==='object'?(value.verdict??value.label):value;
+ const verdictValue=scalarVerdict(secondary.verdict)??secondaryScore.verdict??scalarVerdict(root.verdict)??scoreObject.verdict??'UNKNOWN';
+ const confidenceObject=root.confidence&&typeof root.confidence==='object'?root.confidence:{{}},scalarConfidence=value=>value&&typeof value==='object'?(value.level??value.rating??value.confidence):value;
+ const confidence=String(scalarConfidence(secondary.confidence)??secondaryScore.confidence??scalarConfidence(root.confidence)??scalarConfidence(root.score?.confidence)??'UNKNOWN');
+ const percentage=value=>typeof value==='number'?value:(value&&typeof value==='object'?(value.completeness_pct??value.pct??value.percentage??value.value):undefined);
+ const completeness=Number(root.inspection?.completeness_pct??secondary.inspection?.completeness_pct??percentage(root.completeness)??percentage(secondary.completeness)??percentage(scoreObject.completeness)??confidenceObject.completeness_pct??0);
  const knockoutSource=secondary.knockouts??root.knockouts?.results??root.knockouts??[];
  const knockouts=Array.isArray(knockoutSource)?knockoutSource.map(item=>({{rule_id:String(item.rule_id||item.id||''),state:String(item.state||'UNVERIFIED')}})):[];
  return {{result:{{score,verdict:String(verdictValue),confidence,knockouts}},inspection:{{modules:extractModuleBreakdown(root),completeness_pct:completeness,confidence}},reality}}
@@ -386,7 +402,7 @@ async def inject_rescore(
   going_concern_value=boolean_override("going_concern_uncertainty",going_concern_uncertainty)
   unquantified_value=boolean_override("contingent_liab_unquantified",contingent_liab_unquantified)
   sebi_action_value=boolean_override("sebi_ed_action_active",sebi_ed_action_active)
-  def categorical(value:str|None)->str|None: return (value or "").strip() or None
+  def categorical(value:str|None)->str|None: return (value or "").strip().lower() or None
   values={"qib_x":qib_x,"nii_x":nii_x,"retail_x":retail_x,"overall_x":overall_x,"operating_cash_flow_3yr_cumulative":operating_cash_flow_3yr_cumulative,"net_income_3yr_cumulative":net_income_3yr_cumulative,"trade_receivables_days":trade_receivables_days,"net_working_capital_pct_revenue":net_working_capital_pct_revenue,"top_customer_revenue_pct":top_customer_revenue_pct,"loss_making_segments_present":segment_value,"contingent_liabilities_pct_net_worth":contingent_liabilities_pct_net_worth,"material_regulatory_disputes_present":dispute_value,"going_concern_uncertainty":going_concern_value,"contingent_liab_unquantified":unquantified_value,"sebi_ed_action_active":sebi_action_value,"promoter_pledged_shares_pct":promoter_pledged_shares_pct,"pre_issue_promoter_holding_pct":pre_issue_promoter_holding_pct,"industry_cagr_pct":industry_cagr_pct,"moat_rating":categorical(moat_rating),"top5_concentration_pct":top5_concentration_pct,"visibility_rating":categorical(visibility_rating),"use_of_proceeds_bucket":categorical(use_of_proceeds_bucket),"lockin_bucket":categorical(lockin_bucket),"second_multiple_premium_pct":second_multiple_premium_pct,"sector_ipo_relative":categorical(sector_ipo_relative),"anchor_bucket":categorical(anchor_bucket),"gmp_bucket":categorical(gmp_bucket),"market_regime_bucket":categorical(market_regime_bucket)}
   if all(value is None for value in values.values()): raise ValueError("at least one subscription, financial-health, segment-risk, regulatory-risk, or governance value is required")
   digest=hashlib.sha256(data).hexdigest()
