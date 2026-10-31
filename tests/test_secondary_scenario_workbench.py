@@ -1,5 +1,5 @@
 from __future__ import annotations
-import copy, hashlib, json
+import copy, hashlib, json, shutil
 from datetime import datetime, timezone
 from pathlib import Path
 import pytest
@@ -9,6 +9,8 @@ from ipo_screening.supplemental_data import finalize_payload, initialize_templat
 from ipo_screening.secondary_evaluation import build_secondary, store_secondary, verify_secondary, MODULE_CAPS
 from ipo_screening.operator_scenario import scenario_template, finalize_scenario, evaluate_scenario, store_scenario
 from ipo_screening.pipeline import evaluate
+from ipo_screening.presentation.api import create_app
+from ipo_screening.presentation.service import PresentationConfig, PresentationService
 
 ROOT=Path(__file__).resolve().parents[1]
 JIO=ROOT/'docs/investigation/jio-current-engine-probe-20261027/evaluations'
@@ -56,15 +58,16 @@ def test_workbench_explorer_and_badges(monkeypatch,tmp_path):
 
 
 def test_comparison_serializes_five_independently_bound_legacy_inspections(monkeypatch,tmp_path):
- expected={};stored_paths=[];supp=tmp_path/'supp'
+ expected={};stored_paths=[];supp=tmp_path/'supp';active=tmp_path/'active';store_root=active/'evaluations';shutil.copytree(JIO,store_root);workbench=active/'workbench'
  for index in range(5):
   payload,supp=accepted_payload(tmp_path,12.34+index);full=build_secondary(EID,EvaluationStore(JIO),supp,payload['supplemental_payload_id'])
-  legacy=copy.deepcopy(full);legacy.pop('inspection');directory=tmp_path/'sec'/EID/f"scenario-{index}-{full['secondary_evaluation_id']}";directory.mkdir(parents=True);path=directory/'secondary_evaluation.json';path.write_text(json.dumps(legacy));stored_paths.append(path);expected[full['supplemental_payload_id']]=full['inspection']
- before={path:path.read_bytes() for path in stored_paths};_,client=_dashboard(monkeypatch,tmp_path,supp);response=client.get(f'/api/v1/comparison/{EID}');assert response.status_code==200
- enriched=response.json()['enriched'];assert len(enriched)==5
+  legacy=copy.deepcopy(full);legacy.pop('inspection');directory=workbench/'secondary'/EID/f"scenario-{index}-{full['secondary_evaluation_id']}";directory.mkdir(parents=True);path=directory/'secondary_evaluation.json';path.write_text(json.dumps(legacy));stored_paths.append(path);expected[full['supplemental_payload_id']]=full['inspection']
+ shutil.copytree(supp,workbench/'supplemental');before={path:path.read_bytes() for path in stored_paths}
+ service=PresentationService(PresentationConfig(store_root=store_root,config_dir=ROOT/'config',dataset_path=tmp_path/'dataset.json',analytics_path=tmp_path/'analytics.json',proposal_path=ROOT/'config/calibration-proposal.v1.6.0.json'));client=TestClient(create_app(service),base_url='http://127.0.0.1:8000')
+ response=client.get(f'/api/v1/comparison/{EID}');assert response.status_code==200;enriched=response.json()['enriched'];assert len(enriched)==5
  for item in enriched:
   restored=item['inspection'];assert restored==expected[item['supplemental_payload_id']];assert restored['completeness_pct']>0;assert len(restored['modules'])==6;assert all(module['criteria'] for module in restored['modules'])
- # Response reconstruction must perform zero writes to immutable history.
+ # The production endpoint reconstruction must perform zero historical writes.
  assert before=={path:path.read_bytes() for path in stored_paths}
 
 
