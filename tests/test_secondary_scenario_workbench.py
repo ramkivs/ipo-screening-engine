@@ -188,7 +188,7 @@ def test_layer2c_guardrail_overrides_clear_all_knockouts_without_mutating_baseli
      'contingent_liab_unquantified':'false','promoter_pledged_shares_pct':'0',
      'sebi_ed_action_active':'false',
      'industry_cagr_pct':'15','moat_rating':'leader_with_moat','top5_concentration_pct':'10','visibility_rating':'strong',
-     'use_of_proceeds_bucket':'growth','lockin_bucket':'intact','second_multiple_premium_pct':'-10','sector_ipo_relative':'cheaper',
+     'use_of_proceeds_bucket':'growth','lockin_bucket':'intact','second_multiple_premium_pct':'-10','sector_ipo_relative':'Cheaper',
      'anchor_bucket':'reputed','gmp_bucket':'strong','market_regime_bucket':'supportive',
  },files={'evidence':('guardrails.pdf',b'synthetic guardrail test evidence')})
  assert response.status_code==200,response.text
