@@ -17,6 +17,10 @@ const syntheticSecondary = {
     criteria: [{ criterion_id: `criterion_${index}`, label: `${name} criterion`, metric: `metric_${index}`, baseline_value: null, secondary_value: 'strong', score: 5, max: 5, state: index === 4 ? 'CAPPED' : 'SCORED', explanation: 'Matched governed test rule.' }],
   })) },
 };
+const syntheticBaseline = {
+  secondary: { score: 40, verdict: 'VERDICT_UNCERTAIN', confidence: 'Medium', knockout_status: 'CLEAR', knockouts: Array.from({ length: 6 }, (_, i) => ({ rule_id: `K${i + 1}`, state: 'CLEAR' })) },
+  inspection: { completeness_pct: 70, confidence: 'Medium', modules: syntheticSecondary.inspection.modules.map(module => ({ ...module, secondary_points: module.baseline_points, delta: 0, cap_applied: false, criteria: module.criteria.map(item => ({ ...item, secondary_value: item.baseline_value, state: 'UNKNOWN' })) })) },
+};
 const virtualConsole = new VirtualConsole();
 virtualConsole.on('jsdomError', error => errors.push(String(error)));
 virtualConsole.on('error', (...args) => errors.push(args.join(' ')));
@@ -38,7 +42,7 @@ const dom = await JSDOM.fromURL(url, {
         return new Response(JSON.stringify({ detail: 'comparison unavailable' }), { status: 404, headers: { 'content-type': 'application/json' } });
       }
       if (submissions.length && new URL(absolute).pathname.startsWith('/api/v1/comparison/')) {
-        return new Response(JSON.stringify({ baseline: { badge: '[LAYER_1_BASE]' }, enriched: [syntheticSecondary], scenarios: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(JSON.stringify({ baseline: syntheticBaseline, enriched: [syntheticSecondary], scenarios: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       const response = await globalThis.fetch(absolute, options);
       if (new URL(absolute).pathname === '/api/v1/evaluations') {
@@ -83,6 +87,10 @@ assert.equal(document.querySelector('[name="baseline_id"]').value, evaluationId)
 assert.equal(document.querySelector('[name="target_id"]').value, evaluationId);
 assert.equal(controls.every(control => control.dataset.hydrated === 'true'), true, 'all 41 controls must complete the hydration pass');
 assert.equal(document.querySelector('#comparison').children.length, expectedCards);
+if (comparisonMode === 'available') {
+  assert.equal(document.querySelectorAll('.baseline-breakdown .module-accordion').length, 6, 'Layer 1 must render six structured modules');
+  assert.equal(document.querySelector('.baseline-breakdown')?.classList.contains('card'), false, 'Layer 1 must not be a raw JSON card');
+}
 
 const expected = {
   bidding_day: 'DAY_1', observation_time: '2026-10-05T11:00:00Z', source_id: 'BROWSER-E2E',
@@ -119,19 +127,26 @@ assert.equal(submissions[0].net_income_3yr_cumulative, undefined, 'unchanged hyd
 assert.equal(submissions[0].qib_x, undefined, 'unchanged market targets must not be duplicated');
 for (const [name, value] of Object.entries(moduleOverrides)) assert.equal(submissions[0][name], value, `${name} was not serialized`);
 if (comparisonMode === 'available') {
-  while (document.querySelectorAll('.module-accordion').length !== 6) {
+  while (document.querySelectorAll('.secondary-breakdown .module-accordion').length !== 6) {
     if (Date.now() > submissionDeadline) throw new Error('module accordion did not populate after recalculation');
     await new Promise(resolve => setTimeout(resolve, 25));
   }
-  assert.equal(document.querySelector('.secondary-summary')?.textContent.includes('82.0'), true);
-  assert.equal(document.querySelector('.verdict-badge')?.textContent, 'SUBSCRIBE');
-  assert.equal(document.querySelectorAll('.ko-pill.clear').length, 6);
-  const capped = [...document.querySelectorAll('.module-accordion')].filter(item => item.querySelector('.cap-label')).map(item => item.dataset.module);
+  assert.equal(document.querySelectorAll('.baseline-breakdown .module-accordion').length, 6);
+  assert.equal(document.querySelectorAll('.secondary-breakdown .module-accordion').length, 6);
+  assert.equal(document.querySelector('.secondary-breakdown .secondary-summary')?.textContent.includes('82.0'), true);
+  assert.equal(document.querySelector('.secondary-breakdown .verdict-badge')?.textContent, 'SUBSCRIBE');
+  assert.equal(document.querySelectorAll('.secondary-breakdown .ko-pill.clear').length, 6);
+  const capped = [...document.querySelectorAll('.secondary-breakdown .module-accordion')].filter(item => item.querySelector('.cap-label')).map(item => item.dataset.module);
   assert.deepEqual(capped, ['C', 'E', 'F']);
-  const moduleE = document.querySelector('.module-accordion[data-module="E"]');
+  const moduleE = document.querySelector('.secondary-breakdown .module-accordion[data-module="E"]');
+  const moduleESummary = moduleE.querySelector('summary');
   assert.equal(moduleE.open, false);
-  moduleE.querySelector('summary').click();
+  assert.equal(moduleESummary.tabIndex, 0, 'native summary must remain keyboard focusable');
+  assert.equal(moduleESummary.getAttribute('aria-expanded'), 'false');
+  moduleESummary.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(moduleE.open, true);
+  assert.equal(moduleESummary.getAttribute('aria-expanded'), 'true');
   assert.equal(moduleE.querySelector('.criteria-table tbody')?.textContent.includes('Business & Moat criterion'), true);
   assert.equal(moduleE.querySelector('.state-pill')?.textContent, 'CAPPED');
   assert.equal(moduleE.querySelector('tbody')?.textContent.includes('Matched governed test rule.'), true);

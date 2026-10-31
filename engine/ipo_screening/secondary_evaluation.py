@@ -77,7 +77,7 @@ def _module_map(record: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
     return {str(m["module_id"]): m for m in (record.get("score") or {}).get("modules", [])}
 
 
-def _inspection(baseline: Mapping[str, Any], enriched: Mapping[str, Any]) -> Dict[str, Any]:
+def build_inspection(baseline: Mapping[str, Any], enriched: Mapping[str, Any]) -> Dict[str, Any]:
     before_modules, after_modules = _module_map(baseline), _module_map(enriched)
     modules = []
     for module_id in MODULE_CAPS:
@@ -118,6 +118,11 @@ def _inspection(baseline: Mapping[str, Any], enriched: Mapping[str, Any]) -> Dic
         "confidence": str(confidence.get("level") or "UNKNOWN"),
         "modules": modules,
     }
+
+
+def evaluation_inspection(record: Mapping[str, Any]) -> Dict[str, Any]:
+    """Return the presentation-safe structured view for a Layer 1 record."""
+    return {"secondary": _score_view(record), "inspection": build_inspection(record, record)}
 
 
 def _subject(document: Mapping[str, Any]) -> Dict[str, Any]:
@@ -228,7 +233,7 @@ def build_secondary(baseline_id: str, store: EvaluationStore, supp_root: Path, s
         "supplemental_payload_hash": payload["canonical_payload_hash"],
         "evaluated_at": at_text, "admitted_fields": targets,
         "baseline": _score_view(baseline), "secondary": _score_view(enriched),
-        "module_breakdown": breakdown, "inspection": _inspection(baseline, enriched),
+        "module_breakdown": breakdown, "inspection": build_inspection(baseline, enriched),
         "secondary_result_hash": enriched["result_hash"],
         "scoring_profile": "CORE_ENGINE_UNCHANGED", "canonical_secondary_hash": None,
     }
