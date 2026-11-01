@@ -139,10 +139,12 @@ def test_upload_and_form_errors_are_structured(monkeypatch,tmp_path):
 
 def test_multipart_injection_accepts_spooled_upload_and_rescores(monkeypatch,tmp_path):
  dashboard,client=_dashboard(monkeypatch,tmp_path)
- response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'SYNTHETIC-UPLOAD','qib_x':'12.34'},files={'evidence':('demand evidence.pdf',b'synthetic demand artifact')})
+ response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'SYNTHETIC-UPLOAD','qib_x':'12.34'},files={'evidence':('BOMBAY COATED AND SPECIAL STEELS LIMITED.pdf',b'synthetic demand artifact')})
  assert response.status_code==200;body=response.json();assert 'SUPPLEMENTAL_STORAGE_ACCEPTED' in body['detail'];assert body['evaluation_id']==EID;assert body['supplemental_id'].startswith('SUPP-');assert body['secondary_id'].startswith('SEC-')
  assert any((tmp_path/'supp'/EID).glob('*/supplemental_payload.json'));assert any((tmp_path/'sec'/EID).glob('*/secondary_evaluation.json'))
- assert any((tmp_path/'uploads'/EID).glob('*-demand evidence.pdf'))
+ upload=next((tmp_path/'uploads').glob('EVAL-*/ART-*.pdf'));assert upload.read_bytes()==b'synthetic demand artifact'
+ assert len(upload.parent.name)==21 and len(upload.stem)==20
+ assert EID not in str(upload) and 'BOMBAY COATED' not in str(upload)
  assert any((tmp_path/'payloads'/EID).glob('SUPP-*.json'))
 
 
@@ -312,7 +314,7 @@ def test_upload_creates_missing_workspace_tree_and_rejects_stale_id(monkeypatch,
  workspace=tmp_path/'missing'/'nested'/'workbench';dashboard,client=_dashboard(monkeypatch,workspace)
  response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'ACTIVE-WORKSPACE','qib_x':'12.34'},files={'evidence':('active.pdf',b'active workspace artifact')})
  assert response.status_code==200
- assert any((workspace/'uploads'/EID).glob('*-active.pdf'))
+ assert any((workspace/'uploads').glob('EVAL-*/ART-*.pdf'))
  assert (workspace/'supp'/EID).is_dir() and (workspace/'sec'/EID).is_dir()
  stale=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':'STALE-EVALUATION-FROM-OLD-PATH','bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'STALE','qib_x':'1'},files={'evidence':('stale.pdf',b'must not be stored')})
  assert stale.status_code==400;assert 'not in active store' in stale.json()['detail']
