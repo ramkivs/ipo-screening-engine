@@ -12,7 +12,7 @@ Coverage:
   * PBT / tax / PAT relationship;
   * balance-sheet sanity (net worth vs debt);
   * periods ordered and unique;
-  * financial periods three or more, cyclical profile five or more;
+  * financial periods three or more for every sector profile;
   * percentages in range, share counts non-negative;
   * proceeds limits (GCP >25%, unidentified acquisition >25%, combined >35%);
   * OFS 6(2) selling limits;
@@ -31,6 +31,12 @@ from .canonical import EvidenceRegistry, parse_date
 from .canonical_input import CanonicalInput, unprovenanced_paths
 from .errors import Finding, SEVERITY_ERROR, SEVERITY_WARNING, SemanticValidationError
 from .snapshots import MarketSnapshot, PeerSnapshot
+
+MIN_FULL_FY_OBSERVATIONS = 3
+# Cyclical filings use the same SEBI-standard three-FY admission floor.  The
+# five-year cyclical metric remains UNKNOWN when two additional FYs are absent,
+# which lowers completeness/confidence without blocking evaluation.
+MIN_CYCLICAL_FULL_FY_OBSERVATIONS = 3
 
 #: Rupees in one crore: the factor between ``FinancialPeriod`` values (INR
 #: crore) and an absolute rupee amount.  Shared by every EPS/PAT comparison.
@@ -115,19 +121,15 @@ def validate_semantics(
             )
         )
     full_periods = [p for p in periods if not p.get("is_stub")]
-    if len(full_periods) < 3:
+    is_cyclical = canonical.sector_profile == "cyclical"
+    required_periods = (
+        MIN_CYCLICAL_FULL_FY_OBSERVATIONS if is_cyclical else MIN_FULL_FY_OBSERVATIONS
+    )
+    if len(full_periods) < required_periods:
         report.findings.append(
             _err(
-                "PERIODS_INSUFFICIENT",
-                f"at least three full FY observations are required; {len(full_periods)} supplied",
-                "financials.periods",
-            )
-        )
-    if canonical.sector_profile == "cyclical" and len(full_periods) < 5:
-        report.findings.append(
-            _err(
-                "PERIODS_CYCLICAL_INSUFFICIENT",
-                f"the cyclical profile requires five FY observations; {len(full_periods)} supplied",
+                "PERIODS_CYCLICAL_INSUFFICIENT" if is_cyclical else "PERIODS_INSUFFICIENT",
+                f"at least {required_periods} full FY observations are required; {len(full_periods)} supplied",
                 "financials.periods",
             )
         )
