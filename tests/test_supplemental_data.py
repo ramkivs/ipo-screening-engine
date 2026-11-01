@@ -115,6 +115,21 @@ def test_store_isolated_immutable_duplicate_and_conflict(baseline,tmp_path):
     p2,_=completed_payload(store,eid,tmp_path,value=3.0); assert store_payload(p2,store,supp,payload_base=tmp_path)[0]=='CONFLICT_REJECTED'
     assert snapshot(store)==before
 
+@pytest.mark.parametrize("existing_files", [(), ("supplemental_payload.json",)])
+def test_store_bootstraps_incomplete_new_ipo_target(baseline,tmp_path,existing_files):
+    store,eid=baseline; payload,_=completed_payload(store,eid,tmp_path); supp=tmp_path/'supp'
+    target=supp/eid/payload['canonical_payload_hash'];target.mkdir(parents=True)
+    if "supplemental_payload.json" in existing_files:
+        (target/'supplemental_payload.json').write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+    outcome,stored,validation=store_payload(payload,store,supp,payload_base=tmp_path)
+    assert validation.accepted and stored==target and outcome=='SUPPLEMENTAL_STORAGE_BOOTSTRAPPED'
+    assert json.loads((target/'supplemental_payload.json').read_text())==payload
+    manifest=json.loads((target/'supplemental_manifest.json').read_text())
+    assert manifest['payload_hash']==payload['canonical_payload_hash']
+    assert manifest['validation_outcome']=='SUPPLEMENTAL_STORAGE_ACCEPTED'
+    assert store_payload(payload,store,supp,payload_base=tmp_path)[0]=='EXACT_DUPLICATE'
+
+
 def test_invalid_no_partial_store_and_baseline_destination_refused(baseline,tmp_path):
     store,eid=baseline; p,_=completed_payload(store,eid,tmp_path); p['baseline_binding']='0'*64; p=finalize_payload(p)
     supp=tmp_path/'supp'; assert store_payload(p,store,supp,payload_base=tmp_path)[0]=='CONTRACT_REJECTED'; assert not supp.exists()

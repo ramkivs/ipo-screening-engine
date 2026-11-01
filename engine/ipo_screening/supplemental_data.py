@@ -370,8 +370,6 @@ def store_payload(
         return "CONTRACT_REJECTED", root, SupplementalValidation(False, "CONTRACT_REJECTED", ("SUPPLEMENTAL_STORE_SYMLINKS_INSIDE_BASELINE",))
 
     target = root / str(payload["evaluation_id"]) / str(validation.payload_hash)
-    if target.exists():
-        return "EXACT_DUPLICATE", target, validation
     parent = target.parent
     parent.mkdir(parents=True, exist_ok=True)
     # Reject conflicting values for the same target in accepted sibling payloads.
@@ -396,9 +394,52 @@ def store_payload(
         "source_verification": "PER_ENTRY; STORAGE_ACCEPTANCE_IS_NOT VALUE AUTHENTICITY",
         "scoring_eligibility": "NOT_GRANTED",
     }
+    documents = (("supplemental_payload.json", payload), ("supplemental_manifest.json", manifest))
+    if target.exists():
+        if not target.is_dir():
+            raise ValueError("supplemental target exists but is not a directory")
+        unexpected = sorted(path.name for path in target.iterdir() if path.name not in {name for name, _ in documents})
+        if unexpected:
+            raise ValueError(f"incomplete supplemental target contains unexpected files: {', '.join(unexpected)}")
+        payload_path = target / "supplemental_payload.json"
+        if payload_path.is_file():
+            try:
+                existing_payload = json.loads(payload_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError("existing supplemental payload is unreadable") from exc
+            if existing_payload != payload:
+                raise ValueError("supplemental payload identity conflict")
+        manifest_path = target / "supplemental_manifest.json"
+        if manifest_path.is_file():
+            try:
+                existing_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError("existing supplemental manifest is unreadable") from exc
+            if (existing_manifest.get("payload_hash") != validation.payload_hash
+                    or existing_manifest.get("payload_id") != validation.payload_id
+                    or existing_manifest.get("validation_outcome") != "SUPPLEMENTAL_STORAGE_ACCEPTED"):
+                raise ValueError("supplemental manifest identity conflict")
+        missing = [(name, value) for name, value in documents if not (target / name).is_file()]
+        for name, value in missing:
+            fd, temporary_name = tempfile.mkstemp(prefix=f".{name}.tmp-", dir=target)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+                    json.dump(value, handle, indent=2, sort_keys=True, ensure_ascii=False)
+                    handle.write("\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary_name, target / name)
+            except Exception:
+                try:
+                    os.unlink(temporary_name)
+                except FileNotFoundError:
+                    pass
+                raise
+        return ("SUPPLEMENTAL_STORAGE_BOOTSTRAPPED" if missing else "EXACT_DUPLICATE"), target, validation
+
     temp = Path(tempfile.mkdtemp(prefix=f".{validation.payload_hash}.tmp-", dir=parent))
     try:
-        for name, value in (("supplemental_payload.json", payload), ("supplemental_manifest.json", manifest)):
+        for name, value in documents:
             with (temp / name).open("x", encoding="utf-8", newline="\n") as handle:
                 json.dump(value, handle, indent=2, sort_keys=True, ensure_ascii=False)
                 handle.write("\n")
