@@ -369,9 +369,14 @@ def store_payload(
     if resolved_root == evaluation_dir or evaluation_dir in resolved_root.parents:
         return "CONTRACT_REJECTED", root, SupplementalValidation(False, "CONTRACT_REJECTED", ("SUPPLEMENTAL_STORE_SYMLINKS_INSIDE_BASELINE",))
 
-    target = root / str(payload["evaluation_id"]) / str(validation.payload_hash)
-    parent = target.parent
+    parent = root / str(payload["evaluation_id"])
     parent.mkdir(parents=True, exist_ok=True)
+    # New records use the already hash-derived, fixed-width payload ID rather
+    # than another full SHA-256 path segment.  Continue recognizing legacy
+    # full-hash directories so upgrades remain idempotent.
+    short_target = parent / str(validation.payload_id)
+    legacy_target = parent / str(validation.payload_hash)
+    target = legacy_target if legacy_target.exists() and not short_target.exists() else short_target
     # Reject conflicting values for the same target in accepted sibling payloads.
     incoming = {e["target"]: e["value"] for e in payload["entries"]}
     for sibling in parent.iterdir():
@@ -421,7 +426,7 @@ def store_payload(
                 raise ValueError("supplemental manifest identity conflict")
         missing = [(name, value) for name, value in documents if not (target / name).is_file()]
         for name, value in missing:
-            fd, temporary_name = tempfile.mkstemp(prefix=f".{name}.tmp-", dir=target)
+            fd, temporary_name = tempfile.mkstemp(prefix=".f-", dir=target)
             try:
                 with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
                     json.dump(value, handle, indent=2, sort_keys=True, ensure_ascii=False)
@@ -437,7 +442,7 @@ def store_payload(
                 raise
         return ("SUPPLEMENTAL_STORAGE_BOOTSTRAPPED" if missing else "EXACT_DUPLICATE"), target, validation
 
-    temp = Path(tempfile.mkdtemp(prefix=f".{validation.payload_hash}.tmp-", dir=parent))
+    temp = Path(tempfile.mkdtemp(prefix=".tmp-", dir=parent))
     # Materialize the complete staging path defensively.  CPython's mkdtemp()
     # creates it, but the explicit mkdir keeps the atomic writer safe across
     # Windows/path-wrapper implementations that only return a candidate path.

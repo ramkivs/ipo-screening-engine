@@ -115,12 +115,15 @@ def test_store_isolated_immutable_duplicate_and_conflict(baseline,tmp_path):
     p2,_=completed_payload(store,eid,tmp_path,value=3.0); assert store_payload(p2,store,supp,payload_base=tmp_path)[0]=='CONFLICT_REJECTED'
     assert snapshot(store)==before
 
-def test_atomic_writer_materializes_returned_temp_directory(monkeypatch,baseline,tmp_path):
+def test_atomic_writer_uses_short_materialized_temp_directory(monkeypatch,baseline,tmp_path):
     import ipo_screening.supplemental_data as supplemental
-    store,eid=baseline;payload,_=completed_payload(store,eid,tmp_path);supp=tmp_path/'supp';candidate=tmp_path/'not-yet-created'/'.payload.tmp-test'
-    monkeypatch.setattr(supplemental.tempfile,'mkdtemp',lambda **_:str(candidate))
+    store,eid=baseline;payload,_=completed_payload(store,eid,tmp_path);supp=tmp_path/'supp';candidate=tmp_path/'not-yet-created'/'.tmp-test';call={}
+    def candidate_path(**kwargs): call.update(kwargs);return str(candidate)
+    monkeypatch.setattr(supplemental.tempfile,'mkdtemp',candidate_path)
     outcome,target,validation=store_payload(payload,store,supp,payload_base=tmp_path)
     assert validation.accepted and outcome=='SUPPLEMENTAL_STORAGE_ACCEPTED'
+    assert call['prefix']=='.tmp-' and target.name==payload['supplemental_payload_id']
+    assert len(target.name)==21 and len(call['prefix'])==5
     assert (target/'supplemental_payload.json').is_file()
     assert (target/'supplemental_manifest.json').is_file()
 
@@ -128,7 +131,7 @@ def test_atomic_writer_materializes_returned_temp_directory(monkeypatch,baseline
 @pytest.mark.parametrize("existing_files", [(), ("supplemental_payload.json",)])
 def test_store_bootstraps_incomplete_new_ipo_target(baseline,tmp_path,existing_files):
     store,eid=baseline; payload,_=completed_payload(store,eid,tmp_path); supp=tmp_path/'supp'
-    target=supp/eid/payload['canonical_payload_hash'];target.mkdir(parents=True)
+    target=supp/eid/payload['supplemental_payload_id'];target.mkdir(parents=True)
     if "supplemental_payload.json" in existing_files:
         (target/'supplemental_payload.json').write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n',encoding='utf-8')
     outcome,stored,validation=store_payload(payload,store,supp,payload_base=tmp_path)
@@ -138,6 +141,15 @@ def test_store_bootstraps_incomplete_new_ipo_target(baseline,tmp_path,existing_f
     assert manifest['payload_hash']==payload['canonical_payload_hash']
     assert manifest['validation_outcome']=='SUPPLEMENTAL_STORAGE_ACCEPTED'
     assert store_payload(payload,store,supp,payload_base=tmp_path)[0]=='EXACT_DUPLICATE'
+
+
+def test_legacy_full_hash_directory_remains_idempotent(baseline,tmp_path):
+    store,eid=baseline;payload,_=completed_payload(store,eid,tmp_path);supp=tmp_path/'supp'
+    outcome,target,_=store_payload(payload,store,supp,payload_base=tmp_path);assert outcome=='SUPPLEMENTAL_STORAGE_ACCEPTED'
+    legacy=target.parent/payload['canonical_payload_hash'];target.rename(legacy)
+    outcome,resolved,_=store_payload(payload,store,supp,payload_base=tmp_path)
+    assert outcome=='EXACT_DUPLICATE' and resolved==legacy
+    assert not (legacy.parent/payload['supplemental_payload_id']).exists()
 
 
 def test_invalid_no_partial_store_and_baseline_destination_refused(baseline,tmp_path):
