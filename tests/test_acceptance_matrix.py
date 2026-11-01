@@ -621,10 +621,14 @@ def test_p21_loss_making_profile_uses_loss_criteria(config, make_input):
 # ==========================================================================
 
 
-def test_p22_s10_cyclical_overlay_requires_five_fiscal_years(config, make_input):
-    with pytest.raises(SemanticValidationError) as excinfo:
-        run(make_input(sector_profile="cyclical"), config)
-    assert any(f.code == "PERIODS_CYCLICAL_INSUFFICIENT" for f in excinfo.value.findings)
+@pytest.mark.parametrize("mode", ["preliminary", "final"])
+def test_p22_s10_cyclical_overlay_accepts_three_fiscal_years_with_reduced_confidence(config, make_input, mode):
+    outcome = run(make_input(sector_profile="cyclical"), config, mode=mode)
+    assert outcome.record.plan["sector_overlay"] == "cyclical"
+    five_year_metric = metric(outcome, "margin_trend_5y_avg")
+    assert five_year_metric.state == "UNKNOWN"
+    assert "requires 5 FY observations; 3 supplied" in five_year_metric.reason
+    assert outcome.record.confidence["completeness_pct"] < 100
 
 
 def test_p22_s10_cyclical_overlay_with_five_years(config, make_input):

@@ -493,7 +493,7 @@
           "items": {
             "$ref": "#/$defs/period"
           },
-          "description": "oldest first; three full FYs plus an optional stub; the cyclical profile needs five FYs"
+          "description": "oldest first; three full FYs plus an optional stub for all sector profiles; five FYs improve the cyclical margin metric but are not an admission requirement"
         },
         "operating_cash_flow_3yr_cumulative": {
           "description": "Three-full-FY operating cash flow, either as a cumulative amount or oldest-first annual amounts in the reporting unit.",

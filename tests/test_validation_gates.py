@@ -129,11 +129,21 @@ def test_fewer_than_three_full_fiscal_years_is_rejected(config, make_input):
         run(document, config)
 
 
-def test_cyclical_profile_requires_five_fiscal_years(config, make_input):
+def test_cyclical_profile_uses_three_fiscal_year_admission_floor(config, make_input):
     document = make_input(**{"sector_profile": "cyclical"})
-    with pytest.raises(SemanticValidationError) as excinfo:
+    outcome = run(document, config)
+    assert outcome.record.plan["sector_overlay"] == "cyclical"
+
+
+def test_cyclical_profile_still_rejects_fewer_than_three_fiscal_years(config, make_input):
+    document = make_input(**{"sector_profile": "cyclical", "financials.periods": [
+        {"fy": "FY2025", "revenue": 10.0, "pat": 1.0},
+        {"fy": "FY2026", "revenue": 12.0, "pat": 1.2},
+    ]})
+    with pytest.raises((SemanticValidationError, SchemaValidationError)) as excinfo:
         run(document, config)
-    assert any(f.code == "PERIODS_CYCLICAL_INSUFFICIENT" for f in excinfo.value.findings)
+    if isinstance(excinfo.value, SemanticValidationError):
+        assert any(f.code == "PERIODS_CYCLICAL_INSUFFICIENT" for f in excinfo.value.findings)
 
 
 def test_gcp_ceiling_recorded_as_an_amount_is_rejected(config, make_input):
