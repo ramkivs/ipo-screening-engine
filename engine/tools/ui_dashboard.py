@@ -52,6 +52,18 @@ def _ensure_parent(target: str | Path) -> Path:
  return path
 
 
+def _upload_artifact_path(baseline_id:str,digest:str,filename:str)->Path:
+ """Return a short Windows-safe content-addressed Workbench upload path."""
+ evaluation_token=hashlib.sha256(baseline_id.encode("utf-8")).hexdigest()[:16]
+ artifact_token=digest[:16]
+ raw_suffix=Path(filename).suffix.lower()
+ suffix=raw_suffix if 1 < len(raw_suffix) <= 10 and raw_suffix[1:].isalnum() else ".bin"
+ target=UPLOAD/f"EVAL-{evaluation_token}"/f"ART-{artifact_token}{suffix}"
+ # This specific leaf directory may not exist for a newly ingested IPO.
+ os.makedirs(target.parent,exist_ok=True)
+ return target
+
+
 def _ensure_workbench_dirs() -> None:
  for directory in (ROOT,SUPP,SEC,OP,UPLOAD): os.makedirs(directory,exist_ok=True)
 
@@ -439,8 +451,10 @@ async def inject_rescore(
   values={"qib_x":qib_x,"nii_x":nii_x,"retail_x":retail_x,"overall_x":overall_x,"operating_cash_flow_3yr_cumulative":operating_cash_flow_3yr_cumulative,"net_income_3yr_cumulative":net_income_3yr_cumulative,"trade_receivables_days":trade_receivables_days,"net_working_capital_pct_revenue":net_working_capital_pct_revenue,"top_customer_revenue_pct":top_customer_revenue_pct,"loss_making_segments_present":segment_value,"contingent_liabilities_pct_net_worth":contingent_liabilities_pct_net_worth,"material_regulatory_disputes_present":dispute_value,"going_concern_uncertainty":going_concern_value,"contingent_liab_unquantified":unquantified_value,"sebi_ed_action_active":sebi_action_value,"promoter_pledged_shares_pct":promoter_pledged_shares_pct,"pre_issue_promoter_holding_pct":pre_issue_promoter_holding_pct,"industry_cagr_pct":industry_cagr_pct,"moat_rating":categorical(moat_rating),"top5_concentration_pct":top5_concentration_pct,"visibility_rating":categorical(visibility_rating),"use_of_proceeds_bucket":categorical(use_of_proceeds_bucket),"lockin_bucket":categorical(lockin_bucket),"second_multiple_premium_pct":second_multiple_premium_pct,"sector_ipo_relative":categorical(sector_ipo_relative),"anchor_bucket":categorical(anchor_bucket),"gmp_bucket":categorical(gmp_bucket),"market_regime_bucket":categorical(market_regime_bucket)}
   if all(value is None for value in values.values()): raise ValueError("at least one subscription, financial-health, segment-risk, regulatory-risk, or governance value is required")
   digest=hashlib.sha256(data).hexdigest()
-  artifact=_ensure_parent(UPLOAD/baseline_id/f"{digest}-{filename}")
-  if not artifact.exists(): artifact.write_bytes(data)
+  artifact=_upload_artifact_path(baseline_id,digest,filename)
+  if artifact.exists():
+   if hashlib.sha256(artifact.read_bytes()).hexdigest()!=digest: raise ValueError("short upload identity collision")
+  else: artifact.write_bytes(data)
   template=initialize_template(EvaluationStore(L1),baseline_id,allow_layer1_overrides=True);entries=[]
   for entry in template["entries"]:
    key=entry["target"].rsplit(".",1)[1]
