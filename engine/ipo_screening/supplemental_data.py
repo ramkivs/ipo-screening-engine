@@ -438,6 +438,10 @@ def store_payload(
         return ("SUPPLEMENTAL_STORAGE_BOOTSTRAPPED" if missing else "EXACT_DUPLICATE"), target, validation
 
     temp = Path(tempfile.mkdtemp(prefix=f".{validation.payload_hash}.tmp-", dir=parent))
+    # Materialize the complete staging path defensively.  CPython's mkdtemp()
+    # creates it, but the explicit mkdir keeps the atomic writer safe across
+    # Windows/path-wrapper implementations that only return a candidate path.
+    temp.mkdir(parents=True, exist_ok=True)
     try:
         for name, value in documents:
             with (temp / name).open("x", encoding="utf-8", newline="\n") as handle:

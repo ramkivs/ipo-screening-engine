@@ -115,6 +115,16 @@ def test_store_isolated_immutable_duplicate_and_conflict(baseline,tmp_path):
     p2,_=completed_payload(store,eid,tmp_path,value=3.0); assert store_payload(p2,store,supp,payload_base=tmp_path)[0]=='CONFLICT_REJECTED'
     assert snapshot(store)==before
 
+def test_atomic_writer_materializes_returned_temp_directory(monkeypatch,baseline,tmp_path):
+    import ipo_screening.supplemental_data as supplemental
+    store,eid=baseline;payload,_=completed_payload(store,eid,tmp_path);supp=tmp_path/'supp';candidate=tmp_path/'not-yet-created'/'.payload.tmp-test'
+    monkeypatch.setattr(supplemental.tempfile,'mkdtemp',lambda **_:str(candidate))
+    outcome,target,validation=store_payload(payload,store,supp,payload_base=tmp_path)
+    assert validation.accepted and outcome=='SUPPLEMENTAL_STORAGE_ACCEPTED'
+    assert (target/'supplemental_payload.json').is_file()
+    assert (target/'supplemental_manifest.json').is_file()
+
+
 @pytest.mark.parametrize("existing_files", [(), ("supplemental_payload.json",)])
 def test_store_bootstraps_incomplete_new_ipo_target(baseline,tmp_path,existing_files):
     store,eid=baseline; payload,_=completed_payload(store,eid,tmp_path); supp=tmp_path/'supp'
