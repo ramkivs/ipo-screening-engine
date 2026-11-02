@@ -19,6 +19,7 @@ SCORE_OVERRIDE_TARGETS = {
     "business.top5_concentration_pct": "top5_concentration_pct",
     "business.visibility_rating": "visibility_rating",
     "valuation.second_multiple_premium_pct": "second_multiple_premium_pct",
+    "valuation.post_issue_pe": "pe_premium_pct",
     "valuation.sector_ipo_relative": "sector_ipo_relative",
     "issue.use_of_proceeds_bucket": "use_of_proceeds_bucket",
     "capital_structure.lockin_bucket": "lockin_bucket",
@@ -35,13 +36,25 @@ _CATEGORICAL = frozenset({
 _LOCK = RLock()
 
 
-def _constant_metric(metric_id: str, value: Any):
+def _constant_metric(metric_id: str, value: Any, target: str):
     kind = "categorical" if metric_id in _CATEGORICAL else "numeric"
-    def calculate(_ctx: Any) -> MetricValue:
+    def calculate(ctx: Any) -> MetricValue:
+        resolved = value
+        formula = "evidence-backed Layer 2C governed override"
+        if target == "valuation.post_issue_pe":
+            peer_median = ctx.peers.median("pe")
+            if peer_median in (None, 0):
+                return MetricValue(
+                    metric_id, State.UNKNOWN.value, value=None, kind="numeric",
+                    reason="post-issue P/E was supplied but no VALID peer median P/E is available",
+                    formula="(supplied post-issue P/E / median VALID peer P/E - 1) x 100",
+                    inputs=[target, "peers"],
+                )
+            resolved = (float(value) / float(peer_median) - 1.0) * 100.0
+            formula = "(supplied post-issue P/E / median VALID peer P/E - 1) x 100"
         return MetricValue(
-            metric_id, State.VALUE.value, value=value, kind=kind,
-            formula="evidence-backed Layer 2C governed override",
-            inputs=[next(target for target, name in SCORE_OVERRIDE_TARGETS.items() if name == metric_id)],
+            metric_id, State.VALUE.value, value=resolved, kind=kind,
+            formula=formula, inputs=[target],
         )
     return calculate
 
@@ -49,7 +62,7 @@ def _constant_metric(metric_id: str, value: Any):
 @contextmanager
 def score_override_metrics(values: Mapping[str, Any]) -> Iterator[None]:
     replacements = {
-        SCORE_OVERRIDE_TARGETS[target]: _constant_metric(SCORE_OVERRIDE_TARGETS[target], value)
+        SCORE_OVERRIDE_TARGETS[target]: _constant_metric(SCORE_OVERRIDE_TARGETS[target], value, target)
         for target, value in values.items() if target in SCORE_OVERRIDE_TARGETS
     }
     with _LOCK:

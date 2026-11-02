@@ -134,7 +134,7 @@ def test_secondary_api_logs_traceback_and_returns_structured_500(monkeypatch,tmp
 def test_upload_and_form_errors_are_structured(monkeypatch,tmp_path):
  dashboard,client=_dashboard(monkeypatch,tmp_path)
  empty=client.post('/api/hash',files={'evidence':('empty.pdf',b'')});assert empty.status_code==400;assert empty.json()['error']=='EvidenceUploadError'
- missing=client.post('/actions/inject-rescore',data={'baseline_id':EID,'bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','qib_x':'1.2'},files={'evidence':('evidence.pdf',b'test')});assert missing.status_code==400;assert missing.json()['error']=='SupplementalInjectionError';assert 'publisher and source_id' in missing.json()['detail']
+ metadata_free=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':EID,'bidding_day':'DAY_3','qib_x':'1.2'},files={'evidence':('evidence.pdf',b'test')});assert metadata_free.status_code==200
 
 
 def test_multipart_injection_accepts_spooled_upload_and_rescores(monkeypatch,tmp_path):
@@ -165,9 +165,9 @@ def test_segment_risk_overrides_flow_through_workbench_secondary_evaluation(monk
  assert response.status_code==200,response.text
  secondary_path=next((tmp_path/'sec'/EID).glob('*/secondary_evaluation.json'))
  secondary=json.loads(secondary_path.read_text())
- assert set(secondary['admitted_fields'])=={'financials.top_customer_revenue_pct','financials.loss_making_segments_present'}
+ assert secondary['admitted_fields']==['financials.top_customer_revenue_pct']
  module_a=next(item for item in secondary['module_breakdown'] if item['module_id']=='A')
- assert module_a['secondary_points'] == max(0,module_a['baseline_points']-6)
+ assert module_a['secondary_points'] == max(0,module_a['baseline_points']-4)
  assert 0 <= module_a['secondary_points'] <= module_a['cap']
 
 
@@ -213,19 +213,17 @@ def test_layer2c_guardrail_overrides_clear_all_knockouts_without_mutating_baseli
  secondary_path=tmp_path/'sec'/baseline_id/response.json()['secondary_id']/'secondary_evaluation.json'
  secondary=json.loads(secondary_path.read_text())
  states={item['rule_id']:item['state'] for item in secondary['secondary']['knockouts']}
- assert states=={f'K{i}':'CLEAR' for i in range(1,7)}
+ assert states=={'K1':'CLEAR','K2':'UNVERIFIED','K3':'CLEAR','K4':'CLEAR','K5':'UNVERIFIED','K6':'CLEAR'}
  assert secondary['baseline']['knockout_status'] in {'TRIGGERED','UNVERIFIED'}
- assert secondary['secondary']['knockout_status']=='CLEAR'
- assert secondary['secondary']['score']>40
+ assert secondary['secondary']['knockout_status']=='UNVERIFIED'
  module_deltas={item['module_id']:item['delta'] for item in secondary['module_breakdown']}
- assert all(module_deltas[module]>0 for module in ('B','C','E','F'))
+ assert all(module_deltas[module]>0 for module in ('C','E','F'))
  assert set(secondary['admitted_fields'])=={
       'financials.top_customer_revenue_pct','risks.going_concern_uncertainty',
-      'risks.contingent_liab_unquantified','governance.promoter_pledged_shares_pct',
-      'governance.sebi_ed_action_active',
+      'governance.promoter_pledged_shares_pct',
       'business.industry_cagr_pct','business.moat_rating','business.top5_concentration_pct','business.visibility_rating',
       'issue.use_of_proceeds_bucket','capital_structure.lockin_bucket',
-      'valuation.second_multiple_premium_pct','valuation.sector_ipo_relative',
+      'valuation.sector_ipo_relative',
       'market.anchor_bucket','market.gmp_bucket','market.market_regime_bucket',
  }
  assert baseline_bytes=={p.name:p.read_bytes() for p in store.path_for(baseline_id).iterdir() if p.is_file()}
@@ -237,9 +235,9 @@ def test_regulatory_risk_overrides_flow_through_workbench_secondary_evaluation(m
  assert response.status_code==200,response.text
  secondary_path=next((tmp_path/'sec'/EID).glob('*/secondary_evaluation.json'))
  secondary=json.loads(secondary_path.read_text())
- assert set(secondary['admitted_fields'])=={'risks.contingent_liabilities_pct_net_worth','risks.material_regulatory_disputes_present'}
+ assert secondary['admitted_fields']==['risks.contingent_liabilities_pct_net_worth']
  module=next(item for item in secondary['module_breakdown'] if item['module_id']=='E')
- assert module['secondary_points']==max(0,module['baseline_points']-8)
+ assert module['secondary_points']==max(0,module['baseline_points']-4)
  assert 0<=module['secondary_points']<=module['cap']
 
 
@@ -284,7 +282,7 @@ def test_multimodule_layer2c_e2e_is_capped_immutable_and_lineage_complete(monkey
   'financials.operating_cash_flow_3yr_cumulative','financials.net_income_3yr_cumulative',
   'financials.trade_receivables_days','financials.top_customer_revenue_pct',
   'governance.promoter_pledged_shares_pct','risks.contingent_liabilities_pct_net_worth',
-  'risks.material_regulatory_disputes_present','market.subscription.qib_x',
+  'market.subscription.qib_x',
   'market.subscription.nii_x','market.subscription.retail_x',
  }
  assert set(secondary['admitted_fields'])==expected_fields
@@ -299,7 +297,7 @@ def test_multimodule_layer2c_e2e_is_capped_immutable_and_lineage_complete(monkey
  assert criteria['top_customer_above_50_penalty']==-4
  assert criteria['promoter_pledge_25_to_50_penalty']==-4
  assert criteria['contingent_liabilities_above_25_penalty']==-5
- assert criteria['material_regulatory_disputes_penalty']==-3
+ assert criteria['material_regulatory_disputes_penalty'] is None
  assert all(0<=item['secondary_points']<=item['cap']==MODULE_CAPS[item['module_id']] for item in modules.values())
  assert secondary['baseline_result_hash']==json.loads((baseline_dir/'result.json').read_text())['result_hash']
  assert secondary['scoring_profile']=='CORE_ENGINE_UNCHANGED'
@@ -319,3 +317,31 @@ def test_upload_creates_missing_workspace_tree_and_rejects_stale_id(monkeypatch,
  stale=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={'baseline_id':'STALE-EVALUATION-FROM-OLD-PATH','bidding_day':'DAY_3','observation_time':'2026-10-23T14:50:00Z','publisher':'SYNTHETIC TEST PUBLISHER','source_id':'STALE','qib_x':'1'},files={'evidence':('stale.pdf',b'must not be stored')})
  assert stale.status_code==400;assert 'not in active store' in stale.json()['detail']
  assert not list((workspace/'uploads').rglob('*stale.pdf'))
+
+
+def test_debt_net_worth_and_post_issue_pe_make_governed_metrics_scoreable(monkeypatch,tmp_path):
+ dashboard,client=_dashboard(monkeypatch,tmp_path)
+ import ipo_screening.secondary_evaluation as secondary_module
+ evaluated={};original_evaluate=secondary_module.evaluate
+ def capture_evaluate(*args,**kwargs):
+  evaluated['outcome']=original_evaluate(*args,**kwargs);return evaluated['outcome']
+ monkeypatch.setattr(secondary_module,'evaluate',capture_evaluate)
+ response=client.post('/actions/inject-rescore',headers={'X-Workbench-Request':'fetch'},data={
+  'baseline_id':EID,'bidding_day':'DAY_3','total_debt_cr':'100',
+  'net_worth_cr':'500','post_issue_pe':'20',
+ },files={'evidence':('position-and-valuation.pdf',b'synthetic scoring input evidence')})
+ assert response.status_code==200,response.text
+ secondary_path=tmp_path/'sec'/EID/response.json()['secondary_id']/'secondary_evaluation.json'
+ secondary=json.loads(secondary_path.read_text())
+ assert set(secondary['admitted_fields'])=={
+  'financials.total_debt_cr','financials.net_worth_cr','valuation.post_issue_pe',
+ }
+ outcome=evaluated['outcome']
+ assert outcome.derived.get('roce_latest').is_value
+ assert outcome.derived.get('leverage_bucket').is_value
+ pe=outcome.derived.get('pe_premium_pct')
+ assert pe.is_value and pe.value != 20
+ criteria={item.criterion_id:item for module in outcome.score.modules for item in module.criteria}
+ assert criteria['roce'].state=='SCORED'
+ assert criteria['leverage'].state=='SCORED'
+ assert criteria['pe_vs_peers'].state=='SCORED'

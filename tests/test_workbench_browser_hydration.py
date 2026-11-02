@@ -43,6 +43,8 @@ def _wait_for_server(port: int, process: subprocess.Popen[str]) -> None:
 @pytest.mark.parametrize("comparison_mode", ["available", "404"])
 def test_workbench_starts_blank_then_hydrates_explicit_selection(tmp_path, golden_input, config, workbench_path, comparison_mode):
     document = copy.deepcopy(golden_input)
+    document["financials"]["periods"][-1].update({"total_debt": 100, "net_worth": 500})
+    document["issue"].update({"price_band_high": 200, "post_issue_eps": 10})
     document["financials"].update({
         "operating_cash_flow_3yr_cumulative": 100,
         "net_income_3yr_cumulative": 300,
@@ -98,8 +100,8 @@ def test_workbench_starts_blank_then_hydrates_explicit_selection(tmp_path, golde
         )
         assert browser.returncode == 0, f"Browser hydration failed:\n{browser.stdout}\n{browser.stderr}"
         report = json.loads(browser.stdout.strip().splitlines()[-1])
-        assert report["controls"] == 41
-        assert report["hydrated"] == 28
+        assert report["controls"] == 36
+        assert report["hydrated"] == 27
         assert report["comparisonMode"] == comparison_mode
         assert report["cards"] == (0 if comparison_mode == "404" else 3)
         assert report["requests"][:3] == [

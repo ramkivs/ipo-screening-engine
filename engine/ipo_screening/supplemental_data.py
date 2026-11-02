@@ -70,6 +70,18 @@ ELIGIBILITY_REGISTRY.update({
         "gap_category": "FINANCIAL", "gap_item": "net_working_capital_pct_revenue",
         "source_types": ("OFFICIAL_FILING",), "minimum": None, "recordable": True, "scoring_eligible": True,
     },
+    "financials.total_debt_cr": {
+        "category": "FINANCIAL_POSITION", "type": "number", "unit": "INR_CRORES", "currency": "INR",
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "FINANCIAL", "gap_item": "total_debt_cr",
+        "source_types": ("OFFICIAL_FILING",), "minimum": 0, "recordable": True, "scoring_eligible": True,
+    },
+    "financials.net_worth_cr": {
+        "category": "FINANCIAL_POSITION", "type": "number", "unit": "INR_CRORES", "currency": "INR",
+        "requires_observation_time": False, "requires_gap": False,
+        "gap_category": "FINANCIAL", "gap_item": "net_worth_cr",
+        "source_types": ("OFFICIAL_FILING",), "minimum": None, "recordable": True, "scoring_eligible": True,
+    },
     "financials.top_customer_revenue_pct": {
         "category": "SEGMENT_RISK", "type": "number", "unit": "PERCENT", "currency": None,
         "requires_observation_time": False, "requires_gap": False,
@@ -143,6 +155,7 @@ for _target, _category, _type, _minimum, _maximum in (
     ("business.top5_concentration_pct", "BUSINESS_MOAT", "number", 0, 100),
     ("business.visibility_rating", "BUSINESS_MOAT", "string", None, None),
     ("valuation.second_multiple_premium_pct", "PEER_VALUATION", "number", None, None),
+    ("valuation.post_issue_pe", "PEER_VALUATION", "number", 0, None),
     ("valuation.sector_ipo_relative", "PEER_VALUATION", "string", None, None),
     ("issue.use_of_proceeds_bucket", "PROCEEDS_LOCKIN", "string", None, None),
     ("capital_structure.lockin_bucket", "PROCEEDS_LOCKIN", "string", None, None),
