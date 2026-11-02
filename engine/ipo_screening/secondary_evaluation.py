@@ -167,6 +167,17 @@ def build_secondary(baseline_id: str, store: EvaluationStore, supp_root: Path, s
         demand_values.update({"as_of": at_text, "source_id": payload["supplemental_payload_id"]})
         raw.setdefault("market", {})["subscription"] = demand_values
     financial_values = {e["target"].rsplit(".", 1)[1]: e["value"] for e in entries if str(e["target"]).startswith("financials.")}
+    financial_position = {
+        canonical: financial_values.pop(form_key)
+        for form_key, canonical in (("total_debt_cr", "total_debt"), ("net_worth_cr", "net_worth"))
+        if form_key in financial_values
+    }
+    if financial_position:
+        periods = (raw.setdefault("financials", {}).get("periods") or [])
+        full_periods = [period for period in periods if not period.get("is_stub")]
+        if not full_periods:
+            raise ValueError("total debt and net worth overrides require a full FY observation")
+        full_periods[-1].update(financial_position)
     if financial_values:
         raw.setdefault("financials", {}).update(financial_values)
     governance_values = {e["target"].rsplit(".", 1)[1]: e["value"] for e in entries if str(e["target"]).startswith("governance.")}

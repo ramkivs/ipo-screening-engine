@@ -79,7 +79,7 @@ while (!requests.some(request => new URL(request).pathname === '/api/v1/evaluati
 await new Promise(resolve => setTimeout(resolve, 25));
 
 const controls = [...document.querySelectorAll('#inject-form [name],#scenario-form [name]')];
-assert.equal(controls.length, 41);
+assert.equal(controls.length, 36);
 assert.equal(document.querySelector('#evaluation').value, '');
 assert.equal(document.querySelector('[name="baseline_id"]').value, '');
 assert.equal(document.querySelector('[name="target_id"]').value, '');
@@ -100,7 +100,7 @@ assert.equal(document.body.dataset.workbenchReady, 'true');
 assert.equal(document.querySelector('#evaluation').value, evaluationId);
 assert.equal(document.querySelector('[name="baseline_id"]').value, evaluationId);
 assert.equal(document.querySelector('[name="target_id"]').value, evaluationId);
-assert.equal(controls.every(control => control.dataset.hydrated === 'true'), true, 'all 41 controls must complete the hydration pass');
+assert.equal(controls.every(control => control.dataset.hydrated === 'true'), true, 'all controls must complete the hydration pass');
 assert.equal(document.querySelector('#comparison').children.length, expectedCards);
 if (comparisonMode === 'available') {
   assert.equal(document.querySelectorAll('.baseline-breakdown .module-accordion').length, 6, 'Layer 1 must render six structured modules');
@@ -115,13 +115,12 @@ if (comparisonMode === 'available') {
 }
 
 const expected = {
-  bidding_day: 'DAY_1', observation_time: '2026-10-05T11:00:00Z', source_id: 'BROWSER-E2E',
-  qib_x: '25', nii_x: '12', retail_x: '8', overall_x: '15',
+  bidding_day: 'DAY_1', qib_x: '25', nii_x: '12', retail_x: '8', overall_x: '15',
   operating_cash_flow_3yr_cumulative: '100', net_income_3yr_cumulative: '300',
   trade_receivables_days: '100', net_working_capital_pct_revenue: '40',
-  top_customer_revenue_pct: '55', loss_making_segments_present: 'true',
+  top_customer_revenue_pct: '55', total_debt_cr: '100', net_worth_cr: '500', post_issue_pe: '20',
   promoter_pledged_shares_pct: '30', pre_issue_promoter_holding_pct: '50',
-  contingent_liabilities_pct_net_worth: '50', material_regulatory_disputes_present: 'true',
+  contingent_liabilities_pct_net_worth: '50',
   industry_cagr_pct: '15', moat_rating: 'strong_niche', top5_concentration_pct: '20', visibility_rating: 'strong',
   anchor_bucket: 'reputed', gmp_bucket: 'strong', market_regime_bucket: 'supportive',
   peer_delta: '0', rating: 'LOW', qualitative_delta: '0', justification: 'Operator scenario only',
@@ -133,11 +132,10 @@ for (const [name, value] of Object.entries(expected)) {
 document.querySelector('[name="top_customer_revenue_pct"]').value = '0.5';
 const moduleOverrides = {
   industry_cagr_pct: '16', moat_rating: 'leader_with_moat', top5_concentration_pct: '10', visibility_rating: 'moderate',
-  use_of_proceeds_bucket: 'growth', lockin_bucket: 'intact', second_multiple_premium_pct: '-10', sector_ipo_relative: 'cheaper',
+  use_of_proceeds_bucket: 'growth', lockin_bucket: 'intact', post_issue_pe: '18', sector_ipo_relative: 'cheaper',
   anchor_bucket: 'mixed', gmp_bucket: 'flat', market_regime_bucket: 'neutral',
 };
 for (const [name, value] of Object.entries(moduleOverrides)) document.querySelector(`[name="${name}"]`).value = value;
-document.querySelector('[name="publisher"]').value = 'TEST PUBLISHER';
 document.querySelector('#inject-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
 const submissionDeadline = Date.now() + 5000;
 while (submissions.length !== 1) {
@@ -199,4 +197,4 @@ assert.deepEqual(errors, []);
 assert.equal(document.querySelector('#workbench-status').classList.contains('error'), false);
 
 dom.window.close();
-console.log(JSON.stringify({ controls: 41, hydrated: Object.keys(expected).length, comparisonMode, cards: expectedCards, requests: paths }));
+console.log(JSON.stringify({ controls: controls.length, hydrated: Object.keys(expected).length, comparisonMode, cards: expectedCards, requests: paths }));
