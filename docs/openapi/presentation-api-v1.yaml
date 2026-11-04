@@ -10,7 +10,7 @@ info:
     through this API.
 
     PRINCIPLES:
-    - Limited write surface: POST /ingest/document and the archive, unarchive, and make-active evaluation routes only.
+    - Limited write surface: document ingestion, manual-terms ingestion, asynchronous ingestion start, and evaluation lifecycle actions only.
     - Authoritative source of truth remains the EvaluationStore and related artifacts on disk.
     - Zero client-side or API-side duplicate scoring or metric calculation.
     - Explicit preservation of UNKNOWN, NOT_APPLICABLE, and INSUFFICIENT_DATA semantics.
@@ -35,6 +35,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthStatus'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /meta:
     get:
       summary: API and engine metadata
@@ -48,6 +54,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiMeta'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /ipos:
     get:
       summary: Discover and list evaluated IPO issuers
@@ -56,26 +68,37 @@ paths:
       parameters:
         - name: page
           in: query
+          required: false
           schema:
             type: integer
-            default: 1
             minimum: 1
+            default: 1
+            title: Page
         - name: page_size
           in: query
+          required: false
           schema:
             type: integer
-            default: 20
-            minimum: 1
             maximum: 100
+            minimum: 1
+            default: 20
+            title: Page Size
         - name: search
           in: query
-          description: Substring match against company_name or ipo_id
+          required: false
           schema:
-            type: string
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Search
         - name: sector_profile
           in: query
+          required: false
           schema:
-            type: string
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Sector Profile
       responses:
         '200':
           description: Paginated list of IPO issuers
@@ -84,6 +107,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/IpoListResponse'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /ipos/{ipo_id}:
     get:
       summary: Retrieve an IPO issuer and its evaluation summary
@@ -95,6 +130,7 @@ paths:
           required: true
           schema:
             type: string
+            title: Ipo Id
       responses:
         '200':
           description: Authoritative IPO details and evaluation timeline
@@ -109,6 +145,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /ipos/{ipo_id}/history:
     get:
       summary: Retrieve chronological evaluation history and lifecycle deltas
@@ -120,13 +168,16 @@ paths:
           required: true
           schema:
             type: string
+            title: Ipo Id
         - name: include_archived
           in: query
           required: false
           schema:
             type: boolean
+            description: Include archived historical evaluations
             default: false
-          description: Whether to include archived historical evaluations
+            title: Include Archived
+          description: Include archived historical evaluations
       responses:
         '200':
           description: Chronological list of evaluations with preliminary-to-final delta
@@ -141,6 +192,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /evaluations:
     get:
       summary: Discover evaluations across issuers with deterministic filtering
@@ -149,44 +212,69 @@ paths:
       parameters:
         - name: page
           in: query
+          required: false
           schema:
             type: integer
-            default: 1
             minimum: 1
+            default: 1
+            title: Page
         - name: page_size
           in: query
+          required: false
           schema:
             type: integer
-            default: 20
-            minimum: 1
             maximum: 100
+            minimum: 1
+            default: 20
+            title: Page Size
         - name: ipo_id
           in: query
+          required: false
           schema:
-            type: string
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Ipo Id
         - name: mode
           in: query
+          required: false
           schema:
-            type: string
-            enum: [PRELIMINARY, FINAL]
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Mode
         - name: verdict
           in: query
+          required: false
           schema:
-            type: string
-            enum: [APPLY, CONSIDER, AVOID, INSUFFICIENT_DATA]
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Verdict
         - name: confidence
           in: query
+          required: false
           schema:
-            type: string
-            enum: [High, Medium, Low]
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Confidence
         - name: engine_version
           in: query
+          required: false
           schema:
-            type: string
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Engine Version
         - name: config_version
           in: query
+          required: false
           schema:
-            type: string
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Config Version
       responses:
         '200':
           description: Paginated evaluations list
@@ -195,6 +283,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/EvaluationListResponse'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /evaluations/{evaluation_id}:
     get:
       summary: Retrieve complete evaluation scorecard detail
@@ -206,6 +306,7 @@ paths:
           required: true
           schema:
             type: string
+            title: Evaluation Id
       responses:
         '200':
           description: Complete immutable evaluation scorecard
@@ -220,6 +321,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /evaluations/{evaluation_id}/input:
     get:
       summary: Retrieve evaluation detail for Workbench form hydration
@@ -231,13 +344,14 @@ paths:
           required: true
           schema:
             type: string
+            title: Evaluation Id
       responses:
         '200':
-          description: Evaluation detail used to hydrate the Workbench form
+          description: Successful response.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EvaluationDetail'
+                $ref: '#/components/schemas/EvaluationInput'
         '404':
           description: Evaluation identifier not found
           content:
@@ -245,6 +359,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /evaluations/{evaluation_id}/evidence:
     get:
       summary: Retrieve evidence registry and citations for an evaluation
@@ -256,6 +382,7 @@ paths:
           required: true
           schema:
             type: string
+            title: Evaluation Id
       responses:
         '200':
           description: Evidence citations and verbatim prospectus quotes
@@ -270,6 +397,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /evidence/{evidence_id}:
     get:
       summary: Retrieve specific evidence citation by evidence identifier
@@ -279,9 +418,9 @@ paths:
         - name: evidence_id
           in: path
           required: true
-          description: Evidence identifier or compound identifier {eval_id}:{evidence_id}
           schema:
             type: string
+            title: Evidence Id
       responses:
         '200':
           description: Evidence item details with provenance
@@ -296,6 +435,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /evaluations/{evaluation_id}/post-listing:
     get:
       summary: Retrieve post-listing price observations and corporate actions
@@ -307,6 +458,7 @@ paths:
           required: true
           schema:
             type: string
+            title: Evaluation Id
       responses:
         '200':
           description: Multi-horizon post-listing price and return observations
@@ -321,6 +473,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /evaluations/{evaluation_id}/performance:
     get:
       summary: Retrieve realized returns and benchmark alpha summary
@@ -332,6 +496,7 @@ paths:
           required: true
           schema:
             type: string
+            title: Evaluation Id
       responses:
         '200':
           description: Structured horizon returns and Nifty 50 alpha
@@ -346,6 +511,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /backtest/datasets:
     get:
       summary: List available backtest datasets
@@ -359,6 +536,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/BacktestDatasetListResponse'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /backtest/analytics:
     get:
       summary: Retrieve latest backtest analytics and statistical diagnostics
@@ -378,6 +561,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /calibration/proposals:
     get:
       summary: List governed calibration proposals
@@ -391,6 +580,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/CalibrationProposalListResponse'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /calibration/proposals/{proposal_id}:
     get:
       summary: Retrieve detailed calibration proposal artifact
@@ -402,6 +597,7 @@ paths:
           required: true
           schema:
             type: string
+            title: Proposal Id
       responses:
         '200':
           description: Full calibration proposal artifact with shadow evaluation
@@ -416,6 +612,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /configuration/current:
     get:
       summary: Retrieve configuration lifecycle status (active v1.5 vs inactive candidate v1.6)
@@ -429,6 +637,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConfigurationStatusResponse'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /ingest/document:
     post:
       summary: Ingest and evaluate an IPO filing document (DRHP/RHP PDF)
@@ -440,31 +654,20 @@ paths:
       operationId: ingestDocument
       tags: [Ingestion]
       requestBody:
-        required: true
         content:
           multipart/form-data:
             schema:
-              type: object
-              required: [file]
-              properties:
-                file:
-                  type: string
-                  format: binary
-                  description: PDF filing document (DRHP/RHP)
-                mode:
-                  type: string
-                  enum: [final, preliminary]
-                  default: final
-                  description: Evaluation mode
+              $ref: '#/components/schemas/Body_ingest_document_api_v1_ingest_document_post'
+        required: true
       responses:
         '200':
-          description: Evaluation already exists (duplicate idempotent return)
+          description: Existing evaluation returned for a duplicate.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/IngestionResponse'
         '201':
-          description: Document successfully ingested and new evaluation created
+          description: New evaluation created.
           content:
             application/json:
               schema:
@@ -476,18 +679,38 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '413':
-          description: Payload too large (file exceeds 50 MB limit)
+          description: File exceeds 50 MiB.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
         '422':
-          description: Document extraction or evaluation failed
+          description: Request validation failed, issue terms are required, or processing failed.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/HTTPValidationError'
+                  - $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Missing or cross-origin Origin; lifecycle actions may also reject protected records.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-
+        '500':
+          description: Unexpected ingestion error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          description: Must match the request scheme and loopback Host.
+          schema:
+            type: string
   /evaluations/{evaluation_id}/archive:
     post:
       summary: Archive a historical evaluation execution
@@ -505,12 +728,20 @@ paths:
           required: true
           schema:
             type: string
+            title: Evaluation Id
+        - name: Origin
+          in: header
+          required: true
+          description: Must match the request scheme and loopback Host.
+          schema:
+            type: string
       requestBody:
-        required: false
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LifecycleActionRequest'
+              anyOf:
+                - $ref: '#/components/schemas/LifecycleActionRequest'
+                - type: 'null'
       responses:
         '200':
           description: Evaluation successfully archived
@@ -537,6 +768,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /evaluations/{evaluation_id}/unarchive:
     post:
       summary: Unarchive an archived evaluation execution
@@ -551,12 +794,20 @@ paths:
           required: true
           schema:
             type: string
+            title: Evaluation Id
+        - name: Origin
+          in: header
+          required: true
+          description: Must match the request scheme and loopback Host.
+          schema:
+            type: string
       requestBody:
-        required: false
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LifecycleActionRequest'
+              anyOf:
+                - $ref: '#/components/schemas/LifecycleActionRequest'
+                - type: 'null'
       responses:
         '200':
           description: Evaluation successfully unarchived to VISIBLE state
@@ -577,6 +828,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '403':
+          description: Missing or cross-origin Origin; lifecycle actions may also reject protected records.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /evaluations/{evaluation_id}/make-active:
     post:
       summary: Designate a historical evaluation as authoritative ACTIVE (Governed Rollback)
@@ -592,12 +861,20 @@ paths:
           required: true
           schema:
             type: string
+            title: Evaluation Id
+        - name: Origin
+          in: header
+          required: true
+          description: Must match the request scheme and loopback Host.
+          schema:
+            type: string
       requestBody:
-        required: false
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LifecycleActionRequest'
+              anyOf:
+                - $ref: '#/components/schemas/LifecycleActionRequest'
+                - type: 'null'
       responses:
         '200':
           description: Evaluation successfully designated as ACTIVE
@@ -624,56 +901,356 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiError'
 
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '403':
+          description: Missing or cross-origin Origin; lifecycle actions may also reject protected records.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /comparison/{evaluation_id}:
+    get:
+      tags:
+        - Evaluations
+      summary: Get Evaluation Comparison
+      operationId: get_evaluation_comparison_api_v1_comparison__evaluation_id__get
+      parameters:
+        - name: evaluation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Evaluation Id
+      responses:
+        '200':
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationComparison'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Record not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /ingest/manual-terms:
+    post:
+      tags:
+        - Ingestion
+      summary: Ingest Document Manual Terms
+      description: Manual values are labelled MANUAL_ENTRY, not official verification. OFS and fresh issue are monetary
+        amounts in the filing reporting unit; explicit zero is retained. Conflicts return 409 until confirmed; a
+        verified official value is never displaced.
+      operationId: ingest_document_manual_terms_api_v1_ingest_manual_terms_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_ingest_document_manual_terms_api_v1_ingest_manual_terms_post'
+        required: true
+      responses:
+        '200':
+          description: Existing evaluation returned for a duplicate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionResponse'
+        '422':
+          description: Request validation failed, issue terms are required, or processing failed.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/HTTPValidationError'
+                  - $ref: '#/components/schemas/ApiError'
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Missing or cross-origin Origin; lifecycle actions may also reject protected records.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '201':
+          description: New evaluation created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionResponse'
+        '413':
+          description: File exceeds 50 MiB.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Unexpected ingestion error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: Issue term conflict; conflicts contains details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          description: Must match the request scheme and loopback Host.
+          schema:
+            type: string
+  /ingestions/start:
+    post:
+      tags:
+        - Ingestion
+      summary: Start Ingestion
+      description: "Start a traced ingestion in the background (202).\n\nReturns the ingestion/correlation id immediately;
+        the client\npolls ``/ingestions/{id}`` and ``/ingestions/{id}/events`` for\nthe live, durable activity trace.  Processing
+        itself is the\nunchanged synchronous service path running on a thread."
+      operationId: start_ingestion_api_v1_ingestions_start_post
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_start_ingestion_api_v1_ingestions_start_post'
+        required: true
+      responses:
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '403':
+          description: Missing or cross-origin Origin; lifecycle actions may also reject protected records.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '202':
+          description: Ingestion dispatched; poll the activity and events URLs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionStarted'
+        '413':
+          description: File exceeds 50 MiB.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          description: Must match the request scheme and loopback Host.
+          schema:
+            type: string
+  /ingestions/{ingestion_id}:
+    get:
+      tags:
+        - Ingestion
+      summary: Get Ingestion Activity
+      operationId: get_ingestion_activity_api_v1_ingestions__ingestion_id__get
+      parameters:
+        - name: ingestion_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Ingestion Id
+      responses:
+        '200':
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionActivityDetail'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Record not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /ingestions/{ingestion_id}/events:
+    get:
+      tags:
+        - Ingestion
+      summary: Get Ingestion Events
+      operationId: get_ingestion_events_api_v1_ingestions__ingestion_id__events_get
+      parameters:
+        - name: ingestion_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Ingestion Id
+        - name: after_sequence
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+            title: After Sequence
+      responses:
+        '200':
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionEvents'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: Record not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /ingestions:
+    get:
+      tags:
+        - Ingestion
+      summary: List Ingestion Activities
+      operationId: list_ingestion_activities_api_v1_ingestions_get
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 200
+            minimum: 1
+            default: 50
+            title: Limit
+      responses:
+        '200':
+          description: Successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionActivityList'
+        '422':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '400':
+          description: Invalid request or non-loopback Host (LOOPBACK_HOST_REQUIRED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 components:
   schemas:
     HealthStatus:
-      type: object
-      required: [status, timestamp, read_only]
       properties:
         status:
           type: string
+          default: healthy
           example: healthy
         timestamp:
           type: string
-          format: date-time
         read_only:
           type: boolean
           description: False because explicit filing-ingestion and evaluation-lifecycle POST actions are available.
+          default: false
           example: false
-
-    ApiMeta:
       type: object
-      required: [api_version, engine_version, spec_version, active_config_version, candidate_config_version, candidate_config_status, golden_result_hash, read_only]
+      required:
+        - timestamp
+    ApiMeta:
       properties:
         api_version:
           type: string
+          default: v1
           example: v1
         engine_version:
           type: string
+          default: 1.5.0
           example: 1.5.0
         spec_version:
           type: string
+          default: '1.5'
           example: "1.5"
         active_config_version:
           type: string
+          default: 1.5.0
           example: 1.5.0
         candidate_config_version:
           type: string
+          default: 1.6.0
           example: 1.6.0
         candidate_config_status:
           type: string
+          default: IMPLEMENTED_INACTIVE
           example: IMPLEMENTED_INACTIVE
         golden_result_hash:
           type: string
+          default: e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1
           example: e84f8bc0f9b942c43f937fa3b12fdba3c3ef23cc613e9d921a749b12955619e1
         read_only:
           type: boolean
           description: False because explicit filing-ingestion and evaluation-lifecycle POST actions are available.
+          default: false
           example: false
-
-    IpoSummary:
       type: object
-      required: [ipo_id, company_name, evaluation_count]
+    IpoSummary:
       properties:
         ipo_id:
           type: string
@@ -682,59 +1259,75 @@ components:
           type: string
           example: Vishal Nirmiti Limited
         sector_profile:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
           example: standard
         evaluation_count:
           type: integer
+          default: 0
           example: 2
+        historical_count:
+          type: integer
+          default: 0
+        archived_count:
+          type: integer
+          default: 0
         latest_evaluation_id:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         latest_evaluation_mode:
-          type: string
-          nullable: true
-          enum: [PRELIMINARY, FINAL]
+          anyOf:
+            - type: string
+            - type: 'null'
         latest_score:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
           example: 35.0
         latest_verdict:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
           example: INSUFFICIENT_DATA
         latest_confidence:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
           example: Low
-
-    IpoDetail:
       type: object
-      required: [ipo_id, company_name, evaluations]
+      required:
+        - ipo_id
+        - company_name
+    IpoDetail:
       properties:
         ipo_id:
           type: string
         company_name:
           type: string
         sector_profile:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         icdr_route:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         evaluations:
-          type: array
           items:
             $ref: '#/components/schemas/EvaluationSummary'
-
-    IpoListResponse:
+          type: array
       type: object
-      required: [items, total, page, page_size, pages]
+      required:
+        - ipo_id
+        - company_name
+    IpoListResponse:
       properties:
         items:
-          type: array
           items:
             $ref: '#/components/schemas/IpoSummary'
+          type: array
         total:
           type: integer
         page:
@@ -743,11 +1336,19 @@ components:
           type: integer
         pages:
           type: integer
-
-    EvaluationSummary:
       type: object
-      required: [evaluation_id, ipo_id, company_name, evaluation_mode, evaluation_timestamp, final_score, verdict, confidence, engine_version, config_version, result_hash]
+      required:
+        - items
+        - total
+        - page
+        - page_size
+        - pages
+    EvaluationSummary:
       properties:
+        authority_warnings:
+          items:
+            type: string
+          type: array
         evaluation_id:
           type: string
         ipo_id:
@@ -756,64 +1357,76 @@ components:
           type: string
         evaluation_mode:
           type: string
-          enum: [PRELIMINARY, FINAL]
         evaluation_timestamp:
           type: string
-          format: date-time
         final_score:
           type: number
         base_score:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
         penalties_total:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
         lower_bound:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
         upper_bound:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
         verdict:
           type: string
         confidence:
           type: string
         completeness_pct:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
         engine_version:
           type: string
+          default: 1.5.0
         config_version:
           type: string
+          default: 1.5.0
         result_hash:
           type: string
         lifecycle_state:
           type: string
-          enum: [ACTIVE, SUPERSEDED]
           default: ACTIVE
         visibility_state:
           type: string
-          enum: [VISIBLE, ARCHIVED]
           default: VISIBLE
         operational_status:
           type: string
-          enum: [ACTIVE, SUPERSEDED, ARCHIVED]
           default: ACTIVE
         superseded_by:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         supersedes:
-          type: string
-          nullable: true
-
-    EvaluationListResponse:
+          anyOf:
+            - type: string
+            - type: 'null'
       type: object
-      required: [items, total, page, page_size, pages]
+      required:
+        - evaluation_id
+        - ipo_id
+        - company_name
+        - evaluation_mode
+        - evaluation_timestamp
+        - final_score
+        - verdict
+        - confidence
+        - result_hash
+    EvaluationListResponse:
       properties:
         items:
-          type: array
           items:
             $ref: '#/components/schemas/EvaluationSummary'
+          type: array
         total:
           type: integer
         page:
@@ -822,10 +1435,14 @@ components:
           type: integer
         pages:
           type: integer
-
-    CriterionScore:
       type: object
-      required: [id, label, max, score, state]
+      required:
+        - items
+        - total
+        - page
+        - page_size
+        - pages
+    CriterionScore:
       properties:
         id:
           type: string
@@ -836,24 +1453,31 @@ components:
         score:
           type: number
         metric:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         value:
-          type: object
-          nullable: true
+          anyOf:
+            - {}
+            - type: 'null'
         state:
           type: string
-          enum: [SCORED, UNKNOWN, NOT_APPLICABLE]
+          default: SCORED
         reason:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         capped_by:
-          type: string
-          nullable: true
-
-    ModuleScore:
+          anyOf:
+            - type: string
+            - type: 'null'
       type: object
-      required: [id, name, max, score, criteria]
+      required:
+        - id
+        - label
+        - max
+        - score
+    ModuleScore:
       properties:
         id:
           type: string
@@ -864,13 +1488,16 @@ components:
         score:
           type: number
         criteria:
-          type: array
           items:
             $ref: '#/components/schemas/CriterionScore'
-
-    KnockoutRule:
+          type: array
       type: object
-      required: [id, label, state]
+      required:
+        - id
+        - name
+        - max
+        - score
+    KnockoutRule:
       properties:
         id:
           type: string
@@ -878,27 +1505,27 @@ components:
           type: string
         state:
           type: string
-          enum: [CLEAR, TRIGGERED, UNVERIFIED]
         missing_inputs:
-          type: array
           items:
             type: string
-
-    KnockoutSummary:
+          type: array
       type: object
-      required: [status, rules]
+      required:
+        - id
+        - label
+        - state
+    KnockoutSummary:
       properties:
         status:
           type: string
-          enum: [CLEAR, TRIGGERED, UNVERIFIED]
         rules:
-          type: array
           items:
             $ref: '#/components/schemas/KnockoutRule'
-
-    PenaltyItem:
+          type: array
       type: object
-      required: [id, label, points, state]
+      required:
+        - status
+    PenaltyItem:
       properties:
         id:
           type: string
@@ -908,30 +1535,39 @@ components:
           type: number
         state:
           type: string
-          enum: [SCORED, UNKNOWN]
         trigger:
-          type: boolean
-          nullable: true
-
-    MissingUnverifiedItem:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+        reason:
+          anyOf:
+            - type: string
+            - type: 'null'
       type: object
-      required: [category, item]
+      required:
+        - id
+        - label
+        - points
+        - state
+    MissingUnverifiedItem:
       properties:
         category:
           type: string
-          enum: [CRITERION, KNOCKOUT, PENALTY, SNAPSHOT]
         item:
           type: string
         rule_id:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         description:
-          type: string
-          nullable: true
-
-    EvaluationScoreDetail:
+          anyOf:
+            - type: string
+            - type: 'null'
       type: object
-      required: [final_score, base_score, penalties_total, lower_bound, upper_bound, confidence, completeness_pct, modules]
+      required:
+        - category
+        - item
+    EvaluationScoreDetail:
       properties:
         final_score:
           type: number
@@ -944,28 +1580,40 @@ components:
         upper_bound:
           type: number
         available_points:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
         unknown_points:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
         total_evaluable_points:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
         confidence:
           type: string
-          enum: [High, Medium, Low]
         completeness_pct:
           type: number
         modules:
-          type: array
           items:
             $ref: '#/components/schemas/ModuleScore'
-
-    EvaluationDetail:
+          type: array
       type: object
-      required: [evaluation_id, ipo_id, company_name, evaluation_mode, evaluation_timestamp, engine_version, spec_version, config_version, config_hash, input_snapshot_hash, source_manifest_hash, result_hash, score, knockouts, verdict, penalties, missing_unverified, provenance]
+      required:
+        - final_score
+        - base_score
+        - penalties_total
+        - lower_bound
+        - upper_bound
+        - confidence
+        - completeness_pct
+    EvaluationDetail:
       properties:
+        authority_warnings:
+          items:
+            type: string
+          type: array
         evaluation_id:
           type: string
         ipo_id:
@@ -974,10 +1622,8 @@ components:
           type: string
         evaluation_mode:
           type: string
-          enum: [PRELIMINARY, FINAL]
         evaluation_timestamp:
           type: string
-          format: date-time
         engine_version:
           type: string
         spec_version:
@@ -991,11 +1637,17 @@ components:
         source_manifest_hash:
           type: string
         market_snapshot_hash:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         peer_snapshot_hash:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
+        market_blocks:
+          items:
+            $ref: '#/components/schemas/MarketBlockState'
+          type: array
         result_hash:
           type: string
         score:
@@ -1003,78 +1655,67 @@ components:
         knockouts:
           $ref: '#/components/schemas/KnockoutSummary'
         penalties:
-          type: array
           items:
             $ref: '#/components/schemas/PenaltyItem'
-        verdict:
-          type: object
-          properties:
-            verdict:
-              type: string
-            band_score:
-              type: string
-            uncertain:
-              type: boolean
-            insufficient_data:
-              type: boolean
-            mode_label:
-              type: string
-              nullable: true
-        missing_unverified:
           type: array
+        verdict:
+          additionalProperties: true
+          type: object
+        missing_unverified:
           items:
             $ref: '#/components/schemas/MissingUnverifiedItem'
-        preliminary_delta:
-          type: object
-          nullable: true
-        provenance:
-          type: object
-          properties:
-            sources:
-              type: array
-              items:
-                type: string
-            evidence_count:
-              type: integer
-            engine_version:
-              type: string
-            spec_version:
-              type: string
+          type: array
         lifecycle_state:
           type: string
-          enum: [ACTIVE, SUPERSEDED]
           default: ACTIVE
         visibility_state:
           type: string
-          enum: [VISIBLE, ARCHIVED]
           default: VISIBLE
         operational_status:
           type: string
-          enum: [ACTIVE, SUPERSEDED, ARCHIVED]
           default: ACTIVE
         superseded_by:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         supersedes:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         lifecycle:
-          type: object
-          nullable: true
-
-    LifecycleActionRequest:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
       type: object
+      required:
+        - evaluation_id
+        - ipo_id
+        - company_name
+        - evaluation_mode
+        - evaluation_timestamp
+        - engine_version
+        - spec_version
+        - config_version
+        - config_hash
+        - input_snapshot_hash
+        - source_manifest_hash
+        - result_hash
+        - score
+        - knockouts
+        - verdict
+    LifecycleActionRequest:
       properties:
         reason:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         actor:
-          type: string
-          nullable: true
-
-    LifecycleActionResponse:
+          anyOf:
+            - type: string
+            - type: 'null'
       type: object
-      required: [evaluation_id, ipo_id, lifecycle_state, visibility_state, operational_status, message]
+    LifecycleActionResponse:
       properties:
         evaluation_id:
           type: string
@@ -1082,96 +1723,139 @@ components:
           type: string
         lifecycle_state:
           type: string
-          enum: [ACTIVE, SUPERSEDED]
         visibility_state:
           type: string
-          enum: [VISIBLE, ARCHIVED]
         operational_status:
           type: string
-          enum: [ACTIVE, SUPERSEDED, ARCHIVED]
         superseded_by:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         supersedes:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         message:
           type: string
-
-    EvidenceDetail:
+        preliminary_delta:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+        provenance:
+          additionalProperties: true
+          type: object
       type: object
-      required: [evidence_id, field]
+      required:
+        - evaluation_id
+        - ipo_id
+        - lifecycle_state
+        - visibility_state
+        - operational_status
+        - message
+    EvidenceDetail:
       properties:
         evidence_id:
           type: string
         field:
           type: string
         source:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         document:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         page:
-          type: integer
-          nullable: true
+          anyOf:
+            - type: integer
+            - type: 'null'
         locator:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         quote:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         extracted_value:
-          type: object
-          nullable: true
+          anyOf:
+            - {}
+            - type: 'null'
         unit:
-          type: string
-          nullable: true
-
-    EvidenceResponse:
+          anyOf:
+            - type: string
+            - type: 'null'
+        verification:
+          anyOf:
+            - type: string
+            - type: 'null'
+        value_summary:
+          anyOf:
+            - type: string
+            - type: 'null'
+        quote_kind:
+          anyOf:
+            - type: string
+            - type: 'null'
+        note:
+          anyOf:
+            - type: string
+            - type: 'null'
+        extraction_method:
+          anyOf:
+            - type: string
+            - type: 'null'
       type: object
-      required: [evaluation_id, source_manifest_hash, evidence_count, items]
+      required:
+        - evidence_id
+        - field
+    EvidenceResponse:
       properties:
         evaluation_id:
           type: string
         source_manifest_hash:
           type: string
         sources:
+          items: {}
           type: array
-          items:
-            type: string
         evidence_count:
           type: integer
         items:
-          type: array
           items:
             $ref: '#/components/schemas/EvidenceDetail'
-
-    IpoHistoryResponse:
+          type: array
       type: object
-      required: [ipo_id, company_name, history]
+      required:
+        - evaluation_id
+        - source_manifest_hash
+        - evidence_count
+    IpoHistoryResponse:
       properties:
         ipo_id:
           type: string
         company_name:
           type: string
         history:
-          type: array
           items:
             $ref: '#/components/schemas/EvaluationSummary'
+          type: array
         delta:
-          type: object
-          nullable: true
-
-    PostListingObservationItem:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
       type: object
-      required: [observation_id, horizon, version, target_date, actual_trading_date, status, issue_price]
+      required:
+        - ipo_id
+        - company_name
+    PostListingObservationItem:
       properties:
         observation_id:
           type: string
         horizon:
           type: string
-          enum: [LISTING_DAY, ONE_WEEK, ONE_MONTH, SIX_MONTH]
         version:
           type: integer
         target_date:
@@ -1180,53 +1864,33 @@ components:
           type: string
         status:
           type: string
-          enum: [VERIFIED, UNVERIFIED, INCOMPLETE, INVALID]
         issue_price:
           type: string
-        price_observation:
-          type: object
-          properties:
-            close:
-              type: string
-              nullable: true
-            source:
-              type: string
-              nullable: true
-        benchmark_observation:
-          type: object
-          properties:
-            index_symbol:
-              type: string
-            base_close:
-              type: string
-              nullable: true
-            observation_close:
-              type: string
-              nullable: true
-            return_pct:
-              type: string
-              nullable: true
-        return_set:
-          type: object
-          properties:
-            listing_gain_pct:
-              type: string
-              nullable: true
-            horizon_return_pct:
-              type: string
-              nullable: true
-            benchmark_return_pct:
-              type: string
-              nullable: true
-            excess_return_pct:
-              type: string
-              nullable: true
-            status:
-              type: string
-
-    PostListingObservationsResponse:
+        prices:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+        benchmark:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+        returns:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
       type: object
-      required: [final_evaluation_id, ipo_id, observation_count, observations]
+      required:
+        - observation_id
+        - horizon
+        - version
+        - target_date
+        - actual_trading_date
+        - status
+        - issue_price
+    PostListingObservationsResponse:
       properties:
         final_evaluation_id:
           type: string
@@ -1235,29 +1899,34 @@ components:
         observation_count:
           type: integer
         observations:
-          type: array
           items:
             $ref: '#/components/schemas/PostListingObservationItem'
-
-    HorizonPerformance:
+          type: array
       type: object
-      required: [status]
+      required:
+        - final_evaluation_id
+        - ipo_id
+        - observation_count
+    HorizonPerformance:
       properties:
         status:
           type: string
         ipo_return_pct:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         benchmark_return_pct:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         excess_return_pct:
-          type: string
-          nullable: true
-
-    PerformanceSummaryResponse:
+          anyOf:
+            - type: string
+            - type: 'null'
       type: object
-      required: [final_evaluation_id, ipo_id, company_name, horizons]
+      required:
+        - status
+    PerformanceSummaryResponse:
       properties:
         final_evaluation_id:
           type: string
@@ -1266,26 +1935,23 @@ components:
         company_name:
           type: string
         issue_price:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         listing_date:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         horizons:
+          additionalProperties:
+            $ref: '#/components/schemas/HorizonPerformance'
           type: object
-          properties:
-            listing_day:
-              $ref: '#/components/schemas/HorizonPerformance'
-            one_week:
-              $ref: '#/components/schemas/HorizonPerformance'
-            one_month:
-              $ref: '#/components/schemas/HorizonPerformance'
-            six_month:
-              $ref: '#/components/schemas/HorizonPerformance'
-
-    BacktestDatasetSummary:
       type: object
-      required: [dataset_id, dataset_hash, row_count, status_counts]
+      required:
+        - final_evaluation_id
+        - ipo_id
+        - company_name
+    BacktestDatasetSummary:
       properties:
         dataset_id:
           type: string
@@ -1295,78 +1961,86 @@ components:
           type: integer
         included_observation_count:
           type: integer
+          default: 0
         generated_at:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         status_counts:
+          additionalProperties:
+            type: integer
           type: object
-
-    BacktestDatasetListResponse:
       type: object
-      required: [datasets, total]
+      required:
+        - dataset_id
+        - dataset_hash
+        - row_count
+    BacktestDatasetListResponse:
       properties:
         datasets:
-          type: array
           items:
             $ref: '#/components/schemas/BacktestDatasetSummary'
+          type: array
         total:
           type: integer
-
-    BacktestAnalyticsResponse:
+          default: 0
       type: object
-      required: [analysis_hash, dataset_hash, sample_maturity, leakage_audit_passed]
+    BacktestAnalyticsResponse:
       properties:
         analysis_hash:
           type: string
         dataset_hash:
           type: string
         sample_maturity:
+          additionalProperties:
+            type: string
           type: object
-          properties:
-            one_week:
-              type: string
-            one_month:
-              type: string
-            six_month:
-              type: string
         leakage_audit_passed:
           type: boolean
         rank_ic:
-          type: object
-          nullable: true
-          properties:
-            horizon:
-              type: string
-            spearman_ic:
-              type: number
-            p_value:
-              type: number
-            sample_size:
-              type: integer
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
         hit_rates:
-          type: object
-          nullable: true
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
         avoided_loss_rates:
-          type: object
-          nullable: true
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
         decile_buckets:
-          type: array
-          items:
-            type: object
-          nullable: true
+          anyOf:
+            - items:
+                additionalProperties: true
+                type: object
+              type: array
+            - type: 'null'
         vintage_analysis:
-          type: array
-          items:
-            $ref: '#/components/schemas/VintageDiagnostic'
-          nullable: true
+          anyOf:
+            - type: array
+              items:
+                $ref: '#/components/schemas/VintageDiagnostic'
+            - type: 'null'
           description: Direct projection of calendar-year vintage diagnostics from the analytics artifact
         holdout_analysis:
-          $ref: '#/components/schemas/TemporalHoldoutResult'
-
+          anyOf:
+            - $ref: '#/components/schemas/TemporalHoldoutResult'
+            - type: 'null'
+          description: Direct projection of the temporal holdout result from the analytics artifact.
+      type: object
+      required:
+        - analysis_hash
+        - dataset_hash
+        - leakage_audit_passed
     VintageDiagnostic:
       type: object
       description: Mean return and positive-rate diagnostics for one calendar-year listing vintage
-      required: [vintage_year, n, mean_score, mean_return_1w, mean_return_1m, mean_return_6m, mean_excess_return_1w, mean_excess_return_1m, mean_excess_return_6m, positive_rate_1w, positive_rate_1m, positive_rate_6m]
+      required: [vintage_year, n, mean_score, mean_return_1w, mean_return_1m, mean_return_6m, mean_excess_return_1w,
+            mean_excess_return_1m, mean_excess_return_6m, positive_rate_1w, positive_rate_1m, positive_rate_6m]
       properties:
         vintage_year:
           type: integer
@@ -1374,82 +2048,96 @@ components:
           type: integer
           minimum: 0
         mean_score:
-          type: number
-          nullable: true
+          anyOf:
+            - type: number
+            - type: 'null'
         mean_return_1w:
-          type: number
-          nullable: true
           description: Decimal mean absolute return
+          anyOf:
+            - type: number
+            - type: 'null'
         mean_return_1m:
-          type: number
-          nullable: true
           description: Decimal mean absolute return
+          anyOf:
+            - type: number
+            - type: 'null'
         mean_return_6m:
-          type: number
-          nullable: true
           description: Decimal mean absolute return
+          anyOf:
+            - type: number
+            - type: 'null'
         mean_excess_return_1w:
-          type: number
-          nullable: true
           description: Decimal mean benchmark-relative return
+          anyOf:
+            - type: number
+            - type: 'null'
         mean_excess_return_1m:
-          type: number
-          nullable: true
           description: Decimal mean benchmark-relative return
+          anyOf:
+            - type: number
+            - type: 'null'
         mean_excess_return_6m:
-          type: number
-          nullable: true
           description: Decimal mean benchmark-relative return
+          anyOf:
+            - type: number
+            - type: 'null'
         positive_rate_1w:
-          type: number
-          nullable: true
           description: Decimal fraction of listings with a positive return
+          anyOf:
+            - type: number
+            - type: 'null'
         positive_rate_1m:
-          type: number
-          nullable: true
           description: Decimal fraction of listings with a positive return
+          anyOf:
+            - type: number
+            - type: 'null'
         positive_rate_6m:
-          type: number
-          nullable: true
           description: Decimal fraction of listings with a positive return
 
+          anyOf:
+            - type: number
+            - type: 'null'
     TemporalHoldoutResult:
-      type: object
-      nullable: true
       description: Direct projection of the temporal holdout diagnostic; unavailable when no sufficient holdout exists
-      required: [development_period, holdout_period, n_development, n_holdout, dev_mean_score, dev_mean_return_1w, holdout_mean_score, holdout_mean_return_1w, status]
-      properties:
-        development_period:
-          type: string
-        holdout_period:
-          type: string
-        n_development:
-          type: integer
-          minimum: 0
-        n_holdout:
-          type: integer
-          minimum: 0
-        dev_mean_score:
-          type: number
-          nullable: true
-        dev_mean_return_1w:
-          type: number
-          nullable: true
-          description: Decimal mean absolute return
-        holdout_mean_score:
-          type: number
-          nullable: true
-        holdout_mean_return_1w:
-          type: number
-          nullable: true
-          description: Decimal mean absolute return
-        status:
-          type: string
-          example: CALCULATED
+      anyOf:
+        - type: object
+          required: [development_period, holdout_period, n_development, n_holdout, dev_mean_score, dev_mean_return_1w,
+                holdout_mean_score, holdout_mean_return_1w, status]
+          properties:
+            development_period:
+              type: string
+            holdout_period:
+              type: string
+            n_development:
+              type: integer
+              minimum: 0
+            n_holdout:
+              type: integer
+              minimum: 0
+            dev_mean_score:
+              anyOf:
+                - type: number
+                - type: 'null'
+            dev_mean_return_1w:
+              description: Decimal mean absolute return
+              anyOf:
+                - type: number
+                - type: 'null'
+            holdout_mean_score:
+              anyOf:
+                - type: number
+                - type: 'null'
+            holdout_mean_return_1w:
+              description: Decimal mean absolute return
+              anyOf:
+                - type: number
+                - type: 'null'
+            status:
+              type: string
+              example: CALCULATED
 
+        - type: 'null'
     CalibrationProposal:
-      type: object
-      required: [proposal_id, proposal_hash, baseline_config_version, candidate_config_version, maturity_gate, status, approval_status]
       properties:
         proposal_id:
           type: string
@@ -1474,76 +2162,106 @@ components:
         approval_status:
           type: string
         module_weight_adjustments:
-          type: object
-          nullable: true
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
         overfitting_safeguards:
-          type: object
-          nullable: true
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
         knockout_firewall_status:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         objective:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         sample_summary:
-          type: object
-          nullable: true
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
         evidence_summary:
-          type: object
-          nullable: true
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
         module_proposals:
-          type: array
-          items:
-            type: object
-          nullable: true
+          anyOf:
+            - items:
+                additionalProperties: true
+                type: object
+              type: array
+            - type: 'null'
         threshold_proposals:
-          type: array
-          items:
-            type: object
-          nullable: true
+          anyOf:
+            - items:
+                additionalProperties: true
+                type: object
+              type: array
+            - type: 'null'
         non_regression_results:
-          type: array
-          items:
-            type: object
-          nullable: true
+          anyOf:
+            - items:
+                additionalProperties: true
+                type: object
+              type: array
+            - type: 'null'
         recommendation:
-          type: string
-          nullable: true
-
-    CalibrationProposalListResponse:
+          anyOf:
+            - type: string
+            - type: 'null'
       type: object
-      required: [proposals, total]
+      required:
+        - proposal_id
+        - proposal_hash
+        - baseline_config_version
+        - candidate_config_version
+        - baseline_config_hash
+        - candidate_config_hash
+        - source_dataset_hash
+        - source_analysis_hash
+        - maturity_gate
+        - status
+        - approval_status
+    CalibrationProposalListResponse:
       properties:
         proposals:
-          type: array
           items:
             $ref: '#/components/schemas/CalibrationProposal'
+          type: array
         total:
           type: integer
-
-    ConfigLifecycleItem:
+          default: 0
       type: object
-      required: [version, status, is_active, config_hash]
+    ConfigLifecycleItem:
       properties:
         version:
           type: string
         status:
           type: string
-          enum: [ACTIVE, IMPLEMENTED_INACTIVE, DEPRECATED]
         is_active:
           type: boolean
         config_hash:
           type: string
         description:
-          type: string
-          nullable: true
+          anyOf:
+            - type: string
+            - type: 'null'
         source_proposal_hash:
-          type: string
-          nullable: true
-
-    ConfigurationStatusResponse:
+          anyOf:
+            - type: string
+            - type: 'null'
       type: object
-      required: [active_configuration, candidate_configuration, frozen_core_status, golden_result_status]
+      required:
+        - version
+        - status
+        - is_active
+        - config_hash
+    ConfigurationStatusResponse:
       properties:
         active_configuration:
           $ref: '#/components/schemas/ConfigLifecycleItem'
@@ -1551,11 +2269,16 @@ components:
           $ref: '#/components/schemas/ConfigLifecycleItem'
         frozen_core_status:
           type: string
+          default: VERIFIED
           example: VERIFIED
         golden_result_status:
           type: string
+          default: VERIFIED
           example: VERIFIED
-
+      type: object
+      required:
+        - active_configuration
+        - candidate_configuration
     ApiError:
       type: object
       required: [error, message, code]
@@ -1570,12 +2293,28 @@ components:
           type: string
           example: EVALUATION_NOT_FOUND
         details:
+          anyOf:
+            - type: object
+            - type: 'null'
+        ingestion_id:
+          type: string
+        correlation_id:
+          type: string
+        activity_url:
+          type: string
+        missing_fields:
+          type: array
+          items:
+            type: string
+        resolution:
           type: object
-          nullable: true
-
+          additionalProperties: true
+        conflicts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
     IngestionResponse:
-      type: object
-      required: [evaluation_id, ipo_id, company_name, evaluation_mode, result_hash, final_score, verdict, confidence, is_duplicate, message, evaluation_url]
       properties:
         evaluation_id:
           type: string
@@ -1588,14 +2327,12 @@ components:
           example: APEX HOUSING FINANCE LIMITED
         evaluation_mode:
           type: string
-          enum: [FINAL, PRELIMINARY]
           example: FINAL
         result_hash:
           type: string
           example: 79385bca35358a030d61d5e12d16f6fb78b9183f2e99971aa8d82aec7dd88cfa
         final_score:
           type: number
-          format: float
           example: 40.0
         verdict:
           type: string
@@ -1605,14 +2342,422 @@ components:
           example: Low
         is_duplicate:
           type: boolean
+          default: false
           example: false
         message:
           type: string
+          default: Document processed and evaluated successfully.
           example: Filing successfully ingested, extracted, and evaluated.
         evaluation_url:
           type: string
           example: /#evaluations/APEX-HOUSING-FINANCE-LIMITED-20261006-120000Z-final-79385bca
         evaluation:
-          $ref: '#/components/schemas/EvaluationDetail'
-          nullable: true
-
+          anyOf:
+            - $ref: '#/components/schemas/EvaluationDetail'
+            - type: 'null'
+        issue_terms:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+        ingestion_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+        correlation_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+      type: object
+      required:
+        - evaluation_id
+        - ipo_id
+        - company_name
+        - evaluation_mode
+        - result_hash
+        - final_score
+        - verdict
+        - confidence
+        - evaluation_url
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      title: ValidationError
+    MarketBlockState:
+      properties:
+        block:
+          type: string
+          title: Block
+        status:
+          type: string
+          title: Status
+        as_of:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: As Of
+        source_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Source Id
+        reason:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Reason
+      type: object
+      required:
+        - block
+        - status
+      title: MarketBlockState
+      description: "One persisted market-data block state, projected read-only from\nthe evaluation record's market snapshot.
+        Status values are the\nexisting snapshot states (FRESH | STALE | MISSING); freshness is a\nstatement about the recorded
+        data's currency, not source\nqualification."
+    Body_ingest_document_api_v1_ingest_document_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+        mode:
+          type: string
+          title: Mode
+          default: final
+      type: object
+      required:
+        - file
+      title: Body_ingest_document_api_v1_ingest_document_post
+    Body_ingest_document_manual_terms_api_v1_ingest_manual_terms_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+        mode:
+          type: string
+          title: Mode
+          default: final
+        price_band_low:
+          anyOf:
+            - type: number
+            - type: 'null'
+          title: Price Band Low
+        price_band_high:
+          anyOf:
+            - type: number
+            - type: 'null'
+          title: Price Band High
+        lot_size:
+          anyOf:
+            - type: number
+            - type: 'null'
+          title: Lot Size
+        ofs:
+          anyOf:
+            - type: number
+            - type: 'null'
+          title: Ofs
+        fresh_issue:
+          anyOf:
+            - type: number
+            - type: 'null'
+          title: Fresh Issue
+        explanation:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Explanation
+        confirm_conflicts:
+          type: boolean
+          title: Confirm Conflicts
+          default: false
+      type: object
+      required:
+        - file
+      title: Body_ingest_document_manual_terms_api_v1_ingest_manual_terms_post
+    Body_start_ingestion_api_v1_ingestions_start_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+        mode:
+          type: string
+          title: Mode
+          default: final
+      type: object
+      required:
+        - file
+      title: Body_start_ingestion_api_v1_ingestions_start_post
+    IngestionEvent:
+      type: object
+      properties:
+        ingestion_id:
+          type: string
+        correlation_id:
+          type: string
+        timestamp:
+          type: string
+        stage:
+          type: string
+        event_type:
+          type: string
+        status:
+          type: string
+        message:
+          type: string
+        sequence:
+          type: integer
+        details:
+          type: object
+          additionalProperties: true
+        duration_ms:
+          anyOf:
+            - type: number
+            - type: 'null'
+        source_reference:
+          anyOf:
+            - type: string
+            - type: 'null'
+        error_code:
+          anyOf:
+            - type: string
+            - type: 'null'
+        retryable:
+          anyOf:
+            - type: boolean
+            - type: 'null'
+      required:
+        - ingestion_id
+        - correlation_id
+        - timestamp
+        - stage
+        - event_type
+        - status
+        - message
+        - sequence
+        - details
+        - duration_ms
+        - source_reference
+        - error_code
+        - retryable
+    IngestionActivity:
+      type: object
+      properties:
+        ingestion_id:
+          type: string
+        correlation_id:
+          type: string
+        filename:
+          type: string
+        mode:
+          type: string
+        status:
+          type: string
+        started_at:
+          type: string
+        contract_version:
+          type: integer
+        finished_at:
+          anyOf:
+            - type: string
+            - type: 'null'
+        evaluation_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+        evaluation_run:
+          type: boolean
+        persisted:
+          type: boolean
+        is_duplicate:
+          type: boolean
+        error_code:
+          anyOf:
+            - type: string
+            - type: 'null'
+        error_message:
+          anyOf:
+            - type: string
+            - type: 'null'
+        missing_fields:
+          type: array
+          items:
+            type: string
+        result:
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+      required:
+        - ingestion_id
+        - correlation_id
+        - filename
+        - mode
+        - status
+        - started_at
+        - contract_version
+        - finished_at
+        - evaluation_id
+        - evaluation_run
+        - persisted
+        - is_duplicate
+        - error_code
+        - error_message
+        - missing_fields
+        - result
+    IngestionActivityDetail:
+      allOf:
+        - $ref: '#/components/schemas/IngestionActivity'
+        - type: object
+          properties:
+            events:
+              type: array
+              items:
+                $ref: '#/components/schemas/IngestionEvent'
+          required:
+            - events
+    IngestionActivityList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/IngestionActivity'
+      required:
+        - items
+    IngestionEvents:
+      type: object
+      properties:
+        ingestion_id:
+          type: string
+        correlation_id:
+          type: string
+        status:
+          anyOf:
+            - type: string
+            - type: 'null'
+        evaluation_run:
+          type: boolean
+        persisted:
+          type: boolean
+        evaluation_id:
+          anyOf:
+            - type: string
+            - type: 'null'
+        error_code:
+          anyOf:
+            - type: string
+            - type: 'null'
+        missing_fields:
+          type: array
+          items:
+            type: string
+        result:
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/IngestionEvent'
+      required:
+        - ingestion_id
+        - correlation_id
+        - status
+        - evaluation_run
+        - persisted
+        - evaluation_id
+        - error_code
+        - missing_fields
+        - result
+        - events
+    IngestionStarted:
+      type: object
+      properties:
+        ingestion_id:
+          type: string
+        correlation_id:
+          type: string
+        status:
+          type: string
+        activity_url:
+          type: string
+        events_url:
+          type: string
+      required:
+        - ingestion_id
+        - correlation_id
+        - status
+        - activity_url
+        - events_url
+    EvaluationInput:
+      type: object
+      properties:
+        evaluation_id:
+          type: string
+        input:
+          type: object
+          additionalProperties: true
+      required:
+        - evaluation_id
+        - input
+    EvaluationComparison:
+      type: object
+      properties:
+        baseline:
+          allOf:
+            - $ref: '#/components/schemas/EvaluationDetail'
+            - type: object
+              properties:
+                badge:
+                  type: string
+              required:
+                - badge
+        enriched:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        scenarios:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      required:
+        - baseline
+        - enriched
+        - scenarios
