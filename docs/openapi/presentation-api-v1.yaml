@@ -1354,6 +1354,98 @@ components:
           items:
             type: object
           nullable: true
+        vintage_analysis:
+          type: array
+          items:
+            $ref: '#/components/schemas/VintageDiagnostic'
+          nullable: true
+          description: Direct projection of calendar-year vintage diagnostics from the analytics artifact
+        holdout_analysis:
+          $ref: '#/components/schemas/TemporalHoldoutResult'
+
+    VintageDiagnostic:
+      type: object
+      description: Mean return and positive-rate diagnostics for one calendar-year listing vintage
+      required: [vintage_year, n, mean_score, mean_return_1w, mean_return_1m, mean_return_6m, mean_excess_return_1w, mean_excess_return_1m, mean_excess_return_6m, positive_rate_1w, positive_rate_1m, positive_rate_6m]
+      properties:
+        vintage_year:
+          type: integer
+        n:
+          type: integer
+          minimum: 0
+        mean_score:
+          type: number
+          nullable: true
+        mean_return_1w:
+          type: number
+          nullable: true
+          description: Decimal mean absolute return
+        mean_return_1m:
+          type: number
+          nullable: true
+          description: Decimal mean absolute return
+        mean_return_6m:
+          type: number
+          nullable: true
+          description: Decimal mean absolute return
+        mean_excess_return_1w:
+          type: number
+          nullable: true
+          description: Decimal mean benchmark-relative return
+        mean_excess_return_1m:
+          type: number
+          nullable: true
+          description: Decimal mean benchmark-relative return
+        mean_excess_return_6m:
+          type: number
+          nullable: true
+          description: Decimal mean benchmark-relative return
+        positive_rate_1w:
+          type: number
+          nullable: true
+          description: Decimal fraction of listings with a positive return
+        positive_rate_1m:
+          type: number
+          nullable: true
+          description: Decimal fraction of listings with a positive return
+        positive_rate_6m:
+          type: number
+          nullable: true
+          description: Decimal fraction of listings with a positive return
+
+    TemporalHoldoutResult:
+      type: object
+      nullable: true
+      description: Direct projection of the temporal holdout diagnostic; unavailable when no sufficient holdout exists
+      required: [development_period, holdout_period, n_development, n_holdout, dev_mean_score, dev_mean_return_1w, holdout_mean_score, holdout_mean_return_1w, status]
+      properties:
+        development_period:
+          type: string
+        holdout_period:
+          type: string
+        n_development:
+          type: integer
+          minimum: 0
+        n_holdout:
+          type: integer
+          minimum: 0
+        dev_mean_score:
+          type: number
+          nullable: true
+        dev_mean_return_1w:
+          type: number
+          nullable: true
+          description: Decimal mean absolute return
+        holdout_mean_score:
+          type: number
+          nullable: true
+        holdout_mean_return_1w:
+          type: number
+          nullable: true
+          description: Decimal mean absolute return
+        status:
+          type: string
+          example: CALCULATED
 
     CalibrationProposal:
       type: object

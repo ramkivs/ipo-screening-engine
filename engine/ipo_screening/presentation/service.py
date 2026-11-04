@@ -1062,6 +1062,8 @@ class PresentationService:
             hit_rates=hit_rates if hit_rates else None,
             avoided_loss_rates=avoided_loss if avoided_loss else None,
             decile_buckets=deciles if deciles else None,
+            vintage_analysis=data.get("vintage_analysis"),
+            holdout_analysis=data.get("holdout_analysis") or None,
         )
 
     # -------------------------------------------------------------------------

@@ -350,6 +350,8 @@ class BacktestAnalyticsResponse(BaseModel):
     hit_rates: Optional[Dict[str, Any]] = None
     avoided_loss_rates: Optional[Dict[str, Any]] = None
     decile_buckets: Optional[List[Dict[str, Any]]] = None
+    vintage_analysis: Optional[List[Dict[str, Any]]] = None
+    holdout_analysis: Optional[Dict[str, Any]] = None
 
 
 class CalibrationProposal(BaseModel):
