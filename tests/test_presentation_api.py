@@ -145,6 +145,33 @@ def populated_env(tmp_path: Path, golden_input: Dict[str, Any], config: Dict[str
                 "hit_rates": {"one_week": 100.0},
                 "avoided_loss_rates": {"one_week": 100.0},
                 "decile_buckets": [],
+                "vintage_analysis": [
+                    {
+                        "vintage_year": 2024,
+                        "n": 2,
+                        "mean_score": 60.0,
+                        "mean_return_1w": 0.03,
+                        "mean_return_1m": 0.06,
+                        "mean_return_6m": None,
+                        "mean_excess_return_1w": 0.01,
+                        "mean_excess_return_1m": 0.02,
+                        "mean_excess_return_6m": None,
+                        "positive_rate_1w": 0.5,
+                        "positive_rate_1m": 1.0,
+                        "positive_rate_6m": None,
+                    }
+                ],
+                "holdout_analysis": {
+                    "development_period": "2021-01-01..2023-12-31",
+                    "holdout_period": "2024-01-01..2024-12-31",
+                    "n_development": 2,
+                    "n_holdout": 1,
+                    "dev_mean_score": 55.0,
+                    "dev_mean_return_1w": 0.025,
+                    "holdout_mean_score": 65.0,
+                    "holdout_mean_return_1w": 0.04,
+                    "status": "CALCULATED",
+                },
             }
         ),
         encoding="utf-8",
@@ -495,6 +522,52 @@ def test_get_backtest_datasets_and_analytics(populated_env):
     an_data = res_an.json()
     assert an_data["leakage_audit_passed"] is True
     assert an_data["rank_ic"]["spearman_ic"] == 0.164656
+    assert an_data["vintage_analysis"] == [
+        {
+            "vintage_year": 2024,
+            "n": 2,
+            "mean_score": 60.0,
+            "mean_return_1w": 0.03,
+            "mean_return_1m": 0.06,
+            "mean_return_6m": None,
+            "mean_excess_return_1w": 0.01,
+            "mean_excess_return_1m": 0.02,
+            "mean_excess_return_6m": None,
+            "positive_rate_1w": 0.5,
+            "positive_rate_1m": 1.0,
+            "positive_rate_6m": None,
+        }
+    ]
+    assert an_data["holdout_analysis"] == {
+        "development_period": "2021-01-01..2023-12-31",
+        "holdout_period": "2024-01-01..2024-12-31",
+        "n_development": 2,
+        "n_holdout": 1,
+        "dev_mean_score": 55.0,
+        "dev_mean_return_1w": 0.025,
+        "holdout_mean_score": 65.0,
+        "holdout_mean_return_1w": 0.04,
+        "status": "CALCULATED",
+    }
+
+
+def test_backtest_analytics_unavailable_diagnostics_project_null(tmp_path: Path):
+    analytics_file = tmp_path / "analytics.json"
+    analytics_file.write_text(json.dumps({"manifest": {}, "decile_buckets": []}), encoding="utf-8")
+    service = PresentationService(PresentationConfig(
+        store_root=tmp_path / "evaluations",
+        config_dir=Path("config"),
+        dataset_path=None,
+        analytics_path=analytics_file,
+        proposal_path=Path("config/calibration-proposal.v1.6.0.json"),
+    ))
+    client = TestClient(create_app(service), base_url="http://127.0.0.1:8000")
+
+    response = client.get("/api/v1/backtest/analytics")
+
+    assert response.status_code == 200
+    assert response.json()["vintage_analysis"] is None
+    assert response.json()["holdout_analysis"] is None
 
 
 def test_get_calibration_proposals(populated_env):

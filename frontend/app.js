@@ -1949,6 +1949,8 @@ export class App {
     const hitRates = analytics.hit_rates || null;
     const avoidedLoss = analytics.avoided_loss_rates || null;
     const deciles = analytics.decile_buckets || [];
+    const vintages = Array.isArray(analytics.vintage_analysis) ? analytics.vintage_analysis : [];
+    const holdout = analytics.holdout_analysis || null;
     const sampleMaturity = analytics.sample_maturity || {};
     const leakagePassed = Boolean(analytics.leakage_audit_passed);
     const activeVersion = config?.active_configuration?.version || '1.5.0';
@@ -2229,17 +2231,45 @@ export class App {
             <span class="meta-tag">CALENDAR COHORTS</span>
           </div>
           <div class="diagnostic-body">
-            <div class="unexposed-box">
-              <div style="font-weight: 700; color: var(--text-main); margin-bottom: 4px;">
-                Status: NOT EXPOSED IN CURRENT API SCHEMA
+            ${vintages.length > 0 ? `
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Vintage</th><th>N</th><th>Mean Score</th>
+                      <th>1W Return (decimal)</th><th>1M Return (decimal)</th><th>6M Return (decimal)</th>
+                      <th>1W Excess (decimal)</th><th>1M Excess (decimal)</th><th>6M Excess (decimal)</th>
+                      <th>1W Positive (decimal)</th><th>1M Positive (decimal)</th><th>6M Positive (decimal)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${vintages.map(v => `
+                      <tr>
+                        <td><strong>${this.escape(String(v.vintage_year ?? '—'))}</strong></td>
+                        <td><code>${this.escape(String(v.n ?? '—'))}</code></td>
+                        <td><code>${this.escape(String(v.mean_score ?? '—'))}</code></td>
+                        <td>${this.formatDecimal(v.mean_return_1w)}</td>
+                        <td>${this.formatDecimal(v.mean_return_1m)}</td>
+                        <td>${this.formatDecimal(v.mean_return_6m)}</td>
+                        <td>${this.formatDecimal(v.mean_excess_return_1w)}</td>
+                        <td>${this.formatDecimal(v.mean_excess_return_1m)}</td>
+                        <td>${this.formatDecimal(v.mean_excess_return_6m)}</td>
+                        <td>${this.formatDecimal(v.positive_rate_1w)}</td>
+                        <td>${this.formatDecimal(v.positive_rate_1m)}</td>
+                        <td>${this.formatDecimal(v.positive_rate_6m)}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
               </div>
-              <div>
-                Calendar-year vintage breakdowns (2021, 2022, 2023, 2024, 2025) are maintained in offline research datasets (<code>build/analytics/analysis.json</code>) and are not projected by the UI-1 Presentation API contract (<code>docs/openapi/presentation-api-v1.yaml</code>).
+              <div class="unexposed-box" style="margin-top: 14px;">
+                Direct projection of the backend <code>vintage_analysis</code> artifact. No cohort aggregation, interpolation, or return calculation occurs in the browser.
               </div>
-              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 6px;">
-                Fail-closed policy: The browser presentation layer does not synthesize or fabricate historical cohorts.
+            ` : `
+              <div class="unexposed-box">
+                <strong>Vintage diagnostics unavailable.</strong> The analytics artifact contains no calendar-year cohort rows. The browser does not synthesize or fabricate historical cohorts.
               </div>
-            </div>
+            `}
           </div>
         </div>
 
@@ -2250,17 +2280,39 @@ export class App {
             <span class="meta-tag">OUT-OF-SAMPLE VALIDATION</span>
           </div>
           <div class="diagnostic-body">
-            <div class="unexposed-box">
-              <div style="font-weight: 700; color: var(--text-main); margin-bottom: 4px;">
-                Status: NOT EXPOSED IN CURRENT API SCHEMA
+            ${holdout ? `
+              <div style="margin-bottom: 12px;">
+                <span class="badge ${holdout.status === 'CALCULATED' ? 'badge-clear' : 'badge-unknown'}">${this.escape(String(holdout.status || 'UNKNOWN'))}</span>
               </div>
-              <div>
-                Temporal holdout partitioning (in-sample development vs out-of-sample holdout) is maintained in offline research manifests and is not projected by the UI-1 Presentation API contract (<code>docs/openapi/presentation-api-v1.yaml</code>).
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead><tr><th>Partition</th><th>Period</th><th>N</th><th>Mean Score</th><th>1W Mean Return (decimal)</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Development</strong></td>
+                      <td>${this.escape(String(holdout.development_period || '—'))}</td>
+                      <td><code>${this.escape(String(holdout.n_development ?? '—'))}</code></td>
+                      <td><code>${this.escape(String(holdout.dev_mean_score ?? '—'))}</code></td>
+                      <td>${this.formatDecimal(holdout.dev_mean_return_1w)}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Temporal Holdout</strong></td>
+                      <td>${this.escape(String(holdout.holdout_period || '—'))}</td>
+                      <td><code>${this.escape(String(holdout.n_holdout ?? '—'))}</code></td>
+                      <td><code>${this.escape(String(holdout.holdout_mean_score ?? '—'))}</code></td>
+                      <td>${this.formatDecimal(holdout.holdout_mean_return_1w)}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 6px;">
-                Fail-closed policy: The browser presentation layer does not synthesize or fabricate holdout splits.
+              <div class="unexposed-box" style="margin-top: 14px;">
+                Direct projection of the backend <code>holdout_analysis</code> artifact. Development and holdout partitions are never inferred or recalculated in the browser.
               </div>
-            </div>
+            ` : `
+              <div class="unexposed-box">
+                <strong>Temporal holdout diagnostics unavailable.</strong> The analytics artifact contains no holdout result. The browser does not synthesize or fabricate holdout splits.
+              </div>
+            `}
           </div>
         </div>
       </div>
@@ -2417,6 +2469,15 @@ export class App {
     const num = typeof val === 'number' ? val : parseFloat(val);
     if (isNaN(num)) return `<code>${this.escape(String(val))}</code>`;
     return `<code>${num.toFixed(1)}%</code>`;
+  }
+
+  formatDecimal(val) {
+    if (val === null || val === undefined || val === '') {
+      return '<span class="badge badge-unknown">UNAVAILABLE</span>';
+    }
+    const num = typeof val === 'number' ? val : parseFloat(val);
+    if (isNaN(num)) return `<code>${this.escape(String(val))}</code>`;
+    return `<code>${num.toFixed(4)}</code>`;
   }
 
   renderMaturityBadge(status) {

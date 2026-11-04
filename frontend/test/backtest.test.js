@@ -230,27 +230,85 @@ test('UI-5 App - Decile analysis renders populated buckets when provided by auth
   assert.ok(html.includes('-6.60%'));
 });
 
-test('UI-5 App - Vintage and Holdout sections report NOT EXPOSED without synthesizing fake data', () => {
+test('UI-5 App - Vintage and Holdout sections render supplied analytics artifacts', () => {
   const app = new App();
   const mockContainer = { innerHTML: '' };
 
   app.renderBacktestContent(mockContainer, {
-    analytics: mockAnalytics,
+    analytics: {
+      ...mockAnalytics,
+      vintage_analysis: [{
+        vintage_year: 2024,
+        n: 2,
+        mean_score: 60.0,
+        mean_return_1w: 0.03,
+        mean_return_1m: 0.06,
+        mean_return_6m: null,
+        mean_excess_return_1w: 0.01,
+        mean_excess_return_1m: 0.02,
+        mean_excess_return_6m: null,
+        positive_rate_1w: 0.5,
+        positive_rate_1m: 1.0,
+        positive_rate_6m: null
+      }],
+      holdout_analysis: {
+        development_period: '2021-01-01..2023-12-31',
+        holdout_period: '2024-01-01..2024-12-31',
+        n_development: 8,
+        n_holdout: 2,
+        dev_mean_score: 55.0,
+        dev_mean_return_1w: 0.025,
+        holdout_mean_score: 65.0,
+        holdout_mean_return_1w: 0.04,
+        status: 'CALCULATED'
+      }
+    },
     datasets: mockDatasets,
     config: mockConfig
   });
 
   const html = mockContainer.innerHTML;
 
-  // Vintage stability section
   assert.ok(html.includes('Historical Vintage &amp; Cohort Stability'));
-  assert.ok(html.includes('Status: NOT EXPOSED IN CURRENT API SCHEMA'));
-  assert.ok(html.includes('Fail-closed policy: The browser presentation layer does not synthesize or fabricate historical cohorts'));
+  assert.ok(html.includes('>2024</strong>'));
+  assert.ok(html.includes('>60</code>'));
+  assert.ok(html.includes('0.0300</code>'));
+  assert.ok(html.includes('0.0100</code>'));
+  assert.ok(html.includes('0.5000</code>'));
+  assert.ok(html.includes('1.0000</code>'));
+  assert.ok(html.includes('UNAVAILABLE'));
+  assert.ok(html.includes('2021-01-01..2023-12-31'));
+  assert.ok(html.includes('2024-01-01..2024-12-31'));
+  assert.ok(html.includes('>8</code>'));
+  assert.ok(html.includes('>2</code>'));
+  assert.ok(html.includes('0.0250</code>'));
+  assert.ok(html.includes('0.0400</code>'));
+  assert.ok(html.includes('badge-clear">CALCULATED'));
+  assert.equal(html.includes('Vintage diagnostics unavailable'), false);
+  assert.equal(html.includes('Temporal holdout diagnostics unavailable'), false);
+});
 
-  // Holdout validation section
-  assert.ok(html.includes('Out-of-Sample Temporal Holdout Partition'));
-  assert.ok(html.includes('Status: NOT EXPOSED IN CURRENT API SCHEMA'));
-  assert.ok(html.includes('Fail-closed policy: The browser presentation layer does not synthesize or fabricate holdout splits'));
+test('UI-5 App - Missing Vintage and Holdout artifacts render unavailable without synthesizing data', () => {
+  const app = new App();
+  const mockContainer = { innerHTML: '' };
+
+  app.renderBacktestContent(mockContainer, {
+    analytics: {
+      ...mockAnalytics,
+      vintage_analysis: [],
+      holdout_analysis: null
+    },
+    datasets: mockDatasets,
+    config: mockConfig
+  });
+
+  const html = mockContainer.innerHTML;
+
+  assert.ok(html.includes('Vintage diagnostics unavailable'));
+  assert.ok(html.includes('Temporal holdout diagnostics unavailable'));
+  assert.ok(html.includes('does not synthesize or fabricate historical cohorts'));
+  assert.ok(html.includes('does not synthesize or fabricate holdout splits'));
+  assert.equal(html.includes('Development</strong>'), false);
 });
 
 test('UI-5 App - Point-in-Time Leakage Audit and Cryptographic Provenance panel', () => {
