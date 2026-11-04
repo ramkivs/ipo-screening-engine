@@ -24,9 +24,23 @@ actual issuer document.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
+import pytest
+
+import ipo_screening.issue_terms as issue_terms_module
 from ipo_screening.extraction.exchange_issue_page import ExchangeIssuePageParser
 from ipo_screening.issue_terms import NoticeCandidate, NoticeSnapshotCache
+
+RETRIEVED_AT = "2026-10-28T00:00:00+00:00"
+CACHE_EVAL_AT = datetime(2026, 11, 4, tzinfo=timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def pinned_notice_cache_clock(monkeypatch):
+    """Evaluate every snapshot exactly at, not beyond, the 168-hour TTL boundary."""
+    monkeypatch.setattr(issue_terms_module, "_utcnow", lambda: CACHE_EVAL_AT)
+
 
 COMPANY = "Synthetic Fixture Industries Limited"
 IPO_ID = "SYNTHETIC-FIXTURE-INDUSTRIES"
@@ -69,7 +83,7 @@ def _candidate(raw: bytes, document_class: str, uri: str, provider: str) -> Noti
         result=result,
         provider=provider,
         uri=uri,
-        retrieved_at="2026-10-28T00:00:00+00:00",
+        retrieved_at=RETRIEVED_AT,
         raw_bytes=raw,
         verified=document_class == "EXCHANGE_ISSUE_PAGE",
     )
@@ -178,7 +192,7 @@ def test_a_snapshot_with_no_extractable_terms_reads_back_without_inventing_them(
         result=result,
         provider="official-discovery",
         uri=EXCHANGE_URL,
-        retrieved_at="2026-10-28T00:00:00+00:00",
+        retrieved_at=RETRIEVED_AT,
         raw_bytes=bare,
         verified=True,
     )
